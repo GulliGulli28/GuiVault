@@ -1,0 +1,40 @@
+[package]
+name = "guivault-server"
+description = "Serveur GuiVault : coffre zero-knowledge pour hôtes, clés SSH et mots de passe, avec vaults partagés."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "guivault"
+path = "src/main.rs"
+
+[dependencies]
+guivault-crypto.workspace = true
+guivault-protocol.workspace = true
+tokio.workspace = true
+axum = { version = "0.8", features = ["macros", "http1", "json", "tokio"] }
+tower = "0.5"
+tower-http = { version = "0.6", features = ["trace", "limit", "timeout", "set-header", "cors"] }
+tower_governor = { version = "0.8", default-features = false, features = ["axum"] }
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "tls-rustls", "postgres", "migrate", "uuid", "chrono", "json", "macros", "ipnet"] }
+serde.workspace = true
+serde_json.workspace = true
+uuid.workspace = true
+base64.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+chrono = { version = "0.4", features = ["serde"] }
+argon2.workspace = true
+sha2.workspace = true
+hmac.workspace = true
+subtle.workspace = true
+getrandom.workspace = true
+zeroize.workspace = true
+
+[dev-dependencies]
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+url = "2"

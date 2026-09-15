@@ -1,0 +1,65 @@
+# GuiVault — serveur + PostgreSQL.
+#
+#   cp .env.example .env      # puis renseigner GUIVAULT_SECRET et POSTGRES_PASSWORD
+#   docker compose up -d
+#
+# Le serveur écoute en HTTP sur le port 8080 : le mettre derrière un reverse
+# proxy TLS (voir le profil `tls` plus bas, ou votre Traefik/nginx existant).
+# Ne jamais exposer 8080 directement sur Internet.
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: guivault
+      POSTGRES_USER: guivault
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?définir POSTGRES_PASSWORD dans .env}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U guivault -d guivault"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  guivault:
+    image: ghcr.io/gulligulli28/guivault:latest
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      GUIVAULT_DATABASE_URL: postgres://guivault:${POSTGRES_PASSWORD}@db:5432/guivault
+      GUIVAULT_SECRET: ${GUIVAULT_SECRET:?définir GUIVAULT_SECRET dans .env (openssl rand -base64 48)}
+      GUIVAULT_REGISTRATION: ${GUIVAULT_REGISTRATION:-invite_only}
+      GUIVAULT_ALLOWED_EMAILS: ${GUIVAULT_ALLOWED_EMAILS:-}
+      GUIVAULT_TRUST_PROXY: ${GUIVAULT_TRUST_PROXY:-false}
+      GUIVAULT_LOG_JSON: "true"
+      RUST_LOG: ${RUST_LOG:-info,sqlx=warn}
+    ports:
+      - "${GUIVAULT_PORT:-127.0.0.1:8080}:8080"
+
+  # Profil optionnel : Caddy en frontal avec certificat Let's Encrypt
+  # automatique. `docker compose --profile tls up -d` avec GUIVAULT_DOMAIN
+  # renseigné et les ports 80/443 ouverts. Dans ce cas, mettre
+  # GUIVAULT_TRUST_PROXY=true.
+  caddy:
+    image: caddy:2-alpine
+    profiles: ["tls"]
+    restart: unless-stopped
+    depends_on:
+      - guivault
+    command: caddy reverse-proxy --from ${GUIVAULT_DOMAIN:-localhost} --to guivault:8080
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - caddy-data:/data
+
+volumes:
+  db-data:
+  caddy-data:

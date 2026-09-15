@@ -1,0 +1,6 @@
+target
+.git
+.env
+docs
+*.md
+!README.md

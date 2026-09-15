@@ -1,0 +1,20 @@
+[package]
+name = "guivault-crypto"
+description = "Primitives cryptographiques partagées entre le serveur GuiVault et ses clients (Guiterm) : dérivation de clés, enveloppes symétriques, boîtes scellées."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+argon2.workspace = true
+chacha20poly1305.workspace = true
+crypto_box.workspace = true
+hkdf.workspace = true
+sha2.workspace = true
+hmac.workspace = true
+subtle.workspace = true
+zeroize.workspace = true
+base64.workspace = true
+serde.workspace = true
+thiserror.workspace = true

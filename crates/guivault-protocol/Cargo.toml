@@ -1,0 +1,17 @@
+[package]
+name = "guivault-protocol"
+description = "Types de l'API GuiVault (requêtes/réponses JSON), partagés entre serveur et clients."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+serde.workspace = true
+uuid.workspace = true
+base64.workspace = true
+guivault-crypto.workspace = true
+chrono = { version = "0.4", features = ["serde"] }
+
+[dev-dependencies]
+serde_json.workspace = true
