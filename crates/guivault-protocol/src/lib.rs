@@ -147,6 +147,61 @@ pub struct LoginResponse {
     pub protected_private_key: Vec<u8>,
 }
 
+/// Réponse `202` de `/auth/login` quand le compte a un second facteur : le
+/// mot de passe est bon, il manque le code. `totp_token` est opaque et
+/// expire en quelques minutes ; il s'échange contre une session sur
+/// `/auth/totp/verify`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TotpChallenge {
+    pub totp_token: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TotpVerifyRequest {
+    pub totp_token: String,
+    /// Code à 6 chiffres, ou un code de récupération.
+    pub code: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TotpStatus {
+    pub enabled: bool,
+}
+
+/// Secret fraîchement généré, pas encore actif : l'utilisateur l'enregistre
+/// dans son application puis prouve qu'il y arrive (`/auth/totp/enable`).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TotpSetupResponse {
+    /// Secret en base32, à saisir à la main dans l'application.
+    pub secret: String,
+    /// `otpauth://totp/...`, à encoder en QR côté client si désiré.
+    pub otpauth_url: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TotpCodeRequest {
+    pub code: String,
+}
+
+/// Codes de récupération, montrés **une seule fois**.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TotpEnableResponse {
+    pub recovery_codes: Vec<String>,
+}
+
+/// Notification poussée sur `GET /events` (SSE). Dit *que* quelque chose a
+/// changé, jamais *quoi* : le client resynchronise.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum ServerEvent {
+    /// Un item a été écrit ou supprimé, ou la clé a tourné.
+    VaultChanged { vault_id: Uuid, revision: i64 },
+    /// Une invitation vous attend.
+    InvitationReceived { invitation_id: Uuid, vault_id: Uuid },
+    /// Vous avez été ajouté, retiré, ou votre rôle a changé.
+    MembershipChanged { vault_id: Uuid },
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RefreshRequest {
     pub refresh_token: String,

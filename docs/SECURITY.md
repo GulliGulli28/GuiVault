@@ -15,6 +15,7 @@ chiffrées.
 | Serveur malveillant qui **modifie** des données | Chaque blob est AEAD. L'AAD lie un item à son vault, son id et son type : un item déplacé, renommé ou substitué ne s'ouvre plus. |
 | Serveur malveillant qui **rejoue** une ancienne version d'un item | Non couvert cryptographiquement (voir « Limites »). Le client peut détecter un retour en arrière de `revision`. |
 | Serveur malveillant qui **substitue une clé publique** pour lire un vault partagé | C'est l'attaque principale contre tout système de partage E2E. Défense : l'**empreinte** de la clé publique (`fingerprint`) est renvoyée partout où une clé publique apparaît ; le client DOIT l'afficher et demander une vérification hors bande (voix, messagerie interne) avant le premier partage vers une personne, puis épingler la clé (TOFU) et alerter si elle change. |
+| Vol du mot de passe maître seul (hameçonnage, épaule) | Second facteur TOTP optionnel : sans le code, pas de session. Ne protège pas contre un vol de mot de passe **plus** un dump de base. |
 | Vol d'un jeton d'accès | Durée 15 min. Révocable (sessions). |
 | Vol d'un jeton de rafraîchissement | Rotation à chaque usage ; le rejeu de l'ancien révoque la session entière. |
 | Force brute sur le mot de passe (en ligne) | Rate-limit par IP sur `/auth/*` ; réponses 401 uniformes ; hachage à coût constant même pour un e-mail inconnu (pas de différence de temps mesurable). |
@@ -51,7 +52,10 @@ partage 12 hôtes et 3 clés avec Bob », jamais lesquels.
   mot de passe maître. Rien côté serveur n'y peut quoi que ce soit.
 - **Le mot de passe maître est irrécupérable.** Pas de réinitialisation, par
   construction.
-- **Pas de 2FA** pour l'instant (voir `ARCHITECTURE.md`).
+- **Le second facteur TOTP protège la session, pas les données.** Son
+  secret est déchiffrable par le serveur (il doit vérifier les codes) : un
+  serveur compromis peut le lire — mais un serveur compromis n'a de toute
+  façon rien d'autre à lire.
 - **`users/lookup` et le 409 d'inscription** confirment l'existence d'un
   compte à un utilisateur authentifié (lookup) ou à n'importe qui (409).
   Acceptable pour un serveur d'équipe ; à revoir avant une offre publique

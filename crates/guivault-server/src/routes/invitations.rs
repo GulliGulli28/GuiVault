@@ -16,7 +16,7 @@ use crate::validate;
 use axum::Json;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
-use guivault_protocol::{CompleteInvitationRequest, CreateInvitationRequest, Invitation, Role};
+use guivault_protocol::{CompleteInvitationRequest, CreateInvitationRequest, Invitation, Role, ServerEvent};
 use uuid::Uuid;
 
 async fn fetch<'e>(db: impl sqlx::PgExecutor<'e>, id: Uuid) -> ApiResult<InvitationRow> {
@@ -113,6 +113,15 @@ pub async fn create(
         .await?;
     let row = fetch(&mut *tx, id).await?;
     tx.commit().await?;
+    if let Some(inv) = &invitee {
+        state.events.publish(
+            vec![inv.id],
+            ServerEvent::InvitationReceived {
+                invitation_id: id,
+                vault_id,
+            },
+        );
+    }
     Ok((StatusCode::CREATED, Json(row.into())))
 }
 
@@ -242,6 +251,15 @@ pub async fn accept(
     }
     let row = fetch(&mut *tx, id).await?;
     tx.commit().await?;
+    // Les admins voient l'invitation avancer (clé à fournir, ou nouveau membre).
+    state
+        .events
+        .vault(
+            &state.db,
+            inv.vault_id,
+            ServerEvent::MembershipChanged { vault_id: inv.vault_id },
+        )
+        .await?;
     Ok(Json(row.into()))
 }
 
@@ -332,5 +350,9 @@ pub async fn complete(
         .await?;
     let row = fetch(&mut *tx, id).await?;
     tx.commit().await?;
+    state.events.publish(
+        vec![invitee.id],
+        ServerEvent::MembershipChanged { vault_id: inv.vault_id },
+    );
     Ok(Json(row.into()))
 }

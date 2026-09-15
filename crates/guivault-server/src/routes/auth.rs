@@ -216,12 +216,15 @@ struct LoginRow {
 const DUMMY_HASH: &str =
     "$argon2id$v=19$m=19456,t=2,p=1$Z3VpdmF1bHQtZHVtbXktc2FsdA$0000000000000000000000000000000000000000000";
 
+/// `200` avec la session, ou `202` avec un défi TOTP si le compte a un
+/// second facteur (voir `routes::totp::verify`).
 pub async fn login(
     State(state): State<AppState>,
     ClientIp(ip): ClientIp,
     headers: HeaderMap,
     Json(req): Json<LoginRequest>,
-) -> ApiResult<Json<LoginResponse>> {
+) -> ApiResult<axum::response::Response> {
+    use axum::response::IntoResponse;
     let email = validate::normalize_email(&req.email)?;
     validate::auth_key(&req.auth_key)?;
 
@@ -255,6 +258,12 @@ pub async fn login(
         ));
     };
 
+    if super::totp::is_enabled(&state.db, row.id).await? {
+        let challenge =
+            super::totp::issue_challenge(&state.db, row.id, validate::device_name(req.device_name), ip).await?;
+        return Ok((StatusCode::ACCEPTED, Json(challenge)).into_response());
+    }
+
     let mut tx = state.db.begin().await?;
     let (_, tokens) = sessions::create(
         &mut *tx,
@@ -280,7 +289,8 @@ pub async fn login(
         },
         protected_user_key: row.protected_user_key,
         protected_private_key: row.protected_private_key,
-    }))
+    })
+    .into_response())
 }
 
 pub async fn refresh(State(state): State<AppState>, Json(req): Json<RefreshRequest>) -> ApiResult<Json<TokenPair>> {

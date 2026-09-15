@@ -8,7 +8,7 @@ use crate::validate;
 use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use guivault_protocol::{Item, ItemsPage, PutItemRequest, Role};
+use guivault_protocol::{Item, ItemsPage, PutItemRequest, Role, ServerEvent};
 use serde::Deserialize;
 use uuid::Uuid;
 
@@ -142,6 +142,17 @@ pub async fn put(
         .write(&mut *tx)
         .await?;
     tx.commit().await?;
+    state
+        .events
+        .vault(
+            &state.db,
+            vault_id,
+            ServerEvent::VaultChanged {
+                vault_id,
+                revision: rev,
+            },
+        )
+        .await?;
 
     Ok((
         if created { StatusCode::CREATED } else { StatusCode::OK },
@@ -186,5 +197,16 @@ pub async fn delete(
         .write(&mut *tx)
         .await?;
     tx.commit().await?;
+    state
+        .events
+        .vault(
+            &state.db,
+            vault_id,
+            ServerEvent::VaultChanged {
+                vault_id,
+                revision: rev,
+            },
+        )
+        .await?;
     Ok(StatusCode::NO_CONTENT)
 }

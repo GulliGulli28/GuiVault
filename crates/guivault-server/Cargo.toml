@@ -34,7 +34,17 @@ hmac.workspace = true
 subtle.workspace = true
 getrandom.workspace = true
 zeroize.workspace = true
+# 2FA : TOTP RFC 6238 + URL otpauth (pas la feature `qr`, le client encode
+# lui-même s'il veut un QR code).
+totp-rs = { version = "5", features = ["otpauth"] }
+hkdf.workspace = true
+# `GET /events` : un flux SSE par client branché sur un canal broadcast.
+tokio-stream = { version = "0.1", features = ["sync"] }
+futures-util = "0.3"
 
 [dev-dependencies]
-reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream"] }
 url = "2"
+futures-util = "0.3"
+bytes = "1"
+totp-rs = { version = "5", features = ["otpauth"] }

@@ -53,6 +53,7 @@ impl TestServer {
             registration,
             allowed_emails: vec!["alice@t.io".into()],
             secret: b"test-secret-test-secret-test-secret-test".to_vec(),
+            totp_key: Config::derive_totp_key(b"test-secret-test-secret-test-secret-test"),
             access_ttl: Duration::from_secs(900),
             refresh_ttl: Duration::from_secs(86400),
             invitation_ttl: Duration::from_secs(86400),
@@ -1102,6 +1103,300 @@ async fn auth_routes_are_rate_limited_per_ip() {
     status!(
         http.get(format!("{}/health", server.base)).send().await.unwrap(),
         StatusCode::OK
+    );
+    server.stop().await;
+}
+
+#[tokio::test]
+async fn totp_second_factor_and_recovery_codes() {
+    let Some(server) = TestServer::start(RegistrationMode::Open).await else {
+        return;
+    };
+    let alice = User::register(&server, "alice@t.io", "pw").await;
+    let st: TotpStatus = alice.get("/auth/totp").await;
+    assert!(!st.enabled);
+
+    let body = status!(
+        alice
+            .req(reqwest::Method::POST, "/auth/totp/setup")
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::OK
+    );
+    let setup: TotpSetupResponse = serde_json::from_str(&body).unwrap();
+    assert!(
+        setup.otpauth_url.starts_with("otpauth://totp/GuiVault:alice%40t.io?")
+            || setup.otpauth_url.contains("issuer=GuiVault"),
+        "{}",
+        setup.otpauth_url
+    );
+    let totp = totp_rs::TOTP::new(
+        totp_rs::Algorithm::SHA1,
+        6,
+        1,
+        30,
+        totp_rs::Secret::Encoded(setup.secret.clone()).to_bytes().unwrap(),
+        Some("GuiVault".into()),
+        "alice@t.io".into(),
+    )
+    .unwrap();
+
+    // Tant que rien n'est confirmé, la connexion reste en une étape.
+    User::login(&server, "alice@t.io", "pw").await.unwrap();
+    status!(
+        alice
+            .req(reqwest::Method::POST, "/auth/totp/enable")
+            .json(&TotpCodeRequest { code: "000000".into() })
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::UNAUTHORIZED
+    );
+    let body = status!(
+        alice
+            .req(reqwest::Method::POST, "/auth/totp/enable")
+            .json(&TotpCodeRequest {
+                code: totp.generate_current().unwrap()
+            })
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::OK
+    );
+    let enabled: TotpEnableResponse = serde_json::from_str(&body).unwrap();
+    assert_eq!(enabled.recovery_codes.len(), 8);
+    let st: TotpStatus = alice.get("/auth/totp").await;
+    assert!(st.enabled);
+
+    // Connexion en deux temps : 202 + défi, puis le code.
+    let http = Client::new();
+    let pre: PreloginResponse = http
+        .post(format!("{}/auth/prelogin", server.base))
+        .json(&PreloginRequest {
+            email: "alice@t.io".into(),
+        })
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    let lm = gc::prepare_login("pw", &pre.kdf_salt, pre.kdf).unwrap();
+    let login = || {
+        http.post(format!("{}/auth/login", server.base)).json(&LoginRequest {
+            email: "alice@t.io".into(),
+            auth_key: lm.auth_key.as_bytes().to_vec(),
+            device_name: Some("phone".into()),
+        })
+    };
+    let body = status!(login().send().await.unwrap(), StatusCode::ACCEPTED);
+    let ch: TotpChallenge = serde_json::from_str(&body).unwrap();
+    let verify = |token: String, code: String| {
+        http.post(format!("{}/auth/totp/verify", server.base))
+            .json(&TotpVerifyRequest {
+                totp_token: token,
+                code,
+            })
+    };
+    status!(
+        verify(ch.totp_token.clone(), "123456".into()).send().await.unwrap(),
+        StatusCode::UNAUTHORIZED
+    );
+    let body = status!(
+        verify(ch.totp_token.clone(), totp.generate_current().unwrap())
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::OK
+    );
+    let session: LoginResponse = serde_json::from_str(&body).unwrap();
+    assert_eq!(session.user.email, "alice@t.io");
+    // Le défi est consommé.
+    status!(
+        verify(ch.totp_token, totp.generate_current().unwrap())
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::UNAUTHORIZED
+    );
+    // La session obtenue marche, et son appareil est celui du premier temps.
+    let sessions: Vec<Session> = http
+        .get(format!("{}/auth/sessions", server.base))
+        .bearer_auth(&session.tokens.access_token)
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert!(
+        sessions
+            .iter()
+            .any(|s| s.current && s.device_name.as_deref() == Some("phone"))
+    );
+
+    // Code de récupération : une fois, pas deux.
+    let body = status!(login().send().await.unwrap(), StatusCode::ACCEPTED);
+    let ch: TotpChallenge = serde_json::from_str(&body).unwrap();
+    let rc = enabled.recovery_codes[0].clone();
+    status!(
+        verify(ch.totp_token, rc.to_uppercase()).send().await.unwrap(),
+        StatusCode::OK
+    );
+    let body = status!(login().send().await.unwrap(), StatusCode::ACCEPTED);
+    let ch: TotpChallenge = serde_json::from_str(&body).unwrap();
+    status!(
+        verify(ch.totp_token.clone(), rc).send().await.unwrap(),
+        StatusCode::UNAUTHORIZED
+    );
+    // Cinq échecs et le défi meurt.
+    for _ in 0..4 {
+        status!(
+            verify(ch.totp_token.clone(), "000000".into()).send().await.unwrap(),
+            StatusCode::UNAUTHORIZED
+        );
+    }
+    let body = status!(
+        verify(ch.totp_token, totp.generate_current().unwrap())
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::UNAUTHORIZED
+    );
+    assert!(body.contains("challenge_expired"), "{body}");
+
+    // Désactivation avec un code, puis connexion en une étape.
+    status!(
+        alice
+            .req(reqwest::Method::POST, "/auth/totp/disable")
+            .json(&TotpCodeRequest {
+                code: totp.generate_current().unwrap()
+            })
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::NO_CONTENT
+    );
+    status!(login().send().await.unwrap(), StatusCode::OK);
+    server.stop().await;
+}
+
+#[tokio::test]
+async fn events_stream_notifies_vault_members() {
+    use futures_util::StreamExt;
+    let Some(server) = TestServer::start(RegistrationMode::Open).await else {
+        return;
+    };
+    let alice = User::register(&server, "alice@t.io", "pw-a").await;
+    let bob = User::register(&server, "bob@t.io", "pw-b").await;
+    let (vault, vkey) = alice.create_vault("Ops").await;
+    let lookup: UserLookupResponse = alice.get("/users/lookup?email=bob@t.io").await;
+    let bob_pk = gc::PublicKey::try_from(lookup.public_key.as_slice()).unwrap();
+
+    // Bob écoute avant que quoi que ce soit n'arrive.
+    let resp = bob.req(reqwest::Method::GET, "/events").send().await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    assert!(
+        resp.headers()
+            .get("content-type")
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .starts_with("text/event-stream")
+    );
+    let mut stream = resp.bytes_stream();
+    let mut buf = String::new();
+    // Lit jusqu'à une ligne `data:` complète (ignore les `: ping`).
+    async fn next_event<S>(stream: &mut S, buf: &mut String) -> ServerEvent
+    where
+        S: futures_util::Stream<Item = reqwest::Result<bytes::Bytes>> + Unpin,
+    {
+        loop {
+            if let Some(pos) = buf.find("\n\n") {
+                let block = buf[..pos].to_string();
+                buf.replace_range(..pos + 2, "");
+                if let Some(data) = block.lines().find_map(|l| l.strip_prefix("data:")) {
+                    return serde_json::from_str::<ServerEvent>(data.trim()).unwrap();
+                }
+                continue;
+            }
+            let chunk = tokio::time::timeout(Duration::from_secs(10), stream.next())
+                .await
+                .expect("événement attendu")
+                .unwrap()
+                .unwrap();
+            buf.push_str(std::str::from_utf8(&chunk).unwrap());
+        }
+    }
+
+    // Invitation → Bob est prévenu.
+    let body = status!(
+        alice
+            .req(reqwest::Method::POST, &format!("/vaults/{}/invitations", vault.id))
+            .json(&CreateInvitationRequest {
+                email: "bob@t.io".into(),
+                role: Role::Writer,
+                wrapped_vault_key: Some(gc::wrap_vault_key(&bob_pk, &vkey).unwrap())
+            })
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::CREATED
+    );
+    let inv: Invitation = serde_json::from_str(&body).unwrap();
+    assert_eq!(
+        next_event(&mut stream, &mut buf).await,
+        ServerEvent::InvitationReceived {
+            invitation_id: inv.id,
+            vault_id: vault.id
+        }
+    );
+
+    // Acceptation → les membres (dont Bob lui-même, désormais) sont prévenus.
+    status!(
+        bob.req(reqwest::Method::POST, &format!("/invitations/{}/accept", inv.id))
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::OK
+    );
+    assert_eq!(
+        next_event(&mut stream, &mut buf).await,
+        ServerEvent::MembershipChanged { vault_id: vault.id }
+    );
+
+    // Écriture d'Alice → Bob reçoit la nouvelle révision.
+    status!(
+        alice.put_item(vault.id, &vkey, Uuid::new_v4(), "host", "x", None).await,
+        StatusCode::CREATED
+    );
+    assert_eq!(
+        next_event(&mut stream, &mut buf).await,
+        ServerEvent::VaultChanged {
+            vault_id: vault.id,
+            revision: 1
+        }
+    );
+
+    // Un vault dont Bob n'est pas membre ne le concerne pas : rien ne vient
+    // (le prochain événement est celui de la suppression de son vault).
+    let (other, okey) = alice.create_vault("Privé").await;
+    status!(
+        alice.put_item(other.id, &okey, Uuid::new_v4(), "host", "y", None).await,
+        StatusCode::CREATED
+    );
+    status!(
+        alice
+            .req(reqwest::Method::DELETE, &format!("/vaults/{}", vault.id))
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::NO_CONTENT
+    );
+    assert_eq!(
+        next_event(&mut stream, &mut buf).await,
+        ServerEvent::MembershipChanged { vault_id: vault.id }
     );
     server.stop().await;
 }

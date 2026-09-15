@@ -152,14 +152,33 @@ membre de quel vault avec quel rôle, nombre et types d'items, dates de
 modification, IP et user-agent des sessions, journal d'audit. **Jamais** :
 un nom de vault, un nom d'hôte, un identifiant, une clé, un mot de passe.
 
+## Second facteur (TOTP)
+
+Optionnel, par utilisateur. Le secret (RFC 6238, SHA-1, 6 chiffres, 30 s)
+est chiffré au repos sous une clé HKDF du secret serveur (AAD = id
+utilisateur) : un dump de base ne fabrique pas de codes. Huit codes de
+récupération hachés (salés par le secret serveur), à usage unique.
+
+Connexion en deux temps : `/auth/login` répond `202` avec un jeton de défi
+(5 min, 5 essais) au lieu de la session ; `/auth/totp/verify` l'échange
+contre la session. Activer le second facteur révoque les autres sessions.
+
+Ce que ça protège : la **session**. Un attaquant avec le mot de passe
+maître *et* un dump de base a tout, 2FA ou pas — voir `SECURITY.md`.
+
+## Notifications temps réel
+
+`GET /events` est un flux SSE. Un canal broadcast en mémoire (256
+événements de profondeur) reçoit chaque écriture d'item, rotation,
+changement d'appartenance et invitation, avec ses destinataires ; le flux
+de chaque utilisateur filtre les siens. L'événement dit *que* quelque chose
+a changé (`vault_changed` porte la révision), jamais quoi : le client
+resynchronise. Rien n'est persisté — un client déconnecté rate des
+événements et compare les révisions à la reconnexion, comme avant.
+
 ## Ce qui n'est pas encore là
 
-- **2FA (TOTP / WebAuthn)** : le schéma n'a pas encore de table pour ça.
-  Note : un second facteur protège la *session*, pas les données — un
-  attaquant qui a le mot de passe maître et un dump de base a tout, 2FA ou
-  pas. Il reste utile contre le vol d'un jeton ou d'un mot de passe seul.
-- **Notifications temps réel** (SSE/WebSocket pour « quelqu'un a modifié
-  le vault ») : aujourd'hui, le client sonde `GET /sync`.
+- **WebAuthn / clés de sécurité** en second facteur.
 - **Web UI d'administration** : tout passe par Guiterm.
 - **Emails** d'invitation : l'invitation est visible dans le client de
   l'invité ; rien n'est envoyé par courrier.

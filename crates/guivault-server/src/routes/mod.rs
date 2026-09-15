@@ -15,10 +15,12 @@ use tower_http::trace::TraceLayer;
 
 pub mod audit;
 pub mod auth;
+pub mod events;
 pub mod health;
 pub mod invitations;
 pub mod items;
 pub mod sync;
+pub mod totp;
 pub mod users;
 pub mod vaults;
 
@@ -41,6 +43,7 @@ pub fn router(state: AppState) -> Router {
         .route("/auth/register", post(auth::register))
         .route("/auth/login", post(auth::login))
         .route("/auth/refresh", post(auth::refresh))
+        .route("/auth/totp/verify", post(totp::verify))
         .layer(GovernorLayer::new(Arc::new(governor)));
 
     let api = Router::new()
@@ -50,6 +53,11 @@ pub fn router(state: AppState) -> Router {
         .route("/auth/password", post(auth::change_password))
         .route("/auth/sessions", get(auth::list_sessions))
         .route("/auth/sessions/{id}", delete(auth::revoke_session))
+        .route("/auth/totp", get(totp::status))
+        .route("/auth/totp/setup", post(totp::setup))
+        .route("/auth/totp/enable", post(totp::enable))
+        .route("/auth/totp/disable", post(totp::disable))
+        .route("/events", get(events::events))
         .route("/users/me", get(users::me))
         .route("/users/me/audit", get(audit::for_me))
         .route("/users/lookup", get(users::lookup))

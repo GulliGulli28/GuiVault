@@ -10,8 +10,8 @@ use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use chrono::{DateTime, Utc};
 use guivault_protocol::{
-    AddMemberRequest, CreateVaultRequest, RenameVaultRequest, Role, RotateVaultKeyRequest, UpdateMemberRequest, Vault,
-    VaultMember,
+    AddMemberRequest, CreateVaultRequest, RenameVaultRequest, Role, RotateVaultKeyRequest, ServerEvent,
+    UpdateMemberRequest, Vault, VaultMember,
 };
 use uuid::Uuid;
 
@@ -104,6 +104,10 @@ pub async fn delete(
     if v.kind == "personal" {
         return Err(AppError::forbidden("le vault personnel ne peut pas être supprimé"));
     }
+    let members: Vec<(Uuid,)> = sqlx::query_as("SELECT user_id FROM vault_members WHERE vault_id = $1")
+        .bind(vault_id)
+        .fetch_all(&state.db)
+        .await?;
     let mut tx = state.db.begin().await?;
     sqlx::query("DELETE FROM vaults WHERE id = $1")
         .bind(vault_id)
@@ -116,6 +120,10 @@ pub async fn delete(
         .write(&mut *tx)
         .await?;
     tx.commit().await?;
+    state.events.publish(
+        members.into_iter().map(|(u,)| u).collect(),
+        ServerEvent::MembershipChanged { vault_id },
+    );
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -232,6 +240,9 @@ pub async fn add_member(
     .fetch_one(&mut *tx)
     .await?;
     tx.commit().await?;
+    state
+        .events
+        .publish(vec![req.user_id], ServerEvent::MembershipChanged { vault_id });
     Ok((StatusCode::CREATED, Json(row.into())))
 }
 
@@ -266,6 +277,9 @@ pub async fn update_member(
         .meta(serde_json::json!({ "role": req.role }))
         .write(&state.db)
         .await?;
+    state
+        .events
+        .publish(vec![member_id], ServerEvent::MembershipChanged { vault_id });
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -301,6 +315,9 @@ pub async fn remove_member(
         .ip(ip)
         .write(&state.db)
         .await?;
+    state
+        .events
+        .publish(vec![member_id], ServerEvent::MembershipChanged { vault_id });
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -363,6 +380,9 @@ pub async fn transfer_ownership(
         .write(&mut *tx)
         .await?;
     tx.commit().await?;
+    state
+        .events
+        .publish(vec![member_id], ServerEvent::MembershipChanged { vault_id });
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -481,5 +501,16 @@ pub async fn rotate_key(
         .await?;
     let row = db::vault_for_user(&mut *tx, user.id, vault_id).await?;
     tx.commit().await?;
+    state
+        .events
+        .vault(
+            &state.db,
+            vault_id,
+            ServerEvent::VaultChanged {
+                vault_id,
+                revision: rev,
+            },
+        )
+        .await?;
     Ok(Json(row.into_proto()))
 }

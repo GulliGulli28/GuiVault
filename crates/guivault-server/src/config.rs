@@ -18,6 +18,8 @@ pub struct Config {
     /// Secret serveur (≥ 32 octets) : sert de clé HMAC pour les sels de
     /// prelogin fictifs (voir `routes::auth::prelogin`). Ne chiffre rien.
     pub secret: Vec<u8>,
+    /// Clé de chiffrement au repos des secrets TOTP, dérivée de `secret`.
+    pub totp_key: guivault_crypto::SymmetricKey,
     pub access_ttl: Duration,
     pub refresh_ttl: Duration,
     pub invitation_ttl: Duration,
@@ -81,6 +83,7 @@ impl Config {
             bind: env_parse("GUIVAULT_BIND", "0.0.0.0:8080".parse()?)?,
             registration,
             allowed_emails,
+            totp_key: Self::derive_totp_key(&secret),
             secret,
             access_ttl: Duration::from_secs(env_parse("GUIVAULT_ACCESS_TTL_SECS", 15 * 60)?),
             refresh_ttl: Duration::from_secs(env_parse("GUIVAULT_REFRESH_TTL_SECS", 30 * 24 * 3600)?),
@@ -95,6 +98,18 @@ impl Config {
 }
 
 impl Config {
+    /// HKDF-SHA256 du secret serveur, étiquette dédiée : changer le secret
+    /// rend les secrets TOTP illisibles (les utilisateurs réenrôlent).
+    pub fn derive_totp_key(secret: &[u8]) -> guivault_crypto::SymmetricKey {
+        use hkdf::Hkdf;
+        use sha2::Sha256;
+        let hk = Hkdf::<Sha256>::new(None, secret);
+        let mut out = [0u8; 32];
+        hk.expand(b"guivault/v1/totp-at-rest", &mut out)
+            .expect("32 octets est une longueur HKDF valide");
+        guivault_crypto::SymmetricKey::from_bytes(out)
+    }
+
     /// `email` est déjà normalisé (minuscules, sans espaces).
     pub fn is_email_allowlisted(&self, email: &str) -> bool {
         self.allowed_emails.iter().any(|a| {
@@ -119,6 +134,7 @@ mod tests {
             registration: RegistrationMode::Closed,
             allowed_emails: vec!["admin@corp.io".into(), "@team.example".into()],
             secret: vec![],
+            totp_key: Config::derive_totp_key(b"x"),
             access_ttl: Duration::ZERO,
             refresh_ttl: Duration::ZERO,
             invitation_ttl: Duration::ZERO,

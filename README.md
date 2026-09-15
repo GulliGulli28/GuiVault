@@ -15,7 +15,9 @@ serveur puisse jamais lire un secret.
   télécharger que ce qui a changé, verrou optimiste (409) sur les conflits,
   pierres tombales pour les suppressions.
 - **Sessions** : jetons opaques hachés, rotation des jetons de
-  rafraîchissement avec détection de rejeu, révocation à distance.
+  rafraîchissement avec détection de rejeu, révocation à distance, second
+  facteur TOTP optionnel avec codes de récupération.
+- **Temps réel** : un flux SSE prévient les clients qu'un vault a changé.
 - **Audit** : journal en ajout seul par vault et par utilisateur.
 - **Une seule image Docker**, Rust/axum/PostgreSQL. Même stack que Guiterm.
 

@@ -9,6 +9,7 @@ pub mod auth;
 pub mod config;
 pub mod db;
 pub mod error;
+pub mod events;
 pub mod routes;
 pub mod sessions;
 pub mod state;
@@ -36,6 +37,7 @@ pub fn app(config: Config, db: sqlx::PgPool) -> axum::Router {
     routes::router(AppState {
         db,
         config: Arc::new(config),
+        events: events::Broadcaster::new(),
     })
 }
 

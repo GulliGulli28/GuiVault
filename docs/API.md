@@ -11,7 +11,8 @@ Erreurs : `{ "code": "…", "message": "…" }` (+ champs selon le code, ex.
 `invitation_required`, `email_taken`, `vault_id_taken`, `revision_mismatch`,
 `item_type_changed`, `item_too_large`, `already_member`,
 `already_invited`, `not_pending`, `invitee_has_no_key`,
-`invitee_not_registered`, `incomplete_rotation`, `unknown_member`,
+`invitee_not_registered`, `totp_already_enabled`, `totp_not_setup`,
+`totp_not_enabled`, `invalid_code`, `challenge_expired`, `incomplete_rotation`, `unknown_member`,
 `unknown_item`, `invalid_*`, `internal`.
 
 ## Santé
@@ -26,7 +27,8 @@ Erreurs : `{ "code": "…", "message": "…" }` (+ champs selon le code, ex.
 |---|---|
 | `POST /auth/prelogin` | `{ email }` → `{ kdf, kdf_salt }` (déterministe même pour un inconnu) |
 | `POST /auth/register` | matériel de compte + `personal_vault` → `201` `LoginResponse` |
-| `POST /auth/login` | `{ email, auth_key, device_name? }` → `LoginResponse` (`access_token`, `refresh_token`, `user`, `protected_user_key`, `protected_private_key`) |
+| `POST /auth/login` | `{ email, auth_key, device_name? }` → `200` `LoginResponse` (`access_token`, `refresh_token`, `user`, `protected_user_key`, `protected_private_key`) — ou `202` `TotpChallenge { totp_token }` si le compte a un second facteur |
+| `POST /auth/totp/verify` | `{ totp_token, code }` → `LoginResponse` (code à 6 chiffres ou code de récupération ; 5 essais, 5 min) |
 | `POST /auth/refresh` | `{ refresh_token }` → `TokenPair` (rotation) |
 
 ## Session (authentifié)
@@ -37,6 +39,11 @@ Erreurs : `{ "code": "…", "message": "…" }` (+ champs selon le code, ex.
 | `POST /auth/password` | `ChangePasswordRequest` → `204`, autres sessions révoquées |
 | `GET /auth/sessions` | `[Session]` |
 | `DELETE /auth/sessions/{id}` | révoque |
+| `GET /auth/totp` | `{ enabled }` |
+| `POST /auth/totp/setup` | → `{ secret, otpauth_url }` (en attente jusqu'à `enable`) |
+| `POST /auth/totp/enable` | `{ code }` → `{ recovery_codes }` (8, montrés une seule fois ; autres sessions révoquées) |
+| `POST /auth/totp/disable` | `{ code }` (TOTP ou récupération) → `204` |
+| `GET /events` | flux SSE de `ServerEvent` (`vault_changed`, `invitation_received`, `membership_changed`) — dit *que* quelque chose a changé, le client resynchronise |
 | `GET /users/me` | `UserProfile` |
 | `GET /users/me/audit?limit=&before=` | mes actions |
 | `GET /users/lookup?email=` | `{ id, email, public_key, fingerprint }` |
