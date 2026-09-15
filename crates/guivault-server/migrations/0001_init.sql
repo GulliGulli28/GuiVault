@@ -67,8 +67,12 @@ CREATE INDEX vault_members_user_idx ON vault_members(user_id);
 -- Un seul propriétaire par vault.
 CREATE UNIQUE INDEX vault_members_one_owner ON vault_members(vault_id) WHERE role = 'owner';
 
+-- L'identifiant d'un item est choisi par le client et n'a de sens que dans
+-- son vault (il est dans l'AAD du chiffré) : clé primaire composite, pour
+-- qu'un déplacement d'un vault à l'autre laisse une tombale dans l'ancien et
+-- crée l'item dans le nouveau sous le même id.
 CREATE TABLE items (
-    id          uuid PRIMARY KEY,
+    id          uuid NOT NULL,
     vault_id    uuid NOT NULL REFERENCES vaults(id) ON DELETE CASCADE,
     item_type   text NOT NULL,
     -- Révision du vault au moment de la dernière écriture de cet item.
@@ -77,7 +81,8 @@ CREATE TABLE items (
     created_at  timestamptz NOT NULL DEFAULT now(),
     updated_at  timestamptz NOT NULL DEFAULT now(),
     -- Pierre tombale : conservée pour que les autres clients suppriment aussi.
-    deleted_at  timestamptz
+    deleted_at  timestamptz,
+    PRIMARY KEY (vault_id, id)
 );
 CREATE INDEX items_vault_revision_idx ON items(vault_id, revision);
 

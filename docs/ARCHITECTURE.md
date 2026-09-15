@@ -100,7 +100,11 @@ Protocole client :
    les deux versions, fusionne (ou demande à l'utilisateur), réessaie.
 
 Les ids d'items et de vaults sont choisis **par le client** (UUID v4) :
-ils font partie de l'AAD, il faut les connaître avant de chiffrer.
+ils font partie de l'AAD, il faut les connaître avant de chiffrer. Un id
+d'item n'a de sens que dans son vault (clé primaire `(vault_id, id)`) :
+déplacer une entité d'un vault à l'autre = tombale dans l'ancien, création
+dans le nouveau, même id — les références entre entités (groupe d'un hôte,
+clé d'un hôte) restent valables.
 
 ## Sessions
 

@@ -120,10 +120,9 @@ pub async fn put(
     let row = sqlx::query_as::<_, ItemRow>(
         "INSERT INTO items (id, vault_id, item_type, revision, ciphertext)
          VALUES ($1, $2, $3, $4, $5)
-         ON CONFLICT (id) DO UPDATE
+         ON CONFLICT (vault_id, id) DO UPDATE
             SET item_type = EXCLUDED.item_type, revision = EXCLUDED.revision,
                 ciphertext = EXCLUDED.ciphertext, updated_at = now(), deleted_at = NULL
-         WHERE items.vault_id = EXCLUDED.vault_id
          RETURNING *",
     )
     .bind(item_id)
@@ -131,11 +130,8 @@ pub async fn put(
     .bind(&req.item_type)
     .bind(rev)
     .bind(&req.ciphertext)
-    .fetch_optional(&mut *tx)
-    .await?
-    // `WHERE items.vault_id = EXCLUDED.vault_id` : un id d'item déjà pris
-    // par un autre vault ne doit pas pouvoir être « volé ».
-    .ok_or_else(|| AppError::conflict("item_id_taken", "cet identifiant d'item existe dans un autre vault"))?;
+    .fetch_one(&mut *tx)
+    .await?;
 
     Audit::new(if created { "item.create" } else { "item.update" })
         .actor(user.id)

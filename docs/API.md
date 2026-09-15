@@ -9,7 +9,7 @@ Erreurs : `{ "code": "…", "message": "…" }` (+ champs selon le code, ex.
 `current` sur `revision_mismatch`). Codes stables :
 `unauthorized`, `invalid_credentials`, `forbidden`, `not_found`,
 `invitation_required`, `email_taken`, `vault_id_taken`, `revision_mismatch`,
-`item_id_taken`, `item_type_changed`, `item_too_large`, `already_member`,
+`item_type_changed`, `item_too_large`, `already_member`,
 `already_invited`, `not_pending`, `invitee_has_no_key`,
 `invitee_not_registered`, `incomplete_rotation`, `unknown_member`,
 `unknown_item`, `invalid_*`, `internal`.
