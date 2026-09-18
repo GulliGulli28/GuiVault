@@ -1,0 +1,36 @@
+{
+  "kdf": {
+    "password": "web → rust",
+    "salt": "66656463626139383736353433323130",
+    "params": {
+      "m_cost": 19456,
+      "t_cost": 2,
+      "p_cost": 1
+    },
+    "stretched_key": "37b1de4964f514d74e743aa48582afd707a62e594341ccf669fc8f9a2d427778",
+    "auth_key": "e4918145011dbf5f405a3e85df063930927450d6c31cea11df145a0318957a83"
+  },
+  "seal": {
+    "key": "0505050505050505050505050505050505050505050505050505050505050505",
+    "aad": "ctx-web",
+    "plaintext": "from the browser",
+    "blob": "01be7dec03b88cf5a8c77937bf793a8e1d66f1e5cdffc9e7b8a2f3a617c5d209fd36b22b9e270c8508e65482ee116ae01c2cf8fa447de38457"
+  },
+  "sealed_box": {
+    "private": "a004f79afb176025fb30189b080bf87692d6a0bfafc6d8b30dbea95896e77f79",
+    "public": "c52283c6c26db106db4edbc5887c3a17f627008f8107033217b56cb0b7d32d7c",
+    "fingerprint": "181a-ed49-0d02-ba4d-228b-8d79-0e05-03e8",
+    "plaintext": "sealed by the browser",
+    "blob": "0151ab32bebb8f81bede656bff294b4c848eba854ddb34bd6349d77a9dd1f0fd3c7d2229228c75265944630d6f925ac50be4519d2f2bd94db561f55a494631ea8b234453248a"
+  },
+  "item": {
+    "vault_key": "0606060606060606060606060606060606060606060606060606060606060606",
+    "vault_id": "1e0720e1-5048-4739-aa61-5789b328c38a",
+    "item_id": "7dd4491a-5dad-482e-b537-e152bc63afc0",
+    "item_type": "snippet",
+    "plaintext": "{\"kind\":\"snippet\"}",
+    "blob": "012f8c15b22e3c154504b00ea7a52064f7e3d84749e5bd12a52b30079c15610437fde244692bdee769b31a608b27f7ae5b3733038354c21a913a66",
+    "name": "Équipe réseau",
+    "name_blob": "016e554abcc0452a8b8dcaacf4c250f29d9e89ac7ee7e623ab1126a22c840eea217a88c2ccf3ab70d9b60e356bd8e8617061f0bed7077cd6"
+  }
+}

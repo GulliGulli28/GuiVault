@@ -1,0 +1,52 @@
+{
+  "account": {
+    "auth_key": "416bca92642b5d6e0e193c96eb6a9149a6968e1b4f2150795fa206736ab1d69a",
+    "kdf": {
+      "m_cost": 65536,
+      "p_cost": 1,
+      "t_cost": 3
+    },
+    "kdf_salt": "09854f37733e1d95a091a30bfe889b20",
+    "password": "correct horse battery staple — é",
+    "private_key": "6484acc8f76bc2506d3258f890ed82ed509bda828b74b8b00efd2c5456d46436",
+    "protected_private_key": "01f7ebab203e24317d21809eecab2df74da2e257bfaa10b1980ed94c0b82eb6239c3f6710571bce03cc3de045eac9519418d9819415704c6ed3083aad26961f10500cf623740afc8a9",
+    "protected_user_key": "014850e7c14403cb2f7810a8d125bcaaa3da7691fa5d47826a6253371a814106d8667b56cc576adb8757fc6d680c7bffe2c3b26d5e78168b2d6f824dc7218f4a42c9ed6731822a0ae2",
+    "public_key": "752f242f81b9443516c62871cb949a99f23b94f191dd338a2e5274af00dfc222",
+    "user_key": "6fdf4d09c27e70e4aabef162e59dda6775ed2a14f87815567e8b62defe22bd55",
+    "wrapped_vault_key": "013b94990caf00286d2b09eddecf7ac4ab0af3e260992de759e32abd8efc2f5c7bcb1a43989493a02d9343dc4b4ff69fc0521150e5ff3428fdfb5cdab785715f54bd32a51404463993a9bbb5f856eacfd5"
+  },
+  "item": {
+    "blob": "015ef88b1718faf8a8277ebc29d0b565574cace034ad58b309c33033b087f471541b657aabc44062b177640d1281aa0b8b7405f32f4002f8",
+    "item_id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+    "item_type": "host",
+    "name": "Prod bancaire",
+    "name_blob": "01eb8ca56a74c64ba13c04a04408deb63fde2c155e65d63ee53d17d03700d560a33c21040281fcd9eb14505b52269b8645c53d3f2556",
+    "plaintext": "{\"kind\":\"host\"}",
+    "vault_id": "11111111-2222-3333-4444-555555555555",
+    "vault_key": "0909090909090909090909090909090909090909090909090909090909090909"
+  },
+  "kdf": {
+    "auth_key": "da7a05e05e87b74ff01b92fceb5caaccd109c05c7b058547aeadb2db81887fa0",
+    "params": {
+      "m_cost": 19456,
+      "p_cost": 1,
+      "t_cost": 2
+    },
+    "password": "correct horse battery staple — é",
+    "salt": "30313233343536373839616263646566",
+    "stretched_key": "62645fd5230d037ffb455e7a07e8f9de2cf56be4f088709843e447f635f7505e"
+  },
+  "seal": {
+    "aad": "ctx-a",
+    "blob": "0174d09a5a8e8005a526e04294bed7a33a730111e9e7e7b8c30707633b777ba1894518861362898114c6283117ad81e74cc2514f3c",
+    "key": "0707070707070707070707070707070707070707070707070707070707070707",
+    "plaintext": "hello, world"
+  },
+  "sealed_box": {
+    "blob": "011d60e9dc2f7ccd8c05d2cb828e89f3e7208b082359b8b4c1bf2ff888f768af7bd8e2117daf0d784afb33fc160e65fac61a2481effc929624f7e352e967ad4ad3455e19e9b74bb37b6110e5960f6541ba",
+    "fingerprint": "7e37-bdf9-0daf-1c8b-3742-c915-3e76-798b",
+    "plaintext": "vault key bytes here 32 bytes!!!",
+    "private": "2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a",
+    "public": "07aaff3e9fc167275544f4c3a6a17cd837f2ec6e78cd8a57b1e3dfb3cc035a76"
+  }
+}

@@ -302,6 +302,40 @@ async fn health_and_registration_mode() {
 }
 
 #[tokio::test]
+async fn web_ui_is_served_at_root_and_api_404_stays_json() {
+    let Some(server) = TestServer::start(RegistrationMode::Open).await else {
+        return;
+    };
+    let origin = server.base.trim_end_matches("/api/v1").to_string();
+    let client = Client::new();
+
+    // Une route d'API inconnue est une erreur d'API, jamais la page.
+    let res = client.get(format!("{origin}/api/v1/nope")).send().await.unwrap();
+    assert_eq!(res.status(), StatusCode::NOT_FOUND);
+    let err: ApiError = res.json().await.unwrap();
+    assert_eq!(err.code, "not_found");
+
+    // La racine : la page si le build Vite est embarqué, sinon un texte qui
+    // explique comment l'obtenir — les deux cas sont légitimes en test.
+    let res = client.get(format!("{origin}/")).send().await.unwrap();
+    let ct = res.headers()[reqwest::header::CONTENT_TYPE].to_str().unwrap().to_string();
+    if guivault_server::web::is_built() {
+        assert_eq!(res.status(), StatusCode::OK);
+        assert!(ct.starts_with("text/html"), "{ct}");
+        assert!(res.headers().contains_key(reqwest::header::CONTENT_SECURITY_POLICY));
+        assert_eq!(res.headers()[reqwest::header::CACHE_CONTROL], "no-cache");
+        // Un chemin inconnu hors API renvoie aussi la page (routage côté client).
+        let res = client.get(format!("{origin}/whatever")).send().await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        assert!(res.headers()[reqwest::header::CONTENT_TYPE].to_str().unwrap().starts_with("text/html"));
+    } else {
+        assert_eq!(res.status(), StatusCode::NOT_FOUND);
+        assert!(ct.starts_with("text/plain"), "{ct}");
+    }
+    server.stop().await;
+}
+
+#[tokio::test]
 async fn register_login_unlock_and_personal_vault() {
     let Some(server) = TestServer::start(RegistrationMode::Open).await else {
         return;

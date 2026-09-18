@@ -13,13 +13,20 @@
                                                     └──────────────────────┘
 ```
 
-Trois crates dans un workspace Cargo :
+Trois crates dans un workspace Cargo, et une application web :
 
 | Crate | Rôle | Qui l'utilise |
 |---|---|---|
 | `guivault-crypto` | dérivation de clés, enveloppes, boîtes scellées, cycle de vie du compte | client **et** serveur (le serveur n'en utilise que le hachage des jetons/clé d'auth) |
 | `guivault-protocol` | structs JSON des requêtes/réponses | client et serveur |
-| `guivault-server` | routes, base, sessions, audit | serveur |
+| `guivault-server` | routes, base, sessions, audit ; sert aussi `web/dist` à `/` | serveur |
+| `web/` | second client, dans le navigateur (Vite + React) ; `src/lib/crypto.ts` porte `guivault-crypto` en TypeScript | utilisateur sans Guiterm sous la main |
+
+Le client web et Guiterm sont interchangeables : mêmes formats de blobs
+(vérifiés par des vecteurs croisés, `crates/guivault-crypto/examples/vectors.rs`
+et `tests/web_interop.rs`), même JSON d'items (celui de
+`termius_core::guivault::entity::Payload`), même règle d'empreintes. Ce que
+l'un écrit, l'autre le lit à la synchronisation suivante.
 
 ## Hiérarchie de clés
 
@@ -179,7 +186,8 @@ resynchronise. Rien n'est persisté — un client déconnecté rate des
 ## Ce qui n'est pas encore là
 
 - **WebAuthn / clés de sécurité** en second facteur.
-- **Web UI d'administration** : tout passe par Guiterm.
+- **Administration du serveur** (comptes, quotas) : il n'y a pas de rôle
+  d'administrateur, seulement les rôles par vault.
 - **Emails** d'invitation : l'invitation est visible dans le client de
   l'invité ; rien n'est envoyé par courrier.
 - **Vérification d'e-mail** à l'inscription.

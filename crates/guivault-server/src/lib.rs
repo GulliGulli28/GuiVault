@@ -14,6 +14,7 @@ pub mod routes;
 pub mod sessions;
 pub mod state;
 pub mod validate;
+pub mod web;
 
 use crate::config::Config;
 use crate::state::AppState;

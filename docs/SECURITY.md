@@ -61,6 +61,35 @@ partage 12 hôtes et 3 clés avec Bob », jamais lesquels.
   Acceptable pour un serveur d'équipe ; à revoir avant une offre publique
   (e-mail de confirmation à la place du 409).
 
+## Interface web
+
+L'interface servie à `/` fait la même cryptographie que Guiterm, dans le
+navigateur (`web/src/lib/crypto.ts`, port de `guivault-crypto`). Le serveur
+ne reçoit toujours que la clé d'auth et des enveloppes. Mais le code qui
+manipule le mot de passe maître est **livré par le serveur à chaque
+chargement** : c'est un cran de moins que le client de bureau, dont le code
+est installé une fois et vérifiable.
+
+- **Un serveur (ou un proxy) compromis peut servir une page modifiée** qui
+  exfiltre le mot de passe maître. C'est le compromis classique des coffres
+  web (même limite que Bitwarden ou Proton) : l'interface web ne protège
+  pas contre un opérateur malveillant, seulement contre un opérateur honnête
+  dont la base fuit. Qui veut cette garantie-là utilise Guiterm.
+- Pour que *rien d'autre* que le binaire ne puisse injecter du code, la page
+  est servie avec une CSP stricte (`script-src 'self'`, pas d'inline, pas
+  de domaine tiers, `frame-ancestors 'none'`), sans referrer, et le binaire
+  n'embarque aucun script externe — l'application est entièrement dans
+  `web/dist`, compilée dans l'image.
+- **Rien n'est persisté dans le navigateur** : jetons, clés et items vivent
+  en mémoire de l'onglet. Recharger la page, c'est se reconnecter. Seules
+  les empreintes épinglées sont en `localStorage`, elles ne sont pas
+  secrètes.
+- La dérivation Argon2id (64 MiB, 3 passes) tourne en JavaScript : une à
+  deux secondes à la connexion, comme dans Guiterm.
+- Les mêmes règles d'empreinte s'appliquent : inviter quelqu'un ou faire
+  tourner une clé exige que son empreinte ait été vérifiée hors bande et
+  épinglée dans *ce* navigateur.
+
 ## Déploiement
 
 - **TLS obligatoire** devant le serveur. Sans TLS, les jetons et la clé

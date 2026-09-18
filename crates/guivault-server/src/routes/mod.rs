@@ -103,6 +103,8 @@ pub fn router(state: AppState) -> Router {
     // d'où une limite bien au-dessus de celle d'un item seul.
     let body_limit = cfg.max_item_bytes.saturating_mul(64).max(8 * 1024 * 1024);
 
+    // L'interface web est fusionnée *après* les couches : ses en-têtes de
+    // cache et de sécurité sont les siens (`web.rs`), pas ceux de l'API.
     Router::new()
         .nest("/api/v1", api)
         .layer(DefaultBodyLimit::max(body_limit))
@@ -119,5 +121,6 @@ pub fn router(state: AppState) -> Router {
             HeaderValue::from_static("nosniff"),
         ))
         .layer(TraceLayer::new_for_http())
+        .merge(crate::web::router())
         .with_state(state)
 }

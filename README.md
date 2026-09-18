@@ -19,6 +19,11 @@ serveur puisse jamais lire un secret.
   facteur TOTP optionnel avec codes de récupération.
 - **Temps réel** : un flux SSE prévient les clients qu'un vault a changé.
 - **Audit** : journal en ajout seul par vault et par utilisateur.
+- **Interface web** servie par le serveur lui-même (`/`), avec le même
+  chiffrement dans le navigateur : consulter et modifier ses hôtes, clés,
+  snippets et connexions, gérer les vaults partagés, les membres, les
+  invitations, les sessions et le second facteur — depuis une machine sans
+  Guiterm.
 - **Une seule image Docker**, Rust/axum/PostgreSQL. Même stack que Guiterm.
 
 Voir [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) pour le fonctionnement,
@@ -48,8 +53,19 @@ GUIVAULT_DOMAIN=vault.example.com docker compose --profile tls up -d
 
 Le serveur ne peut pas créer de compte (il n'a jamais le mot de passe
 maître). En mode `invite_only` (défaut), mettez votre adresse dans
-`GUIVAULT_ALLOWED_EMAILS`, inscrivez-vous depuis Guiterm, puis invitez les
-autres depuis un vault partagé : une invitation autorise l'inscription.
+`GUIVAULT_ALLOWED_EMAILS`, inscrivez-vous depuis Guiterm ou depuis
+l'interface web (`https://vault.example.com/`), puis invitez les autres
+depuis un vault partagé : une invitation autorise l'inscription.
+
+### Interface web
+
+Le binaire sert à `/` une application (React, même charte que Guiterm) qui
+fait exactement ce que fait Guiterm avec le serveur : dériver les clés du
+mot de passe maître dans le navigateur, déchiffrer les vaults, chiffrer ce
+qu'elle écrit. Le serveur ne voit pas plus de choses qu'avec Guiterm. Rien
+n'est conservé dans le navigateur après fermeture de l'onglet (les
+empreintes épinglées mises à part) ; le modèle de menace propre au web est
+dans [`docs/SECURITY.md`](docs/SECURITY.md).
 
 ### Variables d'environnement
 
@@ -82,14 +98,27 @@ pas de « réinitialisation » possible côté serveur, par construction.
 scripts/test-db.sh        # Postgres jetable dans Docker (port 55432)
 cargo test                # unitaires + intégration bout en bout
 cargo clippy --all-targets
+cd web && npm install && npm test && npm run build   # interface web
 ```
+
+L'interface web est embarquée dans le binaire au moment de `cargo build`
+(`web/dist`, créé par `npm run build`) ; sans ce build, le serveur compile
+quand même et répond sur `/` que l'interface manque. Pour travailler dessus
+avec rechargement à chaud : `cargo run` d'un côté, `cd web && npm run dev`
+de l'autre (Vite sert sur `http://localhost:1430` et proxifie `/api` vers
+le serveur).
 
 Structure :
 
 - `crates/guivault-crypto` — primitives et hiérarchie de clés, partagées
   avec les clients. **Tout le chiffrement se passe ici, côté client.**
 - `crates/guivault-protocol` — types JSON de l'API.
-- `crates/guivault-server` — le serveur (axum + sqlx/PostgreSQL).
+- `crates/guivault-server` — le serveur (axum + sqlx/PostgreSQL), qui sert
+  aussi l'interface web.
+- `web/` — l'interface web (Vite + React + TypeScript). `src/lib/crypto.ts`
+  est le port de `guivault-crypto` ; des vecteurs générés par le crate
+  Rust (et réciproquement) garantissent que les deux lisent les mêmes
+  blobs.
 
 Guiterm consommera `guivault-crypto` et `guivault-protocol` en dépendances
 git : une réponse qui change casse la compilation des deux côtés au lieu de

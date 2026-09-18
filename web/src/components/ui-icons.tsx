@@ -1,0 +1,590 @@
+type P = { size?: number; className?: string };
+
+export function IconHosts({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <rect x="1" y="2" width="14" height="5" rx="1.5" stroke="currentColor" strokeWidth="1.25" />
+      <rect x="1" y="9" width="14" height="5" rx="1.5" stroke="currentColor" strokeWidth="1.25" />
+      <circle cx="12.5" cy="4.5" r="1" fill="currentColor" />
+      <circle cx="12.5" cy="11.5" r="1" fill="currentColor" />
+    </svg>
+  );
+}
+
+export function IconSnippets({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <path d="M5.5 5L2.5 8L5.5 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M10.5 5L13.5 8L10.5 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M9 3L7 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function IconTunnels({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <circle cx="2.5" cy="8" r="1.5" stroke="currentColor" strokeWidth="1.25" />
+      <circle cx="13.5" cy="8" r="1.5" stroke="currentColor" strokeWidth="1.25" />
+      <path d="M4 8h3.5M8.5 8H12" stroke="currentColor" strokeWidth="1.25" strokeDasharray="1.5 1.5" strokeLinecap="round" />
+      <path d="M11 6.5l2 1.5-2 1.5" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function IconKeychain({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <circle cx="5.5" cy="7" r="3.5" stroke="currentColor" strokeWidth="1.25" />
+      <path d="M9 7h5" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" />
+      <path d="M12 7v2M14 7v2" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** A cloud with a keyhole: the AWS identities panel — a login, not a machine
+ * (which is what `IconHosts` already says). */
+export function IconCloud({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <path
+        d="M4.4 12.5a2.9 2.9 0 0 1-.3-5.78 3.9 3.9 0 0 1 7.48-1.06A2.94 2.94 0 0 1 12 12.5H4.4Z"
+        stroke="currentColor"
+        strokeWidth="1.25"
+        strokeLinejoin="round"
+      />
+      <circle cx="8" cy="8.2" r="1.35" stroke="currentColor" strokeWidth="1.15" />
+      <path d="M8 9.55v1.4" stroke="currentColor" strokeWidth="1.15" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function IconSettings({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      {[0, 60, 120, 180, 240, 300].map((angle) => (
+        <rect
+          key={angle}
+          x="7.05"
+          y="0.6"
+          width="1.9"
+          height="2.9"
+          rx="0.7"
+          fill="currentColor"
+          transform={`rotate(${angle} 8 8)`}
+        />
+      ))}
+      <circle cx="8" cy="8" r="3.1" stroke="currentColor" strokeWidth="1.25" fill="none" />
+      <circle cx="8" cy="8" r="1.15" fill="currentColor" />
+    </svg>
+  );
+}
+
+export function IconTerminal({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <path d="M3 5l3.5 3L3 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M9 11h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function IconTransfer({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <path d="M2 4.5C2 3.67 2.67 3 3.5 3H6l1.5 2H12.5c.83 0 1.5.67 1.5 1.5v5c0 .83-.67 1.5-1.5 1.5h-9C2.67 13 2 12.33 2 11.5V4.5Z" stroke="currentColor" strokeWidth="1.25" />
+      <path d="M8 7v4M6 9.5L8 11.5 10 9.5" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function IconMonitor({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <rect x="2" y="2" width="12" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.25" />
+      <path d="M5 14h6M8 11v3" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function IconDocker({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <rect x="2" y="10" width="12" height="3" rx="0.5" stroke="currentColor" strokeWidth="1.25" />
+      <rect x="4" y="6.5" width="2.5" height="2.5" rx="0.4" stroke="currentColor" strokeWidth="1.15" />
+      <rect x="7" y="6.5" width="2.5" height="2.5" rx="0.4" stroke="currentColor" strokeWidth="1.15" />
+      <rect x="7" y="3.5" width="2.5" height="2.5" rx="0.4" stroke="currentColor" strokeWidth="1.15" />
+    </svg>
+  );
+}
+
+export function IconKubernetes({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <path d="M8 2l5 2.7v6.6L8 14l-5-2.7V4.7L8 2Z" stroke="currentColor" strokeWidth="1.25" strokeLinejoin="round" />
+      <circle cx="8" cy="8" r="1.4" stroke="currentColor" strokeWidth="1.1" />
+    </svg>
+  );
+}
+
+export function IconDotsVertical({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="currentColor" className={className}>
+      <circle cx="8" cy="4" r="1.25" />
+      <circle cx="8" cy="8" r="1.25" />
+      <circle cx="8" cy="12" r="1.25" />
+    </svg>
+  );
+}
+
+export function IconPlus({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function IconKeyboard({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <rect x="1.5" y="4" width="13" height="8" rx="1.5" stroke="currentColor" strokeWidth="1.25" />
+      <path d="M4 7h1M7 7h1M10 7h1M4 10h8" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function IconSplit({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <rect x="1.5" y="2" width="13" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.25" />
+      <path d="M8 2v12" stroke="currentColor" strokeWidth="1.25" />
+    </svg>
+  );
+}
+
+export function IconClose({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function IconEdit({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <path d="M10.5 3.5l2 2L5 13H3v-2l7.5-7.5Z" stroke="currentColor" strokeWidth="1.25" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function IconTrash({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <path d="M3 5h10M6 5V3.5h4V5" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M5.5 5l.5 7.5h5L12 5" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function IconUpload({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <path d="M8 10V3M5 6L8 3l3 3" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M3 11v2h10v-2" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function IconDownload({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <path d="M8 3v7M5 7.5L8 10.5l3-3" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M3 11v2h10v-2" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** Arrow leaving a frame — "opens outside this window", for handing a file to
+ * the user's own editor rather than editing it in the app. */
+export function IconExternal({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <path d="M12.5 3.5h-4M12.5 3.5v4M12.5 3.5L7 9" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M11 10v2.5h-8v-8H5.5" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function IconCopy({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <rect x="6" y="6" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="1.25" />
+      <path d="M10 6V4a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1h2" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function IconFolder({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <path d="M2 4.5C2 3.67 2.67 3 3.5 3H6l1.5 2H12.5c.83 0 1.5.67 1.5 1.5v5c0 .83-.67 1.5-1.5 1.5h-9C2.67 13 2 12.33 2 11.5V4.5Z" stroke="currentColor" strokeWidth="1.25" />
+    </svg>
+  );
+}
+
+/** Une punaise — « épinglé, ça reste là ». Marque un onglet dont la session
+ * vit côté serveur et survit à sa fermeture (`persistent_shell`). Aucune des
+ * icônes existantes ne dit ça : une flèche circulaire se lit « recharger », un
+ * bouclier se lit « sécurité ». */
+export function IconPin({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <path d="M6 2h4l-.75 3.5 2.25 2v1H4.5v-1l2.25-2L6 2Z" stroke="currentColor" strokeWidth="1.25" strokeLinejoin="round" />
+      <path d="M8 8.5V14" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function IconChevronDown({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function IconChevronRight({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function IconFlash({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="currentColor" className={className}>
+      <path d="M9 1.5L4 9h4.5L6 14.5l7.5-7.5H9V1.5Z" />
+    </svg>
+  );
+}
+
+export function IconSearch({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <circle cx="7" cy="7" r="4.5" stroke="currentColor" strokeWidth="1.25" />
+      <path d="M11 11l3 3" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function IconPlay({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="currentColor" className={className}>
+      <path d="M5 3.5l8 4.5-8 4.5V3.5Z" />
+    </svg>
+  );
+}
+
+export function IconPalette({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <path d="M8 1.5c-3.6 0-6.5 2.75-6.5 6.15 0 2.55 2 3.85 3.6 3.85.75 0 .95-.4.95-.85s-.25-.65-.25-1.2c0-.55.45-1 1.05-1h1.6c2 0 3.55-1.4 3.55-3.5 0-2.4-1.9-3.45-4-3.45Z" stroke="currentColor" strokeWidth="1.25" strokeLinejoin="round" />
+      <circle cx="4.6" cy="7.4" r="0.75" fill="currentColor" />
+      <circle cx="6.4" cy="4.9" r="0.75" fill="currentColor" />
+      <circle cx="9.6" cy="4.9" r="0.75" fill="currentColor" />
+      <circle cx="11.2" cy="7.4" r="0.75" fill="currentColor" />
+    </svg>
+  );
+}
+
+export function IconShield({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <path d="M8 1.5l5.5 2v4c0 3.5-2.3 5.9-5.5 7-3.2-1.1-5.5-3.5-5.5-7v-4L8 1.5Z" stroke="currentColor" strokeWidth="1.25" strokeLinejoin="round" />
+      <path d="M5.8 8l1.6 1.6 2.8-3.2" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function IconSun({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <circle cx="8" cy="8" r="3" stroke="currentColor" strokeWidth="1.25" />
+      <path d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.2 3.2l1.1 1.1M11.7 11.7l1.1 1.1M3.2 12.8l1.1-1.1M11.7 4.3l1.1-1.1" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function IconMoon({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <path d="M13.5 9.8A5.8 5.8 0 0 1 6.2 2.5a5.8 5.8 0 1 0 7.3 7.3Z" stroke="currentColor" strokeWidth="1.25" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function IconBell({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <path d="M8 2.5c-2 0-3.25 1.5-3.25 3.75v1.5c0 .9-.35 1.75-1 2.4l-.5.5h9.5l-.5-.5c-.65-.65-1-1.5-1-2.4v-1.5C11.25 4 10 2.5 8 2.5Z" stroke="currentColor" strokeWidth="1.25" strokeLinejoin="round" />
+      <path d="M6.5 12.5a1.5 1.5 0 0 0 3 0" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function IconBroadcast({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <circle cx="8" cy="8" r="1.5" fill="currentColor" />
+      <path d="M5.5 5.5a3.6 3.6 0 0 0 0 5" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" />
+      <path d="M10.5 5.5a3.6 3.6 0 0 1 0 5" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" />
+      <path d="M3.2 3.2a6.6 6.6 0 0 0 0 9.6" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" />
+      <path d="M12.8 3.2a6.6 6.6 0 0 1 0 9.6" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** Network diagnostics: a radar sweep. Deliberately not `IconBroadcast`'s
+ * symmetric waves — broadcasting sends the same thing everywhere, diagnosing
+ * asks and listens back, and the two buttons sit in the same bar. */
+export function IconNetDiag({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.15" />
+      <circle cx="8" cy="8" r="2.6" stroke="currentColor" strokeWidth="1.15" />
+      <circle cx="8" cy="8" r="1" fill="currentColor" />
+      <path d="M8 8L12.4 4.4" stroke="currentColor" strokeWidth="1.15" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** Distinct from `IconHosts` (a single stacked server) — a 2x2 grid reads as
+ * "several independent machines", matching what fleet operations actually
+ * target (many hosts at once). */
+export function IconFleet({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <rect x="1.5" y="1.5" width="5.5" height="5.5" rx="1.1" stroke="currentColor" strokeWidth="1.25" />
+      <rect x="9" y="1.5" width="5.5" height="5.5" rx="1.1" stroke="currentColor" strokeWidth="1.25" />
+      <rect x="1.5" y="9" width="5.5" height="5.5" rx="1.1" stroke="currentColor" strokeWidth="1.25" />
+      <rect x="9" y="9" width="5.5" height="5.5" rx="1.1" stroke="currentColor" strokeWidth="1.25" />
+    </svg>
+  );
+}
+
+/** Une procédure ordonnée : des étapes cochées les unes après les autres. */
+export function IconRunbook({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <path d="M1.8 3.4 3 4.6l2-2.2" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M1.8 8.4 3 9.6l2-2.2" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M2 13.2h3" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" />
+      <path d="M7.5 3.6h6.8M7.5 8.6h6.8M7.5 13.2h6.8" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function IconDatabase({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <ellipse cx="8" cy="4" rx="6" ry="2.25" stroke="currentColor" strokeWidth="1.25" />
+      <path d="M2 4v4c0 1.24 2.69 2.25 6 2.25S14 9.24 14 8V4" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" />
+      <path d="M2 8v4c0 1.24 2.69 2.25 6 2.25S14 13.24 14 12V8" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function IconRefresh({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <path d="M2.5 8a5.5 5.5 0 0 1 9.3-4" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" />
+      <path d="M13.5 8a5.5 5.5 0 0 1-9.3 4" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" />
+      <path d="M11.5 2.5v2.5H9" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M4.5 13.5V11H7" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function IconFullscreen({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <path d="M2 6V2.5h3.5M10.5 2H14v3.5M14 10v3.5h-3.5M5.5 14H2v-3.5" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function IconFullscreenExit({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <path d="M5.5 2v3.5H2M14 5.5h-3.5V2M10.5 14v-3.5H14M2 10.5h3.5V14" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** Comparer deux choses : deux flèches opposées, la même idée que le `⇄`
+ * qu'elle remplace — un caractère qui ne s'affichait pas partout. */
+export function IconCompare({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <path d="M2.5 5.5h9M9 3l2.5 2.5L9 8" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M13.5 10.5h-9M7 8l-2.5 2.5L7 13" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** Une archive : un carton fermé par sa bande. */
+export function IconArchive({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <rect x="2" y="3" width="12" height="3" rx="0.75" stroke="currentColor" strokeWidth="1.25" />
+      <path d="M3 6v6.25c0 .41.34.75.75.75h8.5c.41 0 .75-.34.75-.75V6" stroke="currentColor" strokeWidth="1.25" />
+      <path d="M6.5 9h3" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** Extraire : le même carton, ouvert, et ce qui en sort. */
+export function IconExtract({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <path d="M2.5 8.5V12.25c0 .41.34.75.75.75h9.5c.41 0 .75-.34.75-.75V8.5" stroke="currentColor" strokeWidth="1.25" />
+      <path d="M8 9V2.5M5.5 5L8 2.5 10.5 5" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** Fichiers cachés affichés, et masqués. */
+export function IconEye({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8Z" stroke="currentColor" strokeWidth="1.25" />
+      <circle cx="8" cy="8" r="2" stroke="currentColor" strokeWidth="1.25" />
+    </svg>
+  );
+}
+
+export function IconEyeOff({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <path d="M6.2 4c.57-.17 1.17-.25 1.8-.25 4 0 6.5 4.25 6.5 4.25s-.8 1.36-2.2 2.5" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" />
+      <path d="M12 12c-1.1.6-2.4 1-4 1-4 0-6.5-4.5-6.5-4.5S2.7 6.4 4.3 5.2" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" />
+      <path d="M2.5 2.5l11 11" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** Un fichier vierge — le pendant d'`IconFolder` pour « Nouveau fichier ». */
+export function IconFile({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <path d="M4 2.5h5L12 5.5v8a.5.5 0 0 1-.5.5h-7a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5Z" stroke="currentColor" strokeWidth="1.25" strokeLinejoin="round" />
+      <path d="M9 2.5v3h3" stroke="currentColor" strokeWidth="1.25" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** Une liste à cocher — le mode « sélectionner plusieurs hôtes ». */
+export function IconChecklist({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <path d="M2.5 4.5l1.25 1.25L6 3.5" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M2.5 10.5l1.25 1.25L6 9.5" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M8.5 4.5h5M8.5 10.5h5" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** Une coche — l'état « fait », « sélectionné », « réussi ». Remplace le « ✓ »
+ * en texte, dont la forme dépend de la police système. */
+export function IconCheck({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <path d="M3 8.5l3 3 7-7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** Un dossier plein — l'entrée « dossier » d'une liste de fichiers, par
+ * opposition au contour d'`IconFolder` réservé aux actions. */
+export function IconFolderFilled({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <path d="M1.5 4.5C1.5 3.67 2.17 3 3 3h3l1.5 2H13c.83 0 1.5.67 1.5 1.5v5c0 .83-.67 1.5-1.5 1.5H3c-.83 0-1.5-.67-1.5-1.5v-7Z" fill="currentColor" fillOpacity="0.9" />
+    </svg>
+  );
+}
+
+/** Un fichier plein, coin plié — l'entrée « fichier » d'une liste. */
+export function IconFileFilled({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <path d="M4 2h5l3 3v8.5a.5.5 0 0 1-.5.5h-7.5a.5.5 0 0 1-.5-.5v-11A.5.5 0 0 1 4 2Z" fill="currentColor" fillOpacity="0.35" />
+      <path d="M9 2v3h3" fill="currentColor" fillOpacity="0.6" />
+    </svg>
+  );
+}
+
+/** Un cadenas fermé. */
+export function IconLock({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <rect x="3" y="7" width="10" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.25" />
+      <path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** Un cadenas ouvert. */
+export function IconUnlock({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <rect x="3" y="7" width="10" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.25" />
+      <path d="M5.5 7V5a2.5 2.5 0 0 1 4.8-1" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** Un triangle d'avertissement. */
+export function IconWarning({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <path d="M8 2.5 14 13H2L8 2.5Z" stroke="currentColor" strokeWidth="1.25" strokeLinejoin="round" />
+      <path d="M8 6.5v3" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" />
+      <circle cx="8" cy="11.25" r="0.6" fill="currentColor" />
+    </svg>
+  );
+}
+
+/** Une flèche vers le haut — « dossier parent ». */
+export function IconArrowUp({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <path d="M8 13V3M4 7l4-4 4 4" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** Une table : la grille d'une base de données. */
+export function IconTable({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <rect x="2" y="3" width="12" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.25" />
+      <path d="M2 6.5h12M6.5 6.5V13" stroke="currentColor" strokeWidth="1.25" />
+    </svg>
+  );
+}
+
+/** GuiVault : un coffre — le cadenas de `IconLock` est déjà pris par le coffre
+ * local, celui-ci a une porte et une roue. */
+export function IconVault({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <rect x="1.5" y="2" width="13" height="11" rx="1.5" stroke="currentColor" strokeWidth="1.25" />
+      <circle cx="8" cy="7.5" r="2.5" stroke="currentColor" strokeWidth="1.25" />
+      <path d="M8 6v1.5l1 1M4 13v1.5M12 13v1.5" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" />
+    </svg>
+  );
+}

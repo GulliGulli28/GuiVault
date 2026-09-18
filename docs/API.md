@@ -3,7 +3,9 @@
 Base : `/api/v1`. JSON partout. Authentification : `Authorization: Bearer
 <access_token>`. Les champs binaires sont en base64 standard. Les types
 exacts sont dans `crates/guivault-protocol/src/lib.rs` — ce fichier est la
-référence, la page-ci un résumé.
+référence, la page-ci un résumé. Tout ce qui n'est pas sous `/api/` sert
+l'interface web embarquée (`web/dist`, routage côté client), voir
+`README.md`.
 
 Erreurs : `{ "code": "…", "message": "…" }` (+ champs selon le code, ex.
 `current` sur `revision_mismatch`). Codes stables :
@@ -100,6 +102,8 @@ aad        = "guivault/v1/item\0" ‖ vault_id ‖ "\0" ‖ item_id ‖ "\0" ‖
 ciphertext = 0x01 ‖ nonce(24) ‖ XChaCha20-Poly1305(vault_key, nonce, plaintext, aad)
 ```
 
-`item_type` est libre (`[A-Za-z0-9._-]{1,64}`). Guiterm utilisera par
-exemple `host`, `group`, `ssh-key`, `password`, `snippet`, `sql-connection`.
-Le contenu est du JSON défini par le client ; le serveur ne le voit jamais.
+`item_type` est libre (`[A-Za-z0-9._-]{1,64}`). Guiterm et l'interface web
+utilisent `host`, `group`, `key`, `snippet`, `sql-connection`, `icon`, avec
+pour contenu le JSON de `termius_core::guivault::entity::Payload`
+(`{ "kind": "<item_type>", … }`, id de l'entité = id de l'item). Le serveur
+ne le voit jamais.

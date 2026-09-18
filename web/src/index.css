@@ -1,0 +1,467 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Jetons ────────────────────────────────────────────────────────────────
+ *
+ * Deux familles seulement : les surfaces (`--c-bg*`, posées par `App.tsx`
+ * selon le fond et le mode choisis dans les préférences) et le texte. Tout le
+ * reste en dérive — survol, accent atténué, ombres — de sorte qu'un thème se
+ * réduit à quatre couleurs de surface et que le mode clair ne soit jamais un
+ * cas particulier codé à la main dans un composant.
+ *
+ * Le langage visuel : surfaces plates, élévation par une bordure d'un pixel
+ * et un cran de ton, jamais par dégradé ni halo. L'accent est réservé à ce
+ * qui *agit* (bouton primaire, élément actif, focus) — il ne colore pas le
+ * décor. Les données (adresses, ports, chemins, commandes) sont en mono, la
+ * coquille en sans : c'est ce qui distingue à l'œil une valeur d'un libellé. */
+:root {
+  --font-ui: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, Menlo, monospace;
+
+  --c-accent: #2563eb;
+  --c-accent-hover: #3b82f6;
+  --c-accent-text: #93c5fd;
+  --c-accent-dim: rgba(37, 99, 235, 0.18);
+  --c-bg: #0c0c0e;
+  --c-bg2: #121215;
+  --c-bg3: #19191d;
+  --c-border: #26262b;
+
+  --c-text: #e7e7ea;
+  --c-text-secondary: #a1a1aa;
+  --c-text-muted: #71717a;
+  --c-text-faint: #52525b;
+
+  /* Survol / enfoncé : un voile, pour rester juste quelle que soit la surface
+     en dessous. Défini en clair aussi (voir plus bas) — un `white/5` codé en
+     dur dans un composant est invisible sur fond blanc. */
+  --c-hover: rgba(255, 255, 255, 0.06);
+  --c-active: rgba(255, 255, 255, 0.1);
+  --c-border-strong: rgba(255, 255, 255, 0.16);
+  --c-input-bg: rgba(0, 0, 0, 0.25);
+
+  --c-ok: #22c55e;
+  --c-warn: #f59e0b;
+  --c-danger: #ef4444;
+
+  /* Lignes de dossier des arborescences — reposées par `App.tsx` selon la
+     préférence « taille des dossiers ». */
+  --group-row-font: 13px;
+  --group-row-icon: 16px;
+  --group-row-h: 29px;
+  /* Lignes d'entité (hôtes, clés, bases…) — idem, préférence « Hôtes ». */
+  --entity-font: 12.5px;
+  --entity-sub-font: 10.5px;
+  --entity-icon: 24px;
+
+  /* Ombres : seulement pour ce qui flotte (menus, palette, modales). Une
+     carte statique n'en a pas — elle se distingue par sa bordure. */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.45), 0 0 0 1px var(--c-border);
+  --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.55), 0 0 0 1px var(--c-border);
+}
+
+:root[data-mode="light"] {
+  /* Surfaces « Sable » et accent en mode clair — ce que `App.tsx` de Guiterm
+     pose par script selon les préférences ; ici il n'y a qu'un thème. */
+  --c-bg: #f0eee9;
+  --c-bg2: #fbfaf7;
+  --c-bg3: #e8e5de;
+  --c-border: #d6d2c8;
+  --c-accent-text: #2563eb;
+  --c-accent-dim: rgba(37, 99, 235, 0.12);
+
+  --c-text: #18181b;
+  --c-text-secondary: #52525b;
+  --c-text-muted: #71717a;
+  --c-text-faint: #a1a1aa;
+
+  --c-hover: rgba(0, 0, 0, 0.05);
+  --c-active: rgba(0, 0, 0, 0.09);
+  --c-border-strong: rgba(0, 0, 0, 0.18);
+  --c-input-bg: #ffffff;
+
+  --c-ok: #16a34a;
+  --c-warn: #d97706;
+  --c-danger: #dc2626;
+
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --shadow-md: 0 4px 16px rgba(15, 23, 42, 0.12), 0 0 0 1px var(--c-border);
+  --shadow-lg: 0 16px 48px rgba(15, 23, 42, 0.18), 0 0 0 1px var(--c-border);
+}
+
+html {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--c-bg);
+  color: var(--c-text);
+}
+
+/* Les curseurs et barres de progression natifs prennent la couleur d'accent
+   du thème au lieu du bleu système. */
+input[type="radio"],
+input[type="range"],
+progress {
+  accent-color: var(--c-accent);
+}
+
+/* Cases à cocher : dessinées par l'app, pas par le système. La case native de
+   WebView2 est grise, épaisse et ne suit ni le thème ni le rayon des autres
+   contrôles ; celle-ci est un carré de 14 px bordé comme un champ, rempli
+   d'accent avec une coche blanche une fois cochée, et un tiret pour l'état
+   indéterminé (case d'en-tête d'un dossier partiellement coché). */
+input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  flex-shrink: 0;
+  border-radius: 4px;
+  border: 1px solid var(--c-border-strong);
+  background: var(--c-input-bg);
+  display: inline-grid;
+  place-content: center;
+  cursor: pointer;
+  transition: background-color 0.1s, border-color 0.1s;
+  vertical-align: middle;
+}
+input[type="checkbox"]:hover {
+  border-color: var(--c-accent);
+}
+input[type="checkbox"]::before {
+  content: "";
+  width: 14px;
+  height: 14px;
+  transform: scale(0);
+  transition: transform 0.1s;
+  background-color: #fff;
+  mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14'><path d='M3 7.5l2.5 2.5L11 4.5' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/></svg>") center / contain no-repeat;
+  -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14'><path d='M3 7.5l2.5 2.5L11 4.5' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/></svg>") center / contain no-repeat;
+}
+input[type="checkbox"]:checked,
+input[type="checkbox"]:indeterminate {
+  background: var(--c-accent);
+  border-color: var(--c-accent);
+}
+input[type="checkbox"]:checked::before {
+  transform: scale(1);
+}
+input[type="checkbox"]:indeterminate::before {
+  transform: scale(1);
+  mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14'><path d='M3.5 7h7' stroke='black' stroke-width='1.8' stroke-linecap='round'/></svg>");
+  -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14'><path d='M3.5 7h7' stroke='black' stroke-width='1.8' stroke-linecap='round'/></svg>");
+}
+input[type="checkbox"]:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* La barre d'onglets défile à la molette mais ne montre pas de barre : des
+   flèches de défilement au milieu du bandeau, c'est ce qu'on ne veut pas. */
+.scrollbar-none {
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+/* Barres de défilement fines — modèle natif, pour que `scrollbar-gutter`
+   fonctionne (pas de surcouche webkit). */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--c-border-strong) transparent;
+}
+
+/* Conteneurs défilants de la barre latérale :
+   - scrollbar-gutter: stable → la place de la barre est toujours réservée
+     (aucun décalage de mise en page quand elle apparaît) ;
+   - padding-right → un écart visuel entre le contenu et la piste.
+   Un `-mx-1 px-1` sur le conteneur laisse la place au marqueur d'accent des
+   `.list-row` actives, sinon coupé par `overflow-y-auto` (qui force
+   `overflow-x: auto` aussi). */
+.sidebar-scroll {
+  scrollbar-gutter: stable;
+  padding-right: 4px;
+}
+
+/* ── Primitives ────────────────────────────────────────────────────────────
+ *
+ * Dans `@layer components` pour qu'une utilitaire Tailwind posée à côté
+ * (`h-6`, `px-2`, `w-full`) gagne toujours sur la primitive. */
+@layer components {
+  /* Boutons. Une hauteur (28 px), quatre tons. `.btn-sm` pour les barres
+     denses (24 px), `.btn-icon` pour un bouton carré sans libellé. */
+  .btn {
+    @apply inline-flex h-7 shrink-0 select-none items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-transparent px-2.5 text-[12px] font-medium leading-none transition-colors;
+  }
+  .btn:disabled {
+    opacity: 0.45;
+    pointer-events: none;
+  }
+  .btn-sm {
+    @apply h-6 px-2 text-[11.5px];
+  }
+  .btn-icon {
+    @apply w-7 px-0;
+  }
+  .btn-icon.btn-sm {
+    @apply w-6;
+  }
+  .btn-primary {
+    background: var(--c-accent);
+    color: #fff;
+  }
+  .btn-primary:hover {
+    background: var(--c-accent-hover);
+  }
+  .btn-secondary {
+    background: var(--c-bg3);
+    border-color: var(--c-border);
+    color: var(--c-text);
+  }
+  .btn-secondary:hover {
+    border-color: var(--c-border-strong);
+  }
+  .btn-ghost {
+    color: var(--c-text-secondary);
+  }
+  .btn-ghost:hover {
+    background: var(--c-hover);
+    color: var(--c-text);
+  }
+  .btn-danger {
+    background: color-mix(in srgb, var(--c-danger) 12%, transparent);
+    border-color: color-mix(in srgb, var(--c-danger) 30%, transparent);
+    color: var(--c-danger);
+  }
+  .btn-danger:hover {
+    background: color-mix(in srgb, var(--c-danger) 20%, transparent);
+  }
+  /* L'état « enfoncé » d'un bouton bascule (mode split, diffusion…) : accent
+     atténué et texte accentué — jamais un remplissage plein, qui se lirait
+     comme une action primaire. */
+  .btn-toggled {
+    background: var(--c-accent-dim);
+    color: var(--c-accent-text);
+  }
+
+  /* Champs. Fond plus sombre que le panneau (le creux d'un champ), bordure au
+     repos, bordure accent + anneau atténué au focus. */
+  .input {
+    @apply h-7 w-full rounded-md border px-2 text-[12.5px] leading-none;
+    background: var(--c-input-bg);
+    border-color: var(--c-border);
+    color: var(--c-text);
+  }
+  .input::placeholder {
+    color: var(--c-text-muted);
+  }
+  .input:focus {
+    outline: none;
+    border-color: var(--c-accent);
+    box-shadow: 0 0 0 2px var(--c-accent-dim);
+  }
+  .input:disabled {
+    opacity: 0.5;
+  }
+  .input-mono {
+    @apply font-mono text-[12px];
+  }
+  textarea.input {
+    @apply h-auto py-1.5 leading-relaxed;
+  }
+  select.input {
+    @apply pr-6;
+    appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'><path d='M2 3.5 5 6.5 8 3.5' fill='none' stroke='%2371717a' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 7px center;
+  }
+
+  /* Libellé de champ, et « sourcil » de section (titre court en capitales,
+     pour découper un panneau long en zones). */
+  .field-label {
+    @apply mb-1 block text-[11.5px] font-medium text-[var(--c-text-secondary)];
+  }
+  .eyebrow {
+    @apply text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[var(--c-text-muted)];
+  }
+  .help-text {
+    @apply text-[11.5px] leading-relaxed text-[var(--c-text-muted)];
+  }
+
+  /* Surfaces. Une carte est statique et bordée ; un popover flotte et porte
+     une ombre. */
+  .card {
+    @apply rounded-lg border;
+    background: var(--c-bg3);
+    border-color: var(--c-border);
+  }
+  .popover {
+    @apply rounded-lg;
+    background: var(--c-bg2);
+    box-shadow: var(--shadow-md);
+  }
+  .modal {
+    @apply rounded-xl;
+    background: var(--c-bg2);
+    box-shadow: var(--shadow-lg);
+  }
+  .menu-item {
+    @apply flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[12.5px] text-[var(--c-text-secondary)] transition-colors;
+  }
+  .menu-item:hover,
+  .menu-item[data-active="true"] {
+    background: var(--c-hover);
+    color: var(--c-text);
+  }
+  .menu-sep {
+    @apply my-1 border-t border-[var(--c-border)];
+  }
+
+  /* Étiquettes : tag d'hôte, badge de compte. Un rectangle à peine arrondi,
+     pas une pilule. */
+  .tag {
+    @apply inline-flex shrink-0 items-center rounded-sm px-1.5 py-px text-[10.5px] font-medium leading-4;
+    background: var(--c-hover);
+    color: var(--c-text-secondary);
+  }
+  .tag-accent {
+    background: var(--c-accent-dim);
+    color: var(--c-accent-text);
+  }
+  .kbd {
+    @apply inline-flex items-center rounded-sm border px-1 font-mono text-[10.5px] leading-4 text-[var(--c-text-muted)];
+    border-color: var(--c-border);
+    background: var(--c-bg);
+  }
+
+  /* Ligne de liste : 30 px, survol en voile, actif en accent atténué avec un
+     marqueur à gauche. Le marqueur est ce qui dit « c'est celui-ci » sans
+     remplir la ligne. */
+  .list-row {
+    @apply relative flex min-w-0 items-center gap-2.5 rounded-md px-2.5 text-left transition-colors;
+    min-height: 32px;
+  }
+  .list-row:hover {
+    background: var(--c-hover);
+  }
+  .list-row[data-active="true"] {
+    background: var(--c-accent-dim);
+  }
+  .list-row[data-active="true"]::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    border-radius: 1px;
+    background: var(--c-accent);
+  }
+
+  /* Voyant d'état : en ligne / hors ligne / inconnu. */
+  .dot {
+    @apply inline-block h-1.5 w-1.5 shrink-0 rounded-full;
+    background: var(--c-text-faint);
+  }
+  .dot-ok {
+    background: var(--c-ok);
+  }
+  .dot-warn {
+    background: var(--c-warn);
+  }
+  .dot-danger {
+    background: var(--c-danger);
+  }
+
+  /* Contrôle segmenté : deux ou trois options exclusives (« Sombre / Clair »,
+     « Commande / Langage »). */
+  .segmented {
+    @apply inline-flex rounded-md border p-0.5;
+    background: var(--c-bg);
+    border-color: var(--c-border);
+  }
+  .segmented > button {
+    @apply rounded px-2.5 py-1 text-[12px] font-medium text-[var(--c-text-muted)] transition-colors;
+  }
+  .segmented > button:hover {
+    color: var(--c-text);
+  }
+  .segmented > button[data-active="true"] {
+    background: var(--c-bg3);
+    color: var(--c-text);
+    box-shadow: var(--shadow-sm);
+  }
+
+  /* Bandeau d'alerte contextuel (pas la notification globale). */
+  .callout {
+    @apply rounded-md border px-2.5 py-2 text-[12px] leading-relaxed;
+    background: var(--c-hover);
+    border-color: var(--c-border);
+    color: var(--c-text-secondary);
+  }
+  .callout-warn {
+    background: color-mix(in srgb, var(--c-warn) 10%, transparent);
+    border-color: color-mix(in srgb, var(--c-warn) 30%, transparent);
+    color: var(--c-text);
+  }
+  .callout-danger {
+    background: color-mix(in srgb, var(--c-danger) 10%, transparent);
+    border-color: color-mix(in srgb, var(--c-danger) 30%, transparent);
+    color: var(--c-text);
+  }
+}
+
+/* ── Focus clavier visible ──────────────────────────────────────────────────
+ *
+ * 40 composants posent `outline-none` pour supprimer le halo par défaut du
+ * navigateur, qui apparaît aussi au clic souris et alourdit l'interface. Effet
+ * de bord : plus rien n'indiquait où se trouvait le focus en tabulant.
+ *
+ * `:focus-visible` répond aux deux besoins à la fois — le navigateur ne le
+ * déclenche qu'à la navigation clavier, jamais au clic. Rien ne change donc à
+ * la souris.
+ *
+ * Placé après `@tailwind utilities` volontairement : `.outline-none` et
+ * `:focus-visible` ont la même spécificité (une classe), donc c'est l'ordre
+ * source qui tranche. Déplacer ce bloc plus haut le rendrait silencieusement
+ * inopérant.
+ */
+:focus-visible {
+  outline: 2px solid var(--c-accent-hover);
+  outline-offset: 1px;
+}
+
+/* Le terminal et le canvas RDP gardent leur propre indication de focus (curseur
+ * qui clignote, bordure d'onglet actif) et occupent toute la surface : un
+ * liseré de 2 px tout autour n'apporterait rien et découperait l'image. */
+.xterm:focus-visible,
+.xterm-helper-textarea:focus-visible,
+canvas:focus-visible {
+  outline: none;
+}
+
+/* Mouvement : réduit à rien pour qui l'a demandé au système. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
