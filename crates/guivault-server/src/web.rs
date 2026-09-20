@@ -44,10 +44,18 @@ async fn serve(uri: Uri) -> Response {
         // Les fichiers de `assets/` portent un hachage dans leur nom : ils
         // peuvent être gardés indéfiniment. `index.html`, lui, change à
         // chaque version et ne doit pas l'être.
-        let cache = if path.starts_with("assets/") { "public, max-age=31536000, immutable" } else { "no-cache" };
+        let cache = if path.starts_with("assets/") {
+            "public, max-age=31536000, immutable"
+        } else {
+            "no-cache"
+        };
         return (
             [
-                (header::CONTENT_TYPE, HeaderValue::from_str(mime.as_ref()).unwrap_or(HeaderValue::from_static("application/octet-stream"))),
+                (
+                    header::CONTENT_TYPE,
+                    HeaderValue::from_str(mime.as_ref())
+                        .unwrap_or(HeaderValue::from_static("application/octet-stream")),
+                ),
                 (header::CACHE_CONTROL, HeaderValue::from_static(cache)),
                 (header::X_CONTENT_TYPE_OPTIONS, HeaderValue::from_static("nosniff")),
             ],

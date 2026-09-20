@@ -44,7 +44,17 @@ fn opens_browser_item_and_vault_name() {
     let v = &vectors()["item"];
     let key = SymmetricKey::from_slice(&h(&v["vault_key"])).unwrap();
     let vault_id = v["vault_id"].as_str().unwrap();
-    let plain = open_item(&key, vault_id, v["item_id"].as_str().unwrap(), v["item_type"].as_str().unwrap(), &h(&v["blob"])).unwrap();
+    let plain = open_item(
+        &key,
+        vault_id,
+        v["item_id"].as_str().unwrap(),
+        v["item_type"].as_str().unwrap(),
+        &h(&v["blob"]),
+    )
+    .unwrap();
     assert_eq!(plain, v["plaintext"].as_str().unwrap().as_bytes());
-    assert_eq!(open_vault_name(&key, vault_id, &h(&v["name_blob"])).unwrap(), v["name"].as_str().unwrap());
+    assert_eq!(
+        open_vault_name(&key, vault_id, &h(&v["name_blob"])).unwrap(),
+        v["name"].as_str().unwrap()
+    );
 }

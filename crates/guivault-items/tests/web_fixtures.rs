@@ -11,7 +11,10 @@ fn web_items_parse_and_roundtrip() {
     for v in &values {
         let item = SecretItem::from_json(v.to_string().as_bytes()).unwrap();
         assert_eq!(item.item_type(), v["kind"].as_str().unwrap());
-        assert_eq!(item.id().to_string(), v[v["kind"].as_str().unwrap()]["id"].as_str().unwrap());
+        assert_eq!(
+            item.id().to_string(),
+            v[v["kind"].as_str().unwrap()]["id"].as_str().unwrap()
+        );
         // Re-sérialisé puis relu : identique, et rien de perdu par rapport
         // au JSON d'origine (chaque clé du web est encore là).
         let again: Value = serde_json::from_str(&item.to_json().unwrap()).unwrap();

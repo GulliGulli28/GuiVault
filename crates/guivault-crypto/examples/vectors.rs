@@ -13,7 +13,11 @@ fn hex(b: &[u8]) -> String {
 
 fn main() {
     // Paramètres légers : on vérifie la mécanique, pas la résistance.
-    let kdf = KdfParams { m_cost: 19_456, t_cost: 2, p_cost: 1 };
+    let kdf = KdfParams {
+        m_cost: 19_456,
+        t_cost: 2,
+        p_cost: 1,
+    };
     let password = "correct horse battery staple — é";
     let salt: [u8; 16] = *b"0123456789abcdef";
     let master = MasterKey::derive(password, &salt, kdf).unwrap();

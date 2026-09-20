@@ -318,7 +318,10 @@ async fn web_ui_is_served_at_root_and_api_404_stays_json() {
     // La racine : la page si le build Vite est embarqué, sinon un texte qui
     // explique comment l'obtenir — les deux cas sont légitimes en test.
     let res = client.get(format!("{origin}/")).send().await.unwrap();
-    let ct = res.headers()[reqwest::header::CONTENT_TYPE].to_str().unwrap().to_string();
+    let ct = res.headers()[reqwest::header::CONTENT_TYPE]
+        .to_str()
+        .unwrap()
+        .to_string();
     if guivault_server::web::is_built() {
         assert_eq!(res.status(), StatusCode::OK);
         assert!(ct.starts_with("text/html"), "{ct}");
@@ -327,7 +330,12 @@ async fn web_ui_is_served_at_root_and_api_404_stays_json() {
         // Un chemin inconnu hors API renvoie aussi la page (routage côté client).
         let res = client.get(format!("{origin}/whatever")).send().await.unwrap();
         assert_eq!(res.status(), StatusCode::OK);
-        assert!(res.headers()[reqwest::header::CONTENT_TYPE].to_str().unwrap().starts_with("text/html"));
+        assert!(
+            res.headers()[reqwest::header::CONTENT_TYPE]
+                .to_str()
+                .unwrap()
+                .starts_with("text/html")
+        );
     } else {
         assert_eq!(res.status(), StatusCode::NOT_FOUND);
         assert!(ct.starts_with("text/plain"), "{ct}");

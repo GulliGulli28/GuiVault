@@ -70,6 +70,7 @@ build Docker sans base). Les colonnes `citext` se lisent avec `::text`.
 scripts/test-db.sh                   # Postgres jetable (Docker, port 55432)
 cargo test                           # unitaires + tests/api.rs bout en bout
 cargo clippy --all-targets           # doit être vide
+cargo fmt --all --check              # le CI le bloque (max_width = 120)
 cd web && npm test && npm run lint && npm run build   # Node 20 via nvm (`source ~/.nvm/nvm.sh`)
 docker build -f docker/Dockerfile -t guivault:dev .
 ```

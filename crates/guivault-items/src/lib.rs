@@ -296,7 +296,8 @@ mod tests {
 
     #[test]
     fn missing_fields_take_defaults() {
-        let item = SecretItem::from_json(br#"{"kind":"card","card":{"id":"11111111-1111-4111-8111-111111111111"}}"#).unwrap();
+        let item =
+            SecretItem::from_json(br#"{"kind":"card","card":{"id":"11111111-1111-4111-8111-111111111111"}}"#).unwrap();
         let SecretItem::Card { card } = &item else { panic!() };
         assert_eq!(card.number, "");
         assert!(card.base.favorite.is_none());
