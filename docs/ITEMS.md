@@ -75,15 +75,18 @@ colonnes se reconnaissent (`web/src/lib/importers.ts`).
 
 Le jour où Guiterm affiche les secrets, dans l'ordre :
 
-1. **Ne plus avertir sur les `kind` inconnus.** Aujourd'hui
-   `sync.rs` note « JSON invalide, ignoré » pour chaque item qu'il ne sait
-   pas lire — dès qu'un vault contient des identifiants, chaque synchro le
-   répète. Reconnaître `guivault_items::SecretItem::is_secret_type` et
-   passer sans bruit.
-2. **Dépendre de `guivault-items`** (dépendance git, comme
-   `guivault-crypto`), et ajouter à `Payload` des variantes qui délèguent :
-   `Login { login: guivault_items::Login }`, etc. `to_json`/`from_json`
-   marchent tels quels (`serde(tag = "kind")` des deux côtés).
+1. **Fait** (Guiterm dépend de `guivault-items`) : `sync.rs` reconnaît
+   `SecretItem::is_secret_type` et passe sans bruit — ni avertissement,
+   ni état de synchro. Le point qui compte : un item qui entrerait dans
+   `state.items` sans exister localement serait pris pour une suppression
+   locale et **effacé côté serveur** à la synchro suivante. Tant que
+   Guiterm ne stocke pas les secrets, il ne doit pas les voir ; le test
+   `web_secrets_are_left_alone_by_sync` le garantit.
+2. **Ajouter à `Payload`** des variantes qui délèguent : `Login { login:
+   guivault_items::Login }`, etc. `to_json`/`from_json` marchent tels quels
+   (`serde(tag = "kind")` des deux côtés) — mais seulement une fois
+   l'étape 3 en place, pour la raison ci-dessus : `collect` doit alors les
+   émettre et `apply` les ranger.
 3. **Stocker localement** : les secrets n'ont pas leur place dans
    `workspace.json` (en clair sur disque) — les garder dans le coffre local
    (`core::vault`) ou dans un fichier chiffré à part, à l'image de ce qui
