@@ -31,6 +31,9 @@ serveur puisse jamais lire un secret.
   Bitwarden (JSON en clair ou protégé, CSV), Chrome, Firefox, LastPass,
   KeePassXC ; export JSON (chiffré par mot de passe ou en clair) et CSV.
   Formats décrits dans [`docs/ITEMS.md`](docs/ITEMS.md).
+- **Extension de navigateur** (Chrome/Edge/Firefox) : les identifiants de
+  la page courante, remplissage en un clic, codes TOTP, générateur —
+  [`docs/EXTENSION.md`](docs/EXTENSION.md).
 - **Une seule image Docker**, Rust/axum/PostgreSQL. Même stack que Guiterm.
 
 Voir [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) pour le fonctionnement,
@@ -106,6 +109,7 @@ scripts/test-db.sh        # Postgres jetable dans Docker (port 55432)
 cargo test                # unitaires + intégration bout en bout
 cargo clippy --all-targets
 cd web && npm install && npm test && npm run build   # interface web
+cd web && npm run build:ext                          # extension → web/dist-extension/
 ```
 
 L'interface web est embarquée dans le binaire au moment de `cargo build`

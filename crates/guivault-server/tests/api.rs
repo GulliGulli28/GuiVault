@@ -315,6 +315,25 @@ async fn web_ui_is_served_at_root_and_api_404_stays_json() {
     let err: ApiError = res.json().await.unwrap();
     assert_eq!(err.code, "not_found");
 
+    // CORS : une origine quelconque (l'extension de navigateur) peut appeler
+    // l'API avec son jeton ; la page, elle, n'en a pas besoin.
+    let res = client
+        .request(reqwest::Method::OPTIONS, format!("{origin}/api/v1/sync"))
+        .header("Origin", "chrome-extension://abcdef")
+        .header("Access-Control-Request-Method", "GET")
+        .header("Access-Control-Request-Headers", "authorization")
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    assert_eq!(res.headers()["access-control-allow-origin"], "*");
+    assert!(
+        res.headers()["access-control-allow-headers"]
+            .to_str()
+            .unwrap()
+            .contains("authorization")
+    );
+
     // La racine : la page si le build Vite est embarqué, sinon un texte qui
     // explique comment l'obtenir — les deux cas sont légitimes en test.
     let res = client.get(format!("{origin}/")).send().await.unwrap();

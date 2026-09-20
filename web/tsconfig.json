@@ -21,11 +21,13 @@
     "noFallthroughCasesInSwitch": true,
     "types": [
       "node",
-      "vite/client"
+      "vite/client",
+      "chrome"
     ]
   },
   "include": [
-    "src"
+    "src",
+    "extension/src"
   ],
   "references": [
     {

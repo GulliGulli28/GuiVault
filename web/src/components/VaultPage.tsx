@@ -175,7 +175,7 @@ function VaultBody({ ctx, vault }: { ctx: PageContext; vault: VaultView }) {
     const copy = (label: string, value: string) => () => copyText(value).then((ok) => ok && ctx.notify(`${label} copié.`));
     return (
       <>
-        {l.username && <button onClick={copy("Utilisateur", l.username)} className="btn btn-ghost btn-sm" title="Copier l'utilisateur">U</button>}
+        {l.username && <button onClick={copy("Utilisateur", l.username)} className="btn btn-ghost btn-sm" title="Copier l'utilisateur" aria-label="Copier l'utilisateur">U</button>}
         {l.password && <button onClick={copy("Mot de passe", l.password)} className="btn btn-ghost btn-sm btn-icon" title="Copier le mot de passe" aria-label="Copier le mot de passe"><IconCopy size={11} /></button>}
       </>
     );

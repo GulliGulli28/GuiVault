@@ -55,6 +55,11 @@ HMAC pour les sels fictifs de prelogin.
     `lib/generator.ts` (+ `wordlist.ts`, liste EFF), `lib/totp.ts`,
     `lib/csv.ts`, `lib/bitwarden.ts` (JSON en clair ou protégé, CSV),
     `lib/importers.ts` / `lib/exporters.ts` (formats dans `docs/ITEMS.md`).
+  - `extension/` — l'extension de navigateur (MV3), même `node_modules`,
+    importe `../../src/lib/*` et quelques composants. `docs/EXTENSION.md`.
+    Le popup ouvert comme une page n'a pas `activeTab` : pour un test
+    Playwright, copier `dist-extension` en ajoutant `tabs` et une
+    `host_permissions` au manifeste, et ouvrir `popup.html?tab=<id>`.
   - `components/` — une page par route (`VaultPage`, `VaultSettings`,
     `ToolsPage` import/export, `AccountPage`, `InvitationsPage`,
     `GeneratorPanel`), `forms/` un formulaire par type d'item
@@ -72,6 +77,7 @@ cargo test                           # unitaires + tests/api.rs bout en bout
 cargo clippy --all-targets           # doit être vide
 cargo fmt --all --check              # le CI le bloque (max_width = 120)
 cd web && npm test && npm run lint && npm run build   # Node 20 via nvm (`source ~/.nvm/nvm.sh`)
+cd web && npm run build:ext                           # extension (dist-extension/, non embarquée)
 docker build -f docker/Dockerfile -t guivault:dev .
 ```
 

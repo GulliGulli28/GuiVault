@@ -90,6 +90,11 @@ est installé une fois et vérifiable.
   tourner une clé exige que son empreinte ait été vérifiée hors bande et
   épinglée dans *ce* navigateur.
 
+- **CORS ouvert sur `/api/v1`** (pour l'extension de navigateur) : sans
+  cookie ni session ambiante, une page tierce ne peut rien faire sans le
+  jeton porteur ; l'en-tête `Access-Control-Allow-Origin: *` n'expose donc
+  rien. Voir `docs/EXTENSION.md` pour le modèle de menace de l'extension.
+
 ## Déploiement
 
 - **TLS obligatoire** devant le serveur. Sans TLS, les jetons et la clé

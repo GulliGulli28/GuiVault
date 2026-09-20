@@ -6,7 +6,17 @@ import type {
   ServerEvent, Session, SyncResponse, TokenPair, TotpChallenge, UserLookupResponse, UserProfile, Vault, VaultMember,
 } from "./types";
 
-export const BASE = "/api/v1";
+/** L'API : relative dans l'interface embarquée (même origine), absolue dans
+ * l'extension (`setBaseUrl`). */
+let BASE = "/api/v1";
+
+export function setBaseUrl(serverUrl: string) {
+  BASE = `${serverUrl.trim().replace(/\/+$/, "")}/api/v1`;
+}
+
+export function baseUrl(): string {
+  return BASE;
+}
 
 /** Une erreur renvoyée par le serveur : `code` stable, `message` humain, et
  * les champs supplémentaires selon le code (`current` sur
@@ -38,9 +48,17 @@ let refreshing: Promise<void> | null = null;
 /** Le serveur a refusé le jeton et le rafraîchissement a échoué : la session
  * est morte, l'application repasse à l'écran de connexion. */
 let onSessionLost: (() => void) | null = null;
+/** Les jetons ont tourné (connexion, rafraîchissement) : l'extension les
+ * re-persiste, l'interface embarquée n'en a pas besoin. */
+let onTokensChanged: ((t: TokenPair | null) => void) | null = null;
 
 export function setTokens(t: TokenPair | null) {
   tokens = t ? { access: t.access_token, refresh: t.refresh_token } : null;
+  onTokensChanged?.(t);
+}
+
+export function setTokensChangedHandler(f: ((t: TokenPair | null) => void) | null) {
+  onTokensChanged = f;
 }
 
 export function hasSession(): boolean {

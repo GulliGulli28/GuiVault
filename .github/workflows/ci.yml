@@ -50,6 +50,7 @@ jobs:
       - run: npm test
       - run: npm run lint
       - run: npm run build
+      - run: npm run build:ext
 
   docker:
     runs-on: ubuntu-latest

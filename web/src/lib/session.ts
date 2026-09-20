@@ -37,11 +37,19 @@ export type DecodedItem =
 const b64 = toBase64;
 const unb64 = fromBase64;
 
+/** « GuiVault Web » ou « Extension GuiVault » : ce que la liste des sessions
+ * montre. */
+let deviceLabel = "GuiVault Web";
+
+export function setDeviceLabel(label: string) {
+  deviceLabel = label;
+}
+
 function deviceName(): string {
   const ua = navigator.userAgent;
   const browser = /Firefox\//.test(ua) ? "Firefox" : /Edg\//.test(ua) ? "Edge" : /Chrome\//.test(ua) ? "Chrome" : /Safari\//.test(ua) ? "Safari" : "navigateur";
   const os = /Windows/.test(ua) ? "Windows" : /Mac OS/.test(ua) ? "macOS" : /Linux/.test(ua) ? "Linux" : /Android/.test(ua) ? "Android" : /iPhone|iPad/.test(ua) ? "iOS" : "";
-  return `GuiVault Web (${browser}${os ? `, ${os}` : ""})`;
+  return `${deviceLabel} (${browser}${os ? `, ${os}` : ""})`;
 }
 
 // ─── Connexion ──────────────────────────────────────────────────────────────
