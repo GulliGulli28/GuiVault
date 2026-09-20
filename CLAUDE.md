@@ -22,6 +22,12 @@ HMAC pour les sels fictifs de prelogin.
   sur celles de Guiterm (`argon2 0.5`, `chacha20poly1305 0.10`, …) pour
   qu'elles s'unifient dans son binaire.
 - `crates/guivault-protocol` — types JSON. Même contrainte de compatibilité.
+- `crates/guivault-items` — formats en clair des secrets (`login`, `note`,
+  `card`, `identity`), miroir Rust de `web/src/lib/types.ts`, à consommer
+  par Guiterm le jour de l'intégration (plan dans `docs/ITEMS.md`). Champs
+  inconnus conservés (`flatten extra`), tout absent = défaut. Fixtures
+  `tests/web-items.json` écrites par `GUIVAULT_WRITE_VECTORS=1 npx vitest
+  run` : changer un type ici, c'est le changer là-bas, et régénérer.
 - `crates/guivault-server` — `routes/` (une route par domaine), `db.rs`
   (lignes et requêtes partagées), `auth.rs` (extracteur `AuthUser`,
   jetons), `sessions.rs`, `validate.rs` (tailles des blobs), `audit.rs`,
@@ -45,9 +51,15 @@ HMAC pour les sels fictifs de prelogin.
     **même JSON que `termius_core::guivault::entity::Payload`** : un item
     écrit ici doit être relu par Guiterm — les champs inconnus sont
     conservés via `[extra: string]: unknown`).
+  - `lib/items.ts` (secrets vides, ligne secondaire, recherche),
+    `lib/generator.ts` (+ `wordlist.ts`, liste EFF), `lib/totp.ts`,
+    `lib/csv.ts`, `lib/bitwarden.ts` (JSON en clair ou protégé, CSV),
+    `lib/importers.ts` / `lib/exporters.ts` (formats dans `docs/ITEMS.md`).
   - `components/` — une page par route (`VaultPage`, `VaultSettings`,
-    `AccountPage`, `InvitationsPage`), `forms/` un formulaire par type
-    d'item.
+    `ToolsPage` import/export, `AccountPage`, `InvitationsPage`,
+    `GeneratorPanel`), `forms/` un formulaire par type d'item
+    (`SecretBits.tsx` = tronc commun des secrets), `secret-icons.tsx` pour
+    les icônes qui ne sont pas dans Guiterm.
 
 Requêtes sqlx sans macros `query!` (pas de `DATABASE_URL` à la compilation,
 build Docker sans base). Les colonnes `citext` se lisent avec `::text`.

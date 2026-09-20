@@ -755,6 +755,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "guivault-items"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "uuid",
+]
+
+[[package]]
 name = "guivault-protocol"
 version = "0.1.0"
 dependencies = [

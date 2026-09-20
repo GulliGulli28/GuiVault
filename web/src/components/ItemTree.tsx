@@ -2,15 +2,20 @@ import { useMemo, useState, type ReactNode } from "react";
 import { buildVaultTree, visibleRows } from "../lib/vaultTree";
 import { KIND_LABELS, type GuiVaultEntity, type GuiVaultEntityKind } from "../lib/types";
 import { EntityRow, GroupRow } from "./EntityRow";
+import { IconCard, IconIdentity, IconLogin, IconNote, IconStar } from "./secret-icons";
 import { IconDatabase, IconFolder, IconHosts, IconKeychain, IconPalette, IconSnippets } from "./ui-icons";
 
-export const KIND_ICONS: Record<GuiVaultEntityKind, (p: { size?: number }) => ReactNode> = {
+export const KIND_ICONS: Record<GuiVaultEntityKind, (p: { size?: number; className?: string }) => ReactNode> = {
   host: IconHosts,
   group: IconFolder,
   key: IconKeychain,
   snippet: IconSnippets,
   "sql-connection": IconDatabase,
   icon: IconPalette,
+  login: IconLogin,
+  note: IconNote,
+  card: IconCard,
+  identity: IconIdentity,
 };
 
 const BUCKET_ICONS: Record<string, (p: { size?: number }) => ReactNode> = {
@@ -22,12 +27,15 @@ const BUCKET_ICONS: Record<string, (p: { size?: number }) => ReactNode> = {
 /** Le contenu d'un vault, comme dans le panneau GuiVault de Guiterm : mêmes
  * lignes de dossier repliables, mêmes lignes d'entité, même indentation —
  * sans les cases à cocher, un clic ouvre l'entité. */
-export function ItemTree({ entities, query, selected, onSelect, emptyMessage = "Rien ici pour l'instant." }: {
+export function ItemTree({ entities, query, selected, onSelect, emptyMessage = "Rien ici pour l'instant.", rowActions }: {
   entities: GuiVaultEntity[];
   query: string;
   selected: string | null;
   onSelect: (id: string) => void;
   emptyMessage?: string;
+  /** Boutons révélés au survol d'une entité (copier l'utilisateur, le mot
+   * de passe…). */
+  rowActions?: (entity: GuiVaultEntity) => ReactNode;
 }) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const toggle = (id: string) =>
@@ -78,8 +86,11 @@ export function ItemTree({ entities, query, selected, onSelect, emptyMessage = "
             className="cursor-pointer"
             icon={<Icon size={13} />}
             title={entity.name}
+            badges={entity.favorite ? <IconStar size={11} filled className="text-[var(--c-warn)]" /> : undefined}
+            secondary={entity.subtitle ? <span className="truncate">{entity.subtitle}</span> : undefined}
             title_={`${KIND_LABELS[entity.kind]}${entity.path ? ` — ${entity.path}` : ""}`}
             onClick={() => onSelect(entity.id)}
+            actions={rowActions?.(entity)}
           />
         );
       })}

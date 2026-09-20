@@ -273,17 +273,134 @@ export interface CustomIcon {
   [extra: string]: unknown;
 }
 
-/** Miroir de `termius_core::guivault::entity::Payload` : `kind` en
- * kebab-case, c'est aussi l'`item_type` du serveur. */
+// ─── Secrets (gestionnaire de mots de passe) ────────────────────────────────
+//
+// Les types que Guiterm ne connaît pas encore : `login`, `note`, `card`,
+// `identity`. Même convention que ses entités (camelCase, `groupId` pour le
+// dossier, `tags`), miroir Rust dans `crates/guivault-items` — c'est ce que
+// Guiterm ajoutera à son `Payload` le jour de l'intégration (voir
+// `docs/ITEMS.md`). Modelés sur les types de Bitwarden pour que l'import et
+// l'export soient sans perte.
+
+/** Un champ libre ajouté à n'importe quel secret. `hidden` se masque comme
+ * un mot de passe. */
+export interface CustomField {
+  name: string;
+  value: string;
+  type: "text" | "hidden" | "boolean";
+}
+
+/** Ce que tous les secrets ont en commun. */
+export interface SecretBase {
+  id: string;
+  name: string;
+  groupId: string | null;
+  tags: string[];
+  favorite?: boolean;
+  notes?: string;
+  fields?: CustomField[];
+  [extra: string]: unknown;
+}
+
+/** Comment une URI enregistrée se compare à celle d'une page (même sens que
+ * Bitwarden) ; `null` = réglage par défaut du client. */
+export type UriMatch = "domain" | "host" | "startsWith" | "exact" | "regex" | "never";
+
+export interface LoginUri {
+  uri: string;
+  match?: UriMatch | null;
+}
+
+/** Une passkey (WebAuthn) rattachée à un identifiant — le format
+ * `fido2Credentials` de Bitwarden, pour voyager sans perte. Une page web ne
+ * peut pas jouer l'authentificateur : on la stocke, on l'affiche, on
+ * l'importe et l'exporte ; l'utiliser sera le rôle de Guiterm ou d'une
+ * extension. */
+export interface Passkey {
+  credentialId: string;
+  keyType: string;
+  keyAlgorithm: string;
+  keyCurve: string;
+  /** Clé privée (PKCS#8, base64). C'est le secret. */
+  keyValue: string;
+  rpId: string;
+  rpName?: string | null;
+  userHandle: string;
+  userName?: string | null;
+  userDisplayName?: string | null;
+  counter: number;
+  discoverable: boolean;
+  createdAt: string;
+}
+
+export interface PasswordHistoryEntry {
+  password: string;
+  changedAt: string;
+}
+
+export interface Login extends SecretBase {
+  username: string;
+  password: string;
+  uris: LoginUri[];
+  /** Secret TOTP : une URI `otpauth://` ou un secret base32 nu. */
+  totp: string | null;
+  passkeys: Passkey[];
+  passwordHistory: PasswordHistoryEntry[];
+}
+
+export interface Note extends SecretBase {
+  content: string;
+}
+
+export interface Card extends SecretBase {
+  cardholderName: string;
+  brand: string;
+  number: string;
+  expMonth: string;
+  expYear: string;
+  code: string;
+}
+
+export interface Identity extends SecretBase {
+  title: string;
+  firstName: string;
+  middleName: string;
+  lastName: string;
+  username: string;
+  company: string;
+  ssn: string;
+  passportNumber: string;
+  licenseNumber: string;
+  email: string;
+  phone: string;
+  address1: string;
+  address2: string;
+  address3: string;
+  city: string;
+  state: string;
+  postalCode: string;
+  country: string;
+}
+
+/** Le contenu en clair d'un item : `kind` en kebab-case, c'est aussi
+ * l'`item_type` du serveur. Les six premiers sont le miroir de
+ * `termius_core::guivault::entity::Payload`, les quatre suivants sont ceux
+ * de `crates/guivault-items`. */
 export type Payload =
   | { kind: "host"; host: Host; secrets?: HostSecrets }
   | { kind: "group"; group: Group }
   | { kind: "snippet"; snippet: Snippet }
   | { kind: "key"; key: PrivateKey; content?: string | null; passphrase?: string | null }
   | { kind: "sql-connection"; connection: SqlConnection; password?: string | null }
-  | { kind: "icon"; icon: CustomIcon };
+  | { kind: "icon"; icon: CustomIcon }
+  | { kind: "login"; login: Login }
+  | { kind: "note"; note: Note }
+  | { kind: "card"; card: Card }
+  | { kind: "identity"; identity: Identity };
 
 export type ItemKind = Payload["kind"];
+export type SecretKind = "login" | "note" | "card" | "identity";
+export const SECRET_KINDS: SecretKind[] = ["login", "note", "card", "identity"];
 
 export const KIND_LABELS: Record<ItemKind, string> = {
   host: "hôte",
@@ -292,6 +409,23 @@ export const KIND_LABELS: Record<ItemKind, string> = {
   snippet: "snippet",
   "sql-connection": "connexion",
   icon: "icône",
+  login: "identifiant",
+  note: "note",
+  card: "carte",
+  identity: "identité",
+};
+
+export const KIND_LABELS_PLURAL: Record<ItemKind, string> = {
+  host: "Hôtes",
+  group: "Dossiers",
+  key: "Clés",
+  snippet: "Snippets",
+  "sql-connection": "Connexions",
+  icon: "Icônes",
+  login: "Identifiants",
+  note: "Notes",
+  card: "Cartes",
+  identity: "Identités",
 };
 
 export const SQL_ENGINE_LABELS: Record<SqlEngine, string> = {
@@ -314,4 +448,10 @@ export interface GuiVaultEntity {
   /** Le dossier qui la contient ; `null` à la racine, et toujours pour une
    * clé, un snippet ou une icône. */
   parentId: string | null;
+  /** Ce que la recherche voit en plus du nom (utilisateur, site…) — pas
+   * dans Guiterm, qui n'a que le nom. */
+  search?: string;
+  /** La ligne secondaire d'une entité (utilisateur, site, fin de carte). */
+  subtitle?: string;
+  favorite?: boolean;
 }

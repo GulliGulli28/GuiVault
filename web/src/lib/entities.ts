@@ -3,6 +3,7 @@
  * les relais, clés, snippets). */
 import type { DecodedItem } from "./session";
 import { payloadName } from "./session";
+import { describeSecret } from "./items";
 import type { Group, GuiVaultEntity, Host, Payload, PrivateKey, Snippet, SqlConnection } from "./types";
 
 export interface VaultIndex {
@@ -26,7 +27,7 @@ export function indexItems(items: DecodedItem[]): VaultIndex {
       case "key": idx.keys.push(p.key); break;
       case "snippet": idx.snippets.push(p.snippet); break;
       case "sql-connection": idx.connections.push(p.connection); break;
-      case "icon": break;
+      default: break;
     }
   }
   const byName = <T extends { name?: string; label?: string }>(a: T, b: T) => (a.name ?? a.label ?? "").localeCompare(b.name ?? b.label ?? "");
@@ -43,6 +44,10 @@ function parentOf(p: Payload): string | null {
     case "host": return p.host.groupId ?? null;
     case "group": return p.group.parentId ?? null;
     case "sql-connection": return p.connection.groupId ?? null;
+    case "login": return p.login.groupId ?? null;
+    case "note": return p.note.groupId ?? null;
+    case "card": return p.card.groupId ?? null;
+    case "identity": return p.identity.groupId ?? null;
     default: return null;
   }
 }
@@ -62,6 +67,16 @@ export function groupPath(groups: Map<string, Group>, groupId: string | null): s
   return parts.join(" / ");
 }
 
+function payloadEntityFavorite(p: Payload): boolean {
+  switch (p.kind) {
+    case "login": return !!p.login.favorite;
+    case "note": return !!p.note.favorite;
+    case "card": return !!p.card.favorite;
+    case "identity": return !!p.identity.favorite;
+    default: return false;
+  }
+}
+
 export function toEntities(items: DecodedItem[]): GuiVaultEntity[] {
   const groups = new Map<string, Group>();
   for (const it of items) if (it.ok && it.payload.kind === "group") groups.set(it.id, it.payload.group);
@@ -72,7 +87,9 @@ export function toEntities(items: DecodedItem[]): GuiVaultEntity[] {
       continue;
     }
     const parentId = parentOf(it.payload);
-    out.push({ id: it.id, kind: it.payload.kind, name: payloadName(it.payload) || "(sans nom)", path: groupPath(groups, parentId), parentId });
+    const { subtitle, search } = describeSecret(it.payload);
+    const favorite = payloadEntityFavorite(it.payload) || undefined;
+    out.push({ id: it.id, kind: it.payload.kind, name: payloadName(it.payload) || "(sans nom)", path: groupPath(groups, parentId), parentId, subtitle: subtitle || undefined, search: search || undefined, favorite });
   }
   return out;
 }

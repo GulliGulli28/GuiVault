@@ -202,6 +202,10 @@ export function payloadId(p: Payload): string {
     case "key": return p.key.id;
     case "sql-connection": return p.connection.id;
     case "icon": return p.icon.id;
+    case "login": return p.login.id;
+    case "note": return p.note.id;
+    case "card": return p.card.id;
+    case "identity": return p.identity.id;
   }
 }
 
@@ -213,6 +217,27 @@ export function payloadName(p: Payload): string {
     case "key": return p.key.name;
     case "sql-connection": return p.connection.label;
     case "icon": return p.icon.name;
+    case "login": return p.login.name;
+    case "note": return p.note.name;
+    case "card": return p.card.name;
+    case "identity": return p.identity.name;
+  }
+}
+
+/** L'entité d'un payload, quel que soit son type : pour lire `id`,
+ * `groupId`, `favorite` sans dix `switch`. */
+export function payloadEntity(p: Payload): Record<string, unknown> & { id: string } {
+  switch (p.kind) {
+    case "host": return p.host;
+    case "group": return p.group;
+    case "snippet": return p.snippet;
+    case "key": return p.key;
+    case "sql-connection": return p.connection;
+    case "icon": return p.icon;
+    case "login": return p.login;
+    case "note": return p.note;
+    case "card": return p.card;
+    case "identity": return p.identity;
   }
 }
 

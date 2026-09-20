@@ -24,6 +24,13 @@ serveur puisse jamais lire un secret.
   snippets et connexions, gérer les vaults partagés, les membres, les
   invitations, les sessions et le second facteur — depuis une machine sans
   Guiterm.
+- **Gestionnaire de mots de passe** dans la même interface, à la manière de
+  Bitwarden : identifiants (avec sites, codes TOTP, passkeys, historique),
+  notes sécurisées, cartes, identités, favoris, champs personnalisés ;
+  générateur de mots de passe et de phrases de passe ; import depuis
+  Bitwarden (JSON en clair ou protégé, CSV), Chrome, Firefox, LastPass,
+  KeePassXC ; export JSON (chiffré par mot de passe ou en clair) et CSV.
+  Formats décrits dans [`docs/ITEMS.md`](docs/ITEMS.md).
 - **Une seule image Docker**, Rust/axum/PostgreSQL. Même stack que Guiterm.
 
 Voir [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) pour le fonctionnement,
@@ -115,6 +122,9 @@ Structure :
 - `crates/guivault-protocol` — types JSON de l'API.
 - `crates/guivault-server` — le serveur (axum + sqlx/PostgreSQL), qui sert
   aussi l'interface web.
+- `crates/guivault-items` — les formats en clair des secrets (identifiants,
+  notes, cartes, identités), pour qu'un client Rust les lise sans les
+  redéfinir. Testé contre ce que l'interface web écrit.
 - `web/` — l'interface web (Vite + React + TypeScript). `src/lib/crypto.ts`
   est le port de `guivault-crypto` ; des vecteurs générés par le crate
   Rust (et réciproquement) garantissent que les deux lisent les mêmes

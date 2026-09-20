@@ -4,6 +4,7 @@ import { navigate, routeHash, type Route } from "../lib/route";
 import { createVault } from "../lib/session";
 import { errorMessage } from "../lib/api";
 import { ROLE_HINTS, ROLE_LABELS } from "../lib/types";
+import { IconDice } from "./secret-icons";
 import { IconBell, IconPlus, IconSettings, IconVault } from "./ui-icons";
 import { Modal } from "./ui";
 
@@ -14,7 +15,7 @@ export function Sidebar({ ctx, route, onLogout }: { ctx: PageContext; route: Rou
   const { session } = ctx;
   const [creating, setCreating] = useState(false);
   const [open, setOpen] = useState(false);
-  const activeVault = route.page === "vault" || route.page === "vault-settings" ? route.id : null;
+  const activeVault = route.page === "vault" || route.page === "vault-settings" || route.page === "vault-tools" ? route.id : null;
 
   const go = (r: Route) => {
     navigate(r);
@@ -58,6 +59,15 @@ export function Sidebar({ ctx, route, onLogout }: { ctx: PageContext; route: Rou
           <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[var(--c-bg3)] text-[var(--c-text-secondary)]"><IconBell size={12} /></span>
           <span className="min-w-0 flex-1 truncate text-[12.5px] text-[var(--c-text)]">Invitations</span>
           {session.invitations.length > 0 && <span className="tag tag-accent">{session.invitations.length}</span>}
+        </a>
+        <a
+          href={routeHash({ page: "generator" })}
+          onClick={(e) => { e.preventDefault(); go({ page: "generator" }); }}
+          data-active={route.page === "generator" ? "true" : undefined}
+          className="list-row mx-1 mt-0.5 py-1.5"
+        >
+          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[var(--c-bg3)] text-[var(--c-text-secondary)]"><IconDice size={12} /></span>
+          <span className="min-w-0 flex-1 truncate text-[12.5px] text-[var(--c-text)]">Générateur</span>
         </a>
       </div>
 

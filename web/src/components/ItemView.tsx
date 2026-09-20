@@ -1,7 +1,12 @@
+import { useState } from "react";
 import type { VaultIndex } from "../lib/entities";
 import { groupPath } from "../lib/entities";
-import { SQL_ENGINE_LABELS, type AuthMethod, type DbTunnel, type Host, type Payload, type SqlConnection } from "../lib/types";
-import { CopyButton, Eyebrow, Row, SecretValue } from "./ui";
+import { cardBrand, identityFullName } from "../lib/items";
+import { SQL_ENGINE_LABELS, type AuthMethod, type CustomField, type DbTunnel, type Host, type Payload, type SecretBase, type SqlConnection } from "../lib/types";
+import { PasswordStrength } from "./PasswordStrength";
+import { TotpCode } from "./TotpCode";
+import { IconPasskey } from "./secret-icons";
+import { CopyButton, Eyebrow, formatWhen, Row, SecretValue } from "./ui";
 
 /** La fiche d'une entité, en lecture : ce que Guiterm montre dans ses
  * panneaux, secrets masqués et copiables. */
@@ -115,8 +120,160 @@ export function ItemView({ payload, index }: { payload: Payload; index: VaultInd
           <Row label="Aperçu"><img src={payload.icon.dataUrl} alt="" className="h-8 w-8" /></Row>
         </Section>
       );
+    case "login": {
+      const l = payload.login;
+      return (
+        <div className="space-y-4">
+          <Section title="Identifiant">
+            <Row label="Utilisateur"><Copyable value={l.username} mono /></Row>
+            <Row label="Mot de passe">
+              {l.password ? (
+                <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <SecretValue value={l.password} />
+                  <PasswordStrength password={l.password} />
+                </span>
+              ) : <Muted>—</Muted>}
+            </Row>
+            {l.totp && <Row label="Code TOTP"><TotpCode secret={l.totp} /></Row>}
+            {l.uris.length > 0 && (
+              <Row label={l.uris.length > 1 ? "Sites" : "Site"}>
+                <div className="space-y-0.5">
+                  {l.uris.map((u, i) => (
+                    <div key={i} className="flex items-center gap-1">
+                      <a href={/^[a-z][a-z0-9+.-]*:/i.test(u.uri) ? u.uri : `https://${u.uri}`} target="_blank" rel="noopener noreferrer" className="min-w-0 truncate font-mono text-[12px] text-[var(--c-accent-text)] hover:underline" title={u.uri}>{u.uri}</a>
+                      {u.match && <span className="tag" title="Mode de correspondance">{u.match}</span>}
+                      <CopyButton value={u.uri} label="Copier l'adresse" />
+                    </div>
+                  ))}
+                </div>
+              </Row>
+            )}
+          </Section>
+          <SecretCommon base={l} groups={groups} />
+          {l.passkeys.length > 0 && (
+            <Section title="Passkeys">
+              {l.passkeys.map((k) => (
+                <div key={k.credentialId} className="flex items-start gap-2 py-1.5 text-[12px]">
+                  <IconPasskey size={14} className="mt-0.5 shrink-0 text-[var(--c-text-muted)]" />
+                  <span className="min-w-0">
+                    <span className="block text-[var(--c-text)]">{k.rpName || k.rpId}{k.userName ? ` — ${k.userName}` : ""}</span>
+                    <span className="block text-[11px] text-[var(--c-text-muted)]">{k.rpId} · {k.keyAlgorithm} {k.keyCurve} · créée le {formatWhen(k.createdAt)}{k.discoverable ? " · découvrable" : ""}</span>
+                  </span>
+                </div>
+              ))}
+              <p className="help-text pt-1">Stockées et synchronisées ; une page web ne peut pas s'en servir pour se connecter — c'est le rôle de Guiterm ou d'une extension.</p>
+            </Section>
+          )}
+          {l.passwordHistory.length > 0 && <PasswordHistory entries={l.passwordHistory} />}
+        </div>
+      );
+    }
+    case "note": {
+      const n = payload.note;
+      return (
+        <div className="space-y-4">
+          <pre className="card whitespace-pre-wrap break-words p-3 font-sans text-[12.5px] leading-relaxed text-[var(--c-text)]">{n.content || <Muted>(vide)</Muted>}</pre>
+          <SecretCommon base={n} groups={groups} withoutNotes />
+        </div>
+      );
+    }
+    case "card": {
+      const cd = payload.card;
+      return (
+        <div className="space-y-4">
+          <Section title={cd.brand || cardBrand(cd.number) || "Carte"}>
+            <Row label="Titulaire"><Copyable value={cd.cardholderName} /></Row>
+            <Row label="Numéro">{cd.number ? <SecretValue value={cd.number} /> : <Muted>—</Muted>}</Row>
+            <Row label="Expiration"><Copyable value={[cd.expMonth, cd.expYear].filter(Boolean).join(" / ")} mono /></Row>
+            <Row label="Code">{cd.code ? <SecretValue value={cd.code} /> : <Muted>—</Muted>}</Row>
+          </Section>
+          <SecretCommon base={cd} groups={groups} />
+        </div>
+      );
+    }
+    case "identity": {
+      const i = payload.identity;
+      const addr = [i.address1, i.address2, i.address3].filter(Boolean).join("\n");
+      const city = [i.postalCode, i.city].filter(Boolean).join(" ");
+      return (
+        <div className="space-y-4">
+          <Section title="Identité">
+            <Row label="Nom"><Copyable value={identityFullName(i)} /></Row>
+            <Row label="Utilisateur"><Copyable value={i.username} mono /></Row>
+            <Row label="Société"><Copyable value={i.company} /></Row>
+            <Row label="E-mail"><Copyable value={i.email} mono /></Row>
+            <Row label="Téléphone"><Copyable value={i.phone} mono /></Row>
+          </Section>
+          <Section title="Adresse">
+            <Row label="Adresse"><Copyable value={addr} multiline /></Row>
+            <Row label="Ville"><Copyable value={[city, i.state, i.country].filter(Boolean).join(", ")} /></Row>
+          </Section>
+          <Section title="Documents">
+            <Row label="N° sécu.">{i.ssn ? <SecretValue value={i.ssn} /> : <Muted>—</Muted>}</Row>
+            <Row label="Passeport">{i.passportNumber ? <SecretValue value={i.passportNumber} /> : <Muted>—</Muted>}</Row>
+            <Row label="Permis">{i.licenseNumber ? <SecretValue value={i.licenseNumber} /> : <Muted>—</Muted>}</Row>
+          </Section>
+          <SecretCommon base={i} groups={groups} />
+        </div>
+      );
+    }
   }
 }
+
+/** Dossier, tags, notes et champs personnalisés : le pied de fiche de
+ * tous les secrets. */
+function SecretCommon({ base, groups, withoutNotes }: { base: SecretBase; groups: Map<string, import("../lib/types").Group>; withoutNotes?: boolean }) {
+  return (
+    <>
+      {!withoutNotes && base.notes && (
+        <Section title="Notes">
+          <pre className="whitespace-pre-wrap break-words py-1 font-sans text-[12.5px] leading-relaxed text-[var(--c-text)]">{base.notes}</pre>
+        </Section>
+      )}
+      {base.fields && base.fields.length > 0 && (
+        <Section title="Champs personnalisés">
+          {base.fields.map((f, i) => <Row key={i} label={f.name || "(sans nom)"}><FieldValue field={f} /></Row>)}
+        </Section>
+      )}
+      <Section title="Organisation">
+        <Row label="Dossier">{base.groupId ? groupPath(groups, base.groupId) || <Muted>dossier inconnu</Muted> : <Muted>racine</Muted>}</Row>
+        <Row label="Tags"><Tags tags={base.tags} /></Row>
+      </Section>
+    </>
+  );
+}
+
+function FieldValue({ field }: { field: CustomField }) {
+  if (field.type === "boolean") return <span>{field.value === "true" ? "☑ oui" : "☐ non"}</span>;
+  if (field.type === "hidden") return field.value ? <SecretValue value={field.value} /> : <Muted>—</Muted>;
+  return <Copyable value={field.value} />;
+}
+
+function PasswordHistory({ entries }: { entries: { password: string; changedAt: string }[] }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <section>
+      <button type="button" onClick={() => setOpen((o) => !o)} className="eyebrow mb-1 hover:text-[var(--c-text)]">Historique des mots de passe ({entries.length}) {open ? "▾" : "▸"}</button>
+      {open && (
+        <div className="divide-y divide-[var(--c-border)]">
+          {entries.map((e, i) => <Row key={i} label={formatWhen(e.changedAt)}><SecretValue value={e.password} /></Row>)}
+        </div>
+      )}
+    </section>
+  );
+}
+
+/** Une valeur en clair avec son bouton copier, ou un tiret si vide. */
+function Copyable({ value, mono, multiline }: { value: string; mono?: boolean; multiline?: boolean }) {
+  if (!value) return <Muted>—</Muted>;
+  return (
+    <span className="flex min-w-0 items-start gap-1">
+      <span className={`min-w-0 break-words ${multiline ? "whitespace-pre-wrap" : ""} ${mono ? "font-mono text-[12px]" : ""}`}>{value}</span>
+      <CopyButton value={value} />
+    </span>
+  );
+}
+
 
 export const HOST_KIND_LABELS: Record<NonNullable<Host["kind"]>, string> = {
   ssh: "SSH",

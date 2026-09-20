@@ -277,3 +277,22 @@ export function sealVaultName(vaultKey: Uint8Array, vaultId: string, name: strin
 export function openVaultName(vaultKey: Uint8Array, vaultId: string, blob: Uint8Array): string {
   return utf8.decode(open(vaultKey, blob, itemAad(vaultId, "", "vault-name")));
 }
+
+// ─── Exports chiffrés ───────────────────────────────────────────────────────
+
+export const AAD_EXPORT = utf8.encode("guivault/v1/export");
+
+/** Clé d'un export protégé par mot de passe : Argon2id puis HKDF sous un
+ * libellé propre, pour qu'un export et un compte ayant le même mot de
+ * passe n'aient pas la même clé. */
+export async function deriveExportKey(password: string, salt: Uint8Array, params: KdfParams): Promise<Uint8Array> {
+  let master: Uint8Array;
+  try {
+    master = await argon2idAsync(utf8.encode(password), salt, { m: params.m_cost, t: params.t_cost, p: params.p_cost, dkLen: KEY_LEN });
+  } catch (e) {
+    throw new CryptoError("kdf", `dérivation de clé impossible : ${e instanceof Error ? e.message : e}`);
+  }
+  const key = hkdf(sha256, master, undefined, AAD_EXPORT, KEY_LEN);
+  master.fill(0);
+  return key;
+}

@@ -19,6 +19,7 @@ Trois crates dans un workspace Cargo, et une application web :
 |---|---|---|
 | `guivault-crypto` | dérivation de clés, enveloppes, boîtes scellées, cycle de vie du compte | client **et** serveur (le serveur n'en utilise que le hachage des jetons/clé d'auth) |
 | `guivault-protocol` | structs JSON des requêtes/réponses | client et serveur |
+| `guivault-items` | formats en clair des secrets (`login`, `note`, `card`, `identity`) — voir `docs/ITEMS.md` | clients seulement (le serveur ne les voit jamais) |
 | `guivault-server` | routes, base, sessions, audit ; sert aussi `web/dist` à `/` | serveur |
 | `web/` | second client, dans le navigateur (Vite + React) ; `src/lib/crypto.ts` porte `guivault-crypto` en TypeScript | utilisateur sans Guiterm sous la main |
 

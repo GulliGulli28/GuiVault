@@ -1,0 +1,12 @@
+[package]
+name = "guivault-items"
+description = "Formats en clair des secrets GuiVault (identifiants, notes, cartes, identités) : les types que les clients chiffrent dans un item. Le serveur ne les voit jamais."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+uuid.workspace = true

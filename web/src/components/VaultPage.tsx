@@ -3,8 +3,8 @@ import type { PageContext } from "../App";
 import { api, errorMessage } from "../lib/api";
 import { indexItems, toEntities } from "../lib/entities";
 import { navigate } from "../lib/route";
-import { loadItems, moveItem, payloadName, putPayload, RevisionConflict, type DecodedItem, type VaultView } from "../lib/session";
-import { canWrite, KIND_LABELS, ROLE_HINTS, ROLE_LABELS, type ItemKind, type Payload } from "../lib/types";
+import { loadItems, moveItem, payloadEntity, payloadName, putPayload, RevisionConflict, type DecodedItem, type VaultView } from "../lib/session";
+import { canWrite, KIND_LABELS, KIND_LABELS_PLURAL, ROLE_HINTS, ROLE_LABELS, type GuiVaultEntity, type ItemKind, type Payload } from "../lib/types";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { ItemTree, KIND_ICONS } from "./ItemTree";
 import { ItemView } from "./ItemView";
@@ -14,12 +14,23 @@ import { SnippetForm } from "./forms/SnippetForm";
 import { KeyForm } from "./forms/KeyForm";
 import { SqlConnectionForm } from "./forms/SqlConnectionForm";
 import { IconForm } from "./forms/IconForm";
-import { IconChevronDown, IconEdit, IconPlus, IconRefresh, IconSearch, IconSettings, IconTrash } from "./ui-icons";
-import { formatWhen, Loading, useDelayed } from "./ui";
+import { LoginForm } from "./forms/LoginForm";
+import { NoteForm } from "./forms/NoteForm";
+import { CardForm } from "./forms/CardForm";
+import { IdentityForm } from "./forms/IdentityForm";
+import { IconStar, IconTools } from "./secret-icons";
+import { IconChevronDown, IconCopy, IconEdit, IconPlus, IconRefresh, IconSearch, IconSettings, IconTrash } from "./ui-icons";
+import { copyText, formatWhen, Loading, useDelayed } from "./ui";
 
 type Mode = { kind: "view" } | { kind: "edit" } | { kind: "new"; itemKind: ItemKind };
 
-const NEW_KINDS: ItemKind[] = ["host", "group", "sql-connection", "key", "snippet", "icon"];
+/** Les entrées du menu « Nouveau » : les secrets d'abord, puis les entités
+ * Guiterm, un trait entre les deux. */
+const NEW_KINDS: (ItemKind | "sep")[] = ["login", "note", "card", "identity", "sep", "host", "group", "sql-connection", "key", "snippet", "icon"];
+
+type Filter = "all" | "favorites" | ItemKind;
+/** Les filtres proposés, dans l'ordre ; ceux sans élément sont masqués. */
+const FILTERS: Filter[] = ["all", "favorites", "login", "note", "card", "identity", "host", "sql-connection", "key", "snippet", "group", "icon"];
 
 /** Un vault : son contenu à gauche, la fiche ou le formulaire à droite. */
 export function VaultPage({ ctx, vaultId }: { ctx: PageContext; vaultId: string }) {
@@ -32,6 +43,7 @@ function VaultBody({ ctx, vault }: { ctx: PageContext; vault: VaultView }) {
   const [items, setItems] = useState<DecodedItem[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<Filter>("all");
   const [selected, setSelected] = useState<string | null>(null);
   const [mode, setMode] = useState<Mode>({ kind: "view" });
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -75,6 +87,19 @@ function VaultBody({ ctx, vault }: { ctx: PageContext; vault: VaultView }) {
 
   const index = useMemo(() => indexItems(items ?? []), [items]);
   const entities = useMemo(() => toEntities(items ?? []), [items]);
+  const counts = useMemo(() => {
+    const c: Partial<Record<Filter, number>> = { all: entities.length, favorites: entities.filter((e) => e.favorite).length };
+    for (const e of entities) c[e.kind] = (c[e.kind] ?? 0) + 1;
+    return c;
+  }, [entities]);
+  // Filtrer par type garde les dossiers : ils portent l'arborescence, et
+  // `buildVaultTree` retire ceux qui finissent vides.
+  const filtered = useMemo(() => {
+    if (filter === "all") return entities;
+    if (filter === "favorites") return entities.filter((e) => e.favorite || e.kind === "group");
+    if (filter === "group") return entities.filter((e) => e.kind === "group");
+    return entities.filter((e) => e.kind === filter || e.kind === "group");
+  }, [entities, filter]);
   const current = selected ? items?.find((i) => i.id === selected) ?? null : null;
 
   const save = async (payload: Payload, baseRevision?: number) => {
@@ -121,8 +146,44 @@ function VaultBody({ ctx, vault }: { ctx: PageContext; vault: VaultView }) {
     }
   };
 
+  const toggleFavorite = async () => {
+    if (!current?.ok) return;
+    const p = current.payload;
+    const flip = <T extends { favorite?: boolean }>(e: T): T => ({ ...e, favorite: e.favorite ? undefined : true });
+    let next: Payload;
+    switch (p.kind) {
+      case "login": next = { ...p, login: flip(p.login) }; break;
+      case "note": next = { ...p, note: flip(p.note) }; break;
+      case "card": next = { ...p, card: flip(p.card) }; break;
+      case "identity": next = { ...p, identity: flip(p.identity) }; break;
+      default: return;
+    }
+    try {
+      await putPayload(vault, next, current.revision);
+      await load();
+    } catch (e) {
+      ctx.error(errorMessage(e));
+      if (e instanceof RevisionConflict) await load();
+    }
+  };
+
+  /** Copier l'utilisateur ou le mot de passe depuis la liste, sans ouvrir. */
+  const rowActions = (entity: GuiVaultEntity) => {
+    const it = index.byId.get(entity.id);
+    if (!it || it.payload.kind !== "login") return null;
+    const l = it.payload.login;
+    const copy = (label: string, value: string) => () => copyText(value).then((ok) => ok && ctx.notify(`${label} copié.`));
+    return (
+      <>
+        {l.username && <button onClick={copy("Utilisateur", l.username)} className="btn btn-ghost btn-sm" title="Copier l'utilisateur">U</button>}
+        {l.password && <button onClick={copy("Mot de passe", l.password)} className="btn btn-ghost btn-sm btn-icon" title="Copier le mot de passe" aria-label="Copier le mot de passe"><IconCopy size={11} /></button>}
+      </>
+    );
+  };
+
   const otherWritable = ctx.session.vaults.filter((v) => v.id !== vault.id && canWrite(v.role));
   const selectedGroupId = current?.ok && current.payload.kind === "group" ? current.id : current?.ok && "groupId" in payloadEntity(current.payload) ? (payloadEntity(current.payload).groupId as string | null) : null;
+  const isSecretItem = current?.ok && ["login", "note", "card", "identity"].includes(current.payload.kind);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -139,7 +200,8 @@ function VaultBody({ ctx, vault }: { ctx: PageContext; vault: VaultView }) {
                 <>
                   <div className="fixed inset-0 z-10" onClick={() => setNewMenu(false)} />
                   <div className="popover absolute right-0 z-20 mt-1 w-44 py-1">
-                    {NEW_KINDS.map((k) => {
+                    {NEW_KINDS.map((k, i) => {
+                      if (k === "sep") return <div key={i} className="menu-sep" />;
                       const Icon = KIND_ICONS[k];
                       return (
                         <button key={k} onClick={() => { setNewMenu(false); setMode({ kind: "new", itemKind: k }); }} className="menu-item">
@@ -152,19 +214,38 @@ function VaultBody({ ctx, vault }: { ctx: PageContext; vault: VaultView }) {
               )}
             </div>
           )}
+          <button onClick={() => navigate({ page: "vault-tools", id: vault.id })} className="btn btn-secondary btn-sm btn-icon" title="Importer / exporter" aria-label="Importer / exporter"><IconTools size={13} /></button>
           <button onClick={() => navigate({ page: "vault-settings", id: vault.id })} className="btn btn-secondary btn-sm btn-icon" title="Réglages du vault : membres, invitations, clé" aria-label="Réglages du vault"><IconSettings size={13} /></button>
         </div>
       </header>
 
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
         <section className={`flex min-h-0 flex-col border-[var(--c-border)] md:w-80 md:shrink-0 md:border-r lg:w-96 ${mode.kind !== "view" || current ? "max-md:hidden" : ""}`}>
-          <div className="relative shrink-0 p-2">
-            <IconSearch size={12} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[var(--c-text-muted)]" />
-            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Filtrer…" className="input pl-7" />
+          <div className="shrink-0 space-y-1.5 p-2">
+            <div className="relative">
+              <IconSearch size={12} className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[var(--c-text-muted)]" />
+              <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Filtrer…" aria-label="Filtrer" className="input pl-7" />
+            </div>
+            {entities.length > 0 && (
+              <div className="flex flex-wrap gap-1" role="tablist" aria-label="Type d'élément">
+                {FILTERS.filter((f) => f === "all" || (counts[f] ?? 0) > 0).map((f) => (
+                  <button
+                    key={f}
+                    role="tab"
+                    aria-selected={filter === f}
+                    onClick={() => setFilter(f)}
+                    className={`btn btn-sm shrink-0 ${filter === f ? "btn-toggled" : "btn-ghost"}`}
+                  >
+                    {f === "all" ? "Tout" : f === "favorites" ? <><IconStar size={11} filled /> Favoris</> : KIND_LABELS_PLURAL[f]}
+                    <span className="text-[10px] text-[var(--c-text-faint)]">{counts[f]}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
           <div className="sidebar-scroll -mx-1 min-h-0 flex-1 overflow-y-auto px-2 pb-2">
             {items === null ? (slow ? <Loading /> : null) : (
-              <ItemTree entities={entities} query={query} selected={selected} onSelect={(id) => { setSelected(id); setMode({ kind: "view" }); }} emptyMessage={writable ? "Rien ici pour l'instant — « Nouveau » pour commencer, ou synchronisez depuis Guiterm." : "Rien ici pour l'instant."} />
+              <ItemTree entities={filtered} query={query} selected={selected} onSelect={(id) => { setSelected(id); setMode({ kind: "view" }); }} rowActions={rowActions} emptyMessage={writable ? "Rien ici pour l'instant — « Nouveau » pour commencer, importez un export, ou synchronisez depuis Guiterm." : "Rien ici pour l'instant."} />
             )}
           </div>
         </section>
@@ -193,6 +274,10 @@ function VaultBody({ ctx, vault }: { ctx: PageContext; vault: VaultView }) {
                 <span className="text-[11px] text-[var(--c-text-faint)]" title={`Révision ${current.revision}`}>{current.ok ? KIND_LABELS[current.payload.kind] : current.itemType} · {formatWhen(current.updatedAt)}</span>
                 {writable && (
                   <div className="ml-auto flex items-center gap-1">
+                    {isSecretItem && current.ok && (() => {
+                      const fav = !!(payloadEntity(current.payload).favorite);
+                      return <button onClick={() => void toggleFavorite()} aria-pressed={fav} className={`btn btn-sm btn-icon ${fav ? "btn-toggled" : "btn-ghost"}`} title={fav ? "Retirer des favoris" : "Ajouter aux favoris"} aria-label={fav ? "Retirer des favoris" : "Ajouter aux favoris"}><IconStar size={12} filled={fav} /></button>;
+                    })()}
                     {current.ok && <button onClick={() => setMode({ kind: "edit" })} className="btn btn-secondary btn-sm"><IconEdit size={12} /> Modifier</button>}
                     {current.ok && otherWritable.length > 0 && (
                       <select value="" onChange={(e) => { const v = otherWritable.find((x) => x.id === e.target.value); if (v) setMoveTo(v); }} className="input h-6 w-auto text-[11.5px]" title="Déplacer vers un autre vault">
@@ -264,22 +349,19 @@ function ItemForm({ kind, initial, index, defaultGroupId, onSave, onCancel }: {
       return <SqlConnectionForm initial={initial?.kind === "sql-connection" ? initial : undefined} index={index} defaultGroupId={defaultGroupId} onSave={onSave} onCancel={onCancel} />;
     case "icon":
       return <IconForm initial={initial?.kind === "icon" ? initial.icon : undefined} onSave={onSave} onCancel={onCancel} />;
-  }
-}
-
-function payloadEntity(p: Payload): Record<string, unknown> {
-  switch (p.kind) {
-    case "host": return p.host;
-    case "group": return p.group;
-    case "snippet": return p.snippet;
-    case "key": return p.key;
-    case "sql-connection": return p.connection;
-    case "icon": return p.icon;
+    case "login":
+      return <LoginForm initial={initial?.kind === "login" ? initial.login : undefined} index={index} defaultGroupId={defaultGroupId} onSave={onSave} onCancel={onCancel} />;
+    case "note":
+      return <NoteForm initial={initial?.kind === "note" ? initial.note : undefined} index={index} defaultGroupId={defaultGroupId} onSave={onSave} onCancel={onCancel} />;
+    case "card":
+      return <CardForm initial={initial?.kind === "card" ? initial.card : undefined} index={index} defaultGroupId={defaultGroupId} onSave={onSave} onCancel={onCancel} />;
+    case "identity":
+      return <IdentityForm initial={initial?.kind === "identity" ? initial.identity : undefined} index={index} defaultGroupId={defaultGroupId} onSave={onSave} onCancel={onCancel} />;
   }
 }
 
 function payloadIdOf(p: Payload): string {
-  return String(payloadEntity(p).id);
+  return payloadEntity(p).id;
 }
 
 function capitalize(s: string): string {

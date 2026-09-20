@@ -3,7 +3,8 @@ import { KIND_LABELS, type GuiVaultEntity, type GuiVaultEntityKind } from "./typ
 /**
  * L'arborescence du contenu d'un vault, préparée en une passe. Reprise de
  * `src/lib/vaultTree.ts` de Guiterm (même algorithme, mêmes lignes) pour
- * que le contenu d'un vault se lise pareil dans les deux interfaces.
+ * que le contenu d'un vault se lise pareil dans les deux interfaces. Deux
+ * écarts : le seau « Icônes », et `search` dans `matches`.
  *
  * Le résultat est une **liste plate de lignes déjà ordonnées et indentées**,
  * comme les deux autres : le composant ne fait que la parcourir.
@@ -62,7 +63,8 @@ const BUCKETS: { kind: GuiVaultEntityKind; label: string }[] = [
 /** Ce que le filtre compare — le nom, le chemin, le genre (« clé »). */
 function matches(e: GuiVaultEntity, terms: string[]): boolean {
   if (terms.length === 0) return true;
-  const haystack = `${e.name} ${e.path} ${KIND_LABELS[e.kind]}`.toLowerCase();
+  // `search` en plus de Guiterm : l'utilisateur ou le site d'un identifiant.
+  const haystack = `${e.name} ${e.path} ${KIND_LABELS[e.kind]} ${e.search ?? ""}`.toLowerCase();
   return terms.every((t) => haystack.includes(t));
 }
 

@@ -8,6 +8,8 @@ import { VaultPage } from "./components/VaultPage";
 import { VaultSettings } from "./components/VaultSettings";
 import { AccountPage } from "./components/AccountPage";
 import { InvitationsPage } from "./components/InvitationsPage";
+import { GeneratorPage } from "./components/GeneratorPanel";
+import { ToolsPage } from "./components/ToolsPage";
 import { Toasts, useToasts } from "./components/ui";
 
 /** Ce que chaque page reçoit : la session, et de quoi la recharger, notifier,
@@ -110,8 +112,14 @@ export default function App() {
     case "account":
       page = <AccountPage ctx={ctx} onLogout={onLogout} />;
       break;
+    case "vault-tools":
+      page = <ToolsPage key={effective.id} ctx={ctx} vaultId={effective.id} />;
+      break;
     case "invitations":
       page = <InvitationsPage ctx={ctx} />;
+      break;
+    case "generator":
+      page = <GeneratorPage />;
       break;
     default:
       page = <p className="p-6 text-[12.5px] text-[var(--c-text-muted)]">Aucun vault.</p>;
