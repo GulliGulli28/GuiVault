@@ -12,7 +12,10 @@
   "background": { "service_worker": "background.js", "type": "module", "scripts": ["background.js"] },
   "permissions": ["storage", "alarms", "activeTab", "scripting", "tabs"],
   "host_permissions": ["http://*/*", "https://*/*"],
-  "content_scripts": [{ "matches": ["http://*/*", "https://*/*"], "js": ["content.js"], "run_at": "document_idle", "all_frames": true }],
+  "content_scripts": [
+    { "matches": ["http://*/*", "https://*/*"], "js": ["webauthn.js"], "run_at": "document_start", "all_frames": true, "world": "MAIN" },
+    { "matches": ["http://*/*", "https://*/*"], "js": ["content.js"], "run_at": "document_start", "all_frames": true }
+  ],
   "commands": {
     "autofill": { "suggested_key": { "default": "Ctrl+Shift+L", "mac": "Command+Shift+L" }, "description": "Remplir l'identifiant de la page" }
   },

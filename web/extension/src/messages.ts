@@ -28,3 +28,11 @@ export type ToContent =
   | { type: "guivault-pick" };
 
 export type FillReply = { username: boolean; password: boolean; totp: boolean };
+
+// ─── Passkeys ───────────────────────────────────────────────────────────────
+
+export type PasskeyToBackground =
+  | { type: "guivault-passkey-candidates"; rpId: string; allow: string[] }
+  | { type: "guivault-passkey-assert"; credentialId: string; rpId: string; challenge: string }
+  | { type: "guivault-passkey-logins"; rpId: string }
+  | { type: "guivault-passkey-register"; rpId: string; rpName: string; userHandle: string; userName: string; userDisplayName: string; challenge: string; loginId: string | null; discoverable: boolean };

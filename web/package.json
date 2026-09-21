@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "lint": "eslint .",
-    "build:ext": "vite build -c vite.extension.config.ts && vite build -c vite.content.config.ts"
+    "build:ext": "vite build -c vite.extension.config.ts && vite build -c vite.content.config.ts && vite build -c vite.shim.config.ts"
   },
   "dependencies": {
     "@fontsource/jetbrains-mono": "^5.2.8",

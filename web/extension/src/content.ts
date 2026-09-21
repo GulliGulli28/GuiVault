@@ -11,7 +11,7 @@
  *    page si le coffre est verrouillé ou n'a rien pour elle.
  *
  * L'interface injectée vit dans un shadow DOM, hors du style de la page. */
-import type { CredentialsReply, FillReply, MatchesReply, MatchSummary, ToBackground, ToContent } from "./messages";
+import type { CredentialsReply, FillReply, MatchesReply, MatchSummary, PasskeyToBackground, ToBackground, ToContent } from "./messages";
 
 declare global {
   interface Window {
@@ -94,7 +94,7 @@ declare global {
 
   // ─── Proposition dans la page ────────────────────────────────────────────
 
-  const send = <R,>(msg: ToBackground): Promise<R> => chrome.runtime.sendMessage<ToBackground, R>(msg);
+  const send = <R,>(msg: ToBackground | PasskeyToBackground): Promise<R> => chrome.runtime.sendMessage<ToBackground | PasskeyToBackground, R>(msg);
 
   let host: HTMLElement | null = null;
   let shadow: ShadowRoot | null = null;
@@ -122,6 +122,17 @@ declare global {
       .name { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       .user { font-size: 11px; color: #a1a1aa; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       .foot { font-size: 10.5px; color: #71717a; padding: 4px 8px 2px; border-top: 1px solid #26262b; margin-top: 2px; }
+      .veil { position: fixed; inset: 0; background: rgba(0,0,0,.45); }
+      .dialog { position: fixed; left: 50%; top: 18%; transform: translateX(-50%); width: min(360px, calc(100vw - 32px)); background: #121215; color: #e7e7ea; border: 1px solid #26262b; border-radius: 12px; box-shadow: 0 16px 48px rgba(0,0,0,.55); font: 13px system-ui, -apple-system, "Segoe UI", sans-serif; padding: 14px; }
+      .dialog h2 { margin: 0 0 6px; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+      .dialog p { margin: 0 0 10px; color: #a1a1aa; line-height: 1.45; }
+      .dialog select { width: 100%; box-sizing: border-box; margin: 0 0 10px; padding: 6px 8px; border-radius: 6px; border: 1px solid #26262b; background: rgba(0,0,0,.25); color: inherit; font: inherit; }
+      .row { display: flex; justify-content: flex-end; gap: 6px; }
+      .b { padding: 6px 10px; border-radius: 6px; border: 1px solid transparent; font: inherit; font-size: 12px; font-weight: 500; cursor: pointer; }
+      .b-primary { background: #2563eb; color: #fff; }
+      .b-ghost { background: none; color: #a1a1aa; }
+      .b-ghost:hover { color: #e7e7ea; background: rgba(255,255,255,.06); }
+      .logo { display: inline-flex; width: 18px; height: 18px; border-radius: 4px; background: #2563eb; color: #fff; align-items: center; justify-content: center; }
     `;
     shadow.appendChild(style);
     document.documentElement.appendChild(host);
@@ -244,6 +255,96 @@ declare global {
   };
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start);
   else start();
+
+  // ─── Passkeys : le pont entre la page et le service worker ───────────────
+  //
+  // Le shim (`webauthn.ts`, monde de la page) envoie la demande par
+  // `postMessage` ; ici on demande confirmation dans une boîte injectée,
+  // puis on fait signer le worker et on rend la réponse au shim. La page ne
+  // voit jamais une clé, seulement l'assertion ou l'attestation.
+
+  interface Choice { value: string; label: string; sub: string }
+
+  /** Une boîte de dialogue dans le shadow DOM : titre, texte, choix
+   * (facultatif), Continuer / Utiliser le navigateur. */
+  const dialog = (title: string, text: string, choices: Choice[] | null, primary: string): Promise<string | null> =>
+    new Promise((resolve) => {
+      const root = ensureHost();
+      const veil = document.createElement("div");
+      veil.className = "veil";
+      const box = document.createElement("div");
+      box.className = "dialog";
+      box.setAttribute("role", "dialog");
+      box.setAttribute("aria-modal", "true");
+      box.innerHTML = `<h2><span class="logo">${ICON}</span><span></span></h2><p></p>`;
+      (box.querySelector("h2 span:last-child") as HTMLElement).textContent = title;
+      (box.querySelector("p") as HTMLElement).textContent = text;
+      let select: HTMLSelectElement | null = null;
+      if (choices) {
+        select = document.createElement("select");
+        select.setAttribute("aria-label", "Identifiant");
+        for (const c of choices) {
+          const o = document.createElement("option");
+          o.value = c.value;
+          o.textContent = c.sub ? `${c.label} — ${c.sub}` : c.label;
+          select.appendChild(o);
+        }
+        box.appendChild(select);
+      }
+      const row = document.createElement("div");
+      row.className = "row";
+      const cancel = document.createElement("button");
+      cancel.className = "b b-ghost";
+      cancel.textContent = "Utiliser le navigateur";
+      const ok = document.createElement("button");
+      ok.className = "b b-primary";
+      ok.textContent = primary;
+      row.append(cancel, ok);
+      box.appendChild(row);
+      const done = (v: string | null) => {
+        veil.remove();
+        box.remove();
+        resolve(v);
+      };
+      cancel.addEventListener("click", () => done(null));
+      ok.addEventListener("click", () => done(select ? select.value : ""));
+      box.addEventListener("keydown", (e) => { if (e.key === "Escape") done(null); });
+      root.append(veil, box);
+      ok.focus();
+    });
+
+  const replyShim = (id: number, body: Record<string, unknown>) => window.postMessage({ __guivault: "webauthn-reply", id, ...body }, "*");
+
+  window.addEventListener("message", (e) => {
+    const d = e.data as { __guivault?: string; id: number; kind: "get" | "create"; request: Record<string, unknown> } | undefined;
+    if (e.source !== window || !d || d.__guivault !== "webauthn") return;
+    void (async () => {
+      try {
+        if (d.kind === "get") {
+          const req = d.request as { rpId: string; challenge: string; allowCredentials: string[] };
+          const r = await send<{ candidates: { loginId: string; loginName: string; credentialId: string; userName: string }[] | null; error?: string }>({ type: "guivault-passkey-candidates", rpId: req.rpId, allow: req.allowCredentials });
+          if (r.error || !r.candidates || r.candidates.length === 0) return replyShim(d.id, { fallback: true });
+          const choices = r.candidates.map((c) => ({ value: c.credentialId, label: c.loginName, sub: c.userName }));
+          const picked = await dialog(`Se connecter à ${req.rpId}`, r.candidates.length === 1 ? `Avec la passkey de « ${choices[0].label} »${choices[0].sub ? ` (${choices[0].sub})` : ""} enregistrée dans GuiVault.` : "Plusieurs passkeys GuiVault correspondent à ce site.", r.candidates.length === 1 ? null : choices, "Continuer");
+          if (picked === null) return replyShim(d.id, { fallback: true });
+          const a = await send<{ assertion: Record<string, string> | null; error?: string }>({ type: "guivault-passkey-assert", credentialId: picked || choices[0].value, rpId: req.rpId, challenge: req.challenge });
+          if (!a.assertion) return replyShim(d.id, { error: a.error ?? "passkey indisponible" });
+          return replyShim(d.id, { result: a.assertion });
+        }
+        const req = d.request as { rpId: string; rpName: string; userHandle: string; userName: string; userDisplayName: string; challenge: string; excludeCredentials: string[]; discoverable: boolean };
+        const l = await send<{ logins: { id: string; name: string; username: string }[] | null; error?: string }>({ type: "guivault-passkey-logins", rpId: req.rpId });
+        if (l.error || !l.logins) return replyShim(d.id, { fallback: true });
+        const choices: Choice[] = [...l.logins.map((x) => ({ value: x.id, label: x.name, sub: x.username })), { value: "", label: `Nouvel identifiant « ${req.rpName || req.rpId} »`, sub: req.userName }];
+        const picked = await dialog(`Enregistrer une passkey pour ${req.rpName || req.rpId}`, `Pour ${req.userDisplayName || req.userName}. Elle sera chiffrée dans votre coffre et synchronisée.`, choices, "Enregistrer");
+        if (picked === null) return replyShim(d.id, { fallback: true });
+        const a = await send<{ attestation: Record<string, string> | { error: string }; error?: string }>({ type: "guivault-passkey-register", rpId: req.rpId, rpName: req.rpName, userHandle: req.userHandle, userName: req.userName, userDisplayName: req.userDisplayName, challenge: req.challenge, loginId: picked || null, discoverable: req.discoverable });
+        if (a.error || !a.attestation || "error" in a.attestation) return replyShim(d.id, { error: a.error ?? (a.attestation as { error: string })?.error ?? "enregistrement impossible" });
+        return replyShim(d.id, { result: a.attestation });
+      } catch (err) {
+        replyShim(d.id, { error: err instanceof Error ? err.message : String(err) });
+      }
+    })();
+  });
 
   // ─── Ordres du popup et du raccourci ─────────────────────────────────────
 

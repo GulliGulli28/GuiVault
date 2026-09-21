@@ -32,7 +32,8 @@ serveur puisse jamais lire un secret.
   KeePassXC ; export JSON (chiffré par mot de passe ou en clair) et CSV.
   Formats décrits dans [`docs/ITEMS.md`](docs/ITEMS.md).
 - **Extension de navigateur** (Chrome/Edge/Firefox) : les identifiants de
-  la page courante, remplissage en un clic, codes TOTP, générateur —
+  la page courante, remplissage en un clic ou depuis le champ, codes TOTP,
+  passkeys, générateur —
   [`docs/EXTENSION.md`](docs/EXTENSION.md).
 - **Une seule image Docker**, Rust/axum/PostgreSQL. Même stack que Guiterm.
 

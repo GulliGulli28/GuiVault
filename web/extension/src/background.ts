@@ -10,8 +10,14 @@
 import { parseTotp, totpCode } from "../../src/lib/totp";
 import { loginMatches } from "../../src/lib/urimatch";
 import type { Login } from "../../src/lib/types";
-import type { CredentialsReply, FillReply, MatchesReply, ToBackground, ToContent } from "./messages";
-import { LOCK_ALARM, loadItemsCache, loadSettings, lock } from "./store";
+import { setTokensChangedHandler } from "../../src/lib/api";
+import type { CredentialsReply, FillReply, MatchesReply, PasskeyToBackground, ToBackground, ToContent } from "./messages";
+import * as passkeys from "./passkeys";
+import { LOCK_ALARM, loadItemsCache, loadSettings, lock, saveTokens } from "./store";
+
+// Une écriture depuis ici (enregistrer une passkey) peut rafraîchir les
+// jetons : ils doivent revenir dans la session.
+setTokensChangedHandler((t) => { if (t) void saveTokens(t); });
 
 /** Les identifiants déchiffrés en session, sans ouvrir de clé : le cache
  * d'items est déjà en clair dans `chrome.storage.session`. `null` si
@@ -65,17 +71,38 @@ chrome.runtime.onInstalled.addListener(() => void updateActiveBadges());
 
 // ─── Messages du script de page ─────────────────────────────────────────────
 
-chrome.runtime.onMessage.addListener((msg: ToBackground, sender, reply: (r: MatchesReply | CredentialsReply) => void) => {
+chrome.runtime.onMessage.addListener((msg: ToBackground | PasskeyToBackground, sender, reply: (r: unknown) => void) => {
   if (!msg || typeof msg !== "object" || !("type" in msg)) return;
+  const origin = sender.origin ?? (sender.url ? new URL(sender.url).origin : "");
   (async () => {
+    // ── Passkeys : l'origine est celle que le navigateur connaît de
+    // l'expéditeur ; l'identifiant de partie utilisatrice doit lui
+    // appartenir, sinon une page pourrait signer pour un autre site.
+    if (msg.type === "guivault-passkey-candidates") {
+      if (!passkeys.rpIdAllowed(msg.rpId, origin)) return reply({ error: "rpId non autorisé pour cette origine" });
+      return reply({ candidates: await passkeys.candidates(msg.rpId, msg.allow) });
+    }
+    if (msg.type === "guivault-passkey-assert") {
+      if (!passkeys.rpIdAllowed(msg.rpId, origin)) return reply({ error: "rpId non autorisé pour cette origine" });
+      return reply({ assertion: await passkeys.assert(msg.credentialId, msg.rpId, msg.challenge, origin) });
+    }
+    if (msg.type === "guivault-passkey-logins") {
+      if (!passkeys.rpIdAllowed(msg.rpId, origin)) return reply({ error: "rpId non autorisé pour cette origine" });
+      return reply({ logins: await passkeys.loginsForRp(msg.rpId) });
+    }
+    if (msg.type === "guivault-passkey-register") {
+      if (!passkeys.rpIdAllowed(msg.rpId, origin)) return reply({ error: "rpId non autorisé pour cette origine" });
+      const { type: _t, ...req } = msg;
+      return reply({ attestation: await passkeys.register({ ...req, origin }) });
+    }
     if (msg.type === "guivault-matches") {
       // L'URL est celle que le navigateur connaît de l'expéditeur, pas
       // celle que la page prétend.
       const url = sender.tab?.url ?? sender.url ?? msg.url;
       const m = await matchesFor(url);
-      if (!m) return reply({ locked: true });
+      if (!m) return reply({ locked: true } satisfies MatchesReply);
       const settings = await loadSettings();
-      return reply({ locked: false, enabled: settings.inlineAutofill, logins: m.map((l) => ({ id: l.id, name: l.name, username: l.username, hasTotp: !!l.totp, favorite: !!l.favorite })) });
+      return reply({ locked: false, enabled: settings.inlineAutofill, logins: m.map((l) => ({ id: l.id, name: l.name, username: l.username, hasTotp: !!l.totp, favorite: !!l.favorite })) } satisfies MatchesReply);
     }
     if (msg.type === "guivault-credentials") {
       const url = sender.tab?.url ?? sender.url;
@@ -83,9 +110,9 @@ chrome.runtime.onMessage.addListener((msg: ToBackground, sender, reply: (r: Matc
       const l = m?.find((x) => x.id === msg.id);
       if (!l) return reply(null);
       const p = l.totp ? parseTotp(l.totp) : null;
-      return reply({ username: l.username, password: l.password, totp: p ? await totpCode(p) : null });
+      return reply({ username: l.username, password: l.password, totp: p ? await totpCode(p) : null } satisfies CredentialsReply);
     }
-  })().catch(() => reply(null));
+  })().catch((e) => reply({ error: e instanceof Error ? e.message : String(e) }));
   return true;
 });
 

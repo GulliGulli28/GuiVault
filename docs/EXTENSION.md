@@ -33,6 +33,12 @@ maître et le délai de verrouillage.
   les pages »).
 - **Tout** : recherche dans tous les vaults (nom, utilisateur, site, vault).
 - **Générateur** : le même que l'interface web.
+- **Passkeys** : sur un site qui propose une passkey, GuiVault propose de
+  l'enregistrer dans le coffre (dans un identifiant existant du site, ou un
+  nouveau) ; à la connexion, il propose celle(s) qu'il a. « Utiliser le
+  navigateur » rend la main à l'authentificateur natif (Windows Hello,
+  trousseau…). Les passkeys sont synchronisées comme le reste et visibles
+  dans l'interface web.
 - **Verrouiller** : efface la session ; le prochain clic redemande le mot
   de passe maître (serveur et e-mail restent mémorisés).
 
@@ -44,6 +50,8 @@ maître et le délai de verrouillage.
 | `src/store.ts` | la session dans `chrome.storage.session` (jetons, clés du compte, clés et noms des vaults, items déchiffrés) ; réglages dans `chrome.storage.local` |
 | `src/background.ts` | un service worker qui ne fait qu'écouter l'alarme de verrouillage |
 | `src/content.ts` | le script de page : remplit sur ordre (popup, raccourci) et, chargé sur toutes les pages `http(s)`, repère les champs de mot de passe pour y poser le bouton GuiVault ; l'interface injectée vit dans un shadow DOM |
+| `src/webauthn-shim.ts` | injecté dans le **monde de la page** avant ses scripts (`world: MAIN`) : remplace `navigator.credentials.create/get`, traduit la demande en JSON pour le script isolé, rend un `PublicKeyCredential` (même prototype, `toJSON()`), ou rappelle l'implémentation native |
+| `src/passkeys.ts` | l'authentificateur, côté service worker : ES256/P-256 via WebCrypto, attestation `none` (CBOR maison, `cbor.ts`), assertion signée en DER ; enregistre la passkey dans un identifiant du coffre (`putPayload`) |
 | `src/messages.ts` | les messages page ↔ service worker : la page reçoit des *noms* d'identifiants, et le mot de passe d'un seul, à sa demande, après que le worker a revérifié l'URL de l'onglet expéditeur |
 
 Le service worker MV3 meurt au bout de 30 s d'inactivité : il ne peut rien
@@ -60,6 +68,19 @@ origine étrangère ne peut rien en faire sans lui. Pas de permission d'hôte
 
 À chaque ouverture, le popup relit `/sync` et ne re-télécharge que les vaults
 dont la révision a bougé ; les items déchiffrés sont gardés dans la session.
+
+### Passkeys, en détail
+
+Une extension ne peut pas être un fournisseur de passkeys du système ;
+comme Bitwarden, GuiVault remplace donc l'API WebAuthn dans la page. Le
+shim ne voit que les paramètres de la demande ; les clés privées (PKCS#8,
+dans `Login.passkeys[].keyValue`) ne quittent jamais le service worker, qui
+vérifie que le `rpId` demandé appartient à l'origine de l'onglet (hôte ou
+suffixe enregistrable) avant de signer. Compteur à zéro (« non géré »),
+drapeaux UP·UV·BE·BS, AAGUID nul — ce que les sites acceptent d'une passkey
+synchronisée. Seul ES256 est proposé ; un site qui n'accepte que RS256 (rare)
+garde le navigateur. La médiation conditionnelle (« autofill » des
+passkeys) n'est pas gérée : le navigateur la fait.
 
 ## Permissions
 
@@ -94,9 +115,9 @@ clic ; un site ne peut pas déclencher le remplissage lui-même.
   de mot de passe visibles et devine l'utilisateur à côté.
 - Création et modification d'items depuis l'extension (proposer d'enregistrer
   un identifiant saisi).
-- Passkeys : une extension ne peut pas être fournisseur WebAuthn ; il
-  faudrait injecter un script qui remplace `navigator.credentials` dans la
-  page. Les passkeys stockées sont visibles dans l'interface web.
+- Passkeys : pas de compteur de signatures, pas de médiation
+  conditionnelle, pas de suppression depuis l'extension (l'interface web le
+  fait).
 - Firefox n'a pas été testé en vrai (Chromium seulement, via Playwright).
 
 ## Tester
@@ -108,4 +129,7 @@ Il n'y a pas de test automatisé de l'extension dans le CI : Chromium doit
 identifiant de la page, remplissage utilisateur + mot de passe, réouverture
 sans mot de passe, bouton dans la page → menu → remplissage, badge,
 remplissage du TOTP, recherche, copie, verrouillage (bouton et badge
-disparus).
+disparus) ; puis, sur une page WebAuthn de test, création d'une passkey,
+authentification **vérifiée par le site** (signature ECDSA contrôlée avec
+la clé publique de l'attestation), passkey visible dans l'interface web,
+et retour au natif sans candidat.
