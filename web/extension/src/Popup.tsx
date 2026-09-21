@@ -235,6 +235,7 @@ function LoginView({ settings, onSettings, onSession }: { settings: Settings; on
   const [email, setEmail] = useState(settings.email);
   const [password, setPassword] = useState("");
   const [lockMinutes, setLockMinutes] = useState(settings.lockMinutes);
+  const [inlineAutofill, setInlineAutofill] = useState(settings.inlineAutofill);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [totp, setTotp] = useState<{ verify: (code: string) => Promise<SessionState> } | null>(null);
@@ -265,7 +266,7 @@ function LoginView({ settings, onSettings, onSession }: { settings: Settings; on
     try {
       setBaseUrl(url);
       await api.health();
-      onSettings({ serverUrl: url, email: email.trim().toLowerCase(), lockMinutes });
+      onSettings({ serverUrl: url, email: email.trim().toLowerCase(), lockMinutes, inlineAutofill });
       setBusy("Dérivation de la clé…");
       const tokensP = capture();
       const out = await login(email, password);
@@ -315,6 +316,10 @@ function LoginView({ settings, onSettings, onSession }: { settings: Settings; on
           <option value={480}>8 heures d'inactivité</option>
           <option value={0}>À la fermeture du navigateur</option>
         </select>
+      </label>
+      <label className="flex cursor-pointer items-start gap-2 text-[12.5px]">
+        <input type="checkbox" checked={inlineAutofill} onChange={(e) => setInlineAutofill(e.target.checked)} className="mt-0.5" />
+        <span>Proposer le remplissage dans les pages<span className="help-text block">Un bouton GuiVault dans les champs de mot de passe quand le coffre a quelque chose pour le site.</span></span>
       </label>
       {error && <p className="callout callout-danger">{error}</p>}
       <div className="flex items-center justify-between gap-2">

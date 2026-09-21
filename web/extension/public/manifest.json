@@ -10,7 +10,12 @@
     "default_icon": { "16": "icons/icon16.png", "32": "icons/icon32.png" }
   },
   "background": { "service_worker": "background.js", "type": "module", "scripts": ["background.js"] },
-  "permissions": ["storage", "alarms", "activeTab", "scripting"],
+  "permissions": ["storage", "alarms", "activeTab", "scripting", "tabs"],
+  "host_permissions": ["http://*/*", "https://*/*"],
+  "content_scripts": [{ "matches": ["http://*/*", "https://*/*"], "js": ["content.js"], "run_at": "document_idle", "all_frames": true }],
+  "commands": {
+    "autofill": { "suggested_key": { "default": "Ctrl+Shift+L", "mac": "Command+Shift+L" }, "description": "Remplir l'identifiant de la page" }
+  },
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src https: http:"
   },

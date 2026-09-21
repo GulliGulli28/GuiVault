@@ -19,9 +19,11 @@ export interface Settings {
   /** Minutes d'inactivité avant verrouillage ; 0 = jamais (jusqu'à la
    * fermeture du navigateur). */
   lockMinutes: number;
+  /** Le bouton GuiVault dans les champs de mot de passe des pages. */
+  inlineAutofill: boolean;
 }
 
-export const DEFAULT_SETTINGS: Settings = { serverUrl: "", email: "", lockMinutes: 15 };
+export const DEFAULT_SETTINGS: Settings = { serverUrl: "", email: "", lockMinutes: 15, inlineAutofill: true };
 
 interface StoredVault {
   id: string;
