@@ -258,6 +258,14 @@ chrome.runtime.onMessage.addListener((msg: ToBackground | PasskeyToBackground, s
       const personal = s.state.vaults.find((v) => v.kind === "personal");
       return reply({ locked: false, vaults, defaultVaultId: personal?.id ?? vaults[0]?.id ?? "" } satisfies VaultsReply);
     }
+    if (msg.type === "guivault-generator-options") {
+      const r = await chrome.storage.local.get("generator");
+      return reply({ options: (r.generator as GeneratorOptions | undefined) ?? DEFAULT_GENERATOR });
+    }
+    if (msg.type === "guivault-generator-options-set") {
+      await chrome.storage.local.set({ generator: msg.options });
+      return reply({ ok: true });
+    }
     if (msg.type === "guivault-generate") {
       // Les réglages du générateur du popup, si on les a (miroir de son
       // `localStorage` dans `chrome.storage.local`), sinon les défauts.

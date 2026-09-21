@@ -11,6 +11,7 @@
  *    page si le coffre est verrouillé ou n'a rien pour elle.
  *
  * L'interface injectée vit dans un shadow DOM, hors du style de la page. */
+import { DEFAULT_GENERATOR, generate, type GeneratorOptions } from "../../src/lib/generator";
 import type { CredentialsReply, FillReply, MatchesReply, MatchSummary, PasskeyToBackground, Pending, ToBackground, ToContent, VaultsReply } from "./messages";
 
 declare global {
@@ -80,6 +81,7 @@ declare global {
       before.find(isUsernameLike) ??
       before.find((i) => ["text", "email"].includes((i.type || "text").toLowerCase())) ??
       all.find(isUsernameLike) ??
+      all.find((i) => i !== password && isEmailLike(i)) ??
       (document.activeElement instanceof HTMLInputElement && document.activeElement.type !== "password" ? document.activeElement : null)
     );
   };
@@ -161,6 +163,16 @@ declare global {
       .pw { display: flex; gap: 4px; align-items: center; }
       .pw .b { padding: 4px 6px; display: inline-flex; align-items: center; }
       .err { color: #ef4444; font-size: 12px; margin: 0 0 8px; }
+      .gen { border: 1px solid #26262b; border-radius: 8px; padding: 8px; margin: -2px 0 10px; background: rgba(0,0,0,.15); }
+      .gen-out { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+      .gen-value { flex: 1; min-width: 0; font: 13px ui-monospace, "JetBrains Mono", Consolas, monospace; word-break: break-all; color: #e7e7ea; }
+      .seg { display: inline-flex; border: 1px solid #26262b; border-radius: 6px; padding: 2px; margin-bottom: 8px; background: #0c0c0e; }
+      .seg button { border: 0; background: none; color: #71717a; font: inherit; font-size: 12px; padding: 3px 8px; border-radius: 4px; cursor: pointer; }
+      .seg button[data-active="true"] { background: #19191d; color: #e7e7ea; }
+      .checks { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: #e7e7ea; }
+      .checks label { display: inline-flex; align-items: center; gap: 4px; }
+      .checks .sep { width: 3em; padding: 2px 4px; }
+      input[type=range] { width: 100%; accent-color: #2563eb; }
       .logo { display: inline-flex; width: 18px; height: 18px; border-radius: 4px; background: #2563eb; color: #fff; align-items: center; justify-content: center; flex-shrink: 0; }
       .banner { position: fixed; z-index: 3; top: 12px; right: 12px; display: grid; grid-template-columns: auto 1fr; gap: 8px 10px; align-items: center; width: min(420px, calc(100vw - 24px)); box-sizing: border-box; background: #121215; color: #e7e7ea; border: 1px solid #26262b; border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.5); font: 13px system-ui, -apple-system, "Segoe UI", sans-serif; padding: 10px 12px; line-height: 1.4; }
       .banner .text { min-width: 0; }
@@ -215,7 +227,9 @@ declare global {
     const add = document.createElement("button");
     add.className = "item";
     add.setAttribute("role", "menuitem");
-    add.innerHTML = `<span class="name">+ Nouvel identifiant…</span>`;
+    add.innerHTML = `<span class="name"></span><span class="user"></span>`;
+    (add.firstChild as HTMLElement).textContent = matches.length ? "+ Nouvel identifiant…" : `+ Enregistrer un identifiant pour ${location.hostname.replace(/^www\./, "")}…`;
+    (add.lastChild as HTMLElement).textContent = matches.length ? "" : "Aucun identifiant GuiVault pour ce site";
     add.addEventListener("click", () => { closeMenu(); void newLoginDialog(input); });
     menu.appendChild(add);
     const foot = document.createElement("div");
@@ -229,16 +243,18 @@ declare global {
     (menu.querySelector("button") as HTMLElement | null)?.focus();
   };
 
+  const isEmailLike = (i: HTMLInputElement) => (i.type || "text").toLowerCase() === "email" || i.autocomplete === "email" || /e-?mail|courriel/.test(hintOf(i));
+
   /** Le champ qui porte le bouton : l'utilisateur quand on le trouve (c'est
-   * le premier qu'on remplit), sinon le mot de passe lui-même. */
-  const anchorFor = (password: HTMLInputElement, all: HTMLInputElement[]) => usernameFor(password, all) ?? password;
+   * le premier qu'on remplit), sinon un champ e-mail n'importe où dans la
+   * page, sinon le mot de passe lui-même. */
+  const anchorFor = (password: HTMLInputElement, all: HTMLInputElement[]) => usernameFor(password, all) ?? all.find((i) => i !== password && isEmailLike(i)) ?? password;
 
   /** Ce que fait le bouton : verrouillé → le dire ; rien pour ce site →
    * créer ; un compte → remplir ; plusieurs → menu. */
   const onButton = (input: HTMLInputElement, btn: HTMLElement) => {
     if (menu) return closeMenu();
     if (locked) return void dialog("GuiVault est verrouillé", "Cliquez sur l'icône GuiVault dans la barre du navigateur pour vous reconnecter, puis revenez ici.", null, "OK", true);
-    if (matches.length === 0) return void newLoginDialog(input);
     if (matches.length === 1) return void choose(matches[0], input);
     openMenu(input, btn);
   };
@@ -490,6 +506,28 @@ declare global {
       <label class="f"><span>Nom</span><input class="i" name="name"></label>
       <label class="f"><span>Utilisateur</span><input class="i" name="username" autocomplete="off"></label>
       <label class="f"><span>Mot de passe</span><span class="pw"><input class="i" name="password" type="password" autocomplete="off"><button type="button" class="b b-ghost" data-act="show" title="Afficher" aria-label="Afficher">${ICON_EYE}</button><button type="button" class="b b-ghost" data-act="gen" title="Générer" aria-label="Générer">${ICON_DICE}</button></span></label>
+      <div class="gen" hidden>
+        <div class="gen-out"><output class="gen-value"></output><button type="button" class="b b-ghost" data-act="regen" title="Regénérer" aria-label="Regénérer">${ICON_DICE}</button><button type="button" class="b b-primary" data-act="use">Utiliser</button></div>
+        <div class="seg"><button type="button" data-mode="password">Mot de passe</button><button type="button" data-mode="passphrase">Phrase de passe</button></div>
+        <div class="gen-pw">
+          <label class="f"><span>Longueur : <b data-len></b></span><input type="range" min="8" max="64" name="length"></label>
+          <div class="checks">
+            <label><input type="checkbox" name="lowercase"> a-z</label>
+            <label><input type="checkbox" name="uppercase"> A-Z</label>
+            <label><input type="checkbox" name="digits"> 0-9</label>
+            <label><input type="checkbox" name="symbols"> !@#</label>
+            <label><input type="checkbox" name="avoidAmbiguous"> sans ambigus</label>
+          </div>
+        </div>
+        <div class="gen-pp" hidden>
+          <label class="f"><span>Mots : <b data-words></b></span><input type="range" min="3" max="12" name="words"></label>
+          <div class="checks">
+            <label>Séparateur <input class="i sep" name="separator" maxlength="3"></label>
+            <label><input type="checkbox" name="capitalize"> Majuscule</label>
+            <label><input type="checkbox" name="includeNumber"> Chiffre</label>
+          </div>
+        </div>
+      </div>
       <label class="f"><span>Site</span><input class="i" name="uri"></label>
       <label class="f vault"><span>Vault</span><select class="i" name="vault"></select></label>
       <p class="err" hidden></p>
@@ -512,8 +550,50 @@ declare global {
     q("[data-act=cancel]").addEventListener("click", close);
     box.addEventListener("keydown", (e) => { if (e.key === "Escape") close(); });
     q("[data-act=show]").addEventListener("click", () => { const p = q<HTMLInputElement>("[name=password]"); p.type = p.type === "password" ? "text" : "password"; });
+    // Le générateur, avec ses réglages (les mêmes que le popup) : replié
+    // derrière le dé, il produit une valeur à chaque changement.
+    const gen = q<HTMLElement>(".gen");
+    let opts: GeneratorOptions = DEFAULT_GENERATOR;
+    const genValue = q<HTMLOutputElement>(".gen-value");
+    const render = () => {
+      q(".gen-pw").hidden = opts.mode !== "password";
+      q(".gen-pp").hidden = opts.mode !== "passphrase";
+      for (const b of Array.from(gen.querySelectorAll<HTMLButtonElement>("[data-mode]"))) b.dataset.active = String(b.dataset.mode === opts.mode);
+      const pw = opts.password;
+      const pp = opts.passphrase;
+      q<HTMLInputElement>("[name=length]").value = String(pw.length);
+      q("[data-len]").textContent = String(pw.length);
+      for (const k of ["lowercase", "uppercase", "digits", "symbols", "avoidAmbiguous"] as const) q<HTMLInputElement>(`[name=${k}]`).checked = pw[k];
+      q<HTMLInputElement>("[name=words]").value = String(pp.words);
+      q("[data-words]").textContent = String(pp.words);
+      q<HTMLInputElement>("[name=separator]").value = pp.separator;
+      q<HTMLInputElement>("[name=capitalize]").checked = pp.capitalize;
+      q<HTMLInputElement>("[name=includeNumber]").checked = pp.includeNumber;
+      genValue.textContent = generate(opts);
+    };
+    const update = (patch: Partial<GeneratorOptions["password"]> | Partial<GeneratorOptions["passphrase"]> | { mode: GeneratorOptions["mode"] }) => {
+      if ("mode" in patch && patch.mode) opts = { ...opts, mode: patch.mode };
+      else if (opts.mode === "password") opts = { ...opts, password: { ...opts.password, ...(patch as Partial<GeneratorOptions["password"]>) } };
+      else opts = { ...opts, passphrase: { ...opts.passphrase, ...(patch as Partial<GeneratorOptions["passphrase"]>) } };
+      render();
+      void send({ type: "guivault-generator-options-set", options: opts }).catch(() => null);
+    };
+    for (const b of Array.from(gen.querySelectorAll<HTMLButtonElement>("[data-mode]"))) b.addEventListener("click", () => update({ mode: b.dataset.mode as GeneratorOptions["mode"] }));
+    q("[name=length]").addEventListener("input", (e) => update({ length: Number((e.target as HTMLInputElement).value) }));
+    for (const k of ["lowercase", "uppercase", "digits", "symbols", "avoidAmbiguous"] as const) q(`[name=${k}]`).addEventListener("change", (e) => update({ [k]: (e.target as HTMLInputElement).checked }));
+    q("[name=words]").addEventListener("input", (e) => update({ words: Number((e.target as HTMLInputElement).value) }));
+    q("[name=separator]").addEventListener("input", (e) => update({ separator: (e.target as HTMLInputElement).value }));
+    q("[name=capitalize]").addEventListener("change", (e) => update({ capitalize: (e.target as HTMLInputElement).checked }));
+    q("[name=includeNumber]").addEventListener("change", (e) => update({ includeNumber: (e.target as HTMLInputElement).checked }));
+    q("[data-act=regen]").addEventListener("click", () => { genValue.textContent = generate(opts); });
+    q("[data-act=use]").addEventListener("click", () => { const p = q<HTMLInputElement>("[name=password]"); p.value = genValue.textContent ?? ""; p.type = "text"; gen.hidden = true; });
     q("[data-act=gen]").addEventListener("click", () => {
-      void send<{ password: string }>({ type: "guivault-generate" }).then((r) => { const p = q<HTMLInputElement>("[name=password]"); p.value = r.password; p.type = "text"; });
+      if (!gen.hidden) { gen.hidden = true; return; }
+      void send<{ options: GeneratorOptions }>({ type: "guivault-generator-options" }).catch(() => null).then((r) => {
+        if (r?.options) opts = { ...DEFAULT_GENERATOR, ...r.options, password: { ...DEFAULT_GENERATOR.password, ...r.options.password }, passphrase: { ...DEFAULT_GENERATOR.passphrase, ...r.options.passphrase } };
+        render();
+        gen.hidden = false;
+      });
     });
     q("[data-act=save]").addEventListener("click", () => {
       const body = { type: "guivault-create-login" as const, vaultId: select.value, name: q<HTMLInputElement>("[name=name]").value, username: q<HTMLInputElement>("[name=username]").value, password: q<HTMLInputElement>("[name=password]").value, uri: q<HTMLInputElement>("[name=uri]").value };

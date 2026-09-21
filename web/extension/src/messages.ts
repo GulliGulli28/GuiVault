@@ -27,6 +27,9 @@ export type ToBackground =
   /** Les vaults où créer un identifiant depuis la page. */
   | { type: "guivault-vaults" }
   | { type: "guivault-generate" }
+  /** Les réglages du générateur (partagés avec le popup), à lire ou à garder. */
+  | { type: "guivault-generator-options" }
+  | { type: "guivault-generator-options-set"; options: unknown }
   | { type: "guivault-create-login"; vaultId: string; name: string; username: string; password: string; uri: string };
 
 export type VaultsReply = { locked: true } | { locked: false; vaults: { id: string; name: string }[]; defaultVaultId: string };

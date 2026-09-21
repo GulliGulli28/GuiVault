@@ -37,13 +37,15 @@ maître et le délai de verrouillage.
   si un identifiant du site a ce nom mais un autre mot de passe : « Mettre à
   jour ? » (l'ancien passe dans l'historique). La saisie attend deux
   minutes dans la mémoire de session du worker, jamais dans la page.
-- **Dans la page** : un bouton GuiVault sur le champ utilisateur (ou le mot
-  de passe, faute de mieux) de tout formulaire de connexion — y compris les
-  connexions en deux étapes (champ utilisateur seul). Un compte pour le
-  site → il remplit ; plusieurs → un menu ; aucun → **« Nouvel
-  identifiant »** dans la page, nom et site préremplis, utilisateur repris
-  du champ, mot de passe tapé ou généré (réglages du générateur du popup),
-  vault au choix — enregistré puis rempli. Coffre verrouillé → il le dit.
+- **Dans la page** : un bouton GuiVault sur le champ utilisateur (sinon un
+  champ e-mail, sinon le mot de passe) de tout formulaire de connexion — y
+  compris les connexions en deux étapes (champ utilisateur seul). Un compte
+  pour le site → il remplit ; plusieurs → un menu ; aucun → un menu
+  « Enregistrer un identifiant pour <site>… » qui ouvre **« Nouvel
+  identifiant »** dans la page : nom et site préremplis, utilisateur repris
+  du champ, mot de passe tapé ou généré par le générateur avec ses réglages
+  (les mêmes que le popup, dans les deux sens), vault au choix — enregistré
+  puis rempli. Coffre verrouillé → il le dit.
   **Ctrl+Maj+L** remplit sans ouvrir le popup. Désactivable (« Proposer le
   remplissage dans les pages »).
 - **Badge** : le nombre d'identifiants pour l'onglet, seulement quand la
