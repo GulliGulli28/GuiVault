@@ -9,7 +9,7 @@ import { PasswordStrength } from "../PasswordStrength";
 import { TotpCode } from "../TotpCode";
 import { IconDice, IconPasskey } from "../secret-icons";
 import { IconClose, IconPlus } from "../ui-icons";
-import { PasswordInput, formatWhen } from "../ui";
+import { FileButton, PasswordInput, formatWhen } from "../ui";
 import { Field, FormShell } from "./common";
 import { SecretFooter, SecretHeader } from "./SecretBits";
 
@@ -100,7 +100,7 @@ export function LoginForm({ initial, index, defaultGroupId, onSave, onCancel }: 
           className="input input-mono"
         />
         {totp && <div className="mt-1.5"><TotpCode secret={login.totp!} compact /></div>}
-        <input type="file" accept="image/*" aria-label="Image du QR code TOTP" onChange={(e) => void readQr(e.target.files?.[0])} className="mt-1 block text-[11.5px] text-[var(--c-text-muted)]" />
+        <FileButton label="Image du QR code" accept="image/*" className="mt-1.5" onFile={(f) => void readQr(f)} />
         {qrError && <p className="help-text text-[var(--c-danger)]">{qrError}</p>}
       </Field>
 

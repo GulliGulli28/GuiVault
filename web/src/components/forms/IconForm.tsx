@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { uuid } from "../../lib/bytes";
 import type { CustomIcon, Payload } from "../../lib/types";
+import { FileButton } from "../ui";
 import { Field, FormShell } from "./common";
 
 const MAX_BYTES = 64 * 1024;
@@ -33,7 +34,7 @@ export function IconForm({ initial, onSave, onCancel }: { initial?: CustomIcon; 
       <Field group label="Image" hint="SVG ou PNG, 64 Ko au plus. Référencée par les hôtes et dossiers via son identifiant.">
         <div className="flex items-center gap-3">
           <span className="flex h-10 w-10 items-center justify-center rounded-md border border-[var(--c-border)] bg-[var(--c-bg3)]">{dataUrl && <img src={dataUrl} alt="" className="h-7 w-7" />}</span>
-          <input type="file" aria-label="Choisir une image" accept="image/svg+xml,image/png,image/webp" onChange={(e) => loadFile(e.target.files?.[0])} className="text-[11.5px] text-[var(--c-text-muted)]" />
+          <FileButton label="Choisir une image" accept="image/svg+xml,image/png,image/webp" onFile={loadFile} />
         </div>
       </Field>
     </FormShell>

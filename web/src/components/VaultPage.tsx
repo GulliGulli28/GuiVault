@@ -4,14 +4,15 @@ import { api, errorMessage } from "../lib/api";
 import { indexItems, toEntities } from "../lib/entities";
 import { navigate } from "../lib/route";
 import { loadItems, moveItem, payloadEntity, payloadName, putPayload, RevisionConflict, type DecodedItem, type VaultView } from "../lib/session";
-import { canWrite, KIND_LABELS, KIND_LABELS_PLURAL, ROLE_HINTS, ROLE_LABELS, type GuiVaultEntity, type ItemKind, type Payload } from "../lib/types";
+import { canWrite, KIND_LABELS, KIND_LABELS_PLURAL, ROLE_HINTS, ROLE_LABELS, type CustomIcon, type GuiVaultEntity, type ItemKind, type Payload } from "../lib/types";
 import { ConfirmDialog } from "./ConfirmDialog";
-import { ItemTree, KIND_ICONS } from "./ItemTree";
+import { EntityIcon, ItemTree, KIND_ICONS } from "./ItemTree";
 import { ItemView } from "./ItemView";
 import { ItemForm } from "./forms/ItemForm";
 import { IconStar, IconTools } from "./secret-icons";
 import { IconChevronDown, IconCopy, IconEdit, IconPlus, IconRefresh, IconSearch, IconSettings, IconTrash } from "./ui-icons";
 import { copyText, formatWhen, Loading, useDelayed } from "./ui";
+import { PaneHandle, usePersistedPane } from "../hooks/usePersistedPane";
 
 type Mode = { kind: "view" } | { kind: "edit" } | { kind: "new"; itemKind: ItemKind };
 
@@ -43,6 +44,8 @@ function VaultBody({ ctx, vault }: { ctx: PageContext; vault: VaultView }) {
   const [stale, setStale] = useState(false);
   const slow = useDelayed(loading);
   const writable = canWrite(vault.role);
+  // La colonne de la liste se redimensionne, comme les panneaux de Guiterm.
+  const list = usePersistedPane("vault-list", { initial: 340, min: 240, max: 720, axis: "horizontal", mode: "px" });
   const editingRef = useRef(false);
   editingRef.current = mode.kind !== "view";
   // `vault` et `ctx` changent d'identité à chaque `/sync` ou notification :
@@ -172,13 +175,20 @@ function VaultBody({ ctx, vault }: { ctx: PageContext; vault: VaultView }) {
     );
   };
 
+  /** Une icône importée depuis le sélecteur d'un hôte ou d'un dossier :
+   * un item de plus, et l'index se recharge pour que le sélecteur la voie. */
+  const addIcon = async (icon: CustomIcon) => {
+    await putPayload(vault, { kind: "icon", icon });
+    await load();
+  };
+
   const otherWritable = ctx.session.vaults.filter((v) => v.id !== vault.id && canWrite(v.role));
   const selectedGroupId = current?.ok && current.payload.kind === "group" ? current.id : current?.ok && "groupId" in payloadEntity(current.payload) ? (payloadEntity(current.payload).groupId as string | null) : null;
   const isSecretItem = current?.ok && ["login", "note", "card", "identity"].includes(current.payload.kind);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <header className="flex shrink-0 flex-wrap items-center gap-2 border-b border-[var(--c-border)] px-4 py-2.5 pl-4 max-md:pl-28">
+      <header className="flex shrink-0 flex-wrap items-center gap-2 border-b border-[var(--c-border)] px-4 py-2.5 pl-4 max-md:pl-11">
         <h1 className="min-w-0 truncate text-[14px] font-semibold text-[var(--c-text)]">{vault.name}</h1>
         <span className="tag" title={ROLE_HINTS[vault.role]}>{vault.kind === "personal" ? "personnel" : ROLE_LABELS[vault.role]}</span>
         <span className="hidden text-[11px] text-[var(--c-text-faint)] sm:inline" title={`Révision ${vault.revision}`}>{items ? `${items.length} élément(s)` : ""}</span>
@@ -211,7 +221,10 @@ function VaultBody({ ctx, vault }: { ctx: PageContext; vault: VaultView }) {
       </header>
 
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
-        <section className={`flex min-h-0 flex-col border-[var(--c-border)] md:w-80 md:shrink-0 md:border-r lg:w-96 ${mode.kind !== "view" || current ? "max-md:hidden" : ""}`}>
+        <section
+          style={{ "--list-w": `${list.value}px` } as React.CSSProperties}
+          className={`flex min-h-0 flex-col md:w-[var(--list-w)] md:shrink-0 ${mode.kind !== "view" || current ? "max-md:hidden" : ""}`}
+        >
           <div className="shrink-0 space-y-1.5 p-2">
             <div className="relative">
               <IconSearch size={12} className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[var(--c-text-muted)]" />
@@ -236,20 +249,21 @@ function VaultBody({ ctx, vault }: { ctx: PageContext; vault: VaultView }) {
           </div>
           <div className="sidebar-scroll -mx-1 min-h-0 flex-1 overflow-y-auto px-2 pb-2">
             {items === null ? (slow ? <Loading /> : null) : (
-              <ItemTree entities={filtered} query={query} selected={selected} onSelect={(id) => { setSelected(id); setMode({ kind: "view" }); }} rowActions={rowActions} emptyMessage={writable ? "Rien ici pour l'instant — « Nouveau » pour commencer, importez un export, ou synchronisez depuis Guiterm." : "Rien ici pour l'instant."} />
+              <ItemTree entities={filtered} customIcons={index.icons} query={query} selected={selected} onSelect={(id) => { setSelected(id); setMode({ kind: "view" }); }} rowActions={rowActions} emptyMessage={writable ? "Rien ici pour l'instant — « Nouveau » pour commencer, importez un export, ou synchronisez depuis Guiterm." : "Rien ici pour l'instant."} />
             )}
           </div>
         </section>
 
-        <section className="flex min-h-0 flex-1 flex-col">
+        <PaneHandle onMouseDown={list.onMouseDown} />
+        <section className={`flex min-h-0 flex-1 flex-col ${list.isDragging ? "pointer-events-none select-none" : ""}`}>
           {stale && mode.kind !== "view" && (
             <p className="callout callout-warn m-3 mb-0">Ce vault a été modifié entre-temps. Si cet élément l'a été aussi, l'enregistrement sera refusé : rechargez alors avant de réessayer.</p>
           )}
           {mode.kind === "new" && (
-            <ItemForm kind={mode.itemKind} index={index} defaultGroupId={selectedGroupId} onSave={(p) => save(p)} onCancel={() => setMode({ kind: "view" })} />
+            <ItemForm kind={mode.itemKind} index={index} defaultGroupId={selectedGroupId} onSave={(p) => save(p)} onCancel={() => setMode({ kind: "view" })} onAddIcon={addIcon} />
           )}
           {mode.kind === "edit" && current?.ok && (
-            <ItemForm kind={current.payload.kind} initial={current.payload} index={index} onSave={(p) => save(p, current.revision)} onCancel={() => setMode({ kind: "view" })} />
+            <ItemForm kind={current.payload.kind} initial={current.payload} index={index} onSave={(p) => save(p, current.revision)} onCancel={() => setMode({ kind: "view" })} onAddIcon={addIcon} />
           )}
           {mode.kind === "view" && !current && (
             <div className="flex flex-1 items-center justify-center p-6 text-center text-[12.5px] text-[var(--c-text-muted)]">
@@ -260,7 +274,7 @@ function VaultBody({ ctx, vault }: { ctx: PageContext; vault: VaultView }) {
             <>
               <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-[var(--c-border)] px-4 py-2.5">
                 <button onClick={() => setSelected(null)} className="btn btn-ghost btn-sm md:hidden">← Liste</button>
-                {current.ok && (() => { const Icon = KIND_ICONS[current.payload.kind]; return <span className="flex h-6 w-6 items-center justify-center rounded-md bg-[var(--c-bg3)] text-[var(--c-text-secondary)]"><Icon size={13} /></span>; })()}
+                {current.ok && (() => { const entity = entities.find((e) => e.id === current.id); return <span className="flex h-6 w-6 items-center justify-center rounded-md bg-[var(--c-bg3)] text-[var(--c-text-secondary)] [&>.host-icon]:h-[72%] [&>.host-icon]:w-[72%] [&>.host-icon>*]:h-full [&>.host-icon>*]:w-full">{entity ? <EntityIcon entity={entity} customIcons={index.icons} /> : null}</span>; })()}
                 <h2 className="min-w-0 truncate text-[13px] font-semibold text-[var(--c-text)]">{current.ok ? payloadName(current.payload) : "Élément illisible"}</h2>
                 <span className="text-[11px] text-[var(--c-text-faint)]" title={`Révision ${current.revision}`}>{current.ok ? KIND_LABELS[current.payload.kind] : current.itemType} · {formatWhen(current.updatedAt)}</span>
                 {writable && (

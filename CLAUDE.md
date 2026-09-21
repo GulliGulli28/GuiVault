@@ -37,14 +37,30 @@ HMAC pour les sels fictifs de prelogin.
 - `web/` — l'interface web, Vite + React 19 + TypeScript + Tailwind 3,
   **même charte que Guiterm** : `src/index.css` (jetons et primitives
   `.btn`, `.input`, `.card`, `.list-row`…), `components/ui-icons.tsx`,
-  `EntityRow.tsx`, `ConfirmDialog.tsx`, `hooks/useModalSurface.ts` et
-  `lib/vaultTree.ts` sont **copiés de `~/gui-termius/src`** — les garder
-  identiques (re-copier plutôt que diverger). Le reste :
+  `components/icons.tsx` (banque d'icônes d'hôte), `EntityRow.tsx`,
+  `ConfirmDialog.tsx`, `hooks/useModalSurface.ts`, `hooks/useResizablePane.ts`
+  (poignées de redimensionnement ; `usePersistedPane.tsx` le complète en
+  retenant la largeur dans `localStorage`), `lib/focusTrap.ts`
+  et `lib/hostKinds.ts` sont **copiés de `~/gui-termius/src`** — les garder
+  identiques (re-copier plutôt que diverger). `lib/vaultTree.ts` en est
+  une copie avec deux écarts documentés en tête. `lib/preferences.ts`
+  reprend le sous-ensemble « Apparence » des préférences de Guiterm
+  (fonds, accents, polices, tailles de ligne : mêmes tables, à recopier
+  quand elles changent là-bas) et pose les mêmes variables CSS sur
+  `<html>` ; `components/AppearanceSettings.tsx` est sa page de réglages,
+  partagée par `SettingsPage` et le popup de l'extension. Le logo est
+  `src/assets/logo.png` (+ `logo-gray.png`, la version « verrouillé »),
+  généré avec les icônes de l'extension depuis `logo_GuiVault.png` à la
+  racine. Le reste :
   - `lib/crypto.ts` — port de `guivault-crypto` (`@noble/*`). Tout
     changement de format doit passer par les deux vecteurs d'interop :
     `cargo run -p guivault-crypto --example vectors > web/src/lib/crypto.vectors.json`
     et `GUIVAULT_WRITE_VECTORS=1 npx vitest run` (écrit
     `crates/guivault-crypto/tests/web-vectors.json`).
+  - `lib/persist.ts` — la session mise à plat, même format pour l'extension
+    (`chrome.storage.session`) et le web (`sessionStorage` : survit au
+    rechargement, pas à l'onglet), avec le délai d'inactivité « Verrouiller
+    après » (Paramètres › Sécurité, `localStorage`).
   - `lib/api.ts` (HTTP, rafraîchissement des jetons, SSE via `fetch`),
     `lib/session.ts` (compte déverrouillé, vaults, items, partage),
     `lib/types.ts` (protocole en snake_case + entités Guiterm en camelCase,
@@ -62,10 +78,13 @@ HMAC pour les sels fictifs de prelogin.
     Playwright, copier `dist-extension` en ajoutant `tabs` et une
     `host_permissions` au manifeste, et ouvrir `popup.html?tab=<id>`.
   - `components/` — une page par route (`VaultPage`, `VaultSettings`,
-    `ToolsPage` import/export, `AccountPage`, `InvitationsPage`,
-    `GeneratorPanel`), `forms/` un formulaire par type d'item
-    (`SecretBits.tsx` = tronc commun des secrets), `secret-icons.tsx` pour
-    les icônes qui ne sont pas dans Guiterm.
+    `ToolsPage` import/export, `SettingsPage` apparence/compte/sécurité/
+    sessions, `InvitationsPage`, `GeneratorPanel`), `forms/` un formulaire
+    par type d'item (`SecretBits.tsx` = tronc commun des secrets),
+    `IconPicker.tsx` (le sélecteur de Guiterm, sans Tauri : « Mes icônes »
+    sont les items `icon` du vault), `secret-icons.tsx` pour les icônes
+    qui ne sont pas dans Guiterm. Un dossier a pour couleur un **nom
+    d'accent** (`ACCENT_COLORS`), comme dans Guiterm — pas un hexadécimal.
 
 Requêtes sqlx sans macros `query!` (pas de `DATABASE_URL` à la compilation,
 build Docker sans base). Les colonnes `citext` se lisent avec `::text`.

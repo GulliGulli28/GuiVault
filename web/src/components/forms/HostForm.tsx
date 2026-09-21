@@ -1,8 +1,9 @@
 import { useState } from "react";
 import type { VaultIndex } from "../../lib/entities";
 import { uuid } from "../../lib/bytes";
-import type { AuthMethod, EnvVar, Host, HostKind, HostSecrets, Payload, PersistentShellMode } from "../../lib/types";
+import type { AuthMethod, CustomIcon, EnvVar, Host, HostKind, HostSecrets, Payload, PersistentShellMode } from "../../lib/types";
 import { HOST_KIND_LABELS } from "../ItemView";
+import { IconField } from "../IconPicker";
 import { IconClose, IconDocker, IconHosts, IconKubernetes, IconMonitor } from "../ui-icons";
 import { PasswordInput } from "../ui";
 import { Checkbox, Field, FormShell, GroupSelect, HostSelect, TagsInput, parsePort } from "./common";
@@ -24,12 +25,13 @@ function authKindOf(a: AuthMethod): AuthKind {
  * de la commande de proxy, parcours du disque, aperçu d'icône). Les champs
  * que ce formulaire ne connaît pas (`source`, `lastFacts`…) sont conservés
  * tels quels. */
-export function HostForm({ initial, index, defaultGroupId, onSave, onCancel }: {
+export function HostForm({ initial, index, defaultGroupId, onSave, onCancel, onAddIcon }: {
   initial?: { host: Host; secrets?: HostSecrets };
   index: VaultIndex;
   defaultGroupId?: string | null;
   onSave: (p: Payload) => Promise<void>;
   onCancel: () => void;
+  onAddIcon?: (icon: CustomIcon) => Promise<void>;
 }) {
   const h = initial?.host;
   const s = initial?.secrets ?? {};
@@ -54,7 +56,7 @@ export function HostForm({ initial, index, defaultGroupId, onSave, onCancel }: {
   const [envVars, setEnvVars] = useState<(EnvVar & { secretValue: string })[]>(
     (h?.envVars ?? []).map((v) => ({ ...v, secretValue: v.secret ? s.env?.[v.key] ?? "" : "" })),
   );
-  const [icon, setIcon] = useState(h?.icon ?? "");
+  const [icon, setIcon] = useState<string | null>(h?.icon ?? null);
   const [keepalive, setKeepalive] = useState(String(h?.keepaliveIntervalSecs ?? 0));
   const [agentForward, setAgentForward] = useState(h?.agentForward ?? false);
   const [persistentShell, setPersistentShell] = useState<PersistentShellMode>(h?.persistentShell ?? "off");
@@ -89,7 +91,7 @@ export function HostForm({ initial, index, defaultGroupId, onSave, onCancel }: {
       tags,
       startupSnippets,
       envVars: envVars.map(({ key, value, secret }) => ({ key: key.trim(), value: secret ? "" : value, secret: !!secret })).filter((v) => v.key),
-      icon: icon.trim() || undefined,
+      icon: icon ?? undefined,
       keepaliveIntervalSecs: Number.parseInt(keepalive, 10) > 0 ? Number.parseInt(keepalive, 10) : null,
       agentForward: sshExtras && authKind === "agent" ? agentForward : false,
       persistentShell,
@@ -244,8 +246,8 @@ export function HostForm({ initial, index, defaultGroupId, onSave, onCancel }: {
       <Field label="Étiquettes">
         <TagsInput value={tags} onChange={setTags} />
       </Field>
-      <Field label="Icône" hint="Identifiant d'icône Guiterm, ou id d'une icône personnalisée du vault.">
-        <input value={icon} onChange={(e) => setIcon(e.target.value)} className="input input-mono" />
+      <Field group label="Icône" hint="Celle de la banque de Guiterm, ou une icône du vault. Sans choix : l'icône du genre d'hôte.">
+        <IconField value={icon} onChange={setIcon} customIcons={index.icons} onAddIcon={onAddIcon} fallback={(() => { const K = HOST_KINDS.find((k) => k.key === kind)?.Icon ?? IconHosts; return <K size={14} />; })()} />
       </Field>
 
       {kind !== "rdp" && (

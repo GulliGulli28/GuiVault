@@ -52,8 +52,11 @@ let onSessionLost: (() => void) | null = null;
  * re-persiste, l'interface embarquée n'en a pas besoin. */
 let onTokensChanged: ((t: TokenPair | null) => void) | null = null;
 
+let lastPair: TokenPair | null = null;
+
 export function setTokens(t: TokenPair | null) {
   tokens = t ? { access: t.access_token, refresh: t.refresh_token } : null;
+  lastPair = t;
   onTokensChanged?.(t);
 }
 
@@ -63,6 +66,11 @@ export function setTokensChangedHandler(f: ((t: TokenPair | null) => void) | nul
 
 export function hasSession(): boolean {
   return tokens !== null;
+}
+
+/** Les jetons en cours, pour qui persiste la session avec eux. */
+export function currentTokens(): TokenPair | null {
+  return lastPair;
 }
 
 export function setSessionLostHandler(f: (() => void) | null) {
@@ -109,6 +117,7 @@ async function refreshTokens(): Promise<void> {
         setTokens(pair);
       } catch (e) {
         tokens = null;
+        lastPair = null;
         onSessionLost?.();
         throw e;
       } finally {

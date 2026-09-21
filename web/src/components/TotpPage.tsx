@@ -44,7 +44,7 @@ export function TotpPage({ ctx }: { ctx: PageContext }) {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <header className="flex shrink-0 items-center gap-2 border-b border-[var(--c-border)] px-4 py-2.5 max-md:pl-28">
+      <header className="flex shrink-0 items-center gap-2 border-b border-[var(--c-border)] px-4 py-2.5 max-md:pl-11">
         <h1 className="text-[14px] font-semibold text-[var(--c-text)]">Authentificateur</h1>
         <span className="text-[11px] text-[var(--c-text-faint)]">{entries ? `${entries.length} code(s)` : ""}</span>
       </header>

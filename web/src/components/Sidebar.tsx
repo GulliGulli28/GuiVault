@@ -4,14 +4,15 @@ import { navigate, routeHash, type Route } from "../lib/route";
 import { createVault } from "../lib/session";
 import { errorMessage } from "../lib/api";
 import { ROLE_HINTS, ROLE_LABELS } from "../lib/types";
-import { IconDice, IconShieldClock } from "./secret-icons";
-import { IconBell, IconPlus, IconSettings, IconVault } from "./ui-icons";
+import { IconDice, IconIdentity, IconShieldClock } from "./secret-icons";
+import { IconBell, IconPlus, IconVault } from "./ui-icons";
+import { Logo } from "./Logo";
 import { Modal } from "./ui";
 
 /** La barre latérale : les vaults, les invitations reçues, le compte. Même
  * vocabulaire que la barre de Guiterm — surface `--c-bg`, lignes `list-row`,
  * marqueur d'accent sur l'élément actif. */
-export function Sidebar({ ctx, route, onLogout }: { ctx: PageContext; route: Route; onLogout: () => void }) {
+export function Sidebar({ ctx, route, onLogout, width }: { ctx: PageContext; route: Route; onLogout: () => void; width: number }) {
   const { session } = ctx;
   const [creating, setCreating] = useState(false);
   const [open, setOpen] = useState(false);
@@ -24,10 +25,16 @@ export function Sidebar({ ctx, route, onLogout }: { ctx: PageContext; route: Rou
 
   const list = (
     <div className="flex h-full flex-col">
-      <div className="flex items-center gap-2 px-3 py-3">
-        <span className="flex h-6 w-6 items-center justify-center rounded-md bg-[var(--c-accent-dim)] text-[var(--c-accent-text)]"><IconVault size={13} /></span>
+      {/* Le logo ramène à l'accueil : le premier vault. */}
+      <a
+        href={routeHash({ page: "home" })}
+        onClick={(e) => { e.preventDefault(); go({ page: "home" }); }}
+        className="flex items-center gap-2 px-3 py-2.5 text-[var(--c-text)] hover:text-[var(--c-accent-text)]"
+        title="Accueil"
+      >
+        <Logo size={26} />
         <span className="text-[13px] font-semibold">GuiVault</span>
-      </div>
+      </a>
 
       <div className="sidebar-scroll -mx-1 min-h-0 flex-1 overflow-y-auto px-1">
         <div className="flex items-center justify-between px-2 pb-1 pt-1">
@@ -82,15 +89,15 @@ export function Sidebar({ ctx, route, onLogout }: { ctx: PageContext; route: Rou
 
       <div className="border-t border-[var(--c-border)] p-2">
         <a
-          href={routeHash({ page: "account" })}
-          onClick={(e) => { e.preventDefault(); go({ page: "account" }); }}
-          data-active={route.page === "account" ? "true" : undefined}
+          href={routeHash({ page: "settings", section: "compte" })}
+          onClick={(e) => { e.preventDefault(); go({ page: "settings", section: "compte" }); }}
+          data-active={route.page === "settings" ? "true" : undefined}
           className="list-row py-1.5"
         >
-          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[var(--c-bg3)] text-[var(--c-text-secondary)]"><IconSettings size={12} /></span>
+          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[var(--c-bg3)] text-[var(--c-text-secondary)]"><IconIdentity size={12} /></span>
           <span className="flex min-w-0 flex-1 flex-col leading-tight">
             <span className="truncate text-[12.5px] text-[var(--c-text)]" title={session.user.email}>{session.user.email}</span>
-            <span className="truncate text-[10.5px] text-[var(--c-text-muted)]">Compte et sessions</span>
+            <span className="truncate text-[10.5px] text-[var(--c-text-muted)]">Compte et paramètres</span>
           </span>
         </a>
         <button onClick={onLogout} className="btn btn-ghost btn-sm mt-1 w-full justify-start">Se déconnecter</button>
@@ -100,12 +107,20 @@ export function Sidebar({ ctx, route, onLogout }: { ctx: PageContext; route: Rou
 
   return (
     <>
-      {/* Étroit : un bouton en haut ouvre la barre en tiroir. */}
+      {/* Étroit : un bouton en haut ouvre la barre en tiroir. Le titre de la
+          page est juste à côté, le bouton ne le répète pas. */}
       <div className="fixed left-2 top-2 z-30 md:hidden">
-        <button onClick={() => setOpen(true)} className="btn btn-secondary btn-sm" aria-label="Menu">☰ {activeVault ? session.vaults.find((v) => v.id === activeVault)?.name ?? "GuiVault" : "GuiVault"}</button>
+        <button onClick={() => setOpen(true)} className="btn btn-secondary btn-sm btn-icon" aria-label="Menu" title="Menu">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2.5 4h11M2.5 8h11M2.5 12h11" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" /></svg>
+        </button>
       </div>
       {open && <div className="fixed inset-0 z-30 bg-black/50 md:hidden" onClick={() => setOpen(false)} />}
-      <aside className={`fixed inset-y-0 left-0 z-40 w-64 border-r border-[var(--c-border)] bg-[var(--c-bg)] transition-transform md:static md:z-auto md:translate-x-0 ${open ? "translate-x-0" : "-translate-x-full"}`}>
+      {/* Large : la largeur réglée à la poignée (la bordure est la poignée) ;
+          étroit : un tiroir de largeur fixe. */}
+      <aside
+        style={{ "--sidebar-w": `${width}px` } as React.CSSProperties}
+        className={`fixed inset-y-0 left-0 z-40 w-64 border-r border-[var(--c-border)] bg-[var(--c-bg)] transition-transform md:static md:z-auto md:w-[var(--sidebar-w)] md:translate-x-0 md:border-r-0 ${open ? "translate-x-0" : "-translate-x-full"}`}
+      >
         {list}
       </aside>
 

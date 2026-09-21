@@ -9,7 +9,7 @@ import { loadItems, putPayload, type DecodedItem, type VaultView } from "../lib/
 import { canWrite, KIND_LABELS_PLURAL, type ItemKind } from "../lib/types";
 import { PasswordStrength } from "./PasswordStrength";
 import { GroupSelect } from "./forms/common";
-import { Eyebrow, Field, PasswordInput } from "./ui";
+import { Eyebrow, Field, FileButton, PasswordInput } from "./ui";
 
 /** Import et export d'un vault. L'import lit le fichier dans le navigateur,
  * montre ce qu'il contient, puis chiffre et envoie item par item ; l'export
@@ -32,7 +32,7 @@ function Body({ ctx, vault }: { ctx: PageContext; vault: VaultView }) {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <header className="flex shrink-0 flex-wrap items-center gap-2 border-b border-[var(--c-border)] px-4 py-2.5 max-md:pl-28">
+      <header className="flex shrink-0 flex-wrap items-center gap-2 border-b border-[var(--c-border)] px-4 py-2.5 max-md:pl-11">
         <button onClick={() => navigate({ page: "vault", id: vault.id })} className="btn btn-ghost btn-sm">← {vault.name}</button>
         <h1 className="text-[14px] font-semibold text-[var(--c-text)]">Importer / exporter</h1>
       </header>
@@ -112,7 +112,7 @@ function ImportSection({ ctx, vault, groups, onDone }: { ctx: PageContext; vault
     <section className="max-w-2xl space-y-3">
       <Eyebrow>Importer dans « {vault.name} »</Eyebrow>
       <p className="help-text">Bitwarden (JSON, en clair ou protégé par mot de passe, et CSV), Chrome, Firefox, LastPass, KeePassXC (CSV), ou un export GuiVault. Le fichier est lu ici, dans le navigateur : rien n'en part en clair.</p>
-      <input type="file" accept=".json,.csv,.txt,application/json,text/csv" aria-label="Fichier à importer" onChange={(e) => void onFile(e.target.files?.[0])} className="block text-[12px] text-[var(--c-text-secondary)]" />
+      <FileButton label="Choisir un fichier à importer" accept=".json,.csv,.txt,application/json,text/csv" small={false} onFile={(f) => void onFile(f)} />
       {needsPassword && text !== null && (
         <form onSubmit={(e) => { e.preventDefault(); void parse(text, password); }} className="callout space-y-2">
           <p>« {filename} » est protégé par un mot de passe.</p>

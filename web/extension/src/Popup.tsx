@@ -1,19 +1,21 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { api, errorMessage, setBaseUrl, setSessionLostHandler, setTokensChangedHandler } from "../../src/lib/api";
-import { indexItems } from "../../src/lib/entities";
+import { indexItems, toEntities } from "../../src/lib/entities";
 import { describeSecret } from "../../src/lib/items";
 import { loadItems, login, payloadEntity, payloadName, refresh, setDeviceLabel, type DecodedItem, type SessionState } from "../../src/lib/session";
 import { loginMatches } from "../../src/lib/urimatch";
-import { KIND_LABELS, KIND_LABELS_PLURAL, type ItemKind, type Login, type Payload, type TokenPair } from "../../src/lib/types";
+import { KIND_LABELS, KIND_LABELS_PLURAL, type CustomIcon, type GuiVaultEntity, type ItemKind, type Login, type Payload, type TokenPair } from "../../src/lib/types";
 import { GeneratorPanel } from "../../src/components/GeneratorPanel";
 import { ItemView } from "../../src/components/ItemView";
-import { KIND_ICONS } from "../../src/components/ItemTree";
+import { EntityIcon, KIND_ICONS } from "../../src/components/ItemTree";
 import { PasswordStrength } from "../../src/components/PasswordStrength";
 import { TotpCode } from "../../src/components/TotpCode";
 import { TotpList } from "../../src/components/TotpList";
 import { ItemForm } from "../../src/components/forms/ItemForm";
-import { IconDice, IconGlobe, IconLogin, IconShieldClock, IconStar } from "../../src/components/secret-icons";
-import { IconChevronDown, IconChevronRight, IconCopy, IconEdit, IconExternal, IconLock, IconPlus, IconRefresh, IconSearch, IconTrash, IconVault } from "../../src/components/ui-icons";
+import { IconDice, IconGlobe, IconShieldClock, IconStar } from "../../src/components/secret-icons";
+import { IconChevronDown, IconChevronRight, IconCopy, IconEdit, IconExternal, IconLock, IconPlus, IconRefresh, IconSearch, IconSettings, IconTrash, IconVault } from "../../src/components/ui-icons";
+import { AppearanceSettings } from "../../src/components/AppearanceSettings";
+import { Logo } from "../../src/components/Logo";
 import { copyText, PasswordInput, SecretValue } from "../../src/components/ui";
 import { clearLockReason, lock, lockReason, loadItemsCache, loadSession, loadSettings, saveItemsCache, saveSession, saveSettings, saveTokens, touchLock, type ItemsCache, type LockReason, type Settings } from "./store";
 import { deleteItem, saveLogin, savePayload } from "./vaultops";
@@ -28,7 +30,7 @@ setDeviceLabel("Extension GuiVault");
 
 type Screen = { kind: "loading" } | { kind: "login"; reason: LockReason | null } | { kind: "vault"; state: SessionState };
 type Tab = "vaults" | "totp" | "generator";
-type View = { kind: "list" } | { kind: "detail"; id: string } | { kind: "edit"; id: string } | { kind: "new"; vaultId: string; itemKind: ItemKind };
+type View = { kind: "list" } | { kind: "detail"; id: string } | { kind: "edit"; id: string } | { kind: "new"; vaultId: string; itemKind: ItemKind } | { kind: "settings" };
 
 /** Un item déchiffré, avec son vault. */
 interface Entry {
@@ -39,6 +41,11 @@ interface Entry {
   name: string;
   subtitle: string;
   search: string;
+  /** La même description que l'arborescence de l'interface web : icône
+   * choisie, genre d'hôte, moteur, tags. */
+  entity: GuiVaultEntity;
+  /** Les icônes du vault, pour dessiner celle d'un hôte ou d'un dossier. */
+  customIcons: CustomIcon[];
 }
 
 interface LoginEntry extends Entry {
@@ -160,12 +167,16 @@ export function Popup() {
     if (screen.kind !== "vault") return [];
     const out: Entry[] = [];
     for (const v of screen.state.vaults) {
-      for (const it of cache[v.id]?.items ?? []) {
+      const items = cache[v.id]?.items ?? [];
+      const entities = new Map(toEntities(items).map((e) => [e.id, e]));
+      const customIcons = indexItems(items).icons;
+      for (const it of items) {
         if (!it.ok) continue;
         const p = it.payload;
-        const { subtitle, search } = describeSecret(p);
-        const sub = subtitle || (p.kind === "host" ? `${p.host.username ? `${p.host.username}@` : ""}${p.host.address}` : p.kind === "sql-connection" ? p.connection.engine : p.kind === "key" ? p.key.path : "");
-        const base: Entry = { vaultId: v.id, vaultName: v.name, item: it, payload: p, name: payloadName(p) || "(sans nom)", subtitle: sub, search: `${search} ${sub}` };
+        const { search } = describeSecret(p);
+        const entity = entities.get(it.id)!;
+        const sub = entity.subtitle ?? (p.kind === "key" ? p.key.path : "");
+        const base: Entry = { vaultId: v.id, vaultName: v.name, item: it, payload: p, name: payloadName(p) || "(sans nom)", subtitle: sub, search: `${search} ${sub}`, entity, customIcons };
         const entry: Entry = p.kind === "login" ? ({ ...base, login: p.login } as LoginEntry) : base;
         out.push(entry);
       }
@@ -225,13 +236,16 @@ export function Popup() {
   return (
     <div className="flex h-[560px] flex-col bg-[var(--c-bg2)] text-[var(--c-text)]">
       <header className="flex shrink-0 items-center gap-2 border-b border-[var(--c-border)] bg-[var(--c-bg)] px-3 py-2">
-        <span className="flex h-6 w-6 items-center justify-center rounded-md bg-[var(--c-accent-dim)] text-[var(--c-accent-text)]"><IconLogin size={13} /></span>
+        {/* Le logo grise quand le coffre est verrouillé — comme l'icône de
+            l'extension dans la barre du navigateur. */}
+        <Logo size={22} locked={screen.kind !== "vault"} />
         <span className="text-[13px] font-semibold">GuiVault</span>
         <span className="ml-auto flex items-center gap-0.5">
           {screen.kind === "vault" && (
             <>
               <button onClick={() => void sync(screen.state, cache)} className="btn btn-ghost btn-sm btn-icon" title="Rafraîchir" aria-label="Rafraîchir"><IconRefresh size={12} className={refreshing ? "animate-spin" : ""} /></button>
               <a href={settings.serverUrl} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-sm btn-icon" title="Ouvrir le coffre (interface web)" aria-label="Ouvrir le coffre"><IconExternal size={12} /></a>
+              <button onClick={() => setView(view.kind === "settings" ? { kind: "list" } : { kind: "settings" })} className={`btn btn-sm btn-icon ${view.kind === "settings" ? "btn-toggled" : "btn-ghost"}`} title="Réglages" aria-label="Réglages" aria-pressed={view.kind === "settings"}><IconSettings size={12} /></button>
               <button onClick={() => void doLock()} className="btn btn-ghost btn-sm btn-icon" title="Verrouiller" aria-label="Verrouiller"><IconLock size={12} /></button>
             </>
           )}
@@ -251,6 +265,8 @@ export function Popup() {
             void sync(state, {});
           }}
         />
+      ) : view.kind === "settings" ? (
+        <SettingsView settings={settings} onSettings={(s) => { setSettings(s); void saveSettings(s); void touchLock(s.lockMinutes); }} onBack={() => setView({ kind: "list" })} />
       ) : view.kind === "edit" && current ? (
         <div className="flex min-h-0 flex-1 flex-col">
           <ItemForm
@@ -418,15 +434,15 @@ function Section({ id, title, icon, count, collapsed, onToggle, accent, children
 
 function Row({ entry, canFill, onFill, onOpen, say }: { entry: Entry; canFill: boolean; onFill: (e: LoginEntry, what: "credentials" | "totp") => Promise<void>; onOpen: () => void; say: (m: string) => void }) {
   const copy = (label: string, v: string) => () => copyText(v).then((ok) => say(ok ? `${label} copié.` : "Copie refusée par le navigateur."));
-  const Icon = KIND_ICONS[entry.payload.kind];
   const favorite = !!payloadEntity(entry.payload).favorite;
+  const { entity } = entry;
   return (
     <div className="list-row mb-0.5 flex-wrap py-1.5">
       <button onClick={onOpen} className="flex min-w-0 flex-1 items-center gap-2 text-left" title={`Ouvrir (${KIND_LABELS[entry.payload.kind]})`}>
-        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[var(--c-bg3)] text-[var(--c-text-secondary)]"><Icon size={12} /></span>
+        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[var(--c-bg3)] text-[var(--c-text-secondary)] [&>.host-icon]:h-[72%] [&>.host-icon]:w-[72%] [&>.host-icon>*]:h-full [&>.host-icon>*]:w-full"><EntityIcon entity={entity} customIcons={entry.customIcons} size={12} /></span>
         <span className="flex min-w-0 flex-1 flex-col leading-tight">
-          <span className="flex items-center gap-1 truncate text-[12.5px] font-medium text-[var(--c-text)]">{entry.name}{favorite && <IconStar size={10} filled className="text-[var(--c-warn)]" />}</span>
-          <span className="truncate text-[10.5px] text-[var(--c-text-muted)]">{entry.subtitle || KIND_LABELS[entry.payload.kind]}</span>
+          <span className="flex items-center gap-1 truncate text-[12.5px] font-medium text-[var(--c-text)]">{entry.name}{favorite && <IconStar size={10} filled className="text-[var(--c-warn)]" />}{entity.badge && <span className="tag">{entity.badge}</span>}</span>
+          <span className={`truncate text-[10.5px] text-[var(--c-text-muted)] ${entity.mono && entry.subtitle ? "font-mono" : ""}`}>{entry.subtitle || KIND_LABELS[entry.payload.kind]}</span>
         </span>
       </button>
       {isLoginEntry(entry) && (
@@ -494,6 +510,41 @@ function Detail({ entry, index, canFill, onBack, onFill, onEdit, onDelete, say }
         {canFill && <button onClick={() => void onFill(entry, "credentials")} className="btn btn-primary btn-sm mt-3 w-full">Remplir la page</button>}
       </div>
       {confirmBox}
+    </div>
+  );
+}
+
+/** Les réglages, une fois connecté : le verrouillage et le remplissage
+ * (les mêmes que sous « Réglages » à la connexion), et l'apparence — la
+ * même page que dans l'interface web et dans Guiterm, en une colonne. */
+function SettingsView({ settings, onSettings, onBack }: { settings: Settings; onSettings: (s: Settings) => void; onBack: () => void }) {
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex shrink-0 items-center gap-1 border-b border-[var(--c-border)] px-2 py-1.5">
+        <button onClick={onBack} className="btn btn-ghost btn-sm" aria-label="Retour">←</button>
+        <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">Réglages</span>
+      </div>
+      <div className="sidebar-scroll min-h-0 flex-1 space-y-4 overflow-y-auto p-3">
+        <section className="space-y-2">
+          <p className="eyebrow">Extension</p>
+          <p className="flex items-center justify-between gap-2 text-[11.5px] text-[var(--c-text-muted)]"><span>Serveur</span><span className="truncate font-mono">{settings.serverUrl}</span></p>
+          <label className="block">
+            <span className="field-label">Verrouiller après</span>
+            <select value={settings.lockMinutes} onChange={(e) => onSettings({ ...settings, lockMinutes: Number(e.target.value) })} className="input">
+              <option value={5}>5 minutes d'inactivité</option>
+              <option value={15}>15 minutes d'inactivité</option>
+              <option value={60}>1 heure d'inactivité</option>
+              <option value={480}>8 heures d'inactivité</option>
+              <option value={0}>À la fermeture du navigateur</option>
+            </select>
+          </label>
+          <label className="flex cursor-pointer items-start gap-2 text-[12.5px]">
+            <input type="checkbox" checked={settings.inlineAutofill} onChange={(e) => onSettings({ ...settings, inlineAutofill: e.target.checked })} className="mt-0.5" />
+            <span>Proposer le remplissage dans les pages<span className="help-text block">Un bouton GuiVault dans les formulaires de connexion quand le coffre a quelque chose pour le site.</span></span>
+          </label>
+        </section>
+        <AppearanceSettings compact />
+      </div>
     </div>
   );
 }

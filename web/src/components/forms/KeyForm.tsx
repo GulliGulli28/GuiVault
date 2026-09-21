@@ -3,7 +3,7 @@ import { uuid } from "../../lib/bytes";
 import type { Payload, PrivateKey } from "../../lib/types";
 import { SshKeyGenerator } from "../GeneratorPanel";
 import { IconDice } from "../secret-icons";
-import { PasswordInput } from "../ui";
+import { FileButton, PasswordInput } from "../ui";
 import { Field, FormShell } from "./common";
 
 export function KeyForm({ initial, onSave, onCancel }: {
@@ -45,7 +45,7 @@ export function KeyForm({ initial, onSave, onCancel }: {
           <button type="button" onClick={() => setShowGenerator((g) => !g)} aria-pressed={showGenerator} className={`btn btn-icon self-start mt-[18px] ${showGenerator ? "btn-toggled" : "btn-secondary"}`} title="Générer une paire de clés" aria-label="Générer une paire de clés"><IconDice size={14} /></button>
         </div>
         <p className="help-text mt-1">Collé, chargé depuis un fichier, ou généré ici : chiffré dans le vault, il suit la clé sur chaque appareil.</p>
-        <input type="file" aria-label="Charger un fichier de clé" onChange={(e) => { loadFile(e.target.files?.[0]); setPublicKey(null); }} className="mt-1 block text-[11.5px] text-[var(--c-text-muted)]" />
+        <FileButton label="Charger un fichier de clé" className="mt-1.5" onFile={(f) => { loadFile(f); setPublicKey(null); }} />
         {showGenerator && (
           <div className="card mt-2 p-3">
             <SshKeyGenerator

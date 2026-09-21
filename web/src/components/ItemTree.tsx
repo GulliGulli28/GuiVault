@@ -1,9 +1,12 @@
 import { useMemo, useState, type ReactNode } from "react";
+import { hostKindMeta } from "../lib/hostKinds";
+import { ACCENT_COLORS, type UiAccent } from "../lib/preferences";
 import { buildVaultTree, visibleRows } from "../lib/vaultTree";
-import { KIND_LABELS, type GuiVaultEntity, type GuiVaultEntityKind } from "../lib/types";
-import { EntityRow, GroupRow } from "./EntityRow";
+import { KIND_LABELS, type CustomIcon, type GuiVaultEntity, type GuiVaultEntityKind } from "../lib/types";
+import { EntityMono, EntityRow, EntityTags, GroupRow } from "./EntityRow";
+import { HostIcon, hasIcon } from "./icons";
 import { IconCard, IconIdentity, IconLogin, IconNote, IconStar } from "./secret-icons";
-import { IconDatabase, IconFolder, IconHosts, IconKeychain, IconPalette, IconSnippets } from "./ui-icons";
+import { IconDatabase, IconFolder, IconFolderFilled, IconHosts, IconKeychain, IconPalette, IconSnippets } from "./ui-icons";
 
 export const KIND_ICONS: Record<GuiVaultEntityKind, (p: { size?: number; className?: string }) => ReactNode> = {
   host: IconHosts,
@@ -24,11 +27,44 @@ const BUCKET_ICONS: Record<string, (p: { size?: number }) => ReactNode> = {
   "Icônes": IconPalette,
 };
 
+/** L'icône d'une entité, choisie comme dans les panneaux de Guiterm : l'icône
+ * qu'on lui a donnée (banque ou icône du vault) quand on sait la dessiner,
+ * sinon celle de son genre — terminal, Docker, Kubernetes, écran RDP pour un
+ * hôte, l'icône du type pour le reste. */
+export function EntityIcon({ entity, customIcons, size = 13 }: { entity: GuiVaultEntity; customIcons: CustomIcon[]; size?: number }) {
+  if (hasIcon(entity.icon, customIcons)) {
+    return <span className="host-icon flex"><HostIcon iconId={entity.icon} customIcons={customIcons} size={16} /></span>;
+  }
+  if (entity.kind === "host") {
+    const { Icon } = hostKindMeta(entity.hostKind);
+    return <Icon size={size} />;
+  }
+  if (entity.kind === "group") {
+    const color = groupColor(entity.color);
+    // Un dossier coloré : le dossier plein, de sa couleur — la même que
+    // Guiterm met sur ses onglets.
+    if (color) return <span className="flex [&>svg]:h-full [&>svg]:w-full" style={{ color }}><IconFolderFilled size={size} /></span>;
+  }
+  const Icon = KIND_ICONS[entity.kind];
+  return <Icon size={size} />;
+}
+
+/** La pastille de couleur d'un dossier — `c500` de l'accent nommé, comme
+ * sur les onglets de Guiterm. `undefined` sans couleur ou pour une couleur
+ * que Guiterm ne connaît pas. */
+export function groupColor(color: string | undefined): string | undefined {
+  if (!color) return undefined;
+  if (color in ACCENT_COLORS) return ACCENT_COLORS[color as UiAccent].c500;
+  return /^#[0-9a-f]{6}$/i.test(color) ? color : undefined;
+}
+
 /** Le contenu d'un vault, comme dans le panneau GuiVault de Guiterm : mêmes
  * lignes de dossier repliables, mêmes lignes d'entité, même indentation —
  * sans les cases à cocher, un clic ouvre l'entité. */
-export function ItemTree({ entities, query, selected, onSelect, emptyMessage = "Rien ici pour l'instant.", rowActions }: {
+export function ItemTree({ entities, customIcons = [], query, selected, onSelect, emptyMessage = "Rien ici pour l'instant.", rowActions }: {
   entities: GuiVaultEntity[];
+  /** Les icônes du vault, pour les hôtes et dossiers qui en portent une. */
+  customIcons?: CustomIcon[];
   query: string;
   selected: string | null;
   onSelect: (id: string) => void;
@@ -63,7 +99,9 @@ export function ItemTree({ entities, query, selected, onSelect, emptyMessage = "
               depth={row.depth}
               expanded={!collapsed.has(row.id)}
               onToggle={() => toggle(row.id)}
-              icon={<IconFolder size={14} />}
+              icon={hasIcon(row.entity.icon, customIcons)
+                ? <HostIcon iconId={row.entity.icon} customIcons={customIcons} size={15} />
+                : <EntityIcon entity={row.entity} customIcons={customIcons} size={14} />}
               name={row.entity.name}
               count={row.keys.length - 1}
               actions={
@@ -77,17 +115,28 @@ export function ItemTree({ entities, query, selected, onSelect, emptyMessage = "
           return <GroupRow key={row.id} depth={row.depth} expanded={!collapsed.has(row.id)} onToggle={() => toggle(row.id)} icon={<Icon size={14} />} name={row.label} count={row.keys.length} />;
         }
         const { entity } = row;
-        const Icon = KIND_ICONS[entity.kind];
+        const badges = (
+          <>
+            {entity.favorite && <IconStar size={11} filled className="text-[var(--c-warn)]" />}
+            {entity.badge && <span className="tag">{entity.badge}</span>}
+          </>
+        );
+        const secondary = entity.subtitle || entity.tags ? (
+          <>
+            {entity.subtitle && (entity.mono ? <EntityMono>{entity.subtitle}</EntityMono> : <span className="truncate">{entity.subtitle}</span>)}
+            {entity.tags && <EntityTags tags={entity.tags} />}
+          </>
+        ) : undefined;
         return (
           <EntityRow
             key={row.id}
             depth={row.depth}
             active={selected === entity.id}
             className="cursor-pointer"
-            icon={<Icon size={13} />}
+            icon={<EntityIcon entity={entity} customIcons={customIcons} />}
             title={entity.name}
-            badges={entity.favorite ? <IconStar size={11} filled className="text-[var(--c-warn)]" /> : undefined}
-            secondary={entity.subtitle ? <span className="truncate">{entity.subtitle}</span> : undefined}
+            badges={entity.favorite || entity.badge ? badges : undefined}
+            secondary={secondary}
             title_={`${KIND_LABELS[entity.kind]}${entity.path ? ` — ${entity.path}` : ""}`}
             onClick={() => onSelect(entity.id)}
             actions={rowActions?.(entity)}

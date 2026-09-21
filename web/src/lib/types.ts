@@ -453,5 +453,17 @@ export interface GuiVaultEntity {
   search?: string;
   /** La ligne secondaire d'une entité (utilisateur, site, fin de carte). */
   subtitle?: string;
+  /** La ligne secondaire est une valeur (adresse, commande) : en mono,
+   * comme dans les listes de Guiterm. */
+  mono?: boolean;
   favorite?: boolean;
+  /** Icône choisie (banque de Guiterm ou icône du vault) — hôte, dossier. */
+  icon?: string;
+  /** Pour un hôte : de quoi choisir l'icône du genre quand il n'en a pas. */
+  hostKind?: HostKind;
+  /** Pour un dossier : sa couleur, un nom d'accent de Guiterm. */
+  color?: string;
+  /** À côté du nom : le moteur d'une connexion, le type d'une clé. */
+  badge?: string;
+  tags?: string[];
 }

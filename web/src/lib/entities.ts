@@ -4,7 +4,7 @@
 import type { DecodedItem } from "./session";
 import { payloadName } from "./session";
 import { describeSecret } from "./items";
-import type { Group, GuiVaultEntity, Host, Payload, PrivateKey, Snippet, SqlConnection } from "./types";
+import { SQL_ENGINE_LABELS, type CustomIcon, type Group, type GuiVaultEntity, type Host, type Payload, type PrivateKey, type Snippet, type SqlConnection } from "./types";
 
 export interface VaultIndex {
   groups: Group[];
@@ -12,11 +12,14 @@ export interface VaultIndex {
   keys: PrivateKey[];
   snippets: Snippet[];
   connections: SqlConnection[];
+  /** Les icônes du vault, celles que `HostIcon` sait dessiner en plus de
+   * la banque de Guiterm. */
+  icons: CustomIcon[];
   byId: Map<string, DecodedItem & { ok: true }>;
 }
 
 export function indexItems(items: DecodedItem[]): VaultIndex {
-  const idx: VaultIndex = { groups: [], hosts: [], keys: [], snippets: [], connections: [], byId: new Map() };
+  const idx: VaultIndex = { groups: [], hosts: [], keys: [], snippets: [], connections: [], icons: [], byId: new Map() };
   for (const it of items) {
     if (!it.ok) continue;
     idx.byId.set(it.id, it);
@@ -27,6 +30,7 @@ export function indexItems(items: DecodedItem[]): VaultIndex {
       case "key": idx.keys.push(p.key); break;
       case "snippet": idx.snippets.push(p.snippet); break;
       case "sql-connection": idx.connections.push(p.connection); break;
+      case "icon": idx.icons.push(p.icon); break;
       default: break;
     }
   }
@@ -89,7 +93,41 @@ export function toEntities(items: DecodedItem[]): GuiVaultEntity[] {
     const parentId = parentOf(it.payload);
     const { subtitle, search } = describeSecret(it.payload);
     const favorite = payloadEntityFavorite(it.payload) || undefined;
-    out.push({ id: it.id, kind: it.payload.kind, name: payloadName(it.payload) || "(sans nom)", path: groupPath(groups, parentId), parentId, subtitle: subtitle || undefined, search: search || undefined, favorite });
+    out.push({ id: it.id, kind: it.payload.kind, name: payloadName(it.payload) || "(sans nom)", path: groupPath(groups, parentId), parentId, subtitle: subtitle || undefined, search: search || undefined, favorite, ...describeEntity(it.payload) });
   }
   return out;
+}
+
+/** Ce que la ligne d'une entité Guiterm montre en plus de son nom — la même
+ * chose que les panneaux de Guiterm : `user@adresse` en mono et les tags
+ * d'un hôte, le moteur d'une connexion, la commande d'un snippet. Et de quoi
+ * choisir son icône. */
+function describeEntity(p: Payload): Pick<GuiVaultEntity, "mono" | "icon" | "hostKind" | "color" | "badge" | "tags" | "subtitle"> {
+  switch (p.kind) {
+    case "host": {
+      const h = p.host;
+      const kind = h.kind ?? "ssh";
+      const defaultPort = kind === "rdp" ? 3389 : 22;
+      const subtitle =
+        kind === "dockerExec" || kind === "k8sExec" ? h.address :
+        `${h.username ? `${h.username}@` : ""}${h.address}${h.port && h.port !== defaultPort ? `:${h.port}` : ""}`;
+      return { subtitle: subtitle || undefined, mono: true, icon: h.icon, hostKind: kind, tags: h.tags?.length ? h.tags : undefined };
+    }
+    case "group":
+      return { icon: p.group.icon, color: p.group.color ?? undefined };
+    case "sql-connection": {
+      const c = p.connection;
+      const target =
+        c.engine === "sqlite" ? c.path :
+        c.engine === "mongodb" ? c.connectionString.replace(/\/\/[^@/]*@/, "//") :
+        `${c.username ? `${c.username}@` : ""}${c.address}${c.database ? `/${c.database}` : ""}`;
+      return { subtitle: target || undefined, mono: true, badge: SQL_ENGINE_LABELS[c.engine], tags: c.tags?.length ? c.tags : undefined };
+    }
+    case "snippet":
+      return { subtitle: p.snippet.command.split("\n")[0].slice(0, 80) || undefined, mono: true, tags: p.snippet.tags?.length ? p.snippet.tags : undefined };
+    case "key":
+      return { subtitle: p.passphrase ? "protégée par passphrase" : undefined };
+    default:
+      return {};
+  }
 }

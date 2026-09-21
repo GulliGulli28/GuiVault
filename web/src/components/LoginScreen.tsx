@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { api, errorMessage } from "../lib/api";
 import { login, register, type SessionState } from "../lib/session";
 import type { HealthResponse } from "../lib/types";
-import { IconVault } from "./ui-icons";
+import { Logo } from "./Logo";
 import { PasswordInput } from "./ui";
 
 /** Connexion ou inscription, puis le second facteur si le compte en a un —
@@ -64,8 +64,9 @@ export function LoginScreen({ onSession }: { onSession: (s: SessionState) => voi
   return (
     <div className="flex min-h-full items-center justify-center p-4">
       <div className="w-full max-w-sm">
-        <div className="mb-5 flex items-center gap-2.5 text-[var(--c-text)]">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--c-accent-dim)] text-[var(--c-accent-text)]"><IconVault size={16} /></span>
+        <div className="mb-5 flex items-center gap-3 text-[var(--c-text)]">
+          {/* Gris tant qu'on n'est pas connecté — comme l'icône de l'extension. */}
+          <Logo size={44} locked />
           <div>
             <h1 className="text-[15px] font-semibold leading-tight">GuiVault</h1>
             <p className="text-[11.5px] text-[var(--c-text-muted)]">Coffre chiffré de bout en bout de Guiterm</p>

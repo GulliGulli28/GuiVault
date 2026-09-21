@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { fingerprintTrust, pinFingerprint, type FingerprintTrust } from "../lib/pins";
 import { useModalSurface } from "../hooks/useModalSurface";
 import { ConfirmDialog } from "./ConfirmDialog";
-import { IconCheck, IconClose, IconCopy, IconEye, IconEyeOff } from "./ui-icons";
+import { IconCheck, IconClose, IconCopy, IconEye, IconEyeOff, IconUpload } from "./ui-icons";
 
 // ─── Presse-papier ───────────────────────────────────────────────────────────
 
@@ -134,6 +134,30 @@ export function PasswordInput({ value, onChange, placeholder, autoFocus, autoCom
   );
 }
 
+/** Un bouton « Choisir un fichier » à la place du contrôle natif, dont le
+ * libellé suit la langue du navigateur (« Choose File ») et pas celle de
+ * l'interface. Le nom du fichier choisi s'affiche à côté. */
+export function FileButton({ label, accept, onFile, className = "", small = true }: {
+  label: string; accept?: string; onFile: (file: File | undefined) => void; className?: string; small?: boolean;
+}) {
+  const [name, setName] = useState<string | null>(null);
+  return (
+    <span className={`inline-flex min-w-0 items-center gap-2 ${className}`}>
+      <label className={`btn btn-secondary ${small ? "btn-sm" : ""} cursor-pointer`}>
+        <IconUpload size={12} /> {label}
+        <input
+          type="file"
+          accept={accept}
+          aria-label={label}
+          onChange={(e) => { const f = e.target.files?.[0]; setName(f?.name ?? null); onFile(f); e.target.value = ""; }}
+          className="sr-only"
+        />
+      </label>
+      {name && <span className="min-w-0 truncate text-[11.5px] text-[var(--c-text-muted)]">{name}</span>}
+    </span>
+  );
+}
+
 // ─── Mise en page de formulaire ──────────────────────────────────────────────
 
 /** L'aide est hors du `<label>` : dedans, elle ferait partie du nom
@@ -248,7 +272,9 @@ export function Loading({ label = "Chargement…" }: { label?: string }) {
   return <p className="px-2 py-6 text-center text-[12px] text-[var(--c-text-muted)]">{label}</p>;
 }
 
+/** Une date en français, quel que soit le réglage du navigateur : le reste
+ * de l'interface l'est. */
 export function formatWhen(iso: string | null | undefined): string {
   if (!iso) return "jamais";
-  return new Date(iso).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" });
+  return new Date(iso).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" });
 }

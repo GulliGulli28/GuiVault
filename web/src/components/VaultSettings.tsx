@@ -78,7 +78,7 @@ function Body({ ctx, vault }: { ctx: PageContext; vault: VaultView }) {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <header className="flex shrink-0 flex-wrap items-center gap-2 border-b border-[var(--c-border)] px-4 py-2.5 max-md:pl-28">
+      <header className="flex shrink-0 flex-wrap items-center gap-2 border-b border-[var(--c-border)] px-4 py-2.5 max-md:pl-11">
         <button onClick={() => navigate({ page: "vault", id: vault.id })} className="btn btn-ghost btn-sm">← {vault.name}</button>
         <h1 className="text-[14px] font-semibold text-[var(--c-text)]">Réglages</h1>
         <span className="tag" title={ROLE_HINTS[vault.role]}>{isPersonal ? "personnel" : ROLE_LABELS[vault.role]}</span>

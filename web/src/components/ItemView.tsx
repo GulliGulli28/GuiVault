@@ -5,6 +5,9 @@ import { cardBrand, identityFullName } from "../lib/items";
 import { SQL_ENGINE_LABELS, type AuthMethod, type CustomField, type DbTunnel, type Host, type Payload, type SecretBase, type SqlConnection } from "../lib/types";
 import { PasswordStrength } from "./PasswordStrength";
 import { TotpCode } from "./TotpCode";
+import { BUILTIN_ICONS, HostIcon, hasIcon } from "./icons";
+import { groupColor } from "./ItemTree";
+import { ACCENT_COLORS, type UiAccent } from "../lib/preferences";
 import { IconPasskey } from "./secret-icons";
 import { CopyButton, Eyebrow, formatWhen, Row, SecretValue } from "./ui";
 
@@ -34,7 +37,7 @@ export function ItemView({ payload, index }: { payload: Payload; index: VaultInd
           <Section title="Organisation">
             <Row label="Dossier">{h.groupId ? groupPath(groups, h.groupId) || <Muted>dossier inconnu</Muted> : <Muted>racine</Muted>}</Row>
             <Row label="Tags"><Tags tags={h.tags} /></Row>
-            {h.icon && <Row label="Icône" mono>{h.icon}</Row>}
+            {h.icon && <Row label="Icône"><IconCell iconId={h.icon} index={index} /></Row>}
           </Section>
           {(h.startupSnippets.length > 0 || h.envVars.length > 0 || h.keepaliveIntervalSecs || h.agentForward || (h.persistentShell && h.persistentShell !== "off")) && (
             <Section title="Session">
@@ -65,8 +68,8 @@ export function ItemView({ payload, index }: { payload: Payload; index: VaultInd
         <Section title="Dossier">
           <Row label="Nom">{g.name}</Row>
           <Row label="Parent">{g.parentId ? groupPath(groups, g.parentId) || <Muted>dossier inconnu</Muted> : <Muted>racine</Muted>}</Row>
-          {g.color && <Row label="Couleur"><span className="inline-block h-3 w-3 rounded-sm align-middle" style={{ background: g.color }} /> <span className="font-mono text-[12px]">{g.color}</span></Row>}
-          {g.icon && <Row label="Icône" mono>{g.icon}</Row>}
+          {g.color && <Row label="Couleur"><span className="inline-block h-3 w-3 rounded-full align-middle" style={{ background: groupColor(g.color) ?? "var(--c-bg3)" }} /> {g.color in ACCENT_COLORS ? ACCENT_COLORS[g.color as UiAccent].label : <span className="font-mono text-[12px]">{g.color}</span>}</Row>}
+          {g.icon && <Row label="Icône"><IconCell iconId={g.icon} index={index} /></Row>}
         </Section>
       );
     }
@@ -349,3 +352,11 @@ function Tags({ tags }: { tags: string[] }) {
   return <span className="flex flex-wrap gap-1">{tags.map((t) => <span key={t} className="tag">{t}</span>)}</span>;
 }
 
+
+/** Une icône choisie, dessinée avec son nom — ou son identifiant seul quand
+ * ce vault ne la connaît pas. */
+function IconCell({ iconId, index }: { iconId: string; index: VaultIndex }) {
+  const name = BUILTIN_ICONS.find((i) => i.id === iconId)?.name ?? index.icons.find((i) => i.id === iconId)?.name;
+  if (!hasIcon(iconId, index.icons)) return <span className="font-mono text-[12px]" title="Icône inconnue dans ce vault">{iconId}</span>;
+  return <span className="inline-flex items-center gap-1.5"><HostIcon iconId={iconId} customIcons={index.icons} size={16} /> {name}</span>;
+}

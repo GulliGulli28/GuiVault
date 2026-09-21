@@ -64,13 +64,19 @@ maître et le délai de verrouillage.
   trousseau…). Les passkeys sont synchronisées comme le reste et visibles
   dans l'interface web.
 - **Verrouiller** : efface la session ; le prochain clic redemande le mot
-  de passe maître (serveur et e-mail restent mémorisés).
+  de passe maître (serveur et e-mail restent mémorisés). L'icône dans la
+  barre du navigateur et le logo du popup passent en gris tant que le
+  coffre est verrouillé.
+- **Réglages** (la roue dentée, une fois connecté) : délai de
+  verrouillage, remplissage dans les pages, et l'apparence — les mêmes
+  réglages que l'interface web et que Guiterm (mode, fond, accent, police,
+  tailles des lignes), retenus par le navigateur pour le popup.
 
 ## Comment c'est fait
 
 | Morceau | Rôle |
 |---|---|
-| `src/Popup.tsx` | tout l'écran : connexion (+ TOTP), liste, remplissage, générateur |
+| `src/Popup.tsx` | tout l'écran : connexion (+ TOTP), liste, remplissage, générateur, réglages |
 | `src/vaultops.ts` | écrire dans le coffre depuis l'extension (créer, modifier, supprimer, déplacer un identifiant) en tenant le cache d'items à jour |
 | `src/store.ts` | la session dans `chrome.storage.session` (jetons, clés du compte, clés et noms des vaults, items déchiffrés) ; réglages dans `chrome.storage.local` |
 | `src/background.ts` | un service worker qui ne fait qu'écouter l'alarme de verrouillage |

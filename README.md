@@ -23,7 +23,9 @@ serveur puisse jamais lire un secret.
   chiffrement dans le navigateur : consulter et modifier ses hôtes, clés,
   snippets et connexions, gérer les vaults partagés, les membres, les
   invitations, les sessions et le second facteur — depuis une machine sans
-  Guiterm.
+  Guiterm. Même charte que Guiterm, mêmes réglages d'apparence (mode
+  sombre/clair/système, fond, couleur d'accent, police, tailles des
+  lignes), mêmes icônes d'hôtes et de dossiers.
 - **Gestionnaire de mots de passe** dans la même interface, à la manière de
   Bitwarden : identifiants (avec sites, codes TOTP, passkeys, historique),
   notes sécurisées, cartes, identités, favoris, champs personnalisés ;

@@ -1,17 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { setSessionLostHandler, subscribeEvents } from "./lib/api";
+import { currentTokens, setSessionLostHandler, setTokens, setTokensChangedHandler, subscribeEvents } from "./lib/api";
+import { clearWebSession, loadWebSession, saveWebSession, saveWebTokens, touchWebSession, webSessionIdle } from "./lib/persist";
 import { navigate, useRoute } from "./lib/route";
 import { logout, refresh, wipe, type SessionState } from "./lib/session";
 import { LoginScreen } from "./components/LoginScreen";
 import { Sidebar } from "./components/Sidebar";
 import { VaultPage } from "./components/VaultPage";
 import { VaultSettings } from "./components/VaultSettings";
-import { AccountPage } from "./components/AccountPage";
+import { SettingsPage } from "./components/SettingsPage";
 import { InvitationsPage } from "./components/InvitationsPage";
 import { GeneratorPage } from "./components/GeneratorPanel";
 import { ToolsPage } from "./components/ToolsPage";
 import { TotpPage } from "./components/TotpPage";
 import { Toasts, useToasts } from "./components/ui";
+import { PaneHandle, usePersistedPane } from "./hooks/usePersistedPane";
 
 /** Ce que chaque page reçoit : la session, et de quoi la recharger, notifier,
  * signaler une erreur. */
@@ -27,12 +29,16 @@ export interface PageContext {
 }
 
 export default function App() {
-  const [session, setSession] = useState<SessionState | null>(null);
+  // La session de l'onglet d'avant rechargement, si le délai d'inactivité
+  // ne l'a pas effacée — sinon on repart de la connexion, en le disant.
+  const restored = useRef(loadWebSession());
+  const [session, setSession] = useState<SessionState | null>(() => (restored.current !== null && restored.current !== "expired" ? restored.current.state : null));
   const [vaultTicks, setVaultTicks] = useState<Record<string, number>>({});
   const { toasts, notify, error, dismiss } = useToasts();
   const route = useRoute();
   const sessionRef = useRef(session);
   sessionRef.current = session;
+  const [booting, setBooting] = useState(restored.current !== null && restored.current !== "expired");
 
   const reload = useCallback(async () => {
     const s = sessionRef.current;
@@ -41,6 +47,7 @@ export default function App() {
       const warnings = await refresh(s);
       warnings.forEach(error);
       setSession({ ...s });
+      if (currentTokens()) saveWebSession(s, currentTokens()!);
     } catch (e) {
       error(e instanceof Error ? e.message : String(e));
     }
@@ -51,12 +58,56 @@ export default function App() {
   useEffect(() => {
     setSessionLostHandler(() => {
       if (sessionRef.current) {
+        clearWebSession();
         setSession(null);
         error("Session expirée ou révoquée : reconnectez-vous.");
       }
     });
     return () => setSessionLostHandler(null);
   }, [error]);
+
+  // Reprise après rechargement : les jetons, puis `/sync` pour les
+  // invitations et les vaults qui ont bougé entre-temps.
+  useEffect(() => {
+    const r = restored.current;
+    restored.current = null;
+    if (r === "expired") {
+      error("Verrouillé après inactivité : reconnectez-vous.");
+      return;
+    }
+    if (!r) return;
+    setTokens(r.tokens);
+    void reload().finally(() => setBooting(false));
+  }, [reload, error]);
+
+  // La session survit au rechargement (`sessionStorage`), pas à l'onglet ;
+  // les jetons qui tournent y sont recopiés, et chaque geste repousse le
+  // délai d'inactivité — dépassé, tout est effacé, comme dans l'extension.
+  useEffect(() => {
+    setTokensChangedHandler((t) => { if (t) saveWebTokens(t); });
+    return () => setTokensChangedHandler(null);
+  }, []);
+  useEffect(() => {
+    if (!session) return;
+    const touch = () => touchWebSession();
+    const events = ["pointerdown", "keydown", "wheel", "touchstart"] as const;
+    events.forEach((ev) => window.addEventListener(ev, touch, { passive: true }));
+    const timer = setInterval(() => {
+      if (webSessionIdle() && sessionRef.current) {
+        clearWebSession();
+        wipe(sessionRef.current);
+        setSession(null);
+        navigate({ page: "home" });
+        error("Verrouillé après inactivité : reconnectez-vous.");
+      }
+    }, 15_000);
+    return () => {
+      events.forEach((ev) => window.removeEventListener(ev, touch));
+      clearInterval(timer);
+    };
+    // `session` identity only matters for connect/disconnect.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session !== null, error]);
 
   // Flux d'événements : un vault modifié ailleurs, une invitation reçue.
   useEffect(() => {
@@ -83,17 +134,21 @@ export default function App() {
     } catch {
       // Le serveur ne répond plus ? La session locale s'efface quand même.
     }
+    clearWebSession();
     if (s) wipe(s);
     setSession(null);
     navigate({ page: "home" });
   }, []);
+
+  // La barre latérale se redimensionne à la souris, comme dans Guiterm.
+  const sidebar = usePersistedPane("sidebar", { initial: 256, min: 200, max: 480, axis: "horizontal", mode: "px" });
 
   const ctx = useMemo<PageContext | null>(() => (session ? { session, reload, notify, error, vaultTicks } : null), [session, reload, notify, error, vaultTicks]);
 
   if (!ctx) {
     return (
       <div className="h-full overflow-y-auto bg-[var(--c-bg)] text-[var(--c-text)]">
-        <LoginScreen onSession={(s) => { setSession(s); navigate({ page: "home" }); }} />
+        <LoginScreen onSession={(s) => { const t = currentTokens(); if (t) saveWebSession(s, t); setSession(s); navigate({ page: "home" }); }} />
         <Toasts toasts={toasts} onDismiss={dismiss} />
       </div>
     );
@@ -103,15 +158,17 @@ export default function App() {
   const effective = route.page === "home" && ctx.session.vaults[0] ? { page: "vault" as const, id: ctx.session.vaults[0].id } : route;
 
   let page;
-  switch (effective.page) {
+  if (booting) {
+    page = <p className="p-6 text-[12.5px] text-[var(--c-text-muted)]">Reprise de la session…</p>;
+  } else switch (effective.page) {
     case "vault":
       page = <VaultPage key={effective.id} ctx={ctx} vaultId={effective.id} />;
       break;
     case "vault-settings":
       page = <VaultSettings key={effective.id} ctx={ctx} vaultId={effective.id} />;
       break;
-    case "account":
-      page = <AccountPage ctx={ctx} onLogout={onLogout} />;
+    case "settings":
+      page = <SettingsPage ctx={ctx} section={effective.section} />;
       break;
     case "vault-tools":
       page = <ToolsPage key={effective.id} ctx={ctx} vaultId={effective.id} />;
@@ -131,8 +188,9 @@ export default function App() {
 
   return (
     <div className="flex h-full w-full overflow-hidden bg-[var(--c-bg)] text-[var(--c-text)]">
-      <Sidebar ctx={ctx} route={effective} onLogout={onLogout} />
-      <main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-[var(--c-bg2)]">{page}</main>
+      <Sidebar ctx={ctx} route={effective} onLogout={onLogout} width={sidebar.value} />
+      <PaneHandle onMouseDown={sidebar.onMouseDown} />
+      <main className={`flex min-w-0 flex-1 flex-col overflow-hidden bg-[var(--c-bg2)] ${sidebar.isDragging ? "pointer-events-none select-none" : ""}`}>{page}</main>
       <Toasts toasts={toasts} onDismiss={dismiss} />
     </div>
   );
