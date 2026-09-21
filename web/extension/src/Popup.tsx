@@ -7,8 +7,9 @@ import type { Login, TokenPair } from "../../src/lib/types";
 import { GeneratorPanel } from "../../src/components/GeneratorPanel";
 import { PasswordStrength } from "../../src/components/PasswordStrength";
 import { TotpCode } from "../../src/components/TotpCode";
+import { TotpList } from "../../src/components/TotpList";
 import { LoginForm } from "../../src/components/forms/LoginForm";
-import { IconDice, IconGlobe, IconLogin, IconStar } from "../../src/components/secret-icons";
+import { IconDice, IconGlobe, IconLogin, IconShieldClock, IconStar } from "../../src/components/secret-icons";
 import { IconChevronDown, IconChevronRight, IconCopy, IconEdit, IconExternal, IconLock, IconPlus, IconRefresh, IconSearch, IconTrash, IconVault } from "../../src/components/ui-icons";
 import { copyText, PasswordInput, SecretValue } from "../../src/components/ui";
 import { clearLockReason, lock, lockReason, loadItemsCache, loadSession, loadSettings, saveItemsCache, saveSession, saveSettings, saveTokens, touchLock, type ItemsCache, type LockReason, type Settings } from "./store";
@@ -17,7 +18,7 @@ import { deleteLogin, saveLogin } from "./vaultops";
 setDeviceLabel("Extension GuiVault");
 
 type Screen = { kind: "loading" } | { kind: "login"; reason: LockReason | null } | { kind: "vault"; state: SessionState };
-type Tab = "vaults" | "generator";
+type Tab = "vaults" | "totp" | "generator";
 type View = { kind: "list" } | { kind: "detail"; id: string } | { kind: "edit"; id: string } | { kind: "new"; vaultId: string };
 
 interface LoginEntry {
@@ -83,6 +84,24 @@ export function Popup() {
       setRefreshing(false);
     }
   }, [say]);
+
+  // Les réglages du générateur (localStorage du popup) sont recopiés dans
+  // `chrome.storage.local` : le service worker les lit pour « Générer »
+  // depuis une page.
+  useEffect(() => {
+    const mirror = () => {
+      try {
+        const raw = localStorage.getItem("guivault.generator");
+        if (raw) void chrome.storage.local.set({ generator: JSON.parse(raw) });
+      } catch {
+        // rien à recopier
+      }
+    };
+    mirror();
+    window.addEventListener("storage", mirror);
+    const t = setInterval(mirror, 2000);
+    return () => { window.removeEventListener("storage", mirror); clearInterval(t); };
+  }, []);
 
   useEffect(() => {
     setTokensChangedHandler((t) => { if (t) void saveTokens(t); });
@@ -254,9 +273,9 @@ export function Popup() {
       ) : (
         <>
           <nav className="flex shrink-0 items-center gap-1 border-b border-[var(--c-border)] px-2 py-1.5">
-            {(["vaults", "generator"] as Tab[]).map((t) => (
+            {(["vaults", "totp", "generator"] as Tab[]).map((t) => (
               <button key={t} onClick={() => setTab(t)} className={`btn btn-sm ${tab === t ? "btn-toggled" : "btn-ghost"}`}>
-                {t === "vaults" ? <><IconVault size={12} /> Vaults</> : <><IconDice size={12} /> Générateur</>}
+                {t === "vaults" ? <><IconVault size={12} /> Vaults</> : t === "totp" ? <><IconShieldClock size={12} /> Codes</> : <><IconDice size={12} /> Générateur</>}
               </button>
             ))}
             {tab === "vaults" && screen.state.vaults.some((v) => v.role !== "reader") && (
@@ -265,6 +284,7 @@ export function Popup() {
           </nav>
           <div className="sidebar-scroll min-h-0 flex-1 overflow-y-auto p-2">
             {tab === "generator" && <GeneratorPanel compact />}
+            {tab === "totp" && <TotpList compact entries={entries.filter((e) => e.login.totp).map((e) => ({ id: e.item.id, vaultName: e.vaultName, login: e.login }))} />}
             {tab === "vaults" && (
               <>
                 <div className="relative mb-2">

@@ -34,11 +34,20 @@ maître et le délai de verrouillage.
   si un identifiant du site a ce nom mais un autre mot de passe : « Mettre à
   jour ? » (l'ancien passe dans l'historique). La saisie attend deux
   minutes dans la mémoire de session du worker, jamais dans la page.
-- **Dans la page** : le badge sur l'icône compte les identifiants qui
-  correspondent à l'onglet ; un bouton GuiVault apparaît sur le champ
-  utilisateur (ou le mot de passe, faute de mieux) des formulaires du site,
-  avec un menu s'il y a plusieurs comptes ; **Ctrl+Maj+L** remplit sans
-  ouvrir le popup. Désactivable (« Proposer le remplissage dans les pages »).
+- **Dans la page** : un bouton GuiVault sur le champ utilisateur (ou le mot
+  de passe, faute de mieux) de tout formulaire de connexion — y compris les
+  connexions en deux étapes (champ utilisateur seul). Un compte pour le
+  site → il remplit ; plusieurs → un menu ; aucun → **« Nouvel
+  identifiant »** dans la page, nom et site préremplis, utilisateur repris
+  du champ, mot de passe tapé ou généré (réglages du générateur du popup),
+  vault au choix — enregistré puis rempli. Coffre verrouillé → il le dit.
+  **Ctrl+Maj+L** remplit sans ouvrir le popup. Désactivable (« Proposer le
+  remplissage dans les pages »).
+- **Badge** : le nombre d'identifiants pour l'onglet, seulement quand la
+  page a un formulaire de connexion sous les yeux.
+- **Codes** : l'authentificateur — tous les codes TOTP du coffre, en
+  direct, avec recherche. Même vue dans l'interface web (« Authentificateur »),
+  où un secret TOTP s'ajoute aussi en déposant ou collant l'image du QR code.
 - **Icône grise** quand il faut se reconnecter (verrouillé, session
   expirée ou révoquée) ; le popup dit pourquoi.
 - **Générateur** : le même que l'interface web.
@@ -120,9 +129,11 @@ clic ; un site ne peut pas déclencher le remplissage lui-même.
 
 ## Ce qui n'est pas là (encore)
 
-- Détection plus fine des formulaires (inscription vs connexion, champs en
-  plusieurs étapes, iframes de connexion tierces) : la v1 repère les champs
-  de mot de passe visibles et devine l'utilisateur à côté.
+- Détection plus fine des formulaires (inscription vs connexion, iframes
+  de connexion tierces). Le champ utilisateur est reconnu par ses attributs,
+  son libellé (`for`, englobant, `aria-labelledby`) et le texte qui le
+  précède, contre une liste de mots (`USERNAME_RE` dans `content.ts`) ;
+  un champ qu'elle rate est un mot à ajouter là.
 - Les autres types d'items (notes, cartes, identités) et les dossiers :
   l'interface web.
 - Passkeys : pas de compteur de signatures, pas de médiation

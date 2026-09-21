@@ -21,7 +21,15 @@ export type ToBackground =
   /** La page (re)chargée demande s'il y a une saisie à proposer d'enregistrer. */
   | { type: "guivault-pending" }
   | { type: "guivault-save-captured"; vaultId: string }
-  | { type: "guivault-dismiss-captured" };
+  | { type: "guivault-dismiss-captured" }
+  /** La page dit si elle a un formulaire de connexion (pour le badge). */
+  | { type: "guivault-form"; present: boolean }
+  /** Les vaults où créer un identifiant depuis la page. */
+  | { type: "guivault-vaults" }
+  | { type: "guivault-generate" }
+  | { type: "guivault-create-login"; vaultId: string; name: string; username: string; password: string; uri: string };
+
+export type VaultsReply = { locked: true } | { locked: false; vaults: { id: string; name: string }[]; defaultVaultId: string };
 
 /** Ce que la bannière « Enregistrer ? » affiche. */
 export interface Pending {

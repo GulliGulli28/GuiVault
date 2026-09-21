@@ -4,7 +4,7 @@ import { navigate, routeHash, type Route } from "../lib/route";
 import { createVault } from "../lib/session";
 import { errorMessage } from "../lib/api";
 import { ROLE_HINTS, ROLE_LABELS } from "../lib/types";
-import { IconDice } from "./secret-icons";
+import { IconDice, IconShieldClock } from "./secret-icons";
 import { IconBell, IconPlus, IconSettings, IconVault } from "./ui-icons";
 import { Modal } from "./ui";
 
@@ -68,6 +68,15 @@ export function Sidebar({ ctx, route, onLogout }: { ctx: PageContext; route: Rou
         >
           <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[var(--c-bg3)] text-[var(--c-text-secondary)]"><IconDice size={12} /></span>
           <span className="min-w-0 flex-1 truncate text-[12.5px] text-[var(--c-text)]">Générateur</span>
+        </a>
+        <a
+          href={routeHash({ page: "totp" })}
+          onClick={(e) => { e.preventDefault(); go({ page: "totp" }); }}
+          data-active={route.page === "totp" ? "true" : undefined}
+          className="list-row mx-1 mt-0.5 py-1.5"
+        >
+          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[var(--c-bg3)] text-[var(--c-text-secondary)]"><IconShieldClock size={12} /></span>
+          <span className="min-w-0 flex-1 truncate text-[12.5px] text-[var(--c-text)]">Authentificateur</span>
         </a>
       </div>
 

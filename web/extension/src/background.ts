@@ -12,7 +12,8 @@ import { loginMatches } from "../../src/lib/urimatch";
 import type { Login } from "../../src/lib/types";
 import { setTokensChangedHandler } from "../../src/lib/api";
 import { uuid } from "../../src/lib/bytes";
-import type { CredentialsReply, FillReply, MatchesReply, PasskeyToBackground, Pending, ToBackground, ToContent } from "./messages";
+import { DEFAULT_GENERATOR, generate, type GeneratorOptions } from "../../src/lib/generator";
+import type { CredentialsReply, FillReply, MatchesReply, PasskeyToBackground, Pending, ToBackground, ToContent, VaultsReply } from "./messages";
 import * as passkeys from "./passkeys";
 import { LOCK_ALARM, loadItemsCache, loadSession, loadSettings, lock, saveTokens } from "./store";
 import { findLogin, saveLogin } from "./vaultops";
@@ -52,6 +53,23 @@ async function updateIcon() {
 
 // ─── Badge ──────────────────────────────────────────────────────────────────
 
+/** Les onglets où le script de page a vu un formulaire de connexion : le
+ * badge ne compte que là — un site où l'on a des identifiants mais pas de
+ * formulaire sous les yeux n'a rien à signaler. */
+async function formPresent(tabId: number): Promise<boolean> {
+  const r = await chrome.storage.session.get("forms");
+  return !!((r.forms as Record<string, boolean> | undefined) ?? {})[tabId];
+}
+
+async function setFormPresent(tabId: number, present: boolean) {
+  const r = await chrome.storage.session.get("forms");
+  const all = (r.forms as Record<string, boolean> | undefined) ?? {};
+  if (all[tabId] === present) return;
+  if (present) all[tabId] = true;
+  else delete all[tabId];
+  await chrome.storage.session.set({ forms: all });
+}
+
 async function updateBadge(tabId: number) {
   let url: string | undefined;
   try {
@@ -59,7 +77,7 @@ async function updateBadge(tabId: number) {
   } catch {
     return;
   }
-  const m = await matchesFor(url);
+  const m = (await formPresent(tabId)) ? await matchesFor(url) : null;
   const text = m && m.length > 0 ? String(m.length) : "";
   await chrome.action.setBadgeText({ tabId, text }).catch(() => {});
   if (text) await chrome.action.setBadgeBackgroundColor({ tabId, color: "#2563eb" }).catch(() => {});
@@ -72,11 +90,14 @@ async function updateActiveBadges() {
 
 chrome.tabs.onActivated.addListener(({ tabId }) => void updateBadge(tabId));
 chrome.tabs.onUpdated.addListener((tabId, info) => {
-  if (info.url || info.status === "complete") void updateBadge(tabId);
+  // Nouvelle page : on oublie le formulaire de l'ancienne, le script de
+  // page redira ce qu'il voit.
+  if (info.status === "loading") void setFormPresent(tabId, false).then(() => updateBadge(tabId));
+  else if (info.url || info.status === "complete") void updateBadge(tabId);
 });
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== "session") return;
-  void updateActiveBadges();
+  if (changes.session || changes.items || changes.forms) void updateActiveBadges();
   if (changes.session) void updateIcon();
 });
 chrome.runtime.onStartup.addListener(() => { void updateActiveBadges(); void updateIcon(); });
@@ -223,6 +244,38 @@ chrome.runtime.onMessage.addListener((msg: ToBackground | PasskeyToBackground, s
       if (sender.tab?.id != null) await setPending(sender.tab.id, null);
       return reply({ ok: true });
     }
+    if (msg.type === "guivault-form") {
+      if (sender.tab?.id != null && sender.frameId === 0) {
+        await setFormPresent(sender.tab.id, msg.present);
+        await updateBadge(sender.tab.id);
+      }
+      return reply({ ok: true });
+    }
+    if (msg.type === "guivault-vaults") {
+      const s = await loadSession();
+      if (!s) return reply({ locked: true } satisfies VaultsReply);
+      const vaults = s.state.vaults.filter((v) => v.role !== "reader").map((v) => ({ id: v.id, name: v.name }));
+      const personal = s.state.vaults.find((v) => v.kind === "personal");
+      return reply({ locked: false, vaults, defaultVaultId: personal?.id ?? vaults[0]?.id ?? "" } satisfies VaultsReply);
+    }
+    if (msg.type === "guivault-generate") {
+      // Les réglages du générateur du popup, si on les a (miroir de son
+      // `localStorage` dans `chrome.storage.local`), sinon les défauts.
+      const r = await chrome.storage.local.get("generator");
+      const opts = (r.generator as GeneratorOptions | undefined) ?? DEFAULT_GENERATOR;
+      return reply({ password: generate(opts) });
+    }
+    if (msg.type === "guivault-create-login") {
+      if (!sender.tab?.url) return reply({ ok: false, error: "pas d'onglet" });
+      const uri = msg.uri.trim() || new URL(sender.tab.url).origin;
+      const login: Login = { id: uuid(), name: msg.name.trim() || hostOf(uri), groupId: null, tags: [], username: msg.username.trim(), password: msg.password, uris: [{ uri, match: null }], totp: null, passkeys: [], passwordHistory: [] };
+      try {
+        await saveLogin(msg.vaultId, login);
+        return reply({ ok: true, name: login.name });
+      } catch (e) {
+        return reply({ ok: false, error: e instanceof Error ? e.message : String(e) });
+      }
+    }
     if (msg.type === "guivault-credentials") {
       const url = sender.tab?.url ?? sender.url;
       const m = await matchesFor(url);
@@ -254,4 +307,4 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === LOCK_ALARM) void lock("timeout");
 });
 
-chrome.tabs.onRemoved.addListener((tabId) => void setPending(tabId, null));
+chrome.tabs.onRemoved.addListener((tabId) => { void setPending(tabId, null); void setFormPresent(tabId, false); });

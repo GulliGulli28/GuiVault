@@ -11,7 +11,7 @@
  *    page si le coffre est verrouillé ou n'a rien pour elle.
  *
  * L'interface injectée vit dans un shadow DOM, hors du style de la page. */
-import type { CredentialsReply, FillReply, MatchesReply, MatchSummary, PasskeyToBackground, Pending, ToBackground, ToContent } from "./messages";
+import type { CredentialsReply, FillReply, MatchesReply, MatchSummary, PasskeyToBackground, Pending, ToBackground, ToContent, VaultsReply } from "./messages";
 
 declare global {
   interface Window {
@@ -45,11 +45,29 @@ declare global {
     el.dispatchEvent(new Event("change", { bubbles: true }));
   };
 
+  /** Tout ce qui nomme un champ, pour le reconnaître : attributs, libellé
+   * associé (`for`, englobant, `aria-labelledby`), texte juste avant. */
+  const hintOf = (i: HTMLInputElement): string => {
+    const parts: (string | null | undefined)[] = [i.name, i.id, i.autocomplete, i.placeholder, i.getAttribute("aria-label"), i.title, i.className];
+    for (const id of (i.getAttribute("aria-labelledby") ?? "").split(/\s+/).filter(Boolean)) parts.push(document.getElementById(id)?.textContent);
+    if (i.id) for (const l of Array.from(document.querySelectorAll<HTMLLabelElement>("label"))) if (l.htmlFor === i.id) parts.push(l.textContent);
+    parts.push(i.closest("label")?.textContent);
+    const prev = i.previousElementSibling ?? i.parentElement?.previousElementSibling;
+    if (prev && prev.textContent && prev.textContent.length < 60) parts.push(prev.textContent);
+    return parts.filter(Boolean).join(" ").toLowerCase().replace(/\s+/g, " ");
+  };
+
+  const USERNAME_RE = /user|usr|login|log-in|signin|sign-in|e-?mail|courriel|identif|ident\b|compte|account|pseudo|nickname|member|membre|customer|client|phone|tel|mobile|portable|matricule|\bid\b|nom d'utilisateur|adresse/;
+  const NOT_USERNAME_RE = /search|recherch|captcha|otp|one-time|code|zip|postal|city|ville|street|rue|firstname|lastname|prénom|surname|card|carte|cvv|iban|coupon|promo|filter|filtre|query|\bq\b/;
+
   const isUsernameLike = (i: HTMLInputElement) => {
     const t = (i.type || "text").toLowerCase();
-    if (!["text", "email", "tel"].includes(t)) return false;
-    const hint = `${i.name} ${i.id} ${i.autocomplete} ${i.placeholder} ${i.getAttribute("aria-label") ?? ""}`.toLowerCase();
-    return /user|login|email|mail|identif|compte|account|name|pseudo|phone|tel/.test(hint) || i.autocomplete === "username";
+    if (!["text", "email", "tel", "number"].includes(t)) return false;
+    if (i.autocomplete === "username" || i.autocomplete === "email" || t === "email") return true;
+    if (i.autocomplete === "off" && t === "number") return false;
+    const hint = hintOf(i);
+    if (NOT_USERNAME_RE.test(hint) && !/user|login|e-?mail|identif|compte|account/.test(hint)) return false;
+    return USERNAME_RE.test(hint);
   };
 
   /** Le champ utilisateur qui va avec un champ mot de passe : le champ texte
@@ -101,9 +119,13 @@ declare global {
   let menu: HTMLElement | null = null;
   const anchors = new Map<HTMLInputElement, HTMLElement>();
   let matches: MatchSummary[] = [];
+  let locked = false;
+  let enabled = false;
   let lastUrl = "";
 
   const ICON = `<svg viewBox="0 0 16 16" fill="none" width="16" height="16"><rect x="1.5" y="4" width="13" height="8" rx="1.5" stroke="currentColor" stroke-width="1.25"/><circle cx="4.75" cy="8" r="0.9" fill="currentColor"/><circle cx="8" cy="8" r="0.9" fill="currentColor"/><circle cx="11.25" cy="8" r="0.9" fill="currentColor"/></svg>`;
+  const ICON_EYE = `<svg viewBox="0 0 16 16" fill="none" width="14" height="14"><path d="M1.5 8s2.5-4.5 6.5-4.5S14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z" stroke="currentColor" stroke-width="1.25"/><circle cx="8" cy="8" r="2" stroke="currentColor" stroke-width="1.25"/></svg>`;
+  const ICON_DICE = `<svg viewBox="0 0 16 16" fill="none" width="14" height="14"><rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" stroke-width="1.25"/><circle cx="5.5" cy="5.5" r="1" fill="currentColor"/><circle cx="10.5" cy="5.5" r="1" fill="currentColor"/><circle cx="8" cy="8" r="1" fill="currentColor"/><circle cx="5.5" cy="10.5" r="1" fill="currentColor"/><circle cx="10.5" cy="10.5" r="1" fill="currentColor"/></svg>`;
 
   const ensureHost = () => {
     if (shadow) return shadow;
@@ -132,6 +154,13 @@ declare global {
       .b-primary { background: #2563eb; color: #fff; }
       .b-ghost { background: none; color: #a1a1aa; }
       .b-ghost:hover { color: #e7e7ea; background: rgba(255,255,255,.06); }
+      .f { display: block; margin: 0 0 8px; }
+      .f > span:first-child { display: block; font-size: 11.5px; color: #a1a1aa; margin-bottom: 3px; }
+      .i { width: 100%; box-sizing: border-box; padding: 6px 8px; border-radius: 6px; border: 1px solid #26262b; background: rgba(0,0,0,.25); color: #e7e7ea; font: 13px system-ui, -apple-system, "Segoe UI", sans-serif; }
+      .i:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 2px rgba(37,99,235,.18); }
+      .pw { display: flex; gap: 4px; align-items: center; }
+      .pw .b { padding: 4px 6px; display: inline-flex; align-items: center; }
+      .err { color: #ef4444; font-size: 12px; margin: 0 0 8px; }
       .logo { display: inline-flex; width: 18px; height: 18px; border-radius: 4px; background: #2563eb; color: #fff; align-items: center; justify-content: center; flex-shrink: 0; }
       .banner { position: fixed; z-index: 3; top: 12px; right: 12px; display: grid; grid-template-columns: auto 1fr; gap: 8px 10px; align-items: center; width: min(420px, calc(100vw - 24px)); box-sizing: border-box; background: #121215; color: #e7e7ea; border: 1px solid #26262b; border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.5); font: 13px system-ui, -apple-system, "Segoe UI", sans-serif; padding: 10px 12px; line-height: 1.4; }
       .banner .text { min-width: 0; }
@@ -183,6 +212,12 @@ declare global {
       b.addEventListener("click", () => void choose(m, input));
       menu.appendChild(b);
     }
+    const add = document.createElement("button");
+    add.className = "item";
+    add.setAttribute("role", "menuitem");
+    add.innerHTML = `<span class="name">+ Nouvel identifiant…</span>`;
+    add.addEventListener("click", () => { closeMenu(); void newLoginDialog(input); });
+    menu.appendChild(add);
     const foot = document.createElement("div");
     foot.className = "foot";
     foot.textContent = "GuiVault — Ctrl+Maj+L pour remplir";
@@ -198,17 +233,27 @@ declare global {
    * le premier qu'on remplit), sinon le mot de passe lui-même. */
   const anchorFor = (password: HTMLInputElement, all: HTMLInputElement[]) => usernameFor(password, all) ?? password;
 
+  /** Ce que fait le bouton : verrouillé → le dire ; rien pour ce site →
+   * créer ; un compte → remplir ; plusieurs → menu. */
+  const onButton = (input: HTMLInputElement, btn: HTMLElement) => {
+    if (menu) return closeMenu();
+    if (locked) return void dialog("GuiVault est verrouillé", "Cliquez sur l'icône GuiVault dans la barre du navigateur pour vous reconnecter, puis revenez ici.", null, "OK", true);
+    if (matches.length === 0) return void newLoginDialog(input);
+    if (matches.length === 1) return void choose(matches[0], input);
+    openMenu(input, btn);
+  };
+
   const attach = (input: HTMLInputElement) => {
     if (anchors.has(input)) return;
     const root = ensureHost();
     const btn = document.createElement("div");
     btn.className = "btn";
-    btn.title = "Remplir avec GuiVault";
+    btn.title = matches.length ? "Remplir avec GuiVault" : "Enregistrer dans GuiVault";
     btn.setAttribute("role", "button");
-    btn.setAttribute("aria-label", "Remplir avec GuiVault");
+    btn.setAttribute("aria-label", "GuiVault");
     btn.innerHTML = ICON;
     btn.addEventListener("mousedown", (e) => e.preventDefault());
-    btn.addEventListener("click", () => (menu ? closeMenu() : matches.length === 1 ? void choose(matches[0], input) : openMenu(input, btn)));
+    btn.addEventListener("click", () => onButton(input, btn));
     root.appendChild(btn);
     anchors.set(input, btn);
     place(input, btn);
@@ -230,18 +275,38 @@ declare global {
     });
   };
 
-  /** Repère les champs de mot de passe et pose (ou retire) les boutons. */
+  /** Les champs qui portent un bouton : pour chaque mot de passe, son
+   * utilisateur (ou lui-même) ; et, sans mot de passe visible (connexion en
+   * deux étapes), les champs qui ressemblent à un utilisateur. */
+  const anchorsWanted = (all: HTMLInputElement[]): HTMLInputElement[] => {
+    const passwords = all.filter((i) => i.type === "password");
+    if (passwords.length) return Array.from(new Set(passwords.map((p) => anchorFor(p, all))));
+    return all.filter(isUsernameLike).slice(0, 3);
+  };
+
+  let reportedForm: boolean | null = null;
+
+  /** Repère les champs et pose (ou retire) les boutons ; dit au worker si
+   * la page a un formulaire (pour le badge). */
   const scan = async () => {
     const url = location.href;
     if (url !== lastUrl) {
       lastUrl = url;
       const r = await send<MatchesReply>({ type: "guivault-matches", url }).catch(() => null);
-      matches = r && !r.locked && r.enabled ? r.logins : [];
+      locked = !!r?.locked;
+      enabled = !!r && (r.locked || r.enabled);
+      matches = r && !r.locked ? r.logins : [];
+      for (const [, btn] of anchors) btn.title = matches.length ? "Remplir avec GuiVault" : "Enregistrer dans GuiVault";
     }
     const all = inputs();
-    const fields = matches.length ? all.filter((i) => i.type === "password").map((p) => anchorFor(p, all)) : [];
+    const fields = enabled ? anchorsWanted(all) : [];
     for (const input of Array.from(anchors.keys())) if (!fields.includes(input)) detach(input);
     for (const input of fields) attach(input);
+    const present = all.some((i) => i.type === "password") || fields.length > 0;
+    if (present !== reportedForm && window === window.top) {
+      reportedForm = present;
+      void send({ type: "guivault-form", present }).catch(() => null);
+    }
   };
 
   let scanTimer: number | undefined;
@@ -357,7 +422,7 @@ declare global {
 
   /** Une boîte de dialogue dans le shadow DOM : titre, texte, choix
    * (facultatif), Continuer / Utiliser le navigateur. */
-  const dialog = (title: string, text: string, choices: Choice[] | null, primary: string): Promise<string | null> =>
+  const dialog = (title: string, text: string, choices: Choice[] | null, primary: string, okOnly = false): Promise<string | null> =>
     new Promise((resolve) => {
       const root = ensureHost();
       const veil = document.createElement("div");
@@ -389,7 +454,8 @@ declare global {
       const ok = document.createElement("button");
       ok.className = "b b-primary";
       ok.textContent = primary;
-      row.append(cancel, ok);
+      if (!okOnly) row.append(cancel);
+      row.append(ok);
       box.appendChild(row);
       const done = (v: string | null) => {
         veil.remove();
@@ -402,6 +468,68 @@ declare global {
       root.append(veil, box);
       ok.focus();
     });
+
+  /** Créer un identifiant depuis la page : nom et site préremplis,
+   * utilisateur repris du champ, mot de passe tapé ou généré ; enregistré
+   * dans le vault choisi puis rempli dans le formulaire. */
+  const newLoginDialog = async (input: HTMLInputElement) => {
+    const v = await send<VaultsReply>({ type: "guivault-vaults" }).catch(() => null);
+    if (!v || v.locked) return void dialog("GuiVault est verrouillé", "Cliquez sur l'icône GuiVault dans la barre du navigateur pour vous reconnecter.", null, "OK", true);
+    const all = inputs();
+    const password = input.type === "password" ? input : (input.form ? Array.from(input.form.querySelectorAll<HTMLInputElement>("input[type=password]")).find(visible) : undefined) ?? all.find((i) => i.type === "password");
+    const user = input.type === "password" ? usernameFor(input, all) : input;
+    const root = ensureHost();
+    const veil = document.createElement("div");
+    veil.className = "veil";
+    const box = document.createElement("div");
+    box.className = "dialog";
+    box.setAttribute("role", "dialog");
+    box.setAttribute("aria-modal", "true");
+    box.innerHTML = `
+      <h2><span class="logo">${ICON}</span><span>Nouvel identifiant</span></h2>
+      <label class="f"><span>Nom</span><input class="i" name="name"></label>
+      <label class="f"><span>Utilisateur</span><input class="i" name="username" autocomplete="off"></label>
+      <label class="f"><span>Mot de passe</span><span class="pw"><input class="i" name="password" type="password" autocomplete="off"><button type="button" class="b b-ghost" data-act="show" title="Afficher" aria-label="Afficher">${ICON_EYE}</button><button type="button" class="b b-ghost" data-act="gen" title="Générer" aria-label="Générer">${ICON_DICE}</button></span></label>
+      <label class="f"><span>Site</span><input class="i" name="uri"></label>
+      <label class="f vault"><span>Vault</span><select class="i" name="vault"></select></label>
+      <p class="err" hidden></p>
+      <div class="row"><button type="button" class="b b-ghost" data-act="cancel">Annuler</button><button type="button" class="b b-primary" data-act="save">Enregistrer</button></div>`;
+    const q = <T extends HTMLElement>(sel: string) => box.querySelector(sel) as T;
+    q<HTMLInputElement>("[name=name]").value = location.hostname.replace(/^www\./, "");
+    q<HTMLInputElement>("[name=username]").value = user?.value ?? "";
+    q<HTMLInputElement>("[name=password]").value = password?.value ?? "";
+    q<HTMLInputElement>("[name=uri]").value = location.origin;
+    const select = q<HTMLSelectElement>("[name=vault]");
+    for (const vt of v.vaults) {
+      const o = document.createElement("option");
+      o.value = vt.id;
+      o.textContent = vt.name;
+      o.selected = vt.id === v.defaultVaultId;
+      select.appendChild(o);
+    }
+    if (v.vaults.length <= 1) q(".vault").hidden = true;
+    const close = () => { veil.remove(); box.remove(); };
+    q("[data-act=cancel]").addEventListener("click", close);
+    box.addEventListener("keydown", (e) => { if (e.key === "Escape") close(); });
+    q("[data-act=show]").addEventListener("click", () => { const p = q<HTMLInputElement>("[name=password]"); p.type = p.type === "password" ? "text" : "password"; });
+    q("[data-act=gen]").addEventListener("click", () => {
+      void send<{ password: string }>({ type: "guivault-generate" }).then((r) => { const p = q<HTMLInputElement>("[name=password]"); p.value = r.password; p.type = "text"; });
+    });
+    q("[data-act=save]").addEventListener("click", () => {
+      const body = { type: "guivault-create-login" as const, vaultId: select.value, name: q<HTMLInputElement>("[name=name]").value, username: q<HTMLInputElement>("[name=username]").value, password: q<HTMLInputElement>("[name=password]").value, uri: q<HTMLInputElement>("[name=uri]").value };
+      if (!body.password) { const err = q(".err"); err.textContent = "Il faut un mot de passe (tapez-le ou générez-le)."; err.hidden = false; return; }
+      (q("[data-act=save]") as HTMLButtonElement).disabled = true;
+      void send<{ ok: true; name: string } | { ok: false; error: string }>(body).then((r) => {
+        if (!r.ok) { const err = q(".err"); err.textContent = r.error; err.hidden = false; (q("[data-act=save]") as HTMLButtonElement).disabled = false; return; }
+        close();
+        fill({ username: body.username, password: body.password }, password);
+        lastUrl = "";
+        scheduleScan();
+      });
+    });
+    root.append(veil, box);
+    q<HTMLInputElement>(password?.value ? "[name=name]" : "[name=password]").focus();
+  };
 
   const replyShim = (id: number, body: Record<string, unknown>) => window.postMessage({ __guivault: "webauthn-reply", id, ...body }, "*");
 

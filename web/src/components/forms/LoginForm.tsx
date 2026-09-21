@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { VaultIndex } from "../../lib/entities";
 import { emptyLogin } from "../../lib/items";
+import { decodeQrImage } from "../../lib/qr";
 import { parseTotp } from "../../lib/totp";
 import type { Login, LoginUri, Payload, UriMatch } from "../../lib/types";
 import { GeneratorPanel } from "../GeneratorPanel";
@@ -24,7 +25,20 @@ export function LoginForm({ initial, index, defaultGroupId, onSave, onCancel }: 
 }) {
   const [login, setLogin] = useState<Login>(initial ?? emptyLogin(defaultGroupId ?? null));
   const [showGenerator, setShowGenerator] = useState(false);
+  const [qrError, setQrError] = useState<string | null>(null);
   const totp = login.totp ? parseTotp(login.totp) : null;
+
+  const readQr = async (file: Blob | undefined) => {
+    if (!file) return;
+    setQrError(null);
+    try {
+      const text = await decodeQrImage(file);
+      if (!text || !parseTotp(text)) setQrError("Pas de QR code TOTP lisible dans cette image.");
+      else setLogin({ ...login, totp: text });
+    } catch {
+      setQrError("Image illisible.");
+    }
+  };
 
   const save = async () => {
     const out: Login = { ...login, name: login.name.trim(), username: login.username.trim(), uris: login.uris.filter((u) => u.uri.trim()).map((u) => ({ ...u, uri: u.uri.trim() })), totp: login.totp?.trim() || null };
@@ -75,9 +89,19 @@ export function LoginForm({ initial, index, defaultGroupId, onSave, onCancel }: 
         </div>
       </Field>
 
-      <Field label="Secret TOTP" hint="Collez l'URI otpauth:// (le texte du QR code) ou le secret base32. Le code courant s'affiche dès qu'il se lit.">
-        <input value={login.totp ?? ""} onChange={(e) => setLogin({ ...login, totp: e.target.value || null })} placeholder="otpauth://totp/…?secret=…" autoComplete="off" spellCheck={false} className="input input-mono" />
+      <Field label="Secret TOTP" hint="Collez l'URI otpauth:// (le texte du QR code), le secret base32, ou une image du QR code (fichier, ou Ctrl+V dans le champ). Le code courant s'affiche dès qu'il se lit.">
+        <input
+          value={login.totp ?? ""}
+          onChange={(e) => setLogin({ ...login, totp: e.target.value || null })}
+          onPaste={(e) => { const f = Array.from(e.clipboardData.files).find((x) => x.type.startsWith("image/")); if (f) { e.preventDefault(); void readQr(f); } }}
+          placeholder="otpauth://totp/…?secret=…"
+          autoComplete="off"
+          spellCheck={false}
+          className="input input-mono"
+        />
         {totp && <div className="mt-1.5"><TotpCode secret={login.totp!} compact /></div>}
+        <input type="file" accept="image/*" aria-label="Image du QR code TOTP" onChange={(e) => void readQr(e.target.files?.[0])} className="mt-1 block text-[11.5px] text-[var(--c-text-muted)]" />
+        {qrError && <p className="help-text text-[var(--c-danger)]">{qrError}</p>}
       </Field>
 
       {login.passkeys.length > 0 && (

@@ -10,7 +10,8 @@ export type Route =
   | { page: "vault-tools"; id: string }
   | { page: "account" }
   | { page: "invitations" }
-  | { page: "generator" };
+  | { page: "generator" }
+  | { page: "totp" };
 
 export function parseRoute(hash: string): Route {
   const parts = hash.replace(/^#\/?/, "").split("/").filter(Boolean);
@@ -22,6 +23,7 @@ export function parseRoute(hash: string): Route {
   if (parts[0] === "account") return { page: "account" };
   if (parts[0] === "invitations") return { page: "invitations" };
   if (parts[0] === "generator") return { page: "generator" };
+  if (parts[0] === "totp") return { page: "totp" };
   return { page: "home" };
 }
 
@@ -34,6 +36,7 @@ export function routeHash(r: Route): string {
     case "account": return "#/account";
     case "invitations": return "#/invitations";
     case "generator": return "#/generator";
+    case "totp": return "#/totp";
   }
 }
 

@@ -10,6 +10,7 @@ import { AccountPage } from "./components/AccountPage";
 import { InvitationsPage } from "./components/InvitationsPage";
 import { GeneratorPage } from "./components/GeneratorPanel";
 import { ToolsPage } from "./components/ToolsPage";
+import { TotpPage } from "./components/TotpPage";
 import { Toasts, useToasts } from "./components/ui";
 
 /** Ce que chaque page reçoit : la session, et de quoi la recharger, notifier,
@@ -120,6 +121,9 @@ export default function App() {
       break;
     case "generator":
       page = <GeneratorPage />;
+      break;
+    case "totp":
+      page = <TotpPage ctx={ctx} />;
       break;
     default:
       page = <p className="p-6 text-[12.5px] text-[var(--c-text-muted)]">Aucun vault.</p>;

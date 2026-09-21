@@ -33,7 +33,7 @@ serveur puisse jamais lire un secret.
   Formats décrits dans [`docs/ITEMS.md`](docs/ITEMS.md).
 - **Extension de navigateur** (Chrome/Edge/Firefox) : les identifiants de
   la page courante, remplissage en un clic ou depuis le champ, codes TOTP,
-  passkeys, générateur —
+  passkeys, authentificateur (codes TOTP), générateur —
   [`docs/EXTENSION.md`](docs/EXTENSION.md).
 - **Une seule image Docker**, Rust/axum/PostgreSQL. Même stack que Guiterm.
 

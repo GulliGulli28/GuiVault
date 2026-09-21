@@ -91,3 +91,12 @@ export function IconTools({ size = 16, className }: P) {
     </svg>
   );
 }
+
+export function IconShieldClock({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <path d="M8 1.5l5 2v4c0 3.2-2.1 5.6-5 7-2.9-1.4-5-3.8-5-7v-4z" stroke="currentColor" strokeWidth="1.25" strokeLinejoin="round" />
+      <path d="M8 5.5v3l1.8 1.2" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
