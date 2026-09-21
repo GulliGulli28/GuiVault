@@ -1,20 +1,30 @@
 import { useState } from "react";
 import type { Login } from "../lib/types";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { TotpCode } from "./TotpCode";
 import { IconLogin } from "./secret-icons";
-import { IconSearch, IconVault } from "./ui-icons";
+import { IconSearch, IconTrash, IconVault } from "./ui-icons";
 
 export interface TotpEntry {
   id: string;
+  vaultId: string;
   vaultName: string;
   login: Login;
+  revision: number;
 }
 
 /** L'authentificateur : tous les identifiants qui ont un secret TOTP, avec
  * leur code en direct — ce qu'on ouvre quand un autre site demande « le
  * code de votre application ». Partagé par l'interface web et l'extension. */
-export function TotpList({ entries, compact, emptyMessage = "Aucun identifiant n'a de secret TOTP. Ajoutez-en un dans la fiche d'un identifiant (URI otpauth:// ou QR code)." }: { entries: TotpEntry[]; compact?: boolean; emptyMessage?: string }) {
+export function TotpList({ entries, compact, onRemove, emptyMessage = "Aucun identifiant n'a de secret TOTP. Ajoutez-en un dans la fiche d'un identifiant (URI otpauth:// ou QR code)." }: {
+  entries: TotpEntry[];
+  compact?: boolean;
+  /** Retirer le secret TOTP d'un identifiant (l'identifiant reste). */
+  onRemove?: (entry: TotpEntry) => Promise<void>;
+  emptyMessage?: string;
+}) {
   const [q, setQ] = useState("");
+  const [removing, setRemoving] = useState<TotpEntry | null>(null);
   const terms = q.trim().toLowerCase().split(/\s+/).filter(Boolean);
   const shown = entries
     .filter((e) => e.login.totp)
@@ -35,8 +45,19 @@ export function TotpList({ entries, compact, emptyMessage = "Aucun identifiant n
             <span className="flex items-center gap-1 truncate text-[10.5px] text-[var(--c-text-muted)]">{e.login.username || "—"}{!compact && <><span>·</span><IconVault size={10} /> {e.vaultName}</>}</span>
           </span>
           <TotpCode secret={e.login.totp!} />
+          {onRemove && <button onClick={() => setRemoving(e)} className="btn btn-ghost btn-sm btn-icon hover:text-[var(--c-danger)]" title="Retirer ce code" aria-label={`Retirer le code de ${e.login.name}`}><IconTrash size={11} /></button>}
         </div>
       ))}
+      {removing && onRemove && (
+        <ConfirmDialog
+          title={`Retirer le code de « ${removing.login.name} » ?`}
+          message="Le secret TOTP est effacé de l'identifiant (qui reste). Si ce site exige encore ce second facteur, vous ne pourrez plus vous y connecter sans vos codes de récupération ou une autre méthode : désactivez-le d'abord chez lui."
+          confirmLabel="Retirer le code"
+          danger
+          onConfirm={() => { const e = removing; setRemoving(null); void onRemove(e); }}
+          onCancel={() => setRemoving(null)}
+        />
+      )}
     </div>
   );
 }

@@ -23,11 +23,14 @@ maître et le délai de verrouillage.
 
 - **Vaults** : « Identifiants sur cette page » quand une URI correspond à
   l'onglet actif (`uris[].match`, sémantique de Bitwarden — `domain` par
-  défaut), puis chaque vault en section repliable. Sur une ligne :
-  « Remplir », copier l'utilisateur, copier le mot de passe ; en l'ouvrant :
-  la fiche (mot de passe révélable, TOTP, sites, notes), **Modifier**,
-  **Supprimer**. « Nouveau » crée un identifiant dans le vault de son choix,
-  avec l'URI de la page courante si on n'en met pas.
+  défaut), puis chaque vault en section repliable, **tous types confondus**
+  (identifiants, notes, cartes, identités, hôtes, dossiers, connexions,
+  clés, snippets, icônes) avec des filtres par type. Sur un identifiant :
+  « Remplir », copier l'utilisateur, copier le mot de passe ; en ouvrant un
+  item : sa fiche (celle de l'interface web), **Modifier**, **Supprimer**.
+  « Nouveau » propose tous les types, avec les formulaires de l'interface
+  web, dans le vault de son choix ; un identifiant sans site reçoit l'URI de
+  la page courante.
 - **Enregistrer ce qu'on saisit** : à la soumission d'un formulaire de
   connexion, si le couple n'est pas dans le coffre, la page suivante montre
   une bannière « Enregistrer l'identifiant pour <site> ? » (avec le vault) ;
@@ -46,7 +49,8 @@ maître et le délai de verrouillage.
 - **Badge** : le nombre d'identifiants pour l'onglet, seulement quand la
   page a un formulaire de connexion sous les yeux.
 - **Codes** : l'authentificateur — tous les codes TOTP du coffre, en
-  direct, avec recherche. Même vue dans l'interface web (« Authentificateur »),
+  direct, avec recherche, et le retrait d'un code (confirmé : sans lui, un
+  site qui l'exige encore devient inaccessible). Même vue dans l'interface web (« Authentificateur »),
   où un secret TOTP s'ajoute aussi en déposant ou collant l'image du QR code.
 - **Icône grise** quand il faut se reconnecter (verrouillé, session
   expirée ou révoquée) ; le popup dit pourquoi.
@@ -134,8 +138,8 @@ clic ; un site ne peut pas déclencher le remplissage lui-même.
   son libellé (`for`, englobant, `aria-labelledby`) et le texte qui le
   précède, contre une liste de mots (`USERNAME_RE` dans `content.ts`) ;
   un champ qu'elle rate est un mot à ajouter là.
-- Les autres types d'items (notes, cartes, identités) et les dossiers :
-  l'interface web.
+- Le partage (membres, invitations, rotation), l'import/export et les
+  réglages du compte : l'interface web.
 - Passkeys : pas de compteur de signatures, pas de médiation
   conditionnelle, pas de suppression depuis l'extension (l'interface web le
   fait).

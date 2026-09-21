@@ -8,16 +8,7 @@ import { canWrite, KIND_LABELS, KIND_LABELS_PLURAL, ROLE_HINTS, ROLE_LABELS, typ
 import { ConfirmDialog } from "./ConfirmDialog";
 import { ItemTree, KIND_ICONS } from "./ItemTree";
 import { ItemView } from "./ItemView";
-import { HostForm } from "./forms/HostForm";
-import { GroupForm } from "./forms/GroupForm";
-import { SnippetForm } from "./forms/SnippetForm";
-import { KeyForm } from "./forms/KeyForm";
-import { SqlConnectionForm } from "./forms/SqlConnectionForm";
-import { IconForm } from "./forms/IconForm";
-import { LoginForm } from "./forms/LoginForm";
-import { NoteForm } from "./forms/NoteForm";
-import { CardForm } from "./forms/CardForm";
-import { IdentityForm } from "./forms/IdentityForm";
+import { ItemForm } from "./forms/ItemForm";
 import { IconStar, IconTools } from "./secret-icons";
 import { IconChevronDown, IconCopy, IconEdit, IconPlus, IconRefresh, IconSearch, IconSettings, IconTrash } from "./ui-icons";
 import { copyText, formatWhen, Loading, useDelayed } from "./ui";
@@ -326,38 +317,6 @@ function VaultBody({ ctx, vault }: { ctx: PageContext; vault: VaultView }) {
       )}
     </div>
   );
-}
-
-function ItemForm({ kind, initial, index, defaultGroupId, onSave, onCancel }: {
-  kind: ItemKind;
-  initial?: Payload;
-  index: ReturnType<typeof indexItems>;
-  defaultGroupId?: string | null;
-  onSave: (p: Payload) => Promise<void>;
-  onCancel: () => void;
-}) {
-  switch (kind) {
-    case "host":
-      return <HostForm initial={initial?.kind === "host" ? initial : undefined} index={index} defaultGroupId={defaultGroupId} onSave={onSave} onCancel={onCancel} />;
-    case "group":
-      return <GroupForm initial={initial?.kind === "group" ? initial.group : undefined} index={index} defaultParentId={defaultGroupId} onSave={onSave} onCancel={onCancel} />;
-    case "snippet":
-      return <SnippetForm initial={initial?.kind === "snippet" ? initial.snippet : undefined} onSave={onSave} onCancel={onCancel} />;
-    case "key":
-      return <KeyForm initial={initial?.kind === "key" ? initial : undefined} onSave={onSave} onCancel={onCancel} />;
-    case "sql-connection":
-      return <SqlConnectionForm initial={initial?.kind === "sql-connection" ? initial : undefined} index={index} defaultGroupId={defaultGroupId} onSave={onSave} onCancel={onCancel} />;
-    case "icon":
-      return <IconForm initial={initial?.kind === "icon" ? initial.icon : undefined} onSave={onSave} onCancel={onCancel} />;
-    case "login":
-      return <LoginForm initial={initial?.kind === "login" ? initial.login : undefined} index={index} defaultGroupId={defaultGroupId} onSave={onSave} onCancel={onCancel} />;
-    case "note":
-      return <NoteForm initial={initial?.kind === "note" ? initial.note : undefined} index={index} defaultGroupId={defaultGroupId} onSave={onSave} onCancel={onCancel} />;
-    case "card":
-      return <CardForm initial={initial?.kind === "card" ? initial.card : undefined} index={index} defaultGroupId={defaultGroupId} onSave={onSave} onCancel={onCancel} />;
-    case "identity":
-      return <IdentityForm initial={initial?.kind === "identity" ? initial.identity : undefined} index={index} defaultGroupId={defaultGroupId} onSave={onSave} onCancel={onCancel} />;
-  }
 }
 
 function payloadIdOf(p: Payload): string {

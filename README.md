@@ -27,7 +27,8 @@ serveur puisse jamais lire un secret.
 - **Gestionnaire de mots de passe** dans la même interface, à la manière de
   Bitwarden : identifiants (avec sites, codes TOTP, passkeys, historique),
   notes sécurisées, cartes, identités, favoris, champs personnalisés ;
-  générateur de mots de passe et de phrases de passe ; import depuis
+  générateur de mots de passe, de phrases de passe et de clés SSH
+  (Ed25519, RSA, ECDSA, format OpenSSH) ; import depuis
   Bitwarden (JSON en clair ou protégé, CSV), Chrome, Firefox, LastPass,
   KeePassXC ; export JSON (chiffré par mot de passe ou en clair) et CSV.
   Formats décrits dans [`docs/ITEMS.md`](docs/ITEMS.md).

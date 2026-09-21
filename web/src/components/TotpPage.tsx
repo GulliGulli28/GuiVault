@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { PageContext } from "../App";
 import { errorMessage } from "../lib/api";
-import { loadItems } from "../lib/session";
+import { loadItems, putPayload } from "../lib/session";
 import { TotpList, type TotpEntry } from "./TotpList";
 import { Loading, useDelayed } from "./ui";
 
@@ -11,6 +11,18 @@ export function TotpPage({ ctx }: { ctx: PageContext }) {
   const slow = useDelayed(entries === null);
   const vaultsKey = ctx.session.vaults.map((v) => `${v.id}:${v.revision}`).join(",");
 
+  const remove = async (e: TotpEntry) => {
+    const vault = ctx.session.vaults.find((v) => v.id === e.vaultId);
+    if (!vault) return;
+    try {
+      await putPayload(vault, { kind: "login", login: { ...e.login, totp: null } }, e.revision);
+      setEntries((list) => (list ?? []).filter((x) => x.id !== e.id));
+      ctx.notify(`Code de « ${e.login.name} » retiré.`);
+    } catch (err) {
+      ctx.error(errorMessage(err));
+    }
+  };
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -18,7 +30,7 @@ export function TotpPage({ ctx }: { ctx: PageContext }) {
       for (const v of ctx.session.vaults) {
         try {
           const page = await loadItems(v);
-          for (const it of page.items) if (it.ok && it.payload.kind === "login" && it.payload.login.totp) out.push({ id: it.id, vaultName: v.name, login: it.payload.login });
+          for (const it of page.items) if (it.ok && it.payload.kind === "login" && it.payload.login.totp) out.push({ id: it.id, vaultId: v.id, vaultName: v.name, login: it.payload.login, revision: it.revision });
         } catch (e) {
           ctx.error(errorMessage(e));
         }
@@ -38,7 +50,7 @@ export function TotpPage({ ctx }: { ctx: PageContext }) {
       </header>
       <div className="sidebar-scroll min-h-0 flex-1 overflow-y-auto p-4">
         <div className="max-w-xl">
-          {entries === null ? (slow ? <Loading /> : null) : <TotpList entries={entries} />}
+          {entries === null ? (slow ? <Loading /> : null) : <TotpList entries={entries} onRemove={ctx.session.vaults.some((v) => v.role !== "reader") ? remove : undefined} />}
         </div>
       </div>
     </div>

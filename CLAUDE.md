@@ -52,7 +52,8 @@ HMAC pour les sels fictifs de prelogin.
     écrit ici doit être relu par Guiterm — les champs inconnus sont
     conservés via `[extra: string]: unknown`).
   - `lib/items.ts` (secrets vides, ligne secondaire, recherche),
-    `lib/generator.ts` (+ `wordlist.ts`, liste EFF), `lib/totp.ts`,
+    `lib/generator.ts` (+ `wordlist.ts`, liste EFF), `lib/sshkey.ts` (clés
+    OpenSSH, testées contre `ssh-keygen`), `lib/totp.ts`, `lib/qr.ts`,
     `lib/csv.ts`, `lib/bitwarden.ts` (JSON en clair ou protégé, CSV),
     `lib/importers.ts` / `lib/exporters.ts` (formats dans `docs/ITEMS.md`).
   - `extension/` — l'extension de navigateur (MV3), même `node_modules`,

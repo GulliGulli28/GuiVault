@@ -1,31 +1,52 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { api, errorMessage, setBaseUrl, setSessionLostHandler, setTokensChangedHandler } from "../../src/lib/api";
 import { indexItems } from "../../src/lib/entities";
-import { loadItems, login, refresh, setDeviceLabel, type DecodedItem, type SessionState } from "../../src/lib/session";
+import { describeSecret } from "../../src/lib/items";
+import { loadItems, login, payloadEntity, payloadName, refresh, setDeviceLabel, type DecodedItem, type SessionState } from "../../src/lib/session";
 import { loginMatches } from "../../src/lib/urimatch";
-import type { Login, TokenPair } from "../../src/lib/types";
+import { KIND_LABELS, KIND_LABELS_PLURAL, type ItemKind, type Login, type Payload, type TokenPair } from "../../src/lib/types";
 import { GeneratorPanel } from "../../src/components/GeneratorPanel";
+import { ItemView } from "../../src/components/ItemView";
+import { KIND_ICONS } from "../../src/components/ItemTree";
 import { PasswordStrength } from "../../src/components/PasswordStrength";
 import { TotpCode } from "../../src/components/TotpCode";
 import { TotpList } from "../../src/components/TotpList";
-import { LoginForm } from "../../src/components/forms/LoginForm";
+import { ItemForm } from "../../src/components/forms/ItemForm";
 import { IconDice, IconGlobe, IconLogin, IconShieldClock, IconStar } from "../../src/components/secret-icons";
 import { IconChevronDown, IconChevronRight, IconCopy, IconEdit, IconExternal, IconLock, IconPlus, IconRefresh, IconSearch, IconTrash, IconVault } from "../../src/components/ui-icons";
 import { copyText, PasswordInput, SecretValue } from "../../src/components/ui";
 import { clearLockReason, lock, lockReason, loadItemsCache, loadSession, loadSettings, saveItemsCache, saveSession, saveSettings, saveTokens, touchLock, type ItemsCache, type LockReason, type Settings } from "./store";
-import { deleteLogin, saveLogin } from "./vaultops";
+import { deleteItem, saveLogin, savePayload } from "./vaultops";
+
+/** Les entrées du menu « Nouveau » : les secrets d'abord, puis les entités
+ * Guiterm — le même menu que l'interface web. */
+const NEW_KINDS: (ItemKind | "sep")[] = ["login", "note", "card", "identity", "sep", "host", "group", "sql-connection", "key", "snippet", "icon"];
+type Filter = "all" | ItemKind;
+const FILTERS: Filter[] = ["all", "login", "note", "card", "identity", "host", "sql-connection", "key", "snippet", "group", "icon"];
 
 setDeviceLabel("Extension GuiVault");
 
 type Screen = { kind: "loading" } | { kind: "login"; reason: LockReason | null } | { kind: "vault"; state: SessionState };
 type Tab = "vaults" | "totp" | "generator";
-type View = { kind: "list" } | { kind: "detail"; id: string } | { kind: "edit"; id: string } | { kind: "new"; vaultId: string };
+type View = { kind: "list" } | { kind: "detail"; id: string } | { kind: "edit"; id: string } | { kind: "new"; vaultId: string; itemKind: ItemKind };
 
-interface LoginEntry {
+/** Un item déchiffré, avec son vault. */
+interface Entry {
   vaultId: string;
   vaultName: string;
   item: DecodedItem & { ok: true };
+  payload: Payload;
+  name: string;
+  subtitle: string;
+  search: string;
+}
+
+interface LoginEntry extends Entry {
   login: Login;
+}
+
+function isLoginEntry(e: Entry): e is LoginEntry {
+  return e.payload.kind === "login";
 }
 
 const COLLAPSED_KEY = "guivault.ext.collapsed";
@@ -54,6 +75,8 @@ export function Popup() {
   const [notice, setNotice] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<Filter>("all");
+  const [newMenu, setNewMenu] = useState(false);
   const [collapsed, setCollapsed] = useState<Set<string>>(loadCollapsed);
 
   const say = useCallback((m: string) => {
@@ -133,21 +156,33 @@ export function Popup() {
     };
   }, [sync]);
 
-  const entries = useMemo<LoginEntry[]>(() => {
+  const entries = useMemo<Entry[]>(() => {
     if (screen.kind !== "vault") return [];
-    const out: LoginEntry[] = [];
+    const out: Entry[] = [];
     for (const v of screen.state.vaults) {
       for (const it of cache[v.id]?.items ?? []) {
-        if (it.ok && it.payload.kind === "login") out.push({ vaultId: v.id, vaultName: v.name, item: it, login: it.payload.login });
+        if (!it.ok) continue;
+        const p = it.payload;
+        const { subtitle, search } = describeSecret(p);
+        const sub = subtitle || (p.kind === "host" ? `${p.host.username ? `${p.host.username}@` : ""}${p.host.address}` : p.kind === "sql-connection" ? p.connection.engine : p.kind === "key" ? p.key.path : "");
+        const base: Entry = { vaultId: v.id, vaultName: v.name, item: it, payload: p, name: payloadName(p) || "(sans nom)", subtitle: sub, search: `${search} ${sub}` };
+        const entry: Entry = p.kind === "login" ? ({ ...base, login: p.login } as LoginEntry) : base;
+        out.push(entry);
       }
     }
-    return out.sort((a, b) => Number(!!b.login.favorite) - Number(!!a.login.favorite) || a.login.name.localeCompare(b.login.name));
+    return out.sort((a, b) => Number(!!payloadEntity(b.payload).favorite) - Number(!!payloadEntity(a.payload).favorite) || a.name.localeCompare(b.name));
   }, [screen, cache]);
+  const logins = useMemo(() => entries.filter(isLoginEntry), [entries]);
+  const counts = useMemo(() => {
+    const c: Partial<Record<Filter, number>> = { all: entries.length };
+    for (const e of entries) c[e.payload.kind] = (c[e.payload.kind] ?? 0) + 1;
+    return c;
+  }, [entries]);
 
   const canFill = !!pageUrl && /^https?:/.test(pageUrl);
-  const forPage = useMemo(() => (canFill ? entries.filter((e) => loginMatches(e.login, pageUrl!)) : []), [entries, pageUrl, canFill]);
+  const forPage = useMemo(() => (canFill ? logins.filter((e) => loginMatches(e.login, pageUrl!)) : []), [logins, pageUrl, canFill]);
   const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
-  const matchesQuery = (e: LoginEntry) => terms.every((t) => `${e.login.name} ${e.login.username} ${e.login.uris.map((u) => u.uri).join(" ")}`.toLowerCase().includes(t));
+  const matchesQuery = (e: Entry) => (filter === "all" || e.payload.kind === filter) && terms.every((t) => `${e.name} ${e.search} ${KIND_LABELS[e.payload.kind]}`.toLowerCase().includes(t));
 
   const fill = async (e: LoginEntry, what: "credentials" | "totp") => {
     if (tabId == null) return;
@@ -185,6 +220,7 @@ export function Popup() {
   if (!settings || screen.kind === "loading") return <div className="p-4 text-[12px] text-[var(--c-text-muted)]">Chargement…</div>;
 
   const current = view.kind === "detail" || view.kind === "edit" ? entries.find((e) => e.item.id === view.id) ?? null : null;
+  const indexFor = (vaultId: string) => indexItems(cache[vaultId]?.items ?? []);
 
   return (
     <div className="flex h-[560px] flex-col bg-[var(--c-bg2)] text-[var(--c-text)]">
@@ -217,15 +253,15 @@ export function Popup() {
         />
       ) : view.kind === "edit" && current ? (
         <div className="flex min-h-0 flex-1 flex-col">
-          <LoginForm
-            initial={current.login}
-            index={indexItems(cache[current.vaultId]?.items ?? [])}
+          <ItemForm
+            kind={current.payload.kind}
+            initial={current.payload}
+            index={indexFor(current.vaultId)}
             onSave={async (p) => {
-              if (p.kind !== "login") return;
-              await saveLogin(current.vaultId, p.login, current.item.revision);
+              await savePayload(current.vaultId, p, current.item.revision);
               await reloadCache();
-              say(`« ${p.login.name} » enregistré.`);
-              setView({ kind: "detail", id: p.login.id });
+              say(`« ${payloadName(p)} » enregistré.`);
+              setView({ kind: "detail", id: payloadEntity(p).id });
             }}
             onCancel={() => setView({ kind: "detail", id: current.item.id })}
           />
@@ -233,20 +269,21 @@ export function Popup() {
       ) : view.kind === "new" ? (
         <div className="flex min-h-0 flex-1 flex-col">
           <label className="flex shrink-0 items-center gap-2 border-b border-[var(--c-border)] px-3 py-1.5 text-[12px] text-[var(--c-text-secondary)]">
-            Dans le vault
-            <select value={view.vaultId} onChange={(e) => setView({ kind: "new", vaultId: e.target.value })} className="input h-6 w-auto text-[12px]" aria-label="Vault">
+            {KIND_LABELS_PLURAL[view.itemKind].replace(/s$/, "")} dans
+            <select value={view.vaultId} onChange={(e) => setView({ ...view, vaultId: e.target.value })} className="input h-6 w-auto text-[12px]" aria-label="Vault">
               {screen.state.vaults.filter((v) => v.role !== "reader").map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
             </select>
           </label>
-          <LoginForm
-            index={indexItems(cache[view.vaultId]?.items ?? [])}
+          <ItemForm
+            key={`${view.vaultId}-${view.itemKind}`}
+            kind={view.itemKind}
+            index={indexFor(view.vaultId)}
             onSave={async (p) => {
-              if (p.kind !== "login") return;
-              if (canFill && p.login.uris.length === 0) p.login.uris = [{ uri: new URL(pageUrl!).origin, match: null }];
-              await saveLogin(view.vaultId, p.login);
+              if (p.kind === "login" && canFill && p.login.uris.length === 0) p.login.uris = [{ uri: new URL(pageUrl!).origin, match: null }];
+              await savePayload(view.vaultId, p);
               await reloadCache();
-              say(`« ${p.login.name} » enregistré.`);
-              setView({ kind: "detail", id: p.login.id });
+              say(`« ${payloadName(p)} » enregistré.`);
+              setView({ kind: "detail", id: payloadEntity(p).id });
             }}
             onCancel={() => setView({ kind: "list" })}
           />
@@ -254,15 +291,16 @@ export function Popup() {
       ) : view.kind === "detail" && current ? (
         <Detail
           entry={current}
+          index={indexFor(current.vaultId)}
           canFill={canFill}
           onBack={() => setView({ kind: "list" })}
           onFill={fill}
           onEdit={() => setView({ kind: "edit", id: current.item.id })}
           onDelete={async () => {
             try {
-              await deleteLogin(current.vaultId, current.item.id);
+              await deleteItem(current.vaultId, current.item.id);
               await reloadCache();
-              say(`« ${current.login.name} » supprimé.`);
+              say(`« ${current.name} » supprimé.`);
               setView({ kind: "list" });
             } catch (e) {
               say(errorMessage(e));
@@ -279,19 +317,60 @@ export function Popup() {
               </button>
             ))}
             {tab === "vaults" && screen.state.vaults.some((v) => v.role !== "reader") && (
-              <button onClick={() => setView({ kind: "new", vaultId: (screen.state.vaults.find((v) => v.kind === "personal") ?? screen.state.vaults[0]).id })} className="btn btn-primary btn-sm ml-auto" title="Nouvel identifiant"><IconPlus size={11} /> Nouveau</button>
+              <div className="relative ml-auto">
+                <button onClick={() => setNewMenu((m) => !m)} className="btn btn-primary btn-sm" aria-haspopup="menu" aria-expanded={newMenu}><IconPlus size={11} /> Nouveau <IconChevronDown size={10} /></button>
+                {newMenu && (
+                  <>
+                    <div className="fixed inset-0 z-10" onClick={() => setNewMenu(false)} />
+                    <div className="popover absolute right-0 z-20 mt-1 w-44 py-1" role="menu">
+                      {NEW_KINDS.map((k, i) => {
+                        if (k === "sep") return <div key={i} className="menu-sep" />;
+                        const Icon = KIND_ICONS[k];
+                        return (
+                          <button key={k} role="menuitem" onClick={() => { setNewMenu(false); setView({ kind: "new", itemKind: k, vaultId: (screen.state.vaults.find((v) => v.kind === "personal") ?? screen.state.vaults[0]).id }); }} className="menu-item">
+                            <Icon size={13} /> {KIND_LABELS[k].charAt(0).toUpperCase() + KIND_LABELS[k].slice(1)}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+              </div>
             )}
           </nav>
           <div className="sidebar-scroll min-h-0 flex-1 overflow-y-auto p-2">
             {tab === "generator" && <GeneratorPanel compact />}
-            {tab === "totp" && <TotpList compact entries={entries.filter((e) => e.login.totp).map((e) => ({ id: e.item.id, vaultName: e.vaultName, login: e.login }))} />}
+            {tab === "totp" && (
+              <TotpList
+                compact
+                entries={logins.filter((e) => e.login.totp).map((e) => ({ id: e.item.id, vaultId: e.vaultId, vaultName: e.vaultName, login: e.login, revision: e.item.revision }))}
+                onRemove={async (e) => {
+                  try {
+                    await saveLogin(e.vaultId, { ...e.login, totp: null }, e.revision);
+                    await reloadCache();
+                    say(`Code de « ${e.login.name} » retiré.`);
+                  } catch (err) {
+                    say(errorMessage(err));
+                  }
+                }}
+              />
+            )}
             {tab === "vaults" && (
               <>
-                <div className="relative mb-2">
+                <div className="relative mb-1.5">
                   <IconSearch size={12} className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[var(--c-text-muted)]" />
                   <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Rechercher…" aria-label="Rechercher" className="input pl-7" />
                 </div>
-                {forPage.length > 0 && terms.length === 0 && (
+                {entries.some((e) => e.payload.kind !== "login") && (
+                  <div className="mb-2 flex flex-wrap gap-1" role="tablist" aria-label="Type d'élément">
+                    {FILTERS.filter((f) => f === "all" || (counts[f] ?? 0) > 0).map((f) => (
+                      <button key={f} role="tab" aria-selected={filter === f} onClick={() => setFilter(f)} className={`btn btn-sm shrink-0 ${filter === f ? "btn-toggled" : "btn-ghost"}`}>
+                        {f === "all" ? "Tout" : KIND_LABELS_PLURAL[f]}<span className="text-[10px] text-[var(--c-text-faint)]">{counts[f]}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {forPage.length > 0 && terms.length === 0 && filter === "all" && (
                   <Section id="page" title="Identifiants sur cette page" icon={<IconGlobe size={12} />} count={forPage.length} collapsed={collapsed.has("page")} onToggle={() => toggleCollapsed("page")} accent>
                     {forPage.map((e) => <Row key={e.item.id} entry={e} canFill onFill={fill} onOpen={() => setView({ kind: "detail", id: e.item.id })} say={say} />)}
                   </Section>
@@ -301,11 +380,11 @@ export function Popup() {
                   if (terms.length && rows.length === 0) return null;
                   return (
                     <Section key={v.id} id={v.id} title={v.name} icon={<IconVault size={12} />} count={rows.length} collapsed={collapsed.has(v.id) && terms.length === 0} onToggle={() => toggleCollapsed(v.id)}>
-                      {rows.length === 0 ? <p className="px-2 py-2 text-[11.5px] text-[var(--c-text-muted)]">Aucun identifiant.</p> : rows.map((e) => <Row key={e.item.id} entry={e} canFill={canFill} onFill={fill} onOpen={() => setView({ kind: "detail", id: e.item.id })} say={say} />)}
+                      {rows.length === 0 ? <p className="px-2 py-2 text-[11.5px] text-[var(--c-text-muted)]">Rien ici.</p> : rows.map((e) => <Row key={e.item.id} entry={e} canFill={canFill} onFill={fill} onOpen={() => setView({ kind: "detail", id: e.item.id })} say={say} />)}
                     </Section>
                   );
                 })}
-                {entries.length === 0 && <p className="px-2 py-6 text-center text-[12px] text-[var(--c-text-muted)]">Aucun identifiant pour l'instant : « Nouveau », ou enregistrez-en un depuis une page de connexion.</p>}
+                {entries.length === 0 && <p className="px-2 py-6 text-center text-[12px] text-[var(--c-text-muted)]">Rien pour l'instant : « Nouveau », ou enregistrez un identifiant depuis une page de connexion.</p>}
               </>
             )}
           </div>
@@ -337,30 +416,63 @@ function Section({ id, title, icon, count, collapsed, onToggle, accent, children
   );
 }
 
-function Row({ entry, canFill, onFill, onOpen, say }: { entry: LoginEntry; canFill: boolean; onFill: (e: LoginEntry, what: "credentials" | "totp") => Promise<void>; onOpen: () => void; say: (m: string) => void }) {
-  const l = entry.login;
+function Row({ entry, canFill, onFill, onOpen, say }: { entry: Entry; canFill: boolean; onFill: (e: LoginEntry, what: "credentials" | "totp") => Promise<void>; onOpen: () => void; say: (m: string) => void }) {
   const copy = (label: string, v: string) => () => copyText(v).then((ok) => say(ok ? `${label} copié.` : "Copie refusée par le navigateur."));
+  const Icon = KIND_ICONS[entry.payload.kind];
+  const favorite = !!payloadEntity(entry.payload).favorite;
   return (
     <div className="list-row mb-0.5 flex-wrap py-1.5">
-      <button onClick={onOpen} className="flex min-w-0 flex-1 items-center gap-2 text-left" title="Ouvrir">
-        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[var(--c-bg3)] text-[var(--c-text-secondary)]"><IconLogin size={12} /></span>
+      <button onClick={onOpen} className="flex min-w-0 flex-1 items-center gap-2 text-left" title={`Ouvrir (${KIND_LABELS[entry.payload.kind]})`}>
+        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[var(--c-bg3)] text-[var(--c-text-secondary)]"><Icon size={12} /></span>
         <span className="flex min-w-0 flex-1 flex-col leading-tight">
-          <span className="flex items-center gap-1 truncate text-[12.5px] font-medium text-[var(--c-text)]">{l.name}{l.favorite && <IconStar size={10} filled className="text-[var(--c-warn)]" />}</span>
-          <span className="truncate text-[10.5px] text-[var(--c-text-muted)]">{l.username || "—"}</span>
+          <span className="flex items-center gap-1 truncate text-[12.5px] font-medium text-[var(--c-text)]">{entry.name}{favorite && <IconStar size={10} filled className="text-[var(--c-warn)]" />}</span>
+          <span className="truncate text-[10.5px] text-[var(--c-text-muted)]">{entry.subtitle || KIND_LABELS[entry.payload.kind]}</span>
         </span>
       </button>
-      <span className="flex shrink-0 items-center gap-0.5">
-        {canFill && <button onClick={() => void onFill(entry, "credentials")} className="btn btn-secondary btn-sm" title="Remplir la page">Remplir</button>}
-        {l.username && <button onClick={copy("Utilisateur", l.username)} className="btn btn-ghost btn-sm" title="Copier l'utilisateur" aria-label="Copier l'utilisateur">U</button>}
-        {l.password && <button onClick={copy("Mot de passe", l.password)} className="btn btn-ghost btn-sm btn-icon" title="Copier le mot de passe" aria-label="Copier le mot de passe"><IconCopy size={11} /></button>}
-      </span>
+      {isLoginEntry(entry) && (
+        <span className="flex shrink-0 items-center gap-0.5">
+          {canFill && <button onClick={() => void onFill(entry, "credentials")} className="btn btn-secondary btn-sm" title="Remplir la page">Remplir</button>}
+          {entry.login.username && <button onClick={copy("Utilisateur", entry.login.username)} className="btn btn-ghost btn-sm" title="Copier l'utilisateur" aria-label="Copier l'utilisateur">U</button>}
+          {entry.login.password && <button onClick={copy("Mot de passe", entry.login.password)} className="btn btn-ghost btn-sm btn-icon" title="Copier le mot de passe" aria-label="Copier le mot de passe"><IconCopy size={11} /></button>}
+        </span>
+      )}
     </div>
   );
 }
 
-function Detail({ entry, canFill, onBack, onFill, onEdit, onDelete, say }: { entry: LoginEntry; canFill: boolean; onBack: () => void; onFill: (e: LoginEntry, what: "credentials" | "totp") => Promise<void>; onEdit: () => void; onDelete: () => Promise<void>; say: (m: string) => void }) {
-  const l = entry.login;
+function Detail({ entry, index, canFill, onBack, onFill, onEdit, onDelete, say }: { entry: Entry; index: ReturnType<typeof indexItems>; canFill: boolean; onBack: () => void; onFill: (e: LoginEntry, what: "credentials" | "totp") => Promise<void>; onEdit: () => void; onDelete: () => Promise<void>; say: (m: string) => void }) {
   const [confirm, setConfirm] = useState(false);
+  const header = (
+    <div className="flex shrink-0 items-center gap-1 border-b border-[var(--c-border)] px-2 py-1.5">
+      <button onClick={onBack} className="btn btn-ghost btn-sm">←</button>
+      <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">{entry.name}</span>
+      <button onClick={onEdit} className="btn btn-secondary btn-sm" title="Modifier"><IconEdit size={11} /> Modifier</button>
+      <button onClick={() => setConfirm(true)} className="btn btn-ghost btn-sm btn-icon hover:text-[var(--c-danger)]" title="Supprimer" aria-label="Supprimer"><IconTrash size={11} /></button>
+    </div>
+  );
+  const confirmBox = confirm && (
+    <div className="shrink-0 border-t border-[var(--c-border)] bg-[var(--c-bg)] p-3">
+      <p className="mb-2 text-[12px]">Supprimer « {entry.name} » ? Une pierre tombale est laissée pour vos autres appareils.</p>
+      <div className="flex justify-end gap-1.5">
+        <button onClick={() => setConfirm(false)} className="btn btn-ghost btn-sm">Annuler</button>
+        <button onClick={() => void onDelete()} className="btn btn-danger btn-sm">Supprimer</button>
+      </div>
+    </div>
+  );
+  if (!isLoginEntry(entry)) {
+    // Les autres types : la fiche de l'interface web, telle quelle.
+    return (
+      <div className="flex min-h-0 flex-1 flex-col">
+        {header}
+        <div className="sidebar-scroll min-h-0 flex-1 overflow-y-auto px-3 py-2">
+          <p className="mb-2 flex items-center gap-1 text-[11px] text-[var(--c-text-muted)]"><IconVault size={11} /> {entry.vaultName} · {KIND_LABELS[entry.payload.kind]}</p>
+          <ItemView payload={entry.payload} index={index} />
+        </div>
+        {confirmBox}
+      </div>
+    );
+  }
+  const l = entry.login;
   const copy = (label: string, v: string) => () => copyText(v).then((ok) => say(ok ? `${label} copié.` : "Copie refusée par le navigateur."));
   const row = (label: string, body: React.ReactNode) => (
     <div className="grid grid-cols-[5.5rem_1fr] items-start gap-x-2 border-b border-[var(--c-border)] py-1.5">
@@ -370,12 +482,7 @@ function Detail({ entry, canFill, onBack, onFill, onEdit, onDelete, say }: { ent
   );
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex shrink-0 items-center gap-1 border-b border-[var(--c-border)] px-2 py-1.5">
-        <button onClick={onBack} className="btn btn-ghost btn-sm">←</button>
-        <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">{l.name}</span>
-        <button onClick={onEdit} className="btn btn-secondary btn-sm" title="Modifier"><IconEdit size={11} /> Modifier</button>
-        <button onClick={() => setConfirm(true)} className="btn btn-ghost btn-sm btn-icon hover:text-[var(--c-danger)]" title="Supprimer" aria-label="Supprimer"><IconTrash size={11} /></button>
-      </div>
+      {header}
       <div className="sidebar-scroll min-h-0 flex-1 overflow-y-auto px-3 py-1">
         {row("Vault", <span className="flex items-center gap-1 text-[var(--c-text-secondary)]"><IconVault size={11} /> {entry.vaultName}</span>)}
         {row("Utilisateur", l.username ? <span className="flex items-center gap-1 font-mono text-[12px]">{l.username}<button onClick={copy("Utilisateur", l.username)} className="btn btn-ghost btn-sm btn-icon" title="Copier" aria-label="Copier l'utilisateur"><IconCopy size={11} /></button></span> : <span className="text-[var(--c-text-muted)]">—</span>)}
@@ -386,15 +493,7 @@ function Detail({ entry, canFill, onBack, onFill, onEdit, onDelete, say }: { ent
         {l.passkeys.length > 0 && row("Passkeys", <span className="text-[12px]">{l.passkeys.map((k) => k.rpName || k.rpId).join(", ")}</span>)}
         {canFill && <button onClick={() => void onFill(entry, "credentials")} className="btn btn-primary btn-sm mt-3 w-full">Remplir la page</button>}
       </div>
-      {confirm && (
-        <div className="shrink-0 border-t border-[var(--c-border)] bg-[var(--c-bg)] p-3">
-          <p className="mb-2 text-[12px]">Supprimer « {l.name} » ? Une pierre tombale est laissée pour vos autres appareils.</p>
-          <div className="flex justify-end gap-1.5">
-            <button onClick={() => setConfirm(false)} className="btn btn-ghost btn-sm">Annuler</button>
-            <button onClick={() => void onDelete()} className="btn btn-danger btn-sm">Supprimer</button>
-          </div>
-        </div>
-      )}
+      {confirmBox}
     </div>
   );
 }
