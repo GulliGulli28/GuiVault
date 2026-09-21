@@ -11,7 +11,7 @@
  *    page si le coffre est verrouillé ou n'a rien pour elle.
  *
  * L'interface injectée vit dans un shadow DOM, hors du style de la page. */
-import type { CredentialsReply, FillReply, MatchesReply, MatchSummary, PasskeyToBackground, ToBackground, ToContent } from "./messages";
+import type { CredentialsReply, FillReply, MatchesReply, MatchSummary, PasskeyToBackground, Pending, ToBackground, ToContent } from "./messages";
 
 declare global {
   interface Window {
@@ -116,14 +116,14 @@ declare global {
       :host { all: initial; }
       .btn { position: fixed; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; border-radius: 4px; background: #2563eb; color: #fff; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,.35); font: 0/0 a; }
       .btn:hover { background: #3b82f6; }
-      .menu { position: fixed; min-width: 220px; max-width: 320px; background: #121215; color: #e7e7ea; border: 1px solid #26262b; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,.45); font: 13px system-ui, -apple-system, "Segoe UI", sans-serif; padding: 4px; overflow: hidden; }
+      .menu { position: fixed; z-index: 2; min-width: 220px; max-width: 320px; background: #121215; color: #e7e7ea; border: 1px solid #26262b; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,.45); font: 13px system-ui, -apple-system, "Segoe UI", sans-serif; padding: 4px; overflow: hidden; }
       .item { display: flex; flex-direction: column; gap: 1px; padding: 6px 8px; border-radius: 6px; cursor: pointer; text-align: left; border: 0; background: none; color: inherit; width: 100%; font: inherit; }
       .item:hover, .item:focus { background: rgba(255,255,255,.08); outline: none; }
       .name { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       .user { font-size: 11px; color: #a1a1aa; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       .foot { font-size: 10.5px; color: #71717a; padding: 4px 8px 2px; border-top: 1px solid #26262b; margin-top: 2px; }
-      .veil { position: fixed; inset: 0; background: rgba(0,0,0,.45); }
-      .dialog { position: fixed; left: 50%; top: 18%; transform: translateX(-50%); width: min(360px, calc(100vw - 32px)); background: #121215; color: #e7e7ea; border: 1px solid #26262b; border-radius: 12px; box-shadow: 0 16px 48px rgba(0,0,0,.55); font: 13px system-ui, -apple-system, "Segoe UI", sans-serif; padding: 14px; }
+      .veil { position: fixed; z-index: 4; inset: 0; background: rgba(0,0,0,.45); }
+      .dialog { position: fixed; z-index: 4; left: 50%; top: 18%; transform: translateX(-50%); width: min(360px, calc(100vw - 32px)); background: #121215; color: #e7e7ea; border: 1px solid #26262b; border-radius: 12px; box-shadow: 0 16px 48px rgba(0,0,0,.55); font: 13px system-ui, -apple-system, "Segoe UI", sans-serif; padding: 14px; }
       .dialog h2 { margin: 0 0 6px; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
       .dialog p { margin: 0 0 10px; color: #a1a1aa; line-height: 1.45; }
       .dialog select { width: 100%; box-sizing: border-box; margin: 0 0 10px; padding: 6px 8px; border-radius: 6px; border: 1px solid #26262b; background: rgba(0,0,0,.25); color: inherit; font: inherit; }
@@ -132,7 +132,11 @@ declare global {
       .b-primary { background: #2563eb; color: #fff; }
       .b-ghost { background: none; color: #a1a1aa; }
       .b-ghost:hover { color: #e7e7ea; background: rgba(255,255,255,.06); }
-      .logo { display: inline-flex; width: 18px; height: 18px; border-radius: 4px; background: #2563eb; color: #fff; align-items: center; justify-content: center; }
+      .logo { display: inline-flex; width: 18px; height: 18px; border-radius: 4px; background: #2563eb; color: #fff; align-items: center; justify-content: center; flex-shrink: 0; }
+      .banner { position: fixed; z-index: 3; top: 12px; right: 12px; display: grid; grid-template-columns: auto 1fr; gap: 8px 10px; align-items: center; width: min(420px, calc(100vw - 24px)); box-sizing: border-box; background: #121215; color: #e7e7ea; border: 1px solid #26262b; border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.5); font: 13px system-ui, -apple-system, "Segoe UI", sans-serif; padding: 10px 12px; line-height: 1.4; }
+      .banner .text { min-width: 0; }
+      .banner .actions { grid-column: 1 / -1; display: flex; justify-content: flex-end; align-items: center; gap: 6px; flex-wrap: wrap; }
+      .banner select { padding: 4px 6px; border-radius: 6px; border: 1px solid #26262b; background: rgba(0,0,0,.25); color: inherit; font: inherit; font-size: 12px; max-width: 140px; }
     `;
     shadow.appendChild(style);
     document.documentElement.appendChild(host);
@@ -159,7 +163,8 @@ declare global {
     closeMenu();
     const c = await send<CredentialsReply>({ type: "guivault-credentials", id: m.id });
     if (!c) return;
-    fill({ username: c.username, password: c.password }, input);
+    const password = input.type === "password" ? input : (input.form ? Array.from(input.form.querySelectorAll<HTMLInputElement>("input[type=password]")).find(visible) : undefined) ?? inputs().find((i) => i.type === "password");
+    fill({ username: c.username, password: c.password }, password);
   };
 
   const openMenu = (input: HTMLInputElement, btn: HTMLElement) => {
@@ -188,6 +193,10 @@ declare global {
     root.appendChild(menu);
     (menu.querySelector("button") as HTMLElement | null)?.focus();
   };
+
+  /** Le champ qui porte le bouton : l'utilisateur quand on le trouve (c'est
+   * le premier qu'on remplit), sinon le mot de passe lui-même. */
+  const anchorFor = (password: HTMLInputElement, all: HTMLInputElement[]) => usernameFor(password, all) ?? password;
 
   const attach = (input: HTMLInputElement) => {
     if (anchors.has(input)) return;
@@ -229,7 +238,8 @@ declare global {
       const r = await send<MatchesReply>({ type: "guivault-matches", url }).catch(() => null);
       matches = r && !r.locked && r.enabled ? r.logins : [];
     }
-    const fields = matches.length ? inputs().filter((i) => i.type === "password") : [];
+    const all = inputs();
+    const fields = matches.length ? all.filter((i) => i.type === "password").map((p) => anchorFor(p, all)) : [];
     for (const input of Array.from(anchors.keys())) if (!fields.includes(input)) detach(input);
     for (const input of fields) attach(input);
   };
@@ -246,6 +256,7 @@ declare global {
   // un rafraîchissement périodique léger.
   const start = () => {
     void scan();
+    if (window === window.top) askPending();
     new MutationObserver(scheduleScan).observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ["type", "style", "class", "hidden"] });
     window.addEventListener("scroll", reposition, true);
     window.addEventListener("resize", reposition);
@@ -255,6 +266,85 @@ declare global {
   };
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start);
   else start();
+
+  // ─── Enregistrer ce qu'on vient de saisir ────────────────────────────────
+  //
+  // À la soumission d'un formulaire avec un mot de passe, on envoie le
+  // couple au service worker ; la page qui suit (souvent une autre, après
+  // navigation) demande s'il y a quelque chose à proposer et affiche la
+  // bannière. Le mot de passe ne repasse jamais par la page : la bannière
+  // ne montre que l'utilisateur.
+
+  const capture = (form: HTMLFormElement | null, trigger: HTMLInputElement | null) => {
+    const scope = form ? Array.from(form.querySelectorAll<HTMLInputElement>("input")).filter(visible) : inputs();
+    const password = (trigger?.type === "password" ? trigger : undefined) ?? scope.find((i) => i.type === "password" && i.value);
+    if (!password?.value) return;
+    const user = usernameFor(password, scope);
+    void send<{ ok: boolean } | null>({ type: "guivault-captured", username: user?.value.trim() ?? "", password: password.value }).catch(() => null);
+  };
+
+  document.addEventListener("submit", (e) => capture(e.target instanceof HTMLFormElement ? e.target : null, null), true);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && e.target instanceof HTMLInputElement && e.target.type === "password") capture(e.target.form, e.target);
+  }, true);
+  document.addEventListener("click", (e) => {
+    const t = e.target instanceof Element ? e.target.closest("button, input[type=submit], [role=button]") : null;
+    if (!t) return;
+    const form = t.closest("form");
+    const password = (form ? Array.from(form.querySelectorAll<HTMLInputElement>("input[type=password]")) : inputs().filter((i) => i.type === "password")).find((i) => visible(i) && i.value);
+    if (password) capture(form, password);
+  }, true);
+
+  let banner: HTMLElement | null = null;
+  const showBanner = (p: Pending) => {
+    if (banner) return;
+    const root = ensureHost();
+    banner = document.createElement("div");
+    banner.className = "banner";
+    banner.setAttribute("role", "dialog");
+    banner.setAttribute("aria-label", "Enregistrer dans GuiVault");
+    const text = p.mode === "update" ? `Mettre à jour le mot de passe de « ${p.loginName} » ?` : `Enregistrer l'identifiant${p.username ? ` « ${p.username} »` : ""} pour ${p.host} ?`;
+    banner.innerHTML = `<span class="logo">${ICON}</span><span class="text"></span>`;
+    (banner.querySelector(".text") as HTMLElement).textContent = text;
+    let select: HTMLSelectElement | null = null;
+    if (p.mode === "new" && p.vaults.length > 1) {
+      select = document.createElement("select");
+      select.setAttribute("aria-label", "Vault");
+      for (const v of p.vaults) {
+        const o = document.createElement("option");
+        o.value = v.id;
+        o.textContent = v.name;
+        o.selected = v.id === p.defaultVaultId;
+        select.appendChild(o);
+      }
+    }
+    const actions = document.createElement("div");
+    actions.className = "actions";
+    if (select) actions.appendChild(select);
+    const later = document.createElement("button");
+    later.className = "b b-ghost";
+    later.textContent = "Pas maintenant";
+    const save = document.createElement("button");
+    save.className = "b b-primary";
+    save.textContent = p.mode === "update" ? "Mettre à jour" : "Enregistrer";
+    actions.append(later, save);
+    banner.appendChild(actions);
+    const close = () => { banner?.remove(); banner = null; };
+    later.addEventListener("click", () => { void send({ type: "guivault-dismiss-captured" }); close(); });
+    save.addEventListener("click", () => {
+      save.disabled = true;
+      void send<{ ok: true; name: string } | { ok: false; error: string }>({ type: "guivault-save-captured", vaultId: select?.value ?? p.defaultVaultId }).then((r) => {
+        (banner?.querySelector(".text") as HTMLElement | null)?.replaceChildren(document.createTextNode(r.ok ? `« ${r.name} » enregistré dans GuiVault.` : `Échec : ${r.error}`));
+        select?.remove();
+        save.remove();
+        later.textContent = "Fermer";
+        if (r.ok) setTimeout(close, 4000);
+      });
+    });
+    root.appendChild(banner);
+  };
+
+  const askPending = () => void send<Pending | null>({ type: "guivault-pending" }).then((p) => { if (p) showBanner(p); }).catch(() => null);
 
   // ─── Passkeys : le pont entre la page et le service worker ───────────────
   //

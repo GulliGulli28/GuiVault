@@ -11,9 +11,11 @@ import { parseTotp, totpCode } from "../../src/lib/totp";
 import { loginMatches } from "../../src/lib/urimatch";
 import type { Login } from "../../src/lib/types";
 import { setTokensChangedHandler } from "../../src/lib/api";
-import type { CredentialsReply, FillReply, MatchesReply, PasskeyToBackground, ToBackground, ToContent } from "./messages";
+import { uuid } from "../../src/lib/bytes";
+import type { CredentialsReply, FillReply, MatchesReply, PasskeyToBackground, Pending, ToBackground, ToContent } from "./messages";
 import * as passkeys from "./passkeys";
-import { LOCK_ALARM, loadItemsCache, loadSettings, lock, saveTokens } from "./store";
+import { LOCK_ALARM, loadItemsCache, loadSession, loadSettings, lock, saveTokens } from "./store";
+import { findLogin, saveLogin } from "./vaultops";
 
 // Une écriture depuis ici (enregistrer une passkey) peut rafraîchir les
 // jetons : ils doivent revenir dans la session.
@@ -37,6 +39,15 @@ async function matchesFor(url: string | undefined): Promise<Login[] | null> {
   if (!url || !/^https?:/.test(url)) return [];
   const all = await logins();
   return all ? all.filter((l) => loginMatches(l, url)).sort((a, b) => Number(!!b.favorite) - Number(!!a.favorite) || a.name.localeCompare(b.name)) : null;
+}
+
+// ─── Icône : grise quand il faut se reconnecter ─────────────────────────────
+
+async function updateIcon() {
+  const has = await chrome.storage.session.get("session");
+  const p = has.session ? "icons/icon" : "icons/gray";
+  await chrome.action.setIcon({ path: { 16: `${p}16.png`, 32: `${p}32.png`, 48: `${p}48.png`, 128: `${p}128.png` } }).catch(() => {});
+  await chrome.action.setTitle({ title: has.session ? "GuiVault" : "GuiVault — verrouillé, cliquez pour vous reconnecter" }).catch(() => {});
 }
 
 // ─── Badge ──────────────────────────────────────────────────────────────────
@@ -63,11 +74,90 @@ chrome.tabs.onActivated.addListener(({ tabId }) => void updateBadge(tabId));
 chrome.tabs.onUpdated.addListener((tabId, info) => {
   if (info.url || info.status === "complete") void updateBadge(tabId);
 });
-chrome.storage.onChanged.addListener((_changes, area) => {
-  if (area === "session") void updateActiveBadges();
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== "session") return;
+  void updateActiveBadges();
+  if (changes.session) void updateIcon();
 });
-chrome.runtime.onStartup.addListener(() => void updateActiveBadges());
-chrome.runtime.onInstalled.addListener(() => void updateActiveBadges());
+chrome.runtime.onStartup.addListener(() => { void updateActiveBadges(); void updateIcon(); });
+chrome.runtime.onInstalled.addListener(() => { void updateActiveBadges(); void updateIcon(); });
+void updateIcon();
+
+// ─── Saisie capturée : proposer d'enregistrer ───────────────────────────────
+//
+// La page soumet son formulaire puis navigue : la bannière ne peut pas
+// vivre dans la page qui part. On garde la saisie ici (mémoire de session,
+// par onglet), la page suivante la demande et l'affiche.
+
+interface Captured {
+  url: string;
+  username: string;
+  password: string;
+  mode: "new" | "update";
+  loginId: string | null;
+  loginName: string | null;
+  at: number;
+}
+
+const PENDING_TTL_MS = 2 * 60_000;
+
+async function pendingFor(tabId: number): Promise<Captured | null> {
+  const r = await chrome.storage.session.get("pending");
+  const all = (r.pending as Record<string, Captured> | undefined) ?? {};
+  const c = all[tabId];
+  return c && Date.now() - c.at < PENDING_TTL_MS ? c : null;
+}
+
+async function setPending(tabId: number, c: Captured | null) {
+  const r = await chrome.storage.session.get("pending");
+  const all = (r.pending as Record<string, Captured> | undefined) ?? {};
+  if (c) all[tabId] = c;
+  else delete all[tabId];
+  await chrome.storage.session.set({ pending: all });
+}
+
+/** Une saisie vaut la peine d'être proposée si aucun identifiant du site
+ * n'a déjà ce couple, ou si l'un a ce nom mais un autre mot de passe. */
+async function classify(url: string, username: string, password: string): Promise<Pick<Captured, "mode" | "loginId" | "loginName"> | null> {
+  const m = await matchesFor(url);
+  if (!m) return null;
+  const same = m.find((l) => l.username.toLowerCase() === username.toLowerCase());
+  if (same && same.password === password) return null;
+  if (same) return { mode: "update", loginId: same.id, loginName: same.name };
+  if (m.some((l) => l.password === password && !l.username)) return null;
+  return { mode: "new", loginId: null, loginName: null };
+}
+
+function hostOf(url: string): string {
+  try {
+    return new URL(url).host;
+  } catch {
+    return url;
+  }
+}
+
+async function saveCaptured(tabId: number, vaultId: string): Promise<{ ok: true; name: string } | { ok: false; error: string }> {
+  const c = await pendingFor(tabId);
+  if (!c) return { ok: false, error: "rien à enregistrer" };
+  try {
+    if (c.mode === "update" && c.loginId) {
+      const found = await findLogin(c.loginId);
+      if (!found) return { ok: false, error: "identifiant introuvable" };
+      const { login, revision } = found;
+      const history = login.password ? [{ password: login.password, changedAt: new Date().toISOString() }, ...login.passwordHistory].slice(0, 10) : login.passwordHistory;
+      await saveLogin(found.vaultId, { ...login, password: c.password, passwordHistory: history }, revision);
+      await setPending(tabId, null);
+      return { ok: true, name: login.name };
+    }
+    const host = hostOf(c.url);
+    const login: Login = { id: uuid(), name: host.replace(/^www\./, ""), groupId: null, tags: [], username: c.username, password: c.password, uris: [{ uri: new URL(c.url).origin, match: null }], totp: null, passkeys: [], passwordHistory: [] };
+    await saveLogin(vaultId, login);
+    await setPending(tabId, null);
+    return { ok: true, name: login.name };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}
 
 // ─── Messages du script de page ─────────────────────────────────────────────
 
@@ -104,6 +194,35 @@ chrome.runtime.onMessage.addListener((msg: ToBackground | PasskeyToBackground, s
       const settings = await loadSettings();
       return reply({ locked: false, enabled: settings.inlineAutofill, logins: m.map((l) => ({ id: l.id, name: l.name, username: l.username, hasTotp: !!l.totp, favorite: !!l.favorite })) } satisfies MatchesReply);
     }
+    if (msg.type === "guivault-captured") {
+      const tabId = sender.tab?.id;
+      const url = sender.tab?.url ?? sender.url;
+      if (tabId == null || !url || !msg.password) return reply(null);
+      const cls = await classify(url, msg.username, msg.password);
+      if (!cls) return reply(null);
+      await setPending(tabId, { url, username: msg.username, password: msg.password, ...cls, at: Date.now() });
+      return reply({ ok: true });
+    }
+    if (msg.type === "guivault-pending") {
+      const tabId = sender.tab?.id;
+      if (tabId == null) return reply(null);
+      const c = await pendingFor(tabId);
+      const s = c ? await loadSession() : null;
+      if (!c || !s) return reply(null);
+      const vaults = s.state.vaults.filter((v) => v.role !== "reader").map((v) => ({ id: v.id, name: v.name }));
+      const personal = s.state.vaults.find((v) => v.kind === "personal");
+      const p: Pending = { host: hostOf(c.url), username: c.username, mode: c.mode, loginName: c.loginName, vaults, defaultVaultId: personal?.id ?? vaults[0]?.id ?? "" };
+      return reply(p);
+    }
+    if (msg.type === "guivault-save-captured") {
+      const tabId = sender.tab?.id;
+      if (tabId == null) return reply({ ok: false, error: "pas d'onglet" });
+      return reply(await saveCaptured(tabId, msg.vaultId));
+    }
+    if (msg.type === "guivault-dismiss-captured") {
+      if (sender.tab?.id != null) await setPending(sender.tab.id, null);
+      return reply({ ok: true });
+    }
     if (msg.type === "guivault-credentials") {
       const url = sender.tab?.url ?? sender.url;
       const m = await matchesFor(url);
@@ -132,5 +251,7 @@ chrome.commands.onCommand.addListener((command) => {
 });
 
 chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === LOCK_ALARM) void lock();
+  if (alarm.name === LOCK_ALARM) void lock("timeout");
 });
+
+chrome.tabs.onRemoved.addListener((tabId) => void setPending(tabId, null));

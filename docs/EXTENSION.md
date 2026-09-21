@@ -21,17 +21,26 @@ maître et le délai de verrouillage.
 
 ## Ce qu'elle fait
 
-- **Cette page** : les identifiants dont une URI correspond à l'onglet
-  actif (`uris[].match`, sémantique de Bitwarden — `domain` par défaut).
-  Un clic remplit le formulaire de connexion ; « U » copie l'utilisateur,
-  l'icône copie le mot de passe, le code TOTP défile avec son bouton
-  « remplir ».
+- **Vaults** : « Identifiants sur cette page » quand une URI correspond à
+  l'onglet actif (`uris[].match`, sémantique de Bitwarden — `domain` par
+  défaut), puis chaque vault en section repliable. Sur une ligne :
+  « Remplir », copier l'utilisateur, copier le mot de passe ; en l'ouvrant :
+  la fiche (mot de passe révélable, TOTP, sites, notes), **Modifier**,
+  **Supprimer**. « Nouveau » crée un identifiant dans le vault de son choix,
+  avec l'URI de la page courante si on n'en met pas.
+- **Enregistrer ce qu'on saisit** : à la soumission d'un formulaire de
+  connexion, si le couple n'est pas dans le coffre, la page suivante montre
+  une bannière « Enregistrer l'identifiant pour <site> ? » (avec le vault) ;
+  si un identifiant du site a ce nom mais un autre mot de passe : « Mettre à
+  jour ? » (l'ancien passe dans l'historique). La saisie attend deux
+  minutes dans la mémoire de session du worker, jamais dans la page.
 - **Dans la page** : le badge sur l'icône compte les identifiants qui
-  correspondent à l'onglet ; un bouton GuiVault apparaît dans les champs de
-  mot de passe du site (menu s'il y a plusieurs comptes) ; **Ctrl+Maj+L**
-  remplit sans ouvrir le popup. Désactivable (« Proposer le remplissage dans
-  les pages »).
-- **Tout** : recherche dans tous les vaults (nom, utilisateur, site, vault).
+  correspondent à l'onglet ; un bouton GuiVault apparaît sur le champ
+  utilisateur (ou le mot de passe, faute de mieux) des formulaires du site,
+  avec un menu s'il y a plusieurs comptes ; **Ctrl+Maj+L** remplit sans
+  ouvrir le popup. Désactivable (« Proposer le remplissage dans les pages »).
+- **Icône grise** quand il faut se reconnecter (verrouillé, session
+  expirée ou révoquée) ; le popup dit pourquoi.
 - **Générateur** : le même que l'interface web.
 - **Passkeys** : sur un site qui propose une passkey, GuiVault propose de
   l'enregistrer dans le coffre (dans un identifiant existant du site, ou un
@@ -47,6 +56,7 @@ maître et le délai de verrouillage.
 | Morceau | Rôle |
 |---|---|
 | `src/Popup.tsx` | tout l'écran : connexion (+ TOTP), liste, remplissage, générateur |
+| `src/vaultops.ts` | écrire dans le coffre depuis l'extension (créer, modifier, supprimer, déplacer un identifiant) en tenant le cache d'items à jour |
 | `src/store.ts` | la session dans `chrome.storage.session` (jetons, clés du compte, clés et noms des vaults, items déchiffrés) ; réglages dans `chrome.storage.local` |
 | `src/background.ts` | un service worker qui ne fait qu'écouter l'alarme de verrouillage |
 | `src/content.ts` | le script de page : remplit sur ordre (popup, raccourci) et, chargé sur toutes les pages `http(s)`, repère les champs de mot de passe pour y poser le bouton GuiVault ; l'interface injectée vit dans un shadow DOM |
@@ -113,8 +123,8 @@ clic ; un site ne peut pas déclencher le remplissage lui-même.
 - Détection plus fine des formulaires (inscription vs connexion, champs en
   plusieurs étapes, iframes de connexion tierces) : la v1 repère les champs
   de mot de passe visibles et devine l'utilisateur à côté.
-- Création et modification d'items depuis l'extension (proposer d'enregistrer
-  un identifiant saisi).
+- Les autres types d'items (notes, cartes, identités) et les dossiers :
+  l'interface web.
 - Passkeys : pas de compteur de signatures, pas de médiation
   conditionnelle, pas de suppression depuis l'extension (l'interface web le
   fait).

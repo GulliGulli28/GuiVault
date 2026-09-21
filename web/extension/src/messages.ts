@@ -15,7 +15,25 @@ export type ToBackground =
   | { type: "guivault-matches"; url: string }
   /** L'utilisateur a choisi un identifiant : ses secrets, si l'URL de
    * l'onglet expéditeur correspond bien. */
-  | { type: "guivault-credentials"; id: string };
+  | { type: "guivault-credentials"; id: string }
+  /** Un formulaire de connexion vient d'être soumis avec ces valeurs. */
+  | { type: "guivault-captured"; username: string; password: string }
+  /** La page (re)chargée demande s'il y a une saisie à proposer d'enregistrer. */
+  | { type: "guivault-pending" }
+  | { type: "guivault-save-captured"; vaultId: string }
+  | { type: "guivault-dismiss-captured" };
+
+/** Ce que la bannière « Enregistrer ? » affiche. */
+export interface Pending {
+  host: string;
+  username: string;
+  /** `update` : un identifiant de ce site a ce nom d'utilisateur mais un
+   * autre mot de passe. */
+  mode: "new" | "update";
+  loginName: string | null;
+  vaults: { id: string; name: string }[];
+  defaultVaultId: string;
+}
 
 export type MatchesReply = { locked: true } | { locked: false; enabled: boolean; logins: MatchSummary[] };
 export type CredentialsReply = { username: string; password: string; totp: string | null } | null;

@@ -9,12 +9,12 @@
  * synchronisées) ; drapeaux UP, UV, BE, BS (présent, vérifié — le coffre est
  * déverrouillé —, sauvegardable et sauvegardé). AAGUID nul. */
 import { fromBase64, toBase64, uuid, utf8 } from "../../src/lib/bytes";
-import { putPayload, type SessionState, type VaultView } from "../../src/lib/session";
+import type { SessionState, VaultView } from "../../src/lib/session";
 import { registrableDomain } from "../../src/lib/urimatch";
 import type { Login, Passkey } from "../../src/lib/types";
 import { cborEncode } from "./cbor";
-import { setBaseUrl } from "../../src/lib/api";
-import { loadItemsCache, loadSession, loadSettings, saveItemsCache } from "./store";
+import { loadItemsCache, loadSession } from "./store";
+import { saveLogin } from "./vaultops";
 
 export function b64url(b: Uint8Array): string {
   return toBase64(b).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
@@ -163,8 +163,6 @@ export interface Attestation {
 export async function register(req: RegisterRequest): Promise<Attestation | { error: string }> {
   const u = await unlocked();
   if (!u) return { error: "coffre verrouillé" };
-  // Le service worker n'a pas configuré l'API : c'est le popup qui l'a fait.
-  setBaseUrl((await loadSettings()).serverUrl);
   const pair = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]);
   const pkcs8 = new Uint8Array(await crypto.subtle.exportKey("pkcs8", pair.privateKey));
   const spki = new Uint8Array(await crypto.subtle.exportKey("spki", pair.publicKey));
@@ -204,14 +202,7 @@ export async function register(req: RegisterRequest): Promise<Attestation | { er
     login = { id: uuid(), name: req.rpName || req.rpId, groupId: null, tags: [], username: req.userName, password: "", uris: [{ uri: `https://${req.rpId}`, match: null }], totp: null, passkeys: [passkey], passwordHistory: [] };
   }
   try {
-    const item = await putPayload(vault, { kind: "login", login }, revision);
-    // Le cache du popup suit, pour que la passkey serve tout de suite.
-    const cache = await loadItemsCache();
-    const entry = cache[vault.id] ?? { revision: 0, items: [] };
-    entry.items = entry.items.filter((i) => i.id !== login.id);
-    entry.items.push({ id: login.id, revision: item.revision, updatedAt: item.updated_at, ok: true, payload: { kind: "login", login } });
-    cache[vault.id] = entry;
-    await saveItemsCache(cache);
+    await saveLogin(vault.id, login, revision);
   } catch (e) {
     return { error: e instanceof Error ? e.message : String(e) };
   }
