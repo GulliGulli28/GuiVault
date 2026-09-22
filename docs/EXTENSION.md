@@ -63,6 +63,9 @@ maître et le délai de verrouillage.
   navigateur » rend la main à l'authentificateur natif (Windows Hello,
   trousseau…). Les passkeys sont synchronisées comme le reste et visibles
   dans l'interface web.
+- **Vaults** : le contenu de chaque vault dans son arborescence, la même
+  que l'interface web (dossiers repliables, icônes, tags) ; les filtres de
+  type masquent les dossiers qui n'ont rien du type voulu.
 - **Verrouiller** : efface la session ; le prochain clic redemande le mot
   de passe maître (serveur et e-mail restent mémorisés). L'icône dans la
   barre du navigateur et le logo du popup passent en gris tant que le

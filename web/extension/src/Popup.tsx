@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { api, errorMessage, setBaseUrl, setSessionLostHandler, setTokensChangedHandler } from "../../src/lib/api";
-import { indexItems, toEntities } from "../../src/lib/entities";
+import { filterEntities, indexItems, toEntities } from "../../src/lib/entities";
+import { buildVaultTree } from "../../src/lib/vaultTree";
 import { describeSecret } from "../../src/lib/items";
 import { loadItems, login, payloadEntity, payloadName, refresh, setDeviceLabel, type DecodedItem, type SessionState } from "../../src/lib/session";
 import { loginMatches } from "../../src/lib/urimatch";
 import { KIND_LABELS, KIND_LABELS_PLURAL, type CustomIcon, type GuiVaultEntity, type ItemKind, type Login, type Payload, type TokenPair } from "../../src/lib/types";
 import { GeneratorPanel } from "../../src/components/GeneratorPanel";
 import { ItemView } from "../../src/components/ItemView";
-import { EntityIcon, KIND_ICONS } from "../../src/components/ItemTree";
+import { EntityIcon, ItemTree, KIND_ICONS } from "../../src/components/ItemTree";
 import { PasswordStrength } from "../../src/components/PasswordStrength";
 import { TotpCode } from "../../src/components/TotpCode";
 import { TotpList } from "../../src/components/TotpList";
@@ -193,7 +194,6 @@ export function Popup() {
   const canFill = !!pageUrl && /^https?:/.test(pageUrl);
   const forPage = useMemo(() => (canFill ? logins.filter((e) => loginMatches(e.login, pageUrl!)) : []), [logins, pageUrl, canFill]);
   const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
-  const matchesQuery = (e: Entry) => (filter === "all" || e.payload.kind === filter) && terms.every((t) => `${e.name} ${e.search} ${KIND_LABELS[e.payload.kind]}`.toLowerCase().includes(t));
 
   const fill = async (e: LoginEntry, what: "credentials" | "totp") => {
     if (tabId == null) return;
@@ -234,7 +234,7 @@ export function Popup() {
   const indexFor = (vaultId: string) => indexItems(cache[vaultId]?.items ?? []);
 
   return (
-    <div className="flex h-[560px] flex-col bg-[var(--c-bg2)] text-[var(--c-text)]">
+    <div className="flex h-[600px] flex-col bg-[var(--c-bg2)] text-[var(--c-text)]">
       <header className="flex shrink-0 items-center gap-2 border-b border-[var(--c-border)] bg-[var(--c-bg)] px-3 py-2">
         {/* Le logo grise quand le coffre est verrouillé — comme l'icône de
             l'extension dans la barre du navigateur. */}
@@ -392,11 +392,29 @@ export function Popup() {
                   </Section>
                 )}
                 {screen.state.vaults.map((v) => {
-                  const rows = entries.filter((e) => e.vaultId === v.id && matchesQuery(e));
-                  if (terms.length && rows.length === 0) return null;
+                  // Le contenu du vault dans son arborescence — la même que
+                  // l'interface web, dossiers compris, sans ceux que le
+                  // filtre de type laisserait vides.
+                  const mine = entries.filter((e) => e.vaultId === v.id);
+                  const all = mine.map((e) => e.entity);
+                  const ents = filter === "all" ? all : filter === "group" ? all.filter((e) => e.kind === "group") : filterEntities(all, (e) => e.kind === filter);
+                  const shown = new Set(buildVaultTree(ents, query).visibleKeys);
+                  const count = ents.filter((e) => e.kind !== "group" && shown.has(e.id)).length;
+                  if (terms.length && count === 0) return null;
                   return (
-                    <Section key={v.id} id={v.id} title={v.name} icon={<IconVault size={12} />} count={rows.length} collapsed={collapsed.has(v.id) && terms.length === 0} onToggle={() => toggleCollapsed(v.id)}>
-                      {rows.length === 0 ? <p className="px-2 py-2 text-[11.5px] text-[var(--c-text-muted)]">Rien ici.</p> : rows.map((e) => <Row key={e.item.id} entry={e} canFill={canFill} onFill={fill} onOpen={() => setView({ kind: "detail", id: e.item.id })} say={say} />)}
+                    <Section key={v.id} id={v.id} title={v.name} icon={<IconVault size={12} />} count={count} collapsed={collapsed.has(v.id) && terms.length === 0} onToggle={() => toggleCollapsed(v.id)}>
+                      <ItemTree
+                        entities={ents}
+                        customIcons={mine[0]?.customIcons ?? []}
+                        query={query}
+                        selected={null}
+                        onSelect={(id) => setView({ kind: "detail", id })}
+                        emptyMessage="Rien ici."
+                        rowActions={(entity) => {
+                          const e = mine.find((x) => x.item.id === entity.id);
+                          return e && isLoginEntry(e) ? <LoginActions entry={e} canFill={canFill} onFill={fill} say={say} /> : null;
+                        }}
+                      />
                     </Section>
                   );
                 })}
@@ -433,7 +451,6 @@ function Section({ id, title, icon, count, collapsed, onToggle, accent, children
 }
 
 function Row({ entry, canFill, onFill, onOpen, say }: { entry: Entry; canFill: boolean; onFill: (e: LoginEntry, what: "credentials" | "totp") => Promise<void>; onOpen: () => void; say: (m: string) => void }) {
-  const copy = (label: string, v: string) => () => copyText(v).then((ok) => say(ok ? `${label} copié.` : "Copie refusée par le navigateur."));
   const favorite = !!payloadEntity(entry.payload).favorite;
   const { entity } = entry;
   return (
@@ -445,14 +462,21 @@ function Row({ entry, canFill, onFill, onOpen, say }: { entry: Entry; canFill: b
           <span className={`truncate text-[10.5px] text-[var(--c-text-muted)] ${entity.mono && entry.subtitle ? "font-mono" : ""}`}>{entry.subtitle || KIND_LABELS[entry.payload.kind]}</span>
         </span>
       </button>
-      {isLoginEntry(entry) && (
-        <span className="flex shrink-0 items-center gap-0.5">
-          {canFill && <button onClick={() => void onFill(entry, "credentials")} className="btn btn-secondary btn-sm" title="Remplir la page">Remplir</button>}
-          {entry.login.username && <button onClick={copy("Utilisateur", entry.login.username)} className="btn btn-ghost btn-sm" title="Copier l'utilisateur" aria-label="Copier l'utilisateur">U</button>}
-          {entry.login.password && <button onClick={copy("Mot de passe", entry.login.password)} className="btn btn-ghost btn-sm btn-icon" title="Copier le mot de passe" aria-label="Copier le mot de passe"><IconCopy size={11} /></button>}
-        </span>
-      )}
+      {isLoginEntry(entry) && <span className="flex shrink-0 items-center gap-0.5"><LoginActions entry={entry} canFill={canFill} onFill={onFill} say={say} /></span>}
     </div>
+  );
+}
+
+/** Remplir, copier l'utilisateur, copier le mot de passe — sur une ligne
+ * d'identifiant, où qu'elle soit. */
+function LoginActions({ entry, canFill, onFill, say }: { entry: LoginEntry; canFill: boolean; onFill: (e: LoginEntry, what: "credentials" | "totp") => Promise<void>; say: (m: string) => void }) {
+  const copy = (label: string, v: string) => () => copyText(v).then((ok) => say(ok ? `${label} copié.` : "Copie refusée par le navigateur."));
+  return (
+    <>
+      {canFill && <button onClick={() => void onFill(entry, "credentials")} className="btn btn-secondary btn-sm" title="Remplir la page">Remplir</button>}
+      {entry.login.username && <button onClick={copy("Utilisateur", entry.login.username)} className="btn btn-ghost btn-sm" title="Copier l'utilisateur" aria-label="Copier l'utilisateur">U</button>}
+      {entry.login.password && <button onClick={copy("Mot de passe", entry.login.password)} className="btn btn-ghost btn-sm btn-icon" title="Copier le mot de passe" aria-label="Copier le mot de passe"><IconCopy size={11} /></button>}
+    </>
   );
 }
 

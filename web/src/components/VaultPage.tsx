@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PageContext } from "../App";
 import { api, errorMessage } from "../lib/api";
-import { indexItems, toEntities } from "../lib/entities";
+import { filterEntities, indexItems, toEntities } from "../lib/entities";
 import { navigate } from "../lib/route";
 import { loadItems, moveItem, payloadEntity, payloadName, putPayload, RevisionConflict, type DecodedItem, type VaultView } from "../lib/session";
 import { canWrite, KIND_LABELS, KIND_LABELS_PLURAL, ROLE_HINTS, ROLE_LABELS, type CustomIcon, type GuiVaultEntity, type ItemKind, type Payload } from "../lib/types";
@@ -86,13 +86,13 @@ function VaultBody({ ctx, vault }: { ctx: PageContext; vault: VaultView }) {
     for (const e of entities) c[e.kind] = (c[e.kind] ?? 0) + 1;
     return c;
   }, [entities]);
-  // Filtrer par type garde les dossiers : ils portent l'arborescence, et
-  // `buildVaultTree` retire ceux qui finissent vides.
+  // Filtrer par type garde les dossiers qui mènent à quelque chose, pas les
+  // autres.
   const filtered = useMemo(() => {
     if (filter === "all") return entities;
-    if (filter === "favorites") return entities.filter((e) => e.favorite || e.kind === "group");
     if (filter === "group") return entities.filter((e) => e.kind === "group");
-    return entities.filter((e) => e.kind === filter || e.kind === "group");
+    if (filter === "favorites") return filterEntities(entities, (e) => !!e.favorite);
+    return filterEntities(entities, (e) => e.kind === filter);
   }, [entities, filter]);
   const current = selected ? items?.find((i) => i.id === selected) ?? null : null;
 

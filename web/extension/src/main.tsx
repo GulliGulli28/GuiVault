@@ -6,7 +6,9 @@ import { installPreferences } from "../../src/lib/preferences";
 import { Popup } from "./Popup";
 
 installPreferences();
-document.documentElement.style.width = "380px";
+// Assez large pour une arborescence indentée avec ses boutons ; Chrome
+// plafonne un popup à 800 × 600.
+document.documentElement.style.width = "440px";
 
 // Les réglages du générateur peuvent avoir été changés depuis une page (le
 // script de page les garde dans `chrome.storage.local`) : on les reprend

@@ -131,3 +131,24 @@ function describeEntity(p: Payload): Pick<GuiVaultEntity, "mono" | "icon" | "hos
       return {};
   }
 }
+
+/** Les entités d'un type (ou les favoris), avec les dossiers qui mènent à
+ * au moins l'une d'elles — pas les autres : filtrer sur « Identifiants »
+ * ne doit pas laisser des dossiers vides. `buildVaultTree` ne retire un
+ * dossier vide que sous une recherche, d'où ce tri en amont. */
+export function filterEntities(entities: GuiVaultEntity[], keep: (e: GuiVaultEntity) => boolean): GuiVaultEntity[] {
+  const groups = new Map(entities.filter((e) => e.kind === "group").map((e) => [e.id, e]));
+  const wanted = new Set<string>();
+  for (const e of entities) {
+    if (e.kind === "group" || !keep(e)) continue;
+    // Le dossier de l'entité et tous ses ancêtres, borné contre un cycle.
+    let cur = e.parentId;
+    const seen = new Set<string>();
+    while (cur && groups.has(cur) && !seen.has(cur)) {
+      seen.add(cur);
+      wanted.add(cur);
+      cur = groups.get(cur)!.parentId;
+    }
+  }
+  return entities.filter((e) => (e.kind === "group" ? wanted.has(e.id) : keep(e)));
+}
