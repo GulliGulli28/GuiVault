@@ -57,7 +57,7 @@ impl TestServer {
             access_ttl: Duration::from_secs(900),
             refresh_ttl: Duration::from_secs(86400),
             invitation_ttl: Duration::from_secs(86400),
-            trust_proxy: false,
+            trust_proxy: guivault_server::config::TrustProxy::No,
             max_item_bytes: 64 * 1024,
             auth_rate_burst: 1000,
             auth_rate_per_second: 1000,

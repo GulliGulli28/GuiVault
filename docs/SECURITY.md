@@ -113,9 +113,21 @@ est installé une fois et vérifiable.
   ailleurs qu'en HTTPS (ou que depuis `localhost`), la page le dit en
   rouge : le navigateur la place hors « contexte sécurisé », ce qui lui
   retire au passage `crypto.randomUUID` et le presse-papiers.
-- `GUIVAULT_TRUST_PROXY=true` **uniquement** derrière un reverse proxy qui
-  écrase `X-Forwarded-For` ; sinon n'importe qui choisit son IP de
-  rate-limit.
+- `GUIVAULT_TRUST_PROXY` : y mettre **l'adresse ou le réseau du proxy**
+  plutôt que `true`. L'en-tête `X-Forwarded-For` est écrit par le client
+  comme n'importe quel autre ; le croire sans condition laisse choisir son
+  IP de rate-limit à qui peut joindre le port directement, donc
+  brute-forcer des mots de passe maîtres sans jamais être limité. Avec une
+  liste, l'en-tête n'est lu que si l'adresse de la connexion TCP — la seule
+  chose qu'un client ne choisit pas — en fait partie. La chaîne est alors
+  lue par la droite en sautant les proxys connus : que le proxy écrase
+  l'en-tête ou qu'il l'ajoute à la suite, c'est l'adresse qu'il a réellement
+  vue qui compte. `true` garde l'ancien comportement (première entrée, sans
+  vérification) et suppose le port injoignable autrement.
+- **Filtrer sur le nom d'hôte ne remplace pas un port fermé** : `Host` est
+  choisi par le client au même titre que `X-Forwarded-For`. Ce qui restreint
+  l'accès, c'est le réseau — publication sur `127.0.0.1`, réseau Docker
+  privé, ou pare-feu.
 - `GUIVAULT_SECRET` ne chiffre rien mais doit rester secret : il rend les
   sels de prelogin fictifs prévisibles s'il fuit (oracle d'existence).
 - La base ne contient rien d'exploitable sans mots de passe maîtres, mais

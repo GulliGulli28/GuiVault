@@ -45,10 +45,17 @@ services:
     ports:
       - "${GUIVAULT_PORT:-127.0.0.1:8080}:8080"
 
+  # Avec votre propre reverse proxy : lui donner l'adresse ou le réseau de
+  # celui-ci dans GUIVAULT_TRUST_PROXY (voir .env.example). S'il tourne en
+  # conteneur sur cet hôte, rattachez-le au réseau de ce compose et visez
+  # `http://guivault:8080` — la publication de port ci-dessus devient
+  # inutile et peut être retirée.
+
   # Profil optionnel : Caddy en frontal avec certificat Let's Encrypt
   # automatique. `docker compose --profile tls up -d` avec GUIVAULT_DOMAIN
-  # renseigné et les ports 80/443 ouverts. Dans ce cas, mettre
-  # GUIVAULT_TRUST_PROXY=true.
+  # renseigné et les ports 80/443 ouverts. Dans ce cas,
+  # GUIVAULT_TRUST_PROXY=true convient : le port de guivault reste publié sur
+  # le loopback, personne d'autre que Caddy ne peut lui parler.
   caddy:
     image: caddy:2-alpine
     profiles: ["tls"]

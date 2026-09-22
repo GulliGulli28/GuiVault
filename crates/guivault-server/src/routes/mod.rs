@@ -36,7 +36,7 @@ pub fn router(state: AppState) -> Router {
         .per_millisecond((1000 / cfg.auth_rate_per_second.max(1)).max(1))
         .burst_size(cfg.auth_rate_burst)
         .key_extractor(ClientIpKey {
-            trust_proxy: cfg.trust_proxy,
+            trust_proxy: cfg.trust_proxy.clone(),
         })
         .finish()
         .expect("configuration de rate-limit valide");

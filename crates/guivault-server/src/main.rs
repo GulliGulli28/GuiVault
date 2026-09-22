@@ -40,7 +40,7 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!(
         version = env!("CARGO_PKG_VERSION"),
         registration = ?config.registration,
-        trust_proxy = config.trust_proxy,
+        trust_proxy = %config.trust_proxy,
         "démarrage de GuiVault"
     );
 

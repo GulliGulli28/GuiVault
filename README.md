@@ -56,8 +56,9 @@ curl http://127.0.0.1:8080/api/v1/health
 ```
 
 Le serveur parle HTTP sur `127.0.0.1:8080`. **Mettez-le derrière un reverse
-proxy TLS** avant de l'exposer : soit le vôtre (Traefik, nginx, Caddy…) avec
-`GUIVAULT_TRUST_PROXY=true`, soit le profil intégré :
+proxy TLS** avant de l'exposer : soit le vôtre (Traefik, nginx, Caddy…) en
+lui déclarant l'adresse de votre proxy (voir plus bas), soit le profil
+intégré :
 
 ```bash
 GUIVAULT_DOMAIN=vault.example.com docker compose --profile tls up -d
@@ -74,6 +75,28 @@ sécurisé :
 ```bash
 ssh -N -L 8082:127.0.0.1:8082 mon-serveur
 ```
+
+### Derrière votre propre reverse proxy
+
+`GUIVAULT_TRUST_PROXY` dit **qui** a le droit d'annoncer l'IP du client via
+`X-Forwarded-For` — ce qui décide du rate-limit des routes
+d'authentification et de ce qu'écrit le journal d'audit. Donnez-lui
+l'adresse (ou le réseau) de votre proxy :
+
+```ini
+GUIVAULT_TRUST_PROXY=172.18.0.0/16      # le réseau Docker du proxy
+# ou 192.168.1.10, ou plusieurs séparés par des virgules
+```
+
+Le serveur ne lit alors l'en-tête que si la connexion vient de là — et une
+adresse de connexion TCP, contrairement à un en-tête, ne se falsifie pas.
+Quelqu'un qui joindrait le port directement se fait donc limiter sur sa
+vraie IP.
+
+`true` reste accepté : l'en-tête est cru quel qu'en soit l'émetteur. À ne
+garder que si le port est réellement injoignable autrement (publié sur
+`127.0.0.1` avec un proxy sur la même machine et *pas* en conteneur, ou pas
+publié du tout). `false` (défaut) ignore l'en-tête.
 
 ### Premier compte
 
@@ -102,7 +125,7 @@ dans [`docs/SECURITY.md`](docs/SECURITY.md).
 | `GUIVAULT_BIND` | `0.0.0.0:8080` | Adresse d'écoute |
 | `GUIVAULT_REGISTRATION` | `invite_only` | `open` / `invite_only` / `closed` |
 | `GUIVAULT_ALLOWED_EMAILS` | — | Adresses ou `@domaines` toujours autorisés à s'inscrire |
-| `GUIVAULT_TRUST_PROXY` | `false` | Lire `X-Forwarded-For` (derrière un proxy de confiance seulement) |
+| `GUIVAULT_TRUST_PROXY` | `false` | IP/CIDR des proxys autorisés à poser `X-Forwarded-For` (`true` = tous, voir ci-dessous) |
 | `GUIVAULT_ACCESS_TTL_SECS` | `900` | Durée du jeton d'accès |
 | `GUIVAULT_REFRESH_TTL_SECS` | `2592000` | Durée du jeton de rafraîchissement (30 j) |
 | `GUIVAULT_INVITATION_TTL_SECS` | `1209600` | Durée d'une invitation (14 j) |

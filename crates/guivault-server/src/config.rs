@@ -2,8 +2,97 @@
 //! config : en Docker, l'environnement est la seule source qui ne demande pas
 //! de monter un volume, et la liste tient en une dizaine de variables.
 use guivault_protocol::RegistrationMode;
-use std::net::SocketAddr;
+use ipnet::IpNet;
+use std::net::{IpAddr, SocketAddr};
 use std::time::Duration;
+
+/// À qui l'on fait confiance pour poser `X-Forwarded-For`.
+///
+/// Cet en-tête est écrit par le client comme n'importe quel autre : le croire
+/// sans condition, c'est laisser choisir son IP de rate-limit à qui peut
+/// joindre le port directement. D'où les trois états — et la préférence pour
+/// le troisième, le seul qui **vérifie** quelque chose : l'adresse de la
+/// connexion TCP, elle, ne se falsifie pas.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub enum TrustProxy {
+    /// `false` : l'en-tête est ignoré, l'IP vue est celle de la connexion.
+    #[default]
+    No,
+    /// `true` : l'en-tête est cru quel que soit l'émetteur. À ne garder que
+    /// si le port est injoignable autrement (loopback, réseau Docker privé).
+    Any,
+    /// Une liste d'adresses ou de réseaux : l'en-tête n'est lu que si la
+    /// connexion vient de l'un d'eux.
+    From(Vec<IpNet>),
+}
+
+impl TrustProxy {
+    /// `GUIVAULT_TRUST_PROXY` : `true` / `false`, ou des adresses et réseaux
+    /// séparés par des virgules (`192.168.1.10, 172.18.0.0/16`). Une adresse
+    /// seule vaut pour elle-même (`/32`, `/128`).
+    pub fn parse(raw: &str) -> anyhow::Result<Self> {
+        let raw = raw.trim();
+        match raw.to_ascii_lowercase().as_str() {
+            "" | "false" | "0" | "no" => return Ok(Self::No),
+            "true" | "1" | "yes" => return Ok(Self::Any),
+            _ => {}
+        }
+        let nets = raw
+            .split(',')
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(|s| {
+                s.parse::<IpNet>()
+                    .or_else(|_| s.parse::<IpAddr>().map(IpNet::from))
+                    .map_err(|_| {
+                        anyhow::anyhow!(
+                            "GUIVAULT_TRUST_PROXY : « {s} » n'est ni une adresse IP, ni un réseau CIDR, ni true/false"
+                        )
+                    })
+            })
+            .collect::<anyhow::Result<Vec<_>>>()?;
+        if nets.is_empty() {
+            return Ok(Self::No);
+        }
+        Ok(Self::From(nets))
+    }
+
+    /// Cette connexion a-t-elle le droit de nous dire qui est le client ?
+    pub fn trusts(&self, peer: IpAddr) -> bool {
+        match self {
+            Self::No => false,
+            Self::Any => true,
+            // Une adresse IPv4 arrivée sur une écoute IPv6 se présente en
+            // `::ffff:a.b.c.d` : on la compare aussi sous sa forme v4, sinon
+            // un réseau v4 de confiance ne reconnaîtrait jamais son proxy.
+            Self::From(nets) => {
+                let v4 = match peer {
+                    IpAddr::V6(a) => a.to_ipv4_mapped().map(IpAddr::V4),
+                    IpAddr::V4(_) => None,
+                };
+                nets.iter()
+                    .any(|n| n.contains(&peer) || v4.is_some_and(|a| n.contains(&a)))
+            }
+        }
+    }
+
+    pub fn enabled(&self) -> bool {
+        !matches!(self, Self::No)
+    }
+}
+
+impl std::fmt::Display for TrustProxy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::No => write!(f, "non"),
+            Self::Any => write!(f, "tous (X-Forwarded-For cru sans vérification)"),
+            Self::From(nets) => {
+                let list: Vec<String> = nets.iter().map(|n| n.to_string()).collect();
+                write!(f, "{}", list.join(", "))
+            }
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct Config {
@@ -23,9 +112,8 @@ pub struct Config {
     pub access_ttl: Duration,
     pub refresh_ttl: Duration,
     pub invitation_ttl: Duration,
-    /// Faire confiance à `X-Forwarded-For` (uniquement derrière un reverse
-    /// proxy qui l'écrase — sinon n'importe qui choisit son IP de rate-limit).
-    pub trust_proxy: bool,
+    /// Qui a le droit de poser `X-Forwarded-For` — voir `TrustProxy`.
+    pub trust_proxy: TrustProxy,
     pub max_item_bytes: usize,
     /// Rafales autorisées sur les routes d'authentification, par IP.
     pub auth_rate_burst: u32,
@@ -88,7 +176,7 @@ impl Config {
             access_ttl: Duration::from_secs(env_parse("GUIVAULT_ACCESS_TTL_SECS", 15 * 60)?),
             refresh_ttl: Duration::from_secs(env_parse("GUIVAULT_REFRESH_TTL_SECS", 30 * 24 * 3600)?),
             invitation_ttl: Duration::from_secs(env_parse("GUIVAULT_INVITATION_TTL_SECS", 14 * 24 * 3600)?),
-            trust_proxy: env_parse("GUIVAULT_TRUST_PROXY", false)?,
+            trust_proxy: TrustProxy::parse(&env("GUIVAULT_TRUST_PROXY").unwrap_or_default())?,
             max_item_bytes: env_parse("GUIVAULT_MAX_ITEM_BYTES", 1024 * 1024)?,
             auth_rate_burst: env_parse("GUIVAULT_AUTH_RATE_BURST", 10)?,
             auth_rate_per_second: env_parse("GUIVAULT_AUTH_RATE_PER_SECOND", 2)?,
@@ -138,7 +226,7 @@ mod tests {
             access_ttl: Duration::ZERO,
             refresh_ttl: Duration::ZERO,
             invitation_ttl: Duration::ZERO,
-            trust_proxy: false,
+            trust_proxy: TrustProxy::No,
             max_item_bytes: 0,
             auth_rate_burst: 0,
             auth_rate_per_second: 0,
