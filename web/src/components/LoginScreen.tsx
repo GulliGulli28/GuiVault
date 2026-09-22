@@ -73,6 +73,19 @@ export function LoginScreen({ onSession }: { onSession: (s: SessionState) => voi
           </div>
         </div>
 
+        {/* Servie en clair, la page est modifiable par qui est sur le chemin :
+            il lui suffit de remplacer ce script pour récupérer le mot de
+            passe maître. Le chiffrement de bout en bout ne protège de rien
+            si le code qui chiffre n'est pas celui qu'on croit. */}
+        {!window.isSecureContext && (
+          <p className="callout callout-danger mb-3">
+            Cette page n'est pas servie en HTTPS. N'y saisissez pas votre mot de passe maître :
+            n'importe qui sur le réseau peut remplacer le code de cette page et le lire.
+            Mettez le serveur derrière un reverse proxy TLS (voir <span className="font-mono">README.md</span>),
+            ou ouvrez-le par <span className="font-mono">http://localhost</span> à travers un tunnel SSH.
+          </p>
+        )}
+
         {totp ? (
           <form onSubmit={submitTotp} className="card space-y-3 p-4">
             <p className="text-[12.5px] text-[var(--c-text-secondary)]">Ce compte a un second facteur. Saisissez le code de votre application d'authentification, ou un code de récupération.</p>

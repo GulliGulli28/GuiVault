@@ -80,9 +80,17 @@ est installé une fois et vérifiable.
   de domaine tiers, `frame-ancestors 'none'`), sans referrer, et le binaire
   n'embarque aucun script externe — l'application est entièrement dans
   `web/dist`, compilée dans l'image.
-- **Rien n'est persisté dans le navigateur** : jetons, clés et items vivent
-  en mémoire de l'onglet. Recharger la page, c'est se reconnecter. Seules
-  les empreintes épinglées sont en `localStorage`, elles ne sont pas
+- **Rien n'atteint le disque et rien ne survit à l'onglet** : jetons et
+  clés sont dans le `sessionStorage` de l'onglet — la page peut donc se
+  recharger sans redemander le mot de passe maître, mais fermer l'onglet
+  efface tout, et un autre onglet n'y a pas accès. Un délai d'inactivité
+  réglable (Paramètres › Sécurité, 15 min par défaut) les efface avant
+  cela ; `0` ne garde la session que le temps de l'onglet. Le
+  `sessionStorage` est lisible par un script de cette origine, mais la CSP
+  n'en laisse tourner aucun d'autre que l'application, et un script injecté
+  dans l'application aurait de toute façon les clés en mémoire. Les items
+  déchiffrés, eux, ne sont jamais stockés. Seules les empreintes épinglées
+  et les préférences d'affichage sont en `localStorage`, elles ne sont pas
   secrètes.
 - La dérivation Argon2id (64 MiB, 3 passes) tourne en JavaScript : une à
   deux secondes à la connexion, comme dans Guiterm.
@@ -99,7 +107,12 @@ est installé une fois et vérifiable.
 
 - **TLS obligatoire** devant le serveur. Sans TLS, les jetons et la clé
   d'auth passent en clair (les données restent chiffrées, mais une session
-  volée permet de supprimer des vaults ou d'injecter des invitations).
+  volée permet de supprimer des vaults ou d'injecter des invitations) — et
+  surtout, n'importe qui sur le chemin peut remplacer le JavaScript de
+  l'interface par une version qui exfiltre le mot de passe maître. Servie
+  ailleurs qu'en HTTPS (ou que depuis `localhost`), la page le dit en
+  rouge : le navigateur la place hors « contexte sécurisé », ce qui lui
+  retire au passage `crypto.randomUUID` et le presse-papiers.
 - `GUIVAULT_TRUST_PROXY=true` **uniquement** derrière un reverse proxy qui
   écrase `X-Forwarded-For` ; sinon n'importe qui choisit son IP de
   rate-limit.

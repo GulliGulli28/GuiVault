@@ -3,7 +3,7 @@
  * `crypto.test.ts`. */
 import { describe, expect, it } from "vitest";
 import { writeFileSync } from "node:fs";
-import { toBase64, utf8 } from "./bytes";
+import { toBase64, utf8, uuid } from "./bytes";
 import { parseCsv, toCsv } from "./csv";
 import { exportCsv, exportEncrypted, exportJson } from "./exporters";
 import { estimateStrength, generatePassphrase, generatePassword, randomInt } from "./generator";
@@ -210,5 +210,24 @@ describe("export", () => {
   it("écrit les fixtures du crate guivault-items (GUIVAULT_WRITE_VECTORS)", () => {
     if (!process.env.GUIVAULT_WRITE_VECTORS) return;
     writeFileSync(new URL("../../../crates/guivault-items/tests/web-items.json", import.meta.url), JSON.stringify(samples(), null, 2) + "\n");
+  });
+});
+
+describe("uuid", () => {
+  it("rend un UUID v4 même sans crypto.randomUUID (page servie en clair)", () => {
+    const real = crypto.randomUUID;
+    // @ts-expect-error — on simule un contexte non sécurisé.
+    delete crypto.randomUUID;
+    try {
+      const ids = new Set(Array.from({ length: 50 }, () => uuid()));
+      expect(ids.size).toBe(50);
+      for (const id of ids) expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    } finally {
+      crypto.randomUUID = real;
+    }
+  });
+
+  it("utilise crypto.randomUUID quand il est là", () => {
+    expect(uuid()).toMatch(/^[0-9a-f]{8}-/);
   });
 });

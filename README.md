@@ -63,6 +63,18 @@ proxy TLS** avant de l'exposer : soit le vôtre (Traefik, nginx, Caddy…) avec
 GUIVAULT_DOMAIN=vault.example.com docker compose --profile tls up -d
 ```
 
+**HTTPS n'est pas optionnel pour l'interface web.** En clair, un navigateur
+place la page hors « contexte sécurisé » et lui retire une partie de
+l'API WebCrypto ; surtout, quiconque est sur le chemin peut remplacer son
+JavaScript par une version qui vole le mot de passe maître. La page
+affiche un avertissement rouge dans ce cas. Pour un essai rapide sans
+certificat, passez par un tunnel SSH — `localhost` est un contexte
+sécurisé :
+
+```bash
+ssh -N -L 8082:127.0.0.1:8082 mon-serveur
+```
+
 ### Premier compte
 
 Le serveur ne peut pas créer de compte (il n'a jamais le mot de passe
@@ -77,7 +89,7 @@ Le binaire sert à `/` une application (React, même charte que Guiterm) qui
 fait exactement ce que fait Guiterm avec le serveur : dériver les clés du
 mot de passe maître dans le navigateur, déchiffrer les vaults, chiffrer ce
 qu'elle écrit. Le serveur ne voit pas plus de choses qu'avec Guiterm. Rien
-n'est conservé dans le navigateur après fermeture de l'onglet (les
+n'est conservé après fermeture de l'onglet (les
 empreintes épinglées mises à part) ; le modèle de menace propre au web est
 dans [`docs/SECURITY.md`](docs/SECURITY.md).
 

@@ -54,6 +54,17 @@ export function randomBytes(n: number): Uint8Array {
   return b;
 }
 
+/** Un UUID v4. `crypto.randomUUID` n'existe que dans un contexte sécurisé
+ * (HTTPS, ou `localhost`) : servie en clair sur une IP, la page n'en a pas.
+ * `crypto.getRandomValues`, lui, est toujours là — on fabrique alors
+ * l'UUID nous-mêmes plutôt que d'échouer sur « is not a function ». Une
+ * page en clair reste une mauvaise idée (voir l'avertissement de l'écran
+ * de connexion), mais elle doit échouer en le disant, pas en plantant. */
 export function uuid(): string {
-  return crypto.randomUUID();
+  if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  const b = randomBytes(16);
+  b[6] = (b[6] & 0x0f) | 0x40; // version 4
+  b[8] = (b[8] & 0x3f) | 0x80; // variante RFC 4122
+  const h = toHex(b);
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
 }
