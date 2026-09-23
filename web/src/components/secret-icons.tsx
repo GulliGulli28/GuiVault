@@ -42,6 +42,16 @@ export function IconIdentity({ size = 16, className }: P) {
   );
 }
 
+/** Une clé d'API : des chevrons de code et une clé. */
+export function IconApiKey({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <circle cx="5" cy="8" r="2.75" stroke="currentColor" strokeWidth="1.25" />
+      <path d="M7.75 8h6.5M12 8v2.25M14.25 8v1.5" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 export function IconStar({ size = 16, className, filled }: P & { filled?: boolean }) {
   return (
     <svg width={size} height={size} viewBox="0 0 16 16" fill={filled ? "currentColor" : "none"} className={className}>

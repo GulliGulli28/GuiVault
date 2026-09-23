@@ -483,6 +483,18 @@ pub fn open_vault_name(vault_key: &SymmetricKey, vault_id: &str, blob: &[u8]) ->
     String::from_utf8(bytes).map_err(|_| CryptoError::Format)
 }
 
+/// Les réglages synchronisés d'un utilisateur (JSON choisi par les
+/// clients) : scellés sous sa *user key*, que lui seul peut ouvrir.
+const AAD_USER_SETTINGS: &[u8] = b"guivault/v1/user-settings";
+
+pub fn seal_user_settings(user_key: &SymmetricKey, json: &[u8]) -> Result<Vec<u8>, CryptoError> {
+    seal(user_key, json, AAD_USER_SETTINGS)
+}
+
+pub fn open_user_settings(user_key: &SymmetricKey, blob: &[u8]) -> Result<Vec<u8>, CryptoError> {
+    open(user_key, blob, AAD_USER_SETTINGS)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -495,6 +507,15 @@ mod tests {
             t_cost: 2,
             p_cost: 1,
         }
+    }
+
+    #[test]
+    fn user_settings_are_bound_to_their_purpose() {
+        let k = SymmetricKey::random();
+        let blob = seal_user_settings(&k, br#"{"appearance":{}}"#).unwrap();
+        assert_eq!(open_user_settings(&k, &blob).unwrap(), br#"{"appearance":{}}"#);
+        // Pas interchangeable avec une autre enveloppe sous la même clé.
+        assert!(open(&k, &blob, AAD_USER_KEY).is_err());
     }
 
     #[test]

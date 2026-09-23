@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { VaultIndex } from "../lib/entities";
 import { groupPath } from "../lib/entities";
-import { cardBrand, identityFullName } from "../lib/items";
+import { awsConfigText, cardBrand, identityFullName, uriHost } from "../lib/items";
 import { SQL_ENGINE_LABELS, type AuthMethod, type CustomField, type DbTunnel, type Host, type Payload, type SecretBase, type SqlConnection } from "../lib/types";
 import { PasswordStrength } from "./PasswordStrength";
 import { TotpCode } from "./TotpCode";
@@ -10,6 +10,7 @@ import { groupColor } from "./ItemTree";
 import { ACCENT_COLORS, type UiAccent } from "../lib/preferences";
 import { IconPasskey } from "./secret-icons";
 import { CopyButton, Eyebrow, formatWhen, Row, SecretValue } from "./ui";
+import { ACTION_LABELS, APPROVAL_LABELS, ON_FAILURE_LABELS } from "./forms/RunbookForm";
 
 /** La fiche d'une entité, en lecture : ce que Guiterm montre dans ses
  * panneaux, secrets masqués et copiables. */
@@ -217,6 +218,103 @@ export function ItemView({ payload, index }: { payload: Payload; index: VaultInd
             <Row label="Permis">{i.licenseNumber ? <SecretValue value={i.licenseNumber} /> : <Muted>—</Muted>}</Row>
           </Section>
           <SecretCommon base={i} groups={groups} />
+        </div>
+      );
+    }
+    case "aws": {
+      const a = payload.aws;
+      const text = awsConfigText(a);
+      return (
+        <div className="space-y-4">
+          <Section title={a.authType === "sso" ? "Session SSO" : "Clés d'accès"}>
+            {a.authType === "sso" ? (
+              <>
+                <Row label="Portail">{a.ssoStartUrl ? <Copyable value={a.ssoStartUrl} mono /> : <Muted>—</Muted>}</Row>
+                <Row label="Session" mono>{a.ssoSessionName || <Muted>—</Muted>}</Row>
+                <Row label="Région SSO" mono>{a.ssoRegion || <Muted>—</Muted>}</Row>
+              </>
+            ) : (
+              <>
+                <Row label="Clé d'accès"><Copyable value={a.accessKeyId} mono /></Row>
+                <Row label="Secret">{a.secretAccessKey ? <SecretValue value={a.secretAccessKey} /> : <Muted>—</Muted>}</Row>
+                {a.mfaSerial && <Row label="MFA"><Copyable value={a.mfaSerial} mono /></Row>}
+              </>
+            )}
+            {a.region && <Row label="Région" mono>{a.region}</Row>}
+          </Section>
+          {a.profiles.length > 0 && (
+            <Section title={`Profils (${a.profiles.length})`}>
+              {a.profiles.map((p, i) => (
+                <Row key={i} label={p.name || "(sans nom)"} mono>
+                  {[p.accountId, p.roleName, p.region || a.region].filter(Boolean).join(" · ") || <Muted>—</Muted>}
+                </Row>
+              ))}
+            </Section>
+          )}
+          <section>
+            <Eyebrow className="mb-1">~/.aws/config</Eyebrow>
+            <div className="relative">
+              <pre className="card overflow-x-auto p-3 font-mono text-[11.5px] leading-relaxed text-[var(--c-text)]">{text.config}</pre>
+              <CopyButton value={text.config} label="Copier ~/.aws/config" className="absolute right-1 top-1" />
+            </div>
+            {text.credentials && (
+              <>
+                <Eyebrow className="mb-1 mt-3">~/.aws/credentials</Eyebrow>
+                <div className="relative">
+                  <pre className="card overflow-x-auto p-3 font-mono text-[11.5px] leading-relaxed text-[var(--c-text)] blur-[3px] transition hover:blur-0 focus:blur-0" tabIndex={0} title="Survoler pour lire">{text.credentials}</pre>
+                  <CopyButton value={text.credentials} label="Copier ~/.aws/credentials" className="absolute right-1 top-1" />
+                </div>
+              </>
+            )}
+          </section>
+          <SecretCommon base={a} groups={groups} />
+        </div>
+      );
+    }
+    case "api-key": {
+      const k = payload.apiKey;
+      const expired = !!k.expiresAt && k.expiresAt < new Date().toISOString().slice(0, 10);
+      return (
+        <div className="space-y-4">
+          <Section title={k.service || "Clé d'API"}>
+            {k.url && <Row label="URL"><a href={/^[a-z][a-z0-9+.-]*:/i.test(k.url) ? k.url : `https://${k.url}`} target="_blank" rel="noopener noreferrer" className="font-mono text-[12px] text-[var(--c-accent-text)] hover:underline">{uriHost(k.url)}</a></Row>}
+            {k.keyId && <Row label="Identifiant"><Copyable value={k.keyId} mono /></Row>}
+            <Row label="Secret">{k.secret ? <SecretValue value={k.secret} /> : <Muted>—</Muted>}</Row>
+            {k.scopes && <Row label="Portée">{k.scopes}</Row>}
+            <Row label="Expiration">{k.expiresAt ? <span className={expired ? "text-[var(--c-danger)]" : ""}>{k.expiresAt}{expired ? " — expirée" : ""}</span> : <Muted>aucune</Muted>}</Row>
+          </Section>
+          <SecretCommon base={k} groups={groups} />
+        </div>
+      );
+    }
+    case "runbook": {
+      const rb = payload.runbook;
+      return (
+        <div className="space-y-4">
+          {rb.description && <p className="whitespace-pre-wrap text-[12.5px] leading-relaxed text-[var(--c-text-secondary)]">{rb.description}</p>}
+          <section className="space-y-2">
+            <Eyebrow>Étapes ({rb.steps.length})</Eyebrow>
+            {rb.steps.map((st, i) => {
+              const code = st.action.kind === "command" ? st.action.command : st.action.kind === "program" ? st.action.programText : null;
+              const scope = [st.scope.tags.length ? `tags ${st.scope.tags.join(" + ")}` : "", st.scope.groups.length ? `dans ${st.scope.groups.join(" ou ")}` : ""].filter(Boolean).join(", ");
+              return (
+                <div key={st.id} className="card space-y-1.5 p-3">
+                  <p className="flex items-center gap-2 text-[12.5px] font-medium text-[var(--c-text)]"><span className="tag">{i + 1}</span>{st.title || <Muted>(sans titre)</Muted>}<span className="ml-auto text-[10.5px] font-normal text-[var(--c-text-faint)]">{ACTION_LABELS[st.action.kind]}</span></p>
+                  {code !== null && (
+                    <div className="relative">
+                      <pre className="overflow-x-auto rounded-md bg-[var(--c-bg3)] p-2 font-mono text-[11.5px] leading-relaxed text-[var(--c-text)]">{code}</pre>
+                      <CopyButton value={code} label="Copier" className="absolute right-1 top-1" />
+                    </div>
+                  )}
+                  {st.action.kind === "playbook" && (
+                    <p className="font-mono text-[11.5px] text-[var(--c-text-secondary)]">{st.action.playbook}{st.action.inventory ? ` -i ${st.action.inventory}` : ""} <span className="font-sans text-[var(--c-text-muted)]">depuis {hostLabel(st.action.relayHostId) ?? st.action.relayHostLabel}</span></p>
+                  )}
+                  <p className="text-[11px] text-[var(--c-text-muted)]">{[scope || "toutes les cibles", `échec : ${ON_FAILURE_LABELS[st.onFailure].toLowerCase()}`, `accord : ${APPROVAL_LABELS[st.approval].toLowerCase()}`].join(" · ")}</p>
+                  {st.notes && <p className="whitespace-pre-wrap text-[11.5px] text-[var(--c-text-secondary)]">{st.notes}</p>}
+                </div>
+              );
+            })}
+          </section>
         </div>
       );
     }

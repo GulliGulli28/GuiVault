@@ -5,7 +5,7 @@ import { navigate, routeHash, type SettingsSection } from "../lib/route";
 import { LOCK_CHOICES, loadLockMinutes, saveLockMinutes } from "../lib/persist";
 import { changePassword } from "../lib/session";
 import type { AuditEntry, Session } from "../lib/types";
-import { AppearanceSettings } from "./AppearanceSettings";
+import { AppearanceSettings, SettingsSyncToggle } from "./AppearanceSettings";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { AuditList } from "./VaultSettings";
 import { IconIdentity } from "./secret-icons";
@@ -74,7 +74,12 @@ export function SettingsPage({ ctx, section }: { ctx: PageContext; section: Sett
         <div className="sidebar-scroll min-w-0 flex-1 space-y-6 overflow-y-auto px-6 py-5">
           <p className="text-[14px] font-semibold text-[var(--c-text)]">{current.label}</p>
 
-          {current.key === "apparence" && <AppearanceSettings />}
+          {current.key === "apparence" && (
+            <>
+              <SettingsSyncToggle />
+              <AppearanceSettings />
+            </>
+          )}
 
           {current.key === "compte" && (
             <>

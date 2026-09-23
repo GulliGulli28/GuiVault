@@ -5,7 +5,7 @@ import { ACCENT_COLORS, type UiAccent } from "../../lib/preferences";
 import type { CustomIcon, Group, Payload } from "../../lib/types";
 import { IconField } from "../IconPicker";
 import { IconClose, IconFolder } from "../ui-icons";
-import { Field, FormShell, GroupSelect } from "./common";
+import { Field, FormShell, GroupSelect, useSeed } from "./common";
 
 export function GroupForm({ initial, index, defaultParentId, onSave, onCancel, onAddIcon }: {
   initial?: Group;
@@ -15,13 +15,14 @@ export function GroupForm({ initial, index, defaultParentId, onSave, onCancel, o
   onCancel: () => void;
   onAddIcon?: (icon: CustomIcon) => Promise<void>;
 }) {
-  const [name, setName] = useState(initial?.name ?? "");
-  const [parentId, setParentId] = useState<string | null>(initial?.parentId ?? defaultParentId ?? null);
-  const [color, setColor] = useState<string | null>(initial?.color ?? null);
-  const [icon, setIcon] = useState<string | null>(initial?.icon ?? null);
+  const seed = useSeed(initial, (p) => (p.kind === "group" ? p.group : undefined));
+  const [name, setName] = useState(seed?.name ?? "");
+  const [parentId, setParentId] = useState<string | null>(seed ? seed.parentId ?? null : defaultParentId ?? null);
+  const [color, setColor] = useState<string | null>(seed?.color ?? null);
+  const [icon, setIcon] = useState<string | null>(seed?.icon ?? null);
 
   const save = async () => {
-    const group: Group = { ...initial, id: initial?.id ?? uuid(), name: name.trim(), parentId, color };
+    const group: Group = { ...seed, id: seed?.id ?? uuid(), name: name.trim(), parentId, color };
     if (icon) group.icon = icon;
     else delete group.icon;
     await onSave({ kind: "group", group });

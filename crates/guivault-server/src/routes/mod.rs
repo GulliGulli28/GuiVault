@@ -62,6 +62,7 @@ pub fn router(state: AppState) -> Router {
         .route("/auth/totp/disable", post(totp::disable))
         .route("/events", get(events::events))
         .route("/users/me", get(users::me))
+        .route("/users/me/settings", get(users::get_settings).put(users::put_settings))
         .route("/users/me/audit", get(audit::for_me))
         .route("/users/lookup", get(users::lookup))
         .route("/sync", get(sync::sync))

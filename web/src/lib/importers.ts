@@ -7,6 +7,7 @@ import { parseCsv } from "./csv";
 import * as c from "./crypto";
 import { folderPathOf, importBitwardenJson, isBitwardenJson, NeedsPassword, type ImportResult, type ImportedItem } from "./bitwarden";
 import { emptyLogin, emptyNote } from "./items";
+import { withParent } from "./entities";
 import type { Group, Payload } from "./types";
 
 export { NeedsPassword };
@@ -206,13 +207,6 @@ export function resolveFolders(result: ImportResult, existing: Group[], rootId: 
 }
 
 function withGroup(p: Payload, groupId: string | null): Payload {
-  switch (p.kind) {
-    case "login": return { ...p, login: { ...p.login, groupId } };
-    case "note": return { ...p, note: { ...p.note, groupId } };
-    case "card": return { ...p, card: { ...p.card, groupId } };
-    case "identity": return { ...p, identity: { ...p.identity, groupId } };
-    case "host": return { ...p, host: { ...p.host, groupId } };
-    case "sql-connection": return { ...p, connection: { ...p.connection, groupId } };
-    default: return p;
-  }
+  // Un dossier importé garde sa place : seul son contenu est rangé ici.
+  return p.kind === "group" ? p : withParent(p, groupId) ?? p;
 }

@@ -139,7 +139,15 @@ export interface AuditEntry {
 export type ServerEvent =
   | { type: "vault_changed"; vault_id: string; revision: number }
   | { type: "invitation_received"; invitation_id: string; vault_id: string }
-  | { type: "membership_changed"; vault_id: string };
+  | { type: "membership_changed"; vault_id: string }
+  | { type: "settings_changed"; revision: number };
+
+/** Les réglages synchronisés, scellés sous la user key (`sealUserSettings`). */
+export interface UserSettings {
+  blob: string;
+  revision: number;
+  updated_at: string;
+}
 
 export const ROLE_LABELS: Record<Role, string> = {
   reader: "lecteur",
@@ -273,6 +281,38 @@ export interface CustomIcon {
   [extra: string]: unknown;
 }
 
+/** Un runbook de Guiterm (`termius_core::model::Runbook`), tel quel : une
+ * procédure ordonnée, sans cibles (elles se choisissent au lancement).
+ * Pas de dossier dans Guiterm : rangé à part, comme les snippets. */
+export interface Runbook {
+  id: string;
+  name: string;
+  description: string;
+  steps: RunbookStep[];
+  [extra: string]: unknown;
+}
+
+export type RunbookAction =
+  | { kind: "command"; command: string; [extra: string]: unknown }
+  | { kind: "program"; programText: string; [extra: string]: unknown }
+  | { kind: "playbook"; relayHostId: string; relayHostLabel: string; playbook: string; inventory: string; [extra: string]: unknown };
+
+export type RunbookOnFailure = "stop" | "continue" | "dropFailed";
+export type RunbookApproval = "beforeIrreversible" | "never" | "always";
+
+export interface RunbookStep {
+  id: string;
+  title: string;
+  notes: string;
+  action: RunbookAction;
+  /** Restreint les cibles de l'étape : tous ces tags ET un de ces dossiers
+   * (par nom). Vide = toute la sélection. */
+  scope: { tags: string[]; groups: string[] };
+  onFailure: RunbookOnFailure;
+  approval: RunbookApproval;
+  [extra: string]: unknown;
+}
+
 // ─── Secrets (gestionnaire de mots de passe) ────────────────────────────────
 //
 // Les types que Guiterm ne connaît pas encore : `login`, `note`, `card`,
@@ -352,6 +392,50 @@ export interface Note extends SecretBase {
   content: string;
 }
 
+/** Un profil AWS : ce qu'une section `[profile …]` de `~/.aws/config` dit
+ * (le `AwsProfile` de Guiterm). */
+export interface AwsProfileEntry {
+  name: string;
+  accountId: string;
+  roleName: string;
+  region: string;
+  [extra: string]: unknown;
+}
+
+/** Un accès AWS : une session SSO (IAM Identity Center) et ses profils —
+ * de quoi réécrire `~/.aws/config` sur un autre poste et s'y reconnecter
+ * depuis Guiterm — ou des clés d'accès IAM. */
+export interface AwsAccess extends SecretBase {
+  authType: "sso" | "keys";
+  /** Le bloc `[sso-session <nom>]` (le `AwsSsoSession` de Guiterm). */
+  ssoSessionName: string;
+  ssoStartUrl: string;
+  ssoRegion: string;
+  /** Clés d'accès (authType `keys`). */
+  accessKeyId: string;
+  secretAccessKey: string;
+  mfaSerial: string;
+  /** Région par défaut des profils qui n'en ont pas. */
+  region: string;
+  profiles: AwsProfileEntry[];
+}
+
+/** Une clé d'API, un jeton, un couple client/secret OAuth. */
+export interface ApiKey extends SecretBase {
+  /** Le service (« Stripe », « GitHub »…). */
+  service: string;
+  /** La console ou l'URL de base de l'API. */
+  url: string;
+  /** La partie publique : identifiant de clé, client ID. */
+  keyId: string;
+  /** Le secret : la clé, le jeton, le client secret. */
+  secret: string;
+  /** Portée, droits accordés — texte libre. */
+  scopes: string;
+  /** Date d'expiration (AAAA-MM-JJ), vide si aucune. */
+  expiresAt: string;
+}
+
 export interface Card extends SecretBase {
   cardholderName: string;
   brand: string;
@@ -396,11 +480,14 @@ export type Payload =
   | { kind: "login"; login: Login }
   | { kind: "note"; note: Note }
   | { kind: "card"; card: Card }
-  | { kind: "identity"; identity: Identity };
+  | { kind: "identity"; identity: Identity }
+  | { kind: "aws"; aws: AwsAccess }
+  | { kind: "api-key"; apiKey: ApiKey }
+  | { kind: "runbook"; runbook: Runbook };
 
 export type ItemKind = Payload["kind"];
-export type SecretKind = "login" | "note" | "card" | "identity";
-export const SECRET_KINDS: SecretKind[] = ["login", "note", "card", "identity"];
+export type SecretKind = "login" | "note" | "card" | "identity" | "aws" | "api-key";
+export const SECRET_KINDS: SecretKind[] = ["login", "note", "card", "identity", "aws", "api-key"];
 
 export const KIND_LABELS: Record<ItemKind, string> = {
   host: "hôte",
@@ -413,6 +500,9 @@ export const KIND_LABELS: Record<ItemKind, string> = {
   note: "note",
   card: "carte",
   identity: "identité",
+  aws: "accès AWS",
+  "api-key": "clé d'API",
+  runbook: "runbook",
 };
 
 export const KIND_LABELS_PLURAL: Record<ItemKind, string> = {
@@ -426,6 +516,9 @@ export const KIND_LABELS_PLURAL: Record<ItemKind, string> = {
   note: "Notes",
   card: "Cartes",
   identity: "Identités",
+  aws: "AWS",
+  "api-key": "Clés d'API",
+  runbook: "Runbooks",
 };
 
 export const SQL_ENGINE_LABELS: Record<SqlEngine, string> = {

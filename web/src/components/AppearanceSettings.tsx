@@ -1,12 +1,28 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ACCENT_COLORS, BG_THEMES, bgThemeLabel, applyPreferences, hostGroupMetrics, hostRowMetrics, loadPreferences, resolvedMode, savePreferences,
   HOST_GROUP_ICON_MAX, HOST_GROUP_ICON_MIN, HOST_GROUP_SIZE_MAX, HOST_GROUP_SIZE_MIN, HOST_ROW_ICON_MAX, HOST_ROW_ICON_MIN, HOST_ROW_SIZE_MAX, HOST_ROW_SIZE_MIN,
   UI_FONT_FAMILIES, type AppPreferences, type ColorModeChoice, type UiAccent, type UiBg,
 } from "../lib/preferences";
+import { onSettingsApplied, setSettingsSyncEnabled, settingsChanged, settingsSyncEnabled } from "../lib/syncedSettings";
 import { EntityRow, EntityMono, EntityTags, GroupRow } from "./EntityRow";
 import { IconLogin } from "./secret-icons";
 import { IconCheck, IconFolder, IconMonitor, IconMoon, IconSun } from "./ui-icons";
+
+/** Synchroniser ou non les réglages de cet appareil avec le compte — un
+ * choix propre à l'appareil. */
+export function SettingsSyncToggle() {
+  const [on, setOn] = useState(settingsSyncEnabled);
+  return (
+    <div>
+      <label className="flex cursor-pointer items-start gap-2 text-[12.5px] text-[var(--c-text)]">
+        <input type="checkbox" checked={on} onChange={(e) => { setOn(e.target.checked); setSettingsSyncEnabled(e.target.checked); }} className="mt-0.5" />
+        <span>Synchroniser les réglages entre mes appareils</span>
+      </label>
+      <p className="help-text pl-[22px]">Apparence, générateur, remplissage de l'extension : chiffrés avec votre compte, retrouvés sur chaque appareil où vous vous connectez. Le délai de verrouillage reste propre à chaque appareil.</p>
+    </div>
+  );
+}
 
 /** La section « Apparence » des paramètres de Guiterm, telle quelle : mode,
  * fond, accent, police, tailles des lignes d'entité et de dossier. Les
@@ -19,7 +35,10 @@ export function AppearanceSettings({ compact = false }: { compact?: boolean }) {
     setPrefs(next);
     savePreferences(next);
     applyPreferences(next);
+    settingsChanged("appearance");
   };
+  // Changés depuis un autre appareil pendant qu'on regarde.
+  useEffect(() => onSettingsApplied(() => setPrefs(loadPreferences())), []);
   const mode = resolvedMode(prefs.colorMode);
   const modes: [ColorModeChoice, string, typeof IconMoon][] = [["dark", "Sombre", IconMoon], ["light", "Clair", IconSun], ["system", "Système", IconMonitor]];
 

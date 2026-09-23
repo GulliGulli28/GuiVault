@@ -3,7 +3,7 @@
  * blobs restent en base64, c'est `session.ts` qui chiffre et déchiffre. */
 import type {
   AuditEntry, HealthResponse, Invitation, Item, ItemsPage, KdfParams, LoginResponse, PreloginResponse, Role,
-  ServerEvent, Session, SyncResponse, TokenPair, TotpChallenge, UserLookupResponse, UserProfile, Vault, VaultMember,
+  ServerEvent, Session, SyncResponse, TokenPair, TotpChallenge, UserLookupResponse, UserProfile, UserSettings, Vault, VaultMember,
 } from "./types";
 
 /** L'API : relative dans l'interface embarquée (même origine), absolue dans
@@ -170,6 +170,8 @@ export const api = {
   // ── Compte ──
   me: () => authed<UserProfile>("GET", "/users/me"),
   myAudit: (limit = 100) => authed<AuditEntry[]>("GET", `/users/me/audit?limit=${limit}`),
+  settings: () => authed<UserSettings | null>("GET", "/users/me/settings"),
+  putSettings: (blob: string, base_revision: number | null) => authed<UserSettings>("PUT", "/users/me/settings", { blob, base_revision }),
   lookup: async (email: string): Promise<UserLookupResponse | null> => {
     try {
       return await authed<UserLookupResponse>("GET", `/users/lookup?email=${q(email)}`);

@@ -3,7 +3,7 @@ import type { VaultIndex } from "../../lib/entities";
 import { cardBrand, emptyCard } from "../../lib/items";
 import type { Card, Payload } from "../../lib/types";
 import { PasswordInput } from "../ui";
-import { Field, FormShell } from "./common";
+import { Field, FormShell, useSeed } from "./common";
 import { SecretFooter, SecretHeader } from "./SecretBits";
 
 const BRANDS = ["Visa", "Mastercard", "American Express", "Discover", "Diners Club", "JCB", "UnionPay", "Maestro", "Autre"];
@@ -16,7 +16,7 @@ export function CardForm({ initial, index, defaultGroupId, onSave, onCancel }: {
   onSave: (p: Payload) => Promise<void>;
   onCancel: () => void;
 }) {
-  const [card, setCard] = useState<Card>(initial ?? emptyCard(defaultGroupId ?? null));
+  const [card, setCard] = useState<Card>(useSeed(initial, (p) => (p.kind === "card" ? p.card : undefined)) ?? emptyCard(defaultGroupId ?? null));
   const year = new Date().getFullYear();
   return (
     <FormShell title={initial ? `Modifier « ${initial.name} »` : "Nouvelle carte"} onSave={() => onSave({ kind: "card", card: { ...card, name: card.name.trim(), number: card.number.replace(/\s+/g, "") } })} onCancel={onCancel} validate={() => (card.name.trim() ? null : "Le nom est obligatoire.")}>

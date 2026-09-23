@@ -4,6 +4,7 @@ import { DEFAULT_SSH_KEY, generateSshKey, type SshKeyOptions, type SshKeyPair } 
 import { PasswordStrength } from "./PasswordStrength";
 import { IconRefresh } from "./ui-icons";
 import { CopyButton } from "./ui";
+import { onSettingsApplied, settingsChanged } from "../lib/syncedSettings";
 
 const KEY = "guivault.generator";
 
@@ -31,12 +32,15 @@ export function GeneratorPanel({ onUse, onUseKey, compact, initialMode }: { onUs
 
   const regenerate = useCallback((o: GeneratorOptions) => setValue(generate(o)), []);
 
+  useEffect(() => onSettingsApplied(() => setOpts(loadOptions())), []);
+
   useEffect(() => {
     try {
       localStorage.setItem(KEY, JSON.stringify(opts));
     } catch {
       // Sans stockage, les réglages valent pour la session.
     }
+    settingsChanged("generator");
     regenerate(opts);
   }, [opts, regenerate]);
 
@@ -149,12 +153,15 @@ export function SshKeyGenerator({ compact, onUse }: { compact?: boolean; onUse?:
     }
   }, []);
 
+  useEffect(() => onSettingsApplied(() => setOpts(loadSshOptions())), []);
+
   useEffect(() => {
     try {
       localStorage.setItem(SSH_KEY, JSON.stringify(opts));
     } catch {
       // idem
     }
+    settingsChanged("sshKey");
   }, [opts]);
 
   // Une clé dès l'ouverture, comme le mot de passe.

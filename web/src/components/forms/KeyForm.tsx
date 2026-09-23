@@ -4,18 +4,19 @@ import type { Payload, PrivateKey } from "../../lib/types";
 import { SshKeyGenerator } from "../GeneratorPanel";
 import { IconDice } from "../secret-icons";
 import { FileButton, PasswordInput } from "../ui";
-import { Field, FormShell } from "./common";
+import { Field, FormShell, useSeed } from "./common";
 
 export function KeyForm({ initial, onSave, onCancel }: {
   initial?: { key: PrivateKey; content?: string | null; passphrase?: string | null };
   onSave: (p: Payload) => Promise<void>;
   onCancel: () => void;
 }) {
-  const k = initial?.key;
+  const seed = useSeed(initial, (p) => (p.kind === "key" ? p : undefined));
+  const k = seed?.key;
   const [name, setName] = useState(k?.name ?? "");
   const [path, setPath] = useState(k?.path ?? "");
-  const [content, setContent] = useState(initial?.content ?? "");
-  const [passphrase, setPassphrase] = useState(initial?.passphrase ?? "");
+  const [content, setContent] = useState(seed?.content ?? "");
+  const [passphrase, setPassphrase] = useState(seed?.passphrase ?? "");
   const [showGenerator, setShowGenerator] = useState(false);
   const [publicKey, setPublicKey] = useState<string | null>(null);
 
@@ -33,7 +34,7 @@ export function KeyForm({ initial, onSave, onCancel }: {
   };
 
   return (
-    <FormShell title={k ? `Modifier « ${k.name} »` : "Nouvelle clé"} onSave={save} onCancel={onCancel} validate={() => (name.trim() ? content.trim() || path.trim() ? null : "Indiquez le contenu de la clé, ou au moins son chemin." : "Le nom est obligatoire.")}>
+    <FormShell title={initial ? `Modifier « ${initial.key.name} »` : "Nouvelle clé"} onSave={save} onCancel={onCancel} validate={() => (name.trim() ? content.trim() || path.trim() ? null : "Indiquez le contenu de la clé, ou au moins son chemin." : "Le nom est obligatoire.")}>
       <Field label="Nom">
         <input value={name} onChange={(e) => setName(e.target.value)} autoFocus className="input" />
       </Field>

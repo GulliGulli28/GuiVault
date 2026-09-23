@@ -1461,3 +1461,93 @@ async fn events_stream_notifies_vault_members() {
     );
     server.stop().await;
 }
+
+#[tokio::test]
+async fn user_settings_follow_the_account_across_devices() {
+    let Some(server) = TestServer::start(RegistrationMode::Open).await else {
+        return;
+    };
+    let desk = User::register(&server, "alice@t.io", "pw-a").await;
+    let laptop = User::login(&server, "alice@t.io", "pw-a").await.unwrap();
+    let bob = User::register(&server, "bob@t.io", "pw-b").await;
+
+    // Rien d'envoyé : `null`.
+    let none: Option<UserSettings> = desk.get("/users/me/settings").await;
+    assert!(none.is_none());
+
+    // Le bureau envoie ses réglages, scellés sous la user key.
+    let json = br#"{"appearance":{"uiAccent":"violet"}}"#;
+    let blob = gc::seal_user_settings(&desk.account.user_key, json).unwrap();
+    let body = status!(
+        desk.req(reqwest::Method::PUT, "/users/me/settings")
+            .json(&PutUserSettingsRequest {
+                blob: blob.clone(),
+                base_revision: None
+            })
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::OK
+    );
+    let saved: UserSettings = serde_json::from_str(&body).unwrap();
+    assert_eq!(saved.revision, 1);
+
+    // L'autre appareil les relit et les ouvre avec la même user key.
+    let got: Option<UserSettings> = laptop.get("/users/me/settings").await;
+    let got = got.expect("réglages présents");
+    assert_eq!(got.revision, 1);
+    assert_eq!(
+        gc::open_user_settings(&laptop.account.user_key, &got.blob).unwrap(),
+        json
+    );
+
+    // Écrire sans avoir lu la dernière révision : 409, avec la courante.
+    let blob2 = gc::seal_user_settings(&laptop.account.user_key, br#"{"appearance":{}}"#).unwrap();
+    let body = status!(
+        laptop
+            .req(reqwest::Method::PUT, "/users/me/settings")
+            .json(&PutUserSettingsRequest {
+                blob: blob2.clone(),
+                base_revision: None
+            })
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::CONFLICT
+    );
+    assert!(
+        body.contains("revision_mismatch") && body.contains("\"revision\":1"),
+        "{body}"
+    );
+    let body = status!(
+        laptop
+            .req(reqwest::Method::PUT, "/users/me/settings")
+            .json(&PutUserSettingsRequest {
+                blob: blob2,
+                base_revision: Some(1)
+            })
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::OK
+    );
+    assert_eq!(serde_json::from_str::<UserSettings>(&body).unwrap().revision, 2);
+
+    // Chacun les siens.
+    let theirs: Option<UserSettings> = bob.get("/users/me/settings").await;
+    assert!(theirs.is_none());
+
+    // Un blob qui n'en est pas un est refusé.
+    status!(
+        bob.req(reqwest::Method::PUT, "/users/me/settings")
+            .json(&PutUserSettingsRequest {
+                blob: vec![1, 2, 3],
+                base_revision: None
+            })
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::BAD_REQUEST
+    );
+    server.stop().await;
+}

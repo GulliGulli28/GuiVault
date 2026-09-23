@@ -10,7 +10,7 @@ import { TotpCode } from "../TotpCode";
 import { IconDice, IconPasskey } from "../secret-icons";
 import { IconClose, IconPlus } from "../ui-icons";
 import { FileButton, PasswordInput, formatWhen } from "../ui";
-import { Field, FormShell } from "./common";
+import { Field, FormShell, useSeed } from "./common";
 import { SecretFooter, SecretHeader } from "./SecretBits";
 
 const MATCH_LABELS: Record<UriMatch, string> = { domain: "domaine", host: "hôte", startsWith: "commence par", exact: "exact", regex: "expression régulière", never: "jamais" };
@@ -23,7 +23,7 @@ export function LoginForm({ initial, index, defaultGroupId, onSave, onCancel }: 
   onSave: (p: Payload) => Promise<void>;
   onCancel: () => void;
 }) {
-  const [login, setLogin] = useState<Login>(initial ?? emptyLogin(defaultGroupId ?? null));
+  const [login, setLogin] = useState<Login>(useSeed(initial, (p) => (p.kind === "login" ? p.login : undefined)) ?? emptyLogin(defaultGroupId ?? null));
   const [showGenerator, setShowGenerator] = useState(false);
   const [qrError, setQrError] = useState<string | null>(null);
   const totp = login.totp ? parseTotp(login.totp) : null;

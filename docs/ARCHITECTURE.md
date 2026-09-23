@@ -53,6 +53,14 @@ master key (32 o) ─ jamais stockée, jamais envoyée
                                items (JSON chiffré), nom du vault
 ```
 
+La *user key* scelle aussi les **réglages synchronisés** (AAD
+`guivault/v1/user-settings`) : apparence, générateur, remplissage de
+l'extension — un blob par utilisateur (`/users/me/settings`) que ses
+autres appareils relisent. Le client le découpe en sections
+(`web/src/lib/syncedSettings.ts`) ; un client réécrit telles quelles celles
+qu'il ne connaît pas, et le dernier qui écrit l'emporte, section par
+section.
+
 Conséquences pratiques :
 
 - **Changer de mot de passe** ré-enveloppe la *user key* et rien d'autre.
@@ -180,7 +188,8 @@ maître *et* un dump de base a tout, 2FA ou pas — voir `SECURITY.md`.
 événements de profondeur) reçoit chaque écriture d'item, rotation,
 changement d'appartenance et invitation, avec ses destinataires ; le flux
 de chaque utilisateur filtre les siens. L'événement dit *que* quelque chose
-a changé (`vault_changed` porte la révision), jamais quoi : le client
+a changé (`vault_changed` porte la révision, `settings_changed` celle des
+réglages synchronisés, au seul utilisateur concerné), jamais quoi : le client
 resynchronise. Rien n'est persisté — un client déconnecté rate des
 événements et compare les révisions à la reconnexion, comme avant.
 

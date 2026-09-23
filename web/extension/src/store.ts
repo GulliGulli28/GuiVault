@@ -8,7 +8,7 @@
 import { setTokens } from "../../src/lib/api";
 import { deserializeSession, serializeSession, type StoredSession } from "../../src/lib/persist";
 import type { DecodedItem, SessionState } from "../../src/lib/session";
-import type { TokenPair } from "../../src/lib/types";
+import type { Payload, TokenPair } from "../../src/lib/types";
 
 export const LOCK_ALARM = "guivault-lock";
 
@@ -20,9 +20,40 @@ export interface Settings {
   lockMinutes: number;
   /** Le bouton GuiVault dans les champs de mot de passe des pages. */
   inlineAutofill: boolean;
+  /** Remplir de lui-même le champ de code (TOTP) d'une page quand un seul
+   * identifiant du site a un secret TOTP. */
+  autoTotp: boolean;
+  /** Motifs de champs de code en plus de ceux reconnus d'office, un par
+   * ligne : `regex` (comparée au nom, à l'id, au libellé… du champ) ou
+   * `regex d'URL => regex de champ`. */
+  otpPatterns: string;
 }
 
-export const DEFAULT_SETTINGS: Settings = { serverUrl: "", email: "", lockMinutes: 15, inlineAutofill: true };
+export const DEFAULT_SETTINGS: Settings = { serverUrl: "", email: "", lockMinutes: 15, inlineAutofill: true, autoTotp: true, otpPatterns: "" };
+
+export interface OtpRule {
+  url: RegExp | null;
+  field: RegExp;
+}
+
+/** Les lignes de `otpPatterns`, compilées ; `errors` : les numéros des
+ * lignes qui ne se compilent pas (ignorées). */
+export function parseOtpPatterns(text: string): { rules: OtpRule[]; errors: number[] } {
+  const rules: OtpRule[] = [];
+  const errors: number[] = [];
+  text.split("\n").forEach((raw, i) => {
+    const line = raw.trim();
+    if (!line || line.startsWith("#")) return;
+    const cut = line.indexOf("=>");
+    try {
+      if (cut >= 0) rules.push({ url: new RegExp(line.slice(0, cut).trim(), "i"), field: new RegExp(line.slice(cut + 2).trim(), "i") });
+      else rules.push({ url: null, field: new RegExp(line, "i") });
+    } catch {
+      errors.push(i + 1);
+    }
+  });
+  return { rules, errors };
+}
 
 /** Les items d'un vault, tels que déchiffrés à une révision donnée. */
 export interface ItemsCache {
@@ -64,6 +95,59 @@ export async function loadItemsCache(): Promise<ItemsCache> {
 
 export async function saveItemsCache(cache: ItemsCache) {
   await chrome.storage.session.set({ items: cache });
+}
+
+// ─── Où en était le popup ────────────────────────────────────────────────────
+//
+// Un clic hors du popup le ferme, et avec lui son état React. On le garde
+// ici — en mémoire de session, parce qu'un brouillon de formulaire peut
+// contenir un secret — pour rouvrir au même endroit. Effacé au verrouillage
+// comme le reste.
+
+export type PopupView =
+  | { kind: "list" }
+  | { kind: "detail"; id: string }
+  | { kind: "edit"; id: string }
+  | { kind: "new"; vaultId: string; itemKind: Payload["kind"] }
+  | { kind: "settings" };
+
+export interface PopupState {
+  tab: "vaults" | "totp" | "generator";
+  view: PopupView;
+  query: string;
+  filter: string;
+  /** Le formulaire en cours (`new` ou `edit`), tel qu'on l'a laissé. */
+  draft: Payload | null;
+  at: number;
+}
+
+/** Au-delà, on rouvre sur la liste (un brouillon, lui, est toujours repris). */
+export const POPUP_STATE_TTL_MS = 15 * 60_000;
+
+export async function loadPopupState(): Promise<PopupState | null> {
+  const r = await chrome.storage.session.get("popup");
+  return (r.popup as PopupState | undefined) ?? null;
+}
+
+export async function savePopupState(state: PopupState) {
+  await chrome.storage.session.set({ popup: state });
+}
+
+/** Le dernier identifiant rempli dans un onglet : une page de SSO qui suit
+ * (autre domaine, même onglet) peut demander *son* code TOTP. */
+export const RECENT_FILL_TTL_MS = 10 * 60_000;
+
+export async function noteRecentFill(tabId: number, loginId: string) {
+  const r = await chrome.storage.session.get("recentFill");
+  const all = (r.recentFill as Record<string, { id: string; at: number }> | undefined) ?? {};
+  all[tabId] = { id: loginId, at: Date.now() };
+  await chrome.storage.session.set({ recentFill: all });
+}
+
+export async function recentFill(tabId: number): Promise<string | null> {
+  const r = await chrome.storage.session.get("recentFill");
+  const e = ((r.recentFill as Record<string, { id: string; at: number }> | undefined) ?? {})[tabId];
+  return e && Date.now() - e.at < RECENT_FILL_TTL_MS ? e.id : null;
 }
 
 export type LockReason = "manual" | "timeout" | "expired";

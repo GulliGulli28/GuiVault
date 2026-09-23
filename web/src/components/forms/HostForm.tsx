@@ -6,7 +6,7 @@ import { HOST_KIND_LABELS } from "../ItemView";
 import { IconField } from "../IconPicker";
 import { IconClose, IconDocker, IconHosts, IconKubernetes, IconMonitor } from "../ui-icons";
 import { PasswordInput } from "../ui";
-import { Checkbox, Field, FormShell, GroupSelect, HostSelect, TagsInput, parsePort } from "./common";
+import { Checkbox, Field, FormShell, GroupSelect, HostSelect, TagsInput, parsePort, useSeed } from "./common";
 
 type AuthKind = "password" | "agent" | "keyboardInteractive" | "privateKey";
 
@@ -33,8 +33,9 @@ export function HostForm({ initial, index, defaultGroupId, onSave, onCancel, onA
   onCancel: () => void;
   onAddIcon?: (icon: CustomIcon) => Promise<void>;
 }) {
-  const h = initial?.host;
-  const s = initial?.secrets ?? {};
+  const seed = useSeed(initial, (p) => (p.kind === "host" ? p : undefined));
+  const h = seed?.host;
+  const s = seed?.secrets ?? {};
   const [label, setLabel] = useState(h?.label ?? "");
   const [kind, setKind] = useState<HostKind>(h?.kind ?? "ssh");
   const [address, setAddress] = useState(h?.address ?? "");
@@ -125,7 +126,7 @@ export function HostForm({ initial, index, defaultGroupId, onSave, onCancel, onA
   const otherHosts = index.hosts.filter((x) => x.id !== h?.id && (x.kind ?? "ssh") === "ssh");
 
   return (
-    <FormShell title={h ? `Modifier « ${h.label} »` : "Nouvel hôte"} onSave={save} onCancel={onCancel} validate={validate}>
+    <FormShell title={initial ? `Modifier « ${initial.host.label} »` : "Nouvel hôte"} onSave={save} onCancel={onCancel} validate={validate}>
       <Field label="Nom">
         <input value={label} onChange={(e) => setLabel(e.target.value)} autoFocus className="input" />
       </Field>

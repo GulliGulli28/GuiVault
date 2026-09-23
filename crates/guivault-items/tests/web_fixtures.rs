@@ -7,18 +7,22 @@ use serde_json::Value;
 fn web_items_parse_and_roundtrip() {
     let raw = include_str!("web-items.json");
     let values: Vec<Value> = serde_json::from_str(raw).unwrap();
-    assert_eq!(values.len(), 4);
+    assert_eq!(values.len(), 6);
+    // Le champ de l'entité : le `kind`, en camelCase (`api-key` → `apiKey`).
+    let field = |kind: &str| match kind {
+        "api-key" => "apiKey".to_string(),
+        k => k.to_string(),
+    };
     for v in &values {
         let item = SecretItem::from_json(v.to_string().as_bytes()).unwrap();
         assert_eq!(item.item_type(), v["kind"].as_str().unwrap());
-        assert_eq!(
-            item.id().to_string(),
-            v[v["kind"].as_str().unwrap()]["id"].as_str().unwrap()
-        );
+        let kind = field(v["kind"].as_str().unwrap());
+        let kind = kind.as_str();
+        assert_eq!(item.id().to_string(), v[kind]["id"].as_str().unwrap());
+        assert!(SecretItem::is_secret_type(item.item_type()));
         // Re-sérialisé puis relu : identique, et rien de perdu par rapport
         // au JSON d'origine (chaque clé du web est encore là).
         let again: Value = serde_json::from_str(&item.to_json().unwrap()).unwrap();
-        let kind = v["kind"].as_str().unwrap();
         for (key, val) in v[kind].as_object().unwrap() {
             assert_eq!(&again[kind][key], val, "{kind}.{key}");
         }
@@ -32,4 +36,14 @@ fn web_items_parse_and_roundtrip() {
     assert_eq!(login.password_history[0].password, "old");
     assert_eq!(login.base.fields.as_ref().unwrap()[0].r#type, FieldType::Hidden);
     assert_eq!(login.base.favorite, Some(true));
+
+    let SecretItem::Aws { aws } = SecretItem::from_json(values[4].to_string().as_bytes()).unwrap() else {
+        panic!()
+    };
+    assert_eq!(aws.auth_type, AwsAuthType::Sso);
+    assert_eq!(aws.profiles[0].account_id, "123456789012");
+    let SecretItem::ApiKey { api_key } = SecretItem::from_json(values[5].to_string().as_bytes()).unwrap() else {
+        panic!()
+    };
+    assert_eq!(api_key.secret, "ghp_x");
 }

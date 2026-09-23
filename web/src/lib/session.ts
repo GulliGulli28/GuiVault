@@ -214,6 +214,9 @@ export function payloadId(p: Payload): string {
     case "note": return p.note.id;
     case "card": return p.card.id;
     case "identity": return p.identity.id;
+    case "aws": return p.aws.id;
+    case "api-key": return p.apiKey.id;
+    case "runbook": return p.runbook.id;
   }
 }
 
@@ -229,6 +232,9 @@ export function payloadName(p: Payload): string {
     case "note": return p.note.name;
     case "card": return p.card.name;
     case "identity": return p.identity.name;
+    case "aws": return p.aws.name;
+    case "api-key": return p.apiKey.name;
+    case "runbook": return p.runbook.name;
   }
 }
 
@@ -246,6 +252,9 @@ export function payloadEntity(p: Payload): Record<string, unknown> & { id: strin
     case "note": return p.note;
     case "card": return p.card;
     case "identity": return p.identity;
+    case "aws": return p.aws;
+    case "api-key": return p.apiKey;
+    case "runbook": return p.runbook;
   }
 }
 

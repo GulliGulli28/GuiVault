@@ -15,23 +15,46 @@ import { TotpList } from "../../src/components/TotpList";
 import { ItemForm } from "../../src/components/forms/ItemForm";
 import { IconDice, IconGlobe, IconShieldClock, IconStar } from "../../src/components/secret-icons";
 import { IconChevronDown, IconChevronRight, IconCopy, IconEdit, IconExternal, IconLock, IconPlus, IconRefresh, IconSearch, IconSettings, IconTrash, IconVault } from "../../src/components/ui-icons";
-import { AppearanceSettings } from "../../src/components/AppearanceSettings";
+import { AppearanceSettings, SettingsSyncToggle } from "../../src/components/AppearanceSettings";
+import { onSettingsApplied, registerSettingsSection, settingsChanged, startSettingsSync } from "../../src/lib/syncedSettings";
+import "../../src/lib/settingsSections";
 import { Logo } from "../../src/components/Logo";
 import { copyText, PasswordInput, SecretValue } from "../../src/components/ui";
-import { clearLockReason, lock, lockReason, loadItemsCache, loadSession, loadSettings, saveItemsCache, saveSession, saveSettings, saveTokens, touchLock, type ItemsCache, type LockReason, type Settings } from "./store";
+import { clearLockReason, lock, lockReason, loadItemsCache, loadPopupState, loadSession, loadSettings, noteRecentFill, parseOtpPatterns, POPUP_STATE_TTL_MS, saveItemsCache, savePopupState, saveSession, saveSettings, saveTokens, touchLock, type ItemsCache, type LockReason, type PopupView, type Settings } from "./store";
 import { deleteItem, saveLogin, savePayload } from "./vaultops";
 
 /** Les entrées du menu « Nouveau » : les secrets d'abord, puis les entités
  * Guiterm — le même menu que l'interface web. */
-const NEW_KINDS: (ItemKind | "sep")[] = ["login", "note", "card", "identity", "sep", "host", "group", "sql-connection", "key", "snippet", "icon"];
+const NEW_KINDS: (ItemKind | "sep")[] = ["login", "note", "card", "identity", "api-key", "aws", "sep", "host", "group", "sql-connection", "key", "snippet", "runbook", "icon"];
 type Filter = "all" | ItemKind;
-const FILTERS: Filter[] = ["all", "login", "note", "card", "identity", "host", "sql-connection", "key", "snippet", "group", "icon"];
+const FILTERS: Filter[] = ["all", "login", "note", "card", "identity", "api-key", "aws", "host", "sql-connection", "key", "snippet", "runbook", "group", "icon"];
 
 setDeviceLabel("Extension GuiVault");
 
+// Ce qui, des réglages de l'extension, suit le compte : le remplissage et
+// les codes. Le serveur, l'e-mail et le délai de verrouillage restent ici.
+registerSettingsSection({
+  key: "extension",
+  read: async () => {
+    const s = await loadSettings();
+    return { inlineAutofill: s.inlineAutofill, autoTotp: s.autoTotp, otpPatterns: s.otpPatterns };
+  },
+  write: async (v) => {
+    if (!v || typeof v !== "object") return;
+    const r = v as Partial<Settings>;
+    const s = await loadSettings();
+    await saveSettings({
+      ...s,
+      inlineAutofill: typeof r.inlineAutofill === "boolean" ? r.inlineAutofill : s.inlineAutofill,
+      autoTotp: typeof r.autoTotp === "boolean" ? r.autoTotp : s.autoTotp,
+      otpPatterns: typeof r.otpPatterns === "string" ? r.otpPatterns : s.otpPatterns,
+    });
+  },
+});
+
 type Screen = { kind: "loading" } | { kind: "login"; reason: LockReason | null } | { kind: "vault"; state: SessionState };
 type Tab = "vaults" | "totp" | "generator";
-type View = { kind: "list" } | { kind: "detail"; id: string } | { kind: "edit"; id: string } | { kind: "new"; vaultId: string; itemKind: ItemKind } | { kind: "settings" };
+type View = PopupView;
 
 /** Un item déchiffré, avec son vault. */
 interface Entry {
@@ -86,6 +109,18 @@ export function Popup() {
   const [filter, setFilter] = useState<Filter>("all");
   const [newMenu, setNewMenu] = useState(false);
   const [collapsed, setCollapsed] = useState<Set<string>>(loadCollapsed);
+  // Le formulaire en cours, repris à la réouverture : `seed` est celui qu'on
+  // rend au formulaire (une fois), `draft` le dernier capturé.
+  const [draft, setDraft] = useState<Payload | null>(null);
+  const [seed, setSeed] = useState<Payload | null>(null);
+  const [restored, setRestored] = useState(false);
+
+  /** Changer d'écran oublie le brouillon du précédent. */
+  const go = useCallback((v: View) => {
+    setView(v);
+    setDraft(null);
+    setSeed(null);
+  }, []);
 
   const say = useCallback((m: string) => {
     setNotice(m);
@@ -154,7 +189,25 @@ export function Popup() {
       }
       const cached = await loadItemsCache();
       setCache(cached);
+      // Rouvrir là où l'on était : un formulaire commencé toujours, le reste
+      // s'il n'y a pas trop longtemps.
+      const ps = await loadPopupState();
+      if (ps) {
+        const fresh = Date.now() - ps.at < POPUP_STATE_TTL_MS;
+        if (ps.draft && (ps.view.kind === "new" || ps.view.kind === "edit")) {
+          setView(ps.view);
+          setDraft(ps.draft);
+          setSeed(ps.draft);
+        } else if (fresh) setView(ps.view);
+        if (fresh) {
+          setTab(ps.tab);
+          setQuery(ps.query);
+          setFilter(ps.filter as Filter);
+        }
+      }
+      setRestored(true);
       setScreen({ kind: "vault", state: restored.state });
+      void startSettingsSync(restored.state.account.userKey);
       await touchLock(s.lockMinutes);
       void sync(restored.state, cached);
     })();
@@ -163,6 +216,14 @@ export function Popup() {
       setSessionLostHandler(null);
     };
   }, [sync]);
+
+  // Réglages de l'extension reçus d'un autre appareil.
+  useEffect(() => onSettingsApplied(() => void loadSettings().then(setSettings)), []);
+
+  useEffect(() => {
+    if (!restored) return;
+    void savePopupState({ tab, view, query, filter, draft: view.kind === "new" || view.kind === "edit" ? draft : null, at: Date.now() });
+  }, [restored, tab, view, query, filter, draft]);
 
   const entries = useMemo<Entry[]>(() => {
     if (screen.kind !== "vault") return [];
@@ -204,6 +265,7 @@ export function Popup() {
       if (!r) say("Pas de réponse de la page.");
       else if (what === "totp") say(r.totp ? "Code rempli." : "Aucun champ de code trouvé.");
       else say(r.password ? (r.username ? "Rempli." : "Mot de passe rempli (utilisateur non trouvé).") : r.username ? "Utilisateur rempli (pas de champ mot de passe)." : "Aucun champ de connexion trouvé sur cette page.");
+      if (r?.password || r?.username) void noteRecentFill(tabId, e.login.id);
       if (r?.password || r?.username || r?.totp) window.close();
     } catch (err) {
       say(`Impossible sur cette page : ${errorMessage(err)}`);
@@ -225,6 +287,7 @@ export function Popup() {
 
   const doLock = async () => {
     await lock("manual");
+    go({ kind: "list" });
     setScreen({ kind: "login", reason: "manual" });
   };
 
@@ -245,7 +308,7 @@ export function Popup() {
             <>
               <button onClick={() => void sync(screen.state, cache)} className="btn btn-ghost btn-sm btn-icon" title="Rafraîchir" aria-label="Rafraîchir"><IconRefresh size={12} className={refreshing ? "animate-spin" : ""} /></button>
               <a href={settings.serverUrl} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-sm btn-icon" title="Ouvrir le coffre (interface web)" aria-label="Ouvrir le coffre"><IconExternal size={12} /></a>
-              <button onClick={() => setView(view.kind === "settings" ? { kind: "list" } : { kind: "settings" })} className={`btn btn-sm btn-icon ${view.kind === "settings" ? "btn-toggled" : "btn-ghost"}`} title="Réglages" aria-label="Réglages" aria-pressed={view.kind === "settings"}><IconSettings size={12} /></button>
+              <button onClick={() => go(view.kind === "settings" ? { kind: "list" } : { kind: "settings" })} className={`btn btn-sm btn-icon ${view.kind === "settings" ? "btn-toggled" : "btn-ghost"}`} title="Réglages" aria-label="Réglages" aria-pressed={view.kind === "settings"}><IconSettings size={12} /></button>
               <button onClick={() => void doLock()} className="btn btn-ghost btn-sm btn-icon" title="Verrouiller" aria-label="Verrouiller"><IconLock size={12} /></button>
             </>
           )}
@@ -261,47 +324,53 @@ export function Popup() {
             await saveSession(state, tokens);
             await clearLockReason();
             await touchLock(settings.lockMinutes);
+            setRestored(true);
             setScreen({ kind: "vault", state });
+            void startSettingsSync(state.account.userKey);
             void sync(state, {});
           }}
         />
       ) : view.kind === "settings" ? (
-        <SettingsView settings={settings} onSettings={(s) => { setSettings(s); void saveSettings(s); void touchLock(s.lockMinutes); }} onBack={() => setView({ kind: "list" })} />
+        <SettingsView settings={settings} onSettings={(s) => { setSettings(s); void saveSettings(s).then(() => settingsChanged("extension")); void touchLock(s.lockMinutes); }} onBack={() => go({ kind: "list" })} />
       ) : view.kind === "edit" && current ? (
         <div className="flex min-h-0 flex-1 flex-col">
           <ItemForm
             kind={current.payload.kind}
             initial={current.payload}
+            draft={seed ?? undefined}
+            onDraft={setDraft}
             index={indexFor(current.vaultId)}
             onSave={async (p) => {
               await savePayload(current.vaultId, p, current.item.revision);
               await reloadCache();
               say(`« ${payloadName(p)} » enregistré.`);
-              setView({ kind: "detail", id: payloadEntity(p).id });
+              go({ kind: "detail", id: payloadEntity(p).id });
             }}
-            onCancel={() => setView({ kind: "detail", id: current.item.id })}
+            onCancel={() => go({ kind: "detail", id: current.item.id })}
           />
         </div>
       ) : view.kind === "new" ? (
         <div className="flex min-h-0 flex-1 flex-col">
           <label className="flex shrink-0 items-center gap-2 border-b border-[var(--c-border)] px-3 py-1.5 text-[12px] text-[var(--c-text-secondary)]">
             {KIND_LABELS_PLURAL[view.itemKind].replace(/s$/, "")} dans
-            <select value={view.vaultId} onChange={(e) => setView({ ...view, vaultId: e.target.value })} className="input h-6 w-auto text-[12px]" aria-label="Vault">
+            <select value={view.vaultId} onChange={(e) => { setView({ ...view, vaultId: e.target.value }); setSeed(draft); }} className="input h-6 w-auto text-[12px]" aria-label="Vault">
               {screen.state.vaults.filter((v) => v.role !== "reader").map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
             </select>
           </label>
           <ItemForm
             key={`${view.vaultId}-${view.itemKind}`}
             kind={view.itemKind}
+            draft={seed ?? undefined}
+            onDraft={setDraft}
             index={indexFor(view.vaultId)}
             onSave={async (p) => {
               if (p.kind === "login" && canFill && p.login.uris.length === 0) p.login.uris = [{ uri: new URL(pageUrl!).origin, match: null }];
               await savePayload(view.vaultId, p);
               await reloadCache();
               say(`« ${payloadName(p)} » enregistré.`);
-              setView({ kind: "detail", id: payloadEntity(p).id });
+              go({ kind: "detail", id: payloadEntity(p).id });
             }}
-            onCancel={() => setView({ kind: "list" })}
+            onCancel={() => go({ kind: "list" })}
           />
         </div>
       ) : view.kind === "detail" && current ? (
@@ -309,15 +378,15 @@ export function Popup() {
           entry={current}
           index={indexFor(current.vaultId)}
           canFill={canFill}
-          onBack={() => setView({ kind: "list" })}
+          onBack={() => go({ kind: "list" })}
           onFill={fill}
-          onEdit={() => setView({ kind: "edit", id: current.item.id })}
+          onEdit={() => go({ kind: "edit", id: current.item.id })}
           onDelete={async () => {
             try {
               await deleteItem(current.vaultId, current.item.id);
               await reloadCache();
               say(`« ${current.name} » supprimé.`);
-              setView({ kind: "list" });
+              go({ kind: "list" });
             } catch (e) {
               say(errorMessage(e));
             }
@@ -343,7 +412,7 @@ export function Popup() {
                         if (k === "sep") return <div key={i} className="menu-sep" />;
                         const Icon = KIND_ICONS[k];
                         return (
-                          <button key={k} role="menuitem" onClick={() => { setNewMenu(false); setView({ kind: "new", itemKind: k, vaultId: (screen.state.vaults.find((v) => v.kind === "personal") ?? screen.state.vaults[0]).id }); }} className="menu-item">
+                          <button key={k} role="menuitem" onClick={() => { setNewMenu(false); go({ kind: "new", itemKind: k, vaultId: (screen.state.vaults.find((v) => v.kind === "personal") ?? screen.state.vaults[0]).id }); }} className="menu-item">
                             <Icon size={13} /> {KIND_LABELS[k].charAt(0).toUpperCase() + KIND_LABELS[k].slice(1)}
                           </button>
                         );
@@ -388,7 +457,7 @@ export function Popup() {
                 )}
                 {forPage.length > 0 && terms.length === 0 && filter === "all" && (
                   <Section id="page" title="Identifiants sur cette page" icon={<IconGlobe size={12} />} count={forPage.length} collapsed={collapsed.has("page")} onToggle={() => toggleCollapsed("page")} accent>
-                    {forPage.map((e) => <Row key={e.item.id} entry={e} canFill onFill={fill} onOpen={() => setView({ kind: "detail", id: e.item.id })} say={say} />)}
+                    {forPage.map((e) => <Row key={e.item.id} entry={e} canFill onFill={fill} onOpen={() => go({ kind: "detail", id: e.item.id })} say={say} />)}
                   </Section>
                 )}
                 {screen.state.vaults.map((v) => {
@@ -408,7 +477,7 @@ export function Popup() {
                         customIcons={mine[0]?.customIcons ?? []}
                         query={query}
                         selected={null}
-                        onSelect={(id) => setView({ kind: "detail", id })}
+                        onSelect={(id) => go({ kind: "detail", id })}
                         emptyMessage="Rien ici."
                         rowActions={(entity) => {
                           const e = mine.find((x) => x.item.id === entity.id);
@@ -567,9 +636,41 @@ function SettingsView({ settings, onSettings, onBack }: { settings: Settings; on
             <span>Proposer le remplissage dans les pages<span className="help-text block">Un bouton GuiVault dans les formulaires de connexion quand le coffre a quelque chose pour le site.</span></span>
           </label>
         </section>
+        <OtpSettings settings={settings} onSettings={onSettings} />
+        <SettingsSyncToggle />
         <AppearanceSettings compact />
       </div>
     </div>
+  );
+}
+
+/** Les codes à usage unique (TOTP) : remplissage automatique, et motifs
+ * pour les champs que la détection ne reconnaît pas. */
+function OtpSettings({ settings, onSettings }: { settings: Settings; onSettings: (s: Settings) => void }) {
+  const [text, setText] = useState(settings.otpPatterns);
+  const { errors } = useMemo(() => parseOtpPatterns(text), [text]);
+  return (
+    <section className="space-y-2">
+      <p className="eyebrow">Codes à usage unique</p>
+      <label className="flex cursor-pointer items-start gap-2 text-[12.5px]">
+        <input type="checkbox" checked={settings.autoTotp} onChange={(e) => onSettings({ ...settings, autoTotp: e.target.checked })} className="mt-0.5" />
+        <span>Remplir le code tout seul<span className="help-text block">Quand une page demande un code et qu'un seul identifiant du site a un secret TOTP. Sinon, le bouton GuiVault du champ propose les codes.</span></span>
+      </label>
+      <label className="block">
+        <span className="field-label">Champs de code supplémentaires</span>
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onBlur={() => { if (text !== settings.otpPatterns) onSettings({ ...settings, otpPatterns: text }); }}
+          rows={3}
+          spellCheck={false}
+          placeholder={"verif_code\nsso\\.exemple\\.fr => ^pin$"}
+          className="input input-mono h-auto py-1.5 text-[11.5px]"
+        />
+      </label>
+      <p className="help-text">Une regex par ligne, comparée au nom, à l'id, au libellé et au texte d'aide du champ ; <span className="kbd">regex d'URL =&gt; regex de champ</span> pour la limiter à certaines pages. Les champs <span className="kbd">autocomplete="one-time-code"</span>, « code de vérification », « 2FA », « OTP »… sont reconnus d'office, de même que les codes en cases séparées.</p>
+      {errors.length > 0 && <p className="callout callout-warn">Ligne{errors.length > 1 ? "s" : ""} {errors.join(", ")} : regex invalide, ignorée.</p>}
+    </section>
   );
 }
 
@@ -610,7 +711,7 @@ function LoginView({ settings, reason, onSettings, onSession }: { settings: Sett
     try {
       setBaseUrl(url);
       await api.health();
-      onSettings({ serverUrl: url, email: email.trim().toLowerCase(), lockMinutes, inlineAutofill });
+      onSettings({ ...settings, serverUrl: url, email: email.trim().toLowerCase(), lockMinutes, inlineAutofill });
       setBusy("Dérivation de la clé…");
       const tokensP = capture();
       const out = await login(email, password);

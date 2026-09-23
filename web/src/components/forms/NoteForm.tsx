@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { VaultIndex } from "../../lib/entities";
 import { emptyNote } from "../../lib/items";
 import type { Note, Payload } from "../../lib/types";
-import { Field, FormShell } from "./common";
+import { Field, FormShell, useSeed } from "./common";
 import { SecretFooter, SecretHeader } from "./SecretBits";
 
 export function NoteForm({ initial, index, defaultGroupId, onSave, onCancel }: {
@@ -12,7 +12,7 @@ export function NoteForm({ initial, index, defaultGroupId, onSave, onCancel }: {
   onSave: (p: Payload) => Promise<void>;
   onCancel: () => void;
 }) {
-  const [note, setNote] = useState<Note>(initial ?? emptyNote(defaultGroupId ?? null));
+  const [note, setNote] = useState<Note>(useSeed(initial, (p) => (p.kind === "note" ? p.note : undefined)) ?? emptyNote(defaultGroupId ?? null));
   return (
     <FormShell title={initial ? `Modifier « ${initial.name} »` : "Nouvelle note"} onSave={() => onSave({ kind: "note", note: { ...note, name: note.name.trim() } })} onCancel={onCancel} validate={() => (note.name.trim() ? null : "Le nom est obligatoire.")}>
       <SecretHeader value={note} onChange={setNote} placeholder="Codes de secours, licence…" />

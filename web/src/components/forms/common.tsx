@@ -1,10 +1,31 @@
-import { useState, type FormEvent, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type FormEvent, type ReactNode } from "react";
 import type { VaultIndex } from "../../lib/entities";
 import { groupPath } from "../../lib/entities";
-import type { Group } from "../../lib/types";
+import type { Group, Payload } from "../../lib/types";
 import { Field } from "../ui";
 
 export { Field };
+
+/** Le brouillon d'un formulaire. Le popup de l'extension se ferme au premier
+ * clic hors de lui : pour rouvrir un formulaire là où on l'avait laissé,
+ * `ItemForm` fait construire à intervalles le payload que `onSave`
+ * recevrait — sans rien enregistrer (`snapshot`) — et le rend au formulaire
+ * suivant (`draft`, lu par `useSeed`). Sans fournisseur, rien de tout ça. */
+export interface DraftContextValue {
+  draft?: Payload;
+  snapshot?: (save: () => Promise<void>) => void;
+}
+
+export const DraftContext = createContext<DraftContextValue>({});
+
+/** Les valeurs de départ d'un formulaire : le brouillon s'il est du même
+ * type, sinon l'élément modifié. `initial` garde son sens (titre
+ * « Modifier », historique du mot de passe). */
+export function useSeed<T>(initial: T | undefined, pick: (p: Payload) => T | undefined): T | undefined {
+  const { draft } = useContext(DraftContext);
+  const [seed] = useState(() => (draft ? pick(draft) : undefined) ?? initial);
+  return seed;
+}
 
 /** L'enveloppe commune des formulaires : erreur en tête, boutons en pied,
  * Entrée soumet. `onSave` peut rejeter : le message s'affiche ici. */
@@ -19,6 +40,13 @@ export function FormShell({ title, onSave, onCancel, children, saveLabel = "Enre
 }) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const { snapshot } = useContext(DraftContext);
+  // Après chaque rendu (donc chaque frappe), un peu plus tard : le brouillon.
+  useEffect(() => {
+    if (!snapshot) return;
+    const t = setTimeout(() => snapshot(onSave), 300);
+    return () => clearTimeout(t);
+  });
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     const problem = validate?.() ?? null;
@@ -92,17 +120,18 @@ export function HostSelect({ index, value, onChange, none = "Aucun", exclude, la
   );
 }
 
-/** Étiquettes séparées par des virgules ou des espaces. */
-export function TagsInput({ value, onChange }: { value: string[]; onChange: (tags: string[]) => void }) {
+/** Étiquettes séparées par des virgules ou des espaces — par des virgules
+ * seulement (`commas`) pour des noms qui en contiennent (dossiers). */
+export function TagsInput({ value, onChange, placeholder = "prod, web, paris", commas }: { value: string[]; onChange: (tags: string[]) => void; placeholder?: string; commas?: boolean }) {
   const [text, setText] = useState(value.join(", "));
   return (
     <input
       value={text}
       onChange={(e) => {
         setText(e.target.value);
-        onChange(Array.from(new Set(e.target.value.split(/[,\s]+/).map((t) => t.trim()).filter(Boolean))));
+        onChange(Array.from(new Set(e.target.value.split(commas ? /,+/ : /[,\s]+/).map((t) => t.trim()).filter(Boolean))));
       }}
-      placeholder="prod, web, paris"
+      placeholder={placeholder}
       className="input"
     />
   );

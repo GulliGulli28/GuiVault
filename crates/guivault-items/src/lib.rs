@@ -29,6 +29,8 @@ pub const TYPE_LOGIN: &str = "login";
 pub const TYPE_NOTE: &str = "note";
 pub const TYPE_CARD: &str = "card";
 pub const TYPE_IDENTITY: &str = "identity";
+pub const TYPE_AWS: &str = "aws";
+pub const TYPE_API_KEY: &str = "api-key";
 
 /// Un champ libre ajouté à n'importe quel secret.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -225,6 +227,86 @@ pub struct Identity {
     pub country: String,
 }
 
+/// Un profil AWS : une section `[profile …]` de `~/.aws/config` (le
+/// `AwsProfile` de Guiterm).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AwsProfileEntry {
+    #[serde(default)]
+    pub name: String,
+    #[serde(default)]
+    pub account_id: String,
+    #[serde(default)]
+    pub role_name: String,
+    #[serde(default)]
+    pub region: String,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum AwsAuthType {
+    /// Une session IAM Identity Center et ses profils.
+    #[default]
+    Sso,
+    /// Des clés d'accès IAM.
+    Keys,
+}
+
+/// Un accès AWS : de quoi réécrire `~/.aws/config` (et `credentials`) sur
+/// un autre poste — ce que le panneau AWS de Guiterm configure.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AwsAccess {
+    #[serde(flatten)]
+    pub base: SecretBase,
+    #[serde(default)]
+    pub auth_type: AwsAuthType,
+    /// Le bloc `[sso-session <nom>]` (le `AwsSsoSession` de Guiterm).
+    #[serde(default)]
+    pub sso_session_name: String,
+    #[serde(default)]
+    pub sso_start_url: String,
+    #[serde(default)]
+    pub sso_region: String,
+    #[serde(default)]
+    pub access_key_id: String,
+    /// Le secret des clés d'accès.
+    #[serde(default)]
+    pub secret_access_key: String,
+    #[serde(default)]
+    pub mfa_serial: String,
+    /// Région par défaut des profils qui n'en ont pas.
+    #[serde(default)]
+    pub region: String,
+    #[serde(default)]
+    pub profiles: Vec<AwsProfileEntry>,
+}
+
+/// Une clé d'API, un jeton, un couple client ID / secret.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ApiKey {
+    #[serde(flatten)]
+    pub base: SecretBase,
+    #[serde(default)]
+    pub service: String,
+    #[serde(default)]
+    pub url: String,
+    /// La partie publique (identifiant de clé, client ID).
+    #[serde(default)]
+    pub key_id: String,
+    /// Le secret.
+    #[serde(default)]
+    pub secret: String,
+    #[serde(default)]
+    pub scopes: String,
+    /// `AAAA-MM-JJ`, vide si aucune.
+    #[serde(default)]
+    pub expires_at: String,
+}
+
 /// L'enveloppe d'un item secret : `kind` est l'`item_type` du serveur.
 // `large_enum_variant` : une identité pèse plus qu'une note, et alors ?
 // Ces valeurs vivent le temps d'un chiffrement, jamais en tableau.
@@ -232,10 +314,25 @@ pub struct Identity {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "kebab-case")]
 pub enum SecretItem {
-    Login { login: Login },
-    Note { note: Note },
-    Card { card: Card },
-    Identity { identity: Identity },
+    Login {
+        login: Login,
+    },
+    Note {
+        note: Note,
+    },
+    Card {
+        card: Card,
+    },
+    Identity {
+        identity: Identity,
+    },
+    Aws {
+        aws: AwsAccess,
+    },
+    ApiKey {
+        #[serde(rename = "apiKey")]
+        api_key: ApiKey,
+    },
 }
 
 impl SecretItem {
@@ -245,11 +342,16 @@ impl SecretItem {
             SecretItem::Note { .. } => TYPE_NOTE,
             SecretItem::Card { .. } => TYPE_CARD,
             SecretItem::Identity { .. } => TYPE_IDENTITY,
+            SecretItem::Aws { .. } => TYPE_AWS,
+            SecretItem::ApiKey { .. } => TYPE_API_KEY,
         }
     }
 
     pub fn is_secret_type(item_type: &str) -> bool {
-        matches!(item_type, TYPE_LOGIN | TYPE_NOTE | TYPE_CARD | TYPE_IDENTITY)
+        matches!(
+            item_type,
+            TYPE_LOGIN | TYPE_NOTE | TYPE_CARD | TYPE_IDENTITY | TYPE_AWS | TYPE_API_KEY
+        )
     }
 
     pub fn base(&self) -> &SecretBase {
@@ -258,6 +360,8 @@ impl SecretItem {
             SecretItem::Note { note } => &note.base,
             SecretItem::Card { card } => &card.base,
             SecretItem::Identity { identity } => &identity.base,
+            SecretItem::Aws { aws } => &aws.base,
+            SecretItem::ApiKey { api_key } => &api_key.base,
         }
     }
 

@@ -33,7 +33,9 @@ chiffrées.
 Adresses e-mail, appartenance aux vaults et rôles, nombre et **types**
 d'items (`host`, `ssh-key`, `password`…), dates, révisions, IP/user-agent
 des sessions, journal d'audit. Ces métadonnées suffisent à dire « Alice
-partage 12 hôtes et 3 clés avec Bob », jamais lesquels.
+partage 12 hôtes et 3 clés avec Bob », jamais lesquels. Des réglages
+synchronisés, il voit la taille du blob et quand il change (chaque réglage
+d'apparence modifié en est un) — pas son contenu.
 
 ## Limites connues
 

@@ -23,7 +23,7 @@ HMAC pour les sels fictifs de prelogin.
   qu'elles s'unifient dans son binaire.
 - `crates/guivault-protocol` — types JSON. Même contrainte de compatibilité.
 - `crates/guivault-items` — formats en clair des secrets (`login`, `note`,
-  `card`, `identity`), miroir Rust de `web/src/lib/types.ts`, à consommer
+  `card`, `identity`, `aws`, `api-key`), miroir Rust de `web/src/lib/types.ts`, à consommer
   par Guiterm le jour de l'intégration (plan dans `docs/ITEMS.md`). Champs
   inconnus conservés (`flatten extra`), tout absent = défaut. Fixtures
   `tests/web-items.json` écrites par `GUIVAULT_WRITE_VECTORS=1 npx vitest
@@ -67,7 +67,12 @@ HMAC pour les sels fictifs de prelogin.
     **même JSON que `termius_core::guivault::entity::Payload`** : un item
     écrit ici doit être relu par Guiterm — les champs inconnus sont
     conservés via `[extra: string]: unknown`).
-  - `lib/items.ts` (secrets vides, ligne secondaire, recherche),
+  - `lib/syncedSettings.ts` — les réglages qui suivent le compte (blob
+    sous la user key, `/users/me/settings`), en sections :
+    `lib/settingsSections.ts` (apparence, générateurs) ; le popup ajoute
+    `extension`. Un nouveau réglage partagé = une section, et
+    `settingsChanged(key)` là où il s'enregistre.
+  - `lib/items.ts` (secrets vides, ligne secondaire, recherche, `~/.aws/config`),
     `lib/generator.ts` (+ `wordlist.ts`, liste EFF), `lib/sshkey.ts` (clés
     OpenSSH, testées contre `ssh-keygen`), `lib/totp.ts`, `lib/qr.ts`,
     `lib/csv.ts`, `lib/bitwarden.ts` (JSON en clair ou protégé, CSV),
@@ -80,7 +85,9 @@ HMAC pour les sels fictifs de prelogin.
   - `components/` — une page par route (`VaultPage`, `VaultSettings`,
     `ToolsPage` import/export, `SettingsPage` apparence/compte/sécurité/
     sessions, `InvitationsPage`, `GeneratorPanel`), `forms/` un formulaire
-    par type d'item (`SecretBits.tsx` = tronc commun des secrets),
+    par type d'item (`SecretBits.tsx` = tronc commun des secrets ;
+    `common.tsx` : `FormShell`, et `useSeed` qui reprend un brouillon —
+    un nouveau formulaire lit ses valeurs de départ par `useSeed`),
     `IconPicker.tsx` (le sélecteur de Guiterm, sans Tauri : « Mes icônes »
     sont les items `icon` du vault), `secret-icons.tsx` pour les icônes
     qui ne sont pas dans Guiterm. Un dossier a pour couleur un **nom

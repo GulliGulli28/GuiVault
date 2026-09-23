@@ -1,16 +1,17 @@
 import { useState } from "react";
 import { uuid } from "../../lib/bytes";
 import type { Payload, Snippet } from "../../lib/types";
-import { Checkbox, Field, FormShell, TagsInput } from "./common";
+import { Checkbox, Field, FormShell, TagsInput, useSeed } from "./common";
 
 export function SnippetForm({ initial, onSave, onCancel }: { initial?: Snippet; onSave: (p: Payload) => Promise<void>; onCancel: () => void }) {
-  const [name, setName] = useState(initial?.name ?? "");
-  const [command, setCommand] = useState(initial?.command ?? "");
-  const [tags, setTags] = useState<string[]>(initial?.tags ?? []);
-  const [adaptive, setAdaptive] = useState(initial?.adaptive ?? false);
+  const seed = useSeed(initial, (p) => (p.kind === "snippet" ? p.snippet : undefined));
+  const [name, setName] = useState(seed?.name ?? "");
+  const [command, setCommand] = useState(seed?.command ?? "");
+  const [tags, setTags] = useState<string[]>(seed?.tags ?? []);
+  const [adaptive, setAdaptive] = useState(seed?.adaptive ?? false);
 
   const save = async () => {
-    const snippet: Snippet = { ...initial, id: initial?.id ?? uuid(), name: name.trim(), command, tags, adaptive };
+    const snippet: Snippet = { ...seed, id: seed?.id ?? uuid(), name: name.trim(), command, tags, adaptive };
     await onSave({ kind: "snippet", snippet });
   };
 

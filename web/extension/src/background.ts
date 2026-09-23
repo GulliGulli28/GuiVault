@@ -13,9 +13,9 @@ import type { Login } from "../../src/lib/types";
 import { setTokensChangedHandler } from "../../src/lib/api";
 import { uuid } from "../../src/lib/bytes";
 import { DEFAULT_GENERATOR, generate, type GeneratorOptions } from "../../src/lib/generator";
-import type { CredentialsReply, FillReply, MatchesReply, PasskeyToBackground, Pending, ToBackground, ToContent, VaultsReply } from "./messages";
+import type { CredentialsReply, FillReply, MatchesReply, MatchSummary, PasskeyToBackground, Pending, ToBackground, ToContent, TotpReply, VaultsReply } from "./messages";
 import * as passkeys from "./passkeys";
-import { LOCK_ALARM, loadItemsCache, loadSession, loadSettings, lock, saveTokens } from "./store";
+import { LOCK_ALARM, loadItemsCache, loadSession, loadSettings, lock, noteRecentFill, parseOtpPatterns, recentFill, saveTokens } from "./store";
 import { findLogin, saveLogin } from "./vaultops";
 
 // Une écriture depuis ici (enregistrer une passkey) peut rafraîchir les
@@ -35,6 +35,8 @@ async function logins(): Promise<Login[] | null> {
   }
   return out;
 }
+
+const summary = (l: Login): MatchSummary => ({ id: l.id, name: l.name, username: l.username, hasTotp: !!l.totp, favorite: !!l.favorite });
 
 async function matchesFor(url: string | undefined): Promise<Login[] | null> {
   if (!url || !/^https?:/.test(url)) return [];
@@ -213,7 +215,22 @@ chrome.runtime.onMessage.addListener((msg: ToBackground | PasskeyToBackground, s
       const m = await matchesFor(url);
       if (!m) return reply({ locked: true } satisfies MatchesReply);
       const settings = await loadSettings();
-      return reply({ locked: false, enabled: settings.inlineAutofill, logins: m.map((l) => ({ id: l.id, name: l.name, username: l.username, hasTotp: !!l.totp, favorite: !!l.favorite })) } satisfies MatchesReply);
+      const tabId = sender.tab?.id;
+      const recentId = tabId != null ? await recentFill(tabId) : null;
+      const recent = recentId && !m.some((l) => l.id === recentId) ? (await logins())?.find((l) => l.id === recentId && l.totp) ?? null : null;
+      const otpPatterns = parseOtpPatterns(settings.otpPatterns).rules.filter((r) => !r.url || (url ? r.url.test(url) : false)).map((r) => r.field.source);
+      return reply({ locked: false, enabled: settings.inlineAutofill, logins: m.map(summary), recent: recent ? summary(recent) : null, autoTotp: settings.autoTotp, otpPatterns } satisfies MatchesReply);
+    }
+    if (msg.type === "guivault-totp") {
+      const url = sender.tab?.url ?? sender.url;
+      const tabId = sender.tab?.id;
+      const m = await matchesFor(url);
+      let l = m?.find((x) => x.id === msg.id);
+      // Pas un identifiant du site : seulement le dernier rempli dans cet
+      // onglet — la page de SSO qui suit, sur son propre domaine.
+      if (!l && tabId != null && (await recentFill(tabId)) === msg.id) l = (await logins())?.find((x) => x.id === msg.id);
+      const p = l?.totp ? parseTotp(l.totp) : null;
+      return reply((p ? { code: await totpCode(p) } : null) satisfies TotpReply);
     }
     if (msg.type === "guivault-captured") {
       const tabId = sender.tab?.id;
@@ -289,6 +306,7 @@ chrome.runtime.onMessage.addListener((msg: ToBackground | PasskeyToBackground, s
       const m = await matchesFor(url);
       const l = m?.find((x) => x.id === msg.id);
       if (!l) return reply(null);
+      if (sender.tab?.id != null) await noteRecentFill(sender.tab.id, l.id);
       const p = l.totp ? parseTotp(l.totp) : null;
       return reply({ username: l.username, password: l.password, totp: p ? await totpCode(p) : null } satisfies CredentialsReply);
     }
@@ -304,10 +322,12 @@ chrome.commands.onCommand.addListener((command) => {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (!tab?.id) return;
     const m = await matchesFor(tab.url);
-    if (!m || m.length === 0) return;
+    if (!m || !tab.url || !/^https?:/.test(tab.url)) return;
+    // La page décide (elle sait si elle montre un champ de code) ; le
+    // script de page est d'ordinaire déjà là, l'injecter n'en crée pas un
+    // second.
     await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["content.js"] });
-    const msg: ToContent = m.length === 1 ? { type: "guivault-fill", username: m[0].username, password: m[0].password } : { type: "guivault-pick" };
-    await chrome.tabs.sendMessage<ToContent, FillReply | undefined>(tab.id, msg).catch(() => undefined);
+    await chrome.tabs.sendMessage<ToContent, FillReply | undefined>(tab.id, { type: "guivault-shortcut" }).catch(() => undefined);
   })();
 });
 

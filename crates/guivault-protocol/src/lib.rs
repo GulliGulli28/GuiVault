@@ -200,6 +200,30 @@ pub enum ServerEvent {
     InvitationReceived { invitation_id: Uuid, vault_id: Uuid },
     /// Vous avez été ajouté, retiré, ou votre rôle a changé.
     MembershipChanged { vault_id: Uuid },
+    /// Vos réglages synchronisés ont changé (depuis un autre appareil).
+    SettingsChanged { revision: i64 },
+}
+
+/// Les réglages synchronisés d'un utilisateur (apparence, générateur,
+/// extension…) : un blob scellé sous sa *user key*
+/// (`guivault_crypto::seal_user_settings`). Le serveur les garde pour ses
+/// autres appareils sans pouvoir les lire.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UserSettings {
+    #[serde(with = "b64")]
+    pub blob: Vec<u8>,
+    pub revision: i64,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PutUserSettingsRequest {
+    #[serde(with = "b64")]
+    pub blob: Vec<u8>,
+    /// La révision que le client a lue ; `None` s'il n'en a lu aucune. Si
+    /// elle ne correspond pas : 409 avec les réglages courants.
+    #[serde(default)]
+    pub base_revision: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

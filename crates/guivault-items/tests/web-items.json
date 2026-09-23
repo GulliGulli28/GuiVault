@@ -105,5 +105,45 @@
       "postalCode": "",
       "country": ""
     }
+  },
+  {
+    "kind": "aws",
+    "aws": {
+      "id": "55555555-5555-4555-8555-555555555555",
+      "name": "Org",
+      "groupId": null,
+      "tags": [],
+      "authType": "sso",
+      "ssoSessionName": "org",
+      "ssoStartUrl": "https://org.awsapps.com/start",
+      "ssoRegion": "eu-west-1",
+      "accessKeyId": "",
+      "secretAccessKey": "",
+      "mfaSerial": "",
+      "region": "eu-west-3",
+      "profiles": [
+        {
+          "name": "prod",
+          "accountId": "123456789012",
+          "roleName": "Admin",
+          "region": ""
+        }
+      ]
+    }
+  },
+  {
+    "kind": "api-key",
+    "apiKey": {
+      "id": "66666666-6666-4666-8666-666666666666",
+      "name": "CI",
+      "groupId": null,
+      "tags": [],
+      "service": "GitHub",
+      "url": "",
+      "keyId": "",
+      "secret": "ghp_x",
+      "scopes": "repo",
+      "expiresAt": "2027-01-01"
+    }
   }
 ]

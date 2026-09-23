@@ -8,7 +8,7 @@ import { parseCsv, toCsv } from "./csv";
 import { exportCsv, exportEncrypted, exportJson } from "./exporters";
 import { estimateStrength, generatePassphrase, generatePassword, randomInt } from "./generator";
 import { importFile, NeedsPassword, resolveFolders } from "./importers";
-import { emptyCard, emptyIdentity, emptyLogin, emptyNote } from "./items";
+import { awsConfigText, emptyApiKey, emptyAws, emptyCard, emptyIdentity, emptyLogin, emptyNote } from "./items";
 import { base32Decode, base32Encode, parseTotp, totpCode } from "./totp";
 import type { Payload } from "./types";
 import { EFF_LARGE_WORDLIST } from "./wordlist";
@@ -173,7 +173,9 @@ function samples(): Payload[] {
   const note = { ...emptyNote(), id: "22222222-2222-4222-8222-222222222222", name: "Codes", content: "a\nb", groupId: "gggggggg-gggg-4ggg-8ggg-gggggggggggg".replace(/g/g, "a") };
   const card = { ...emptyCard(), id: "33333333-3333-4333-8333-333333333333", name: "CB", cardholderName: "A", brand: "Visa", number: "4111111111111111", expMonth: "12", expYear: "2030", code: "123" };
   const identity = { ...emptyIdentity(), id: "44444444-4444-4444-8444-444444444444", name: "Moi", firstName: "Alice", lastName: "L", email: "a@b" };
-  return [{ kind: "login", login }, { kind: "note", note }, { kind: "card", card }, { kind: "identity", identity }];
+  const aws = { ...emptyAws(), id: "55555555-5555-4555-8555-555555555555", name: "Org", ssoSessionName: "org", ssoStartUrl: "https://org.awsapps.com/start", ssoRegion: "eu-west-1", region: "eu-west-3", profiles: [{ name: "prod", accountId: "123456789012", roleName: "Admin", region: "" }] };
+  const apiKey = { ...emptyApiKey(), id: "66666666-6666-4666-8666-666666666666", name: "CI", service: "GitHub", keyId: "", secret: "ghp_x", scopes: "repo", expiresAt: "2027-01-01" };
+  return [{ kind: "login", login }, { kind: "note", note }, { kind: "card", card }, { kind: "identity", identity }, { kind: "aws", aws }, { kind: "api-key", apiKey }];
 }
 
 describe("export", () => {
@@ -184,7 +186,7 @@ describe("export", () => {
     const json = exportJson(vault, [group, ...samples()]);
     const r = await importFile(json);
     expect(r.format).toBe("GuiVault (JSON)");
-    expect(r.items).toHaveLength(4);
+    expect(r.items).toHaveLength(6);
     expect(r.items[1].folderPath).toEqual(["Dossier"]);
     expect(r.items[0].payload).toEqual(samples()[0]);
   });
@@ -195,12 +197,12 @@ describe("export", () => {
     await expect(importFile(enc)).rejects.toThrow(NeedsPassword);
     await expect(importFile(enc, "nope")).rejects.toThrow(/incorrect/);
     const r = await importFile(enc, "export-pw");
-    expect(r.items.map((i) => i.payload.kind)).toEqual(["login", "note", "card", "identity"]);
+    expect(r.items.map((i) => i.payload.kind)).toEqual(["login", "note", "card", "identity", "aws", "api-key"]);
   }, 30_000);
 
   it("CSV Bitwarden : identifiants et notes, le reste compté", async () => {
     const { csv, skipped } = exportCsv([group, ...samples()]);
-    expect(skipped).toBe(2);
+    expect(skipped).toBe(4);
     const r = await importFile(csv);
     expect(r.format).toBe("Bitwarden (CSV)");
     expect(r.items[0].payload).toMatchObject({ kind: "login", login: { name: "GitHub", username: "alice", totp: "JBSWY3DPEHPK3PXP" } });
@@ -229,5 +231,22 @@ describe("uuid", () => {
 
   it("utilise crypto.randomUUID quand il est là", () => {
     expect(uuid()).toMatch(/^[0-9a-f]{8}-/);
+  });
+});
+
+describe("accès AWS", () => {
+  it("écrit ~/.aws/config pour une session SSO", () => {
+    const aws = { ...emptyAws(), ssoSessionName: "org", ssoStartUrl: "https://org.awsapps.com/start", ssoRegion: "eu-west-1", region: "eu-west-3", profiles: [{ name: "prod", accountId: "123456789012", roleName: "Admin", region: "" }] };
+    const { config, credentials } = awsConfigText(aws);
+    expect(config).toBe("[sso-session org]\nsso_start_url = https://org.awsapps.com/start\nsso_region = eu-west-1\nsso_registration_scopes = sso:account:access\n\n[profile prod]\nsso_session = org\nsso_account_id = 123456789012\nsso_role_name = Admin\nregion = eu-west-3\n");
+    expect(credentials).toBe("");
+  });
+
+  it("met les clés d'accès dans ~/.aws/credentials, pas dans config", () => {
+    const aws = { ...emptyAws(), authType: "keys" as const, accessKeyId: "AKIA1", secretAccessKey: "s3cr3t" };
+    const { config, credentials } = awsConfigText(aws);
+    expect(config).not.toContain("s3cr3t");
+    expect(config).toContain("[default]");
+    expect(credentials).toBe("[default]\naws_access_key_id = AKIA1\naws_secret_access_key = s3cr3t\n");
   });
 });

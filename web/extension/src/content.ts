@@ -9,10 +9,15 @@
  *    bouton GuiVault dans le champ ; le menu liste les correspondances, en
  *    choisir une demande *ses* secrets et remplit. Rien n'est ajouté à la
  *    page si le coffre est verrouillé ou n'a rien pour elle.
+ * 3. **Codes** : un champ de code à usage unique (2FA, SSO) reçoit lui aussi
+ *    un bouton, qui propose les codes TOTP des identifiants du site — ou de
+ *    celui qu'on vient de remplir dans l'onglet, pour la page de SSO qui
+ *    suit sur un autre domaine. Avec un seul candidat du site, le code est
+ *    rempli tout seul (réglage « Remplir le code tout seul »).
  *
  * L'interface injectée vit dans un shadow DOM, hors du style de la page. */
 import { DEFAULT_GENERATOR, generate, type GeneratorOptions } from "../../src/lib/generator";
-import type { CredentialsReply, FillReply, MatchesReply, MatchSummary, PasskeyToBackground, Pending, ToBackground, ToContent, VaultsReply } from "./messages";
+import type { CredentialsReply, FillReply, MatchesReply, MatchSummary, PasskeyToBackground, Pending, ToBackground, ToContent, TotpReply, VaultsReply } from "./messages";
 
 declare global {
   interface Window {
@@ -86,13 +91,72 @@ declare global {
     );
   };
 
+  // ─── Champs de code à usage unique ───────────────────────────────────────
+
+  /** Ce qui nomme un champ de code (2FA, SSO, vérification) — en anglais et
+   * en français. `code` seul ne suffit pas : un code postal, promo… */
+  const OTP_RE = /one.?time|\botp\b|totp|\b2fa\b|\bmfa\b|two.?factor|2.?step|multi.?factor|verification.?code|verify.?code|verif.?code|security.?code|auth(entication|entificat\w*|enticator)?.?code|passcode|sms.?code|login.?code|mfa.?code|token.?code|code.?(de )?(v[ée]rification|s[ée]curit[ée]|connexion|confirmation|validation|authentification|à usage unique|re[çc]u)|authenticator|authentificateur|double authentification|\bcode\b.*\b(6|six|8|huit)\b|(6|six|8|huit).{0,12}\bchiffres\b|(6|six|8|huit).{0,12}\bdigit/;
+  const NOT_OTP_RE = /zip|postal|promo|coupon|voucher|gift|cadeau|cvv|cvc|card|carte|captcha|search|recherch|country|pays|phone.?number|t[ée]l[ée]phone|referr?al|parrain|discount|r[ée]duction/;
+  /** Les motifs de l'utilisateur pour cette page (Réglages de l'extension). */
+  let otpPatterns: RegExp[] = [];
+
+  const isOtpLike = (i: HTMLInputElement) => {
+    const t = (i.type || "text").toLowerCase();
+    if (!["text", "tel", "number", "password"].includes(t)) return false;
+    if (i.autocomplete === "one-time-code") return true;
+    const hint = hintOf(i);
+    if (otpPatterns.some((re) => re.test(hint))) return true;
+    // Un mot de passe n'est un code que s'il le dit clairement.
+    if (t === "password" && !/otp|one.?time|2fa|mfa|passcode|verification/.test(hint)) return false;
+    if (NOT_OTP_RE.test(hint)) return false;
+    if (OTP_RE.test(hint)) return true;
+    // Une case d'un code découpé (une par chiffre).
+    return splitGroup(i).length >= 4;
+  };
+
+  /** Les cases d'un code saisi chiffre par chiffre : des champs d'un seul
+   * caractère, côte à côte dans le même conteneur (4 à 8). */
+  const splitGroup = (i: HTMLInputElement): HTMLInputElement[] => {
+    if (i.maxLength !== 1) return [];
+    let box: HTMLElement | null = i.parentElement;
+    for (let depth = 0; box && depth < 3; depth++, box = box.parentElement) {
+      const cells = Array.from(box.querySelectorAll<HTMLInputElement>("input")).filter((x) => x.maxLength === 1 && !x.disabled && visible(x));
+      if (cells.length >= 4 && cells.length <= 8) return cells;
+      if (cells.length > 8) return [];
+    }
+    return [];
+  };
+
+  /** Les champs de code de la page : un par code (la première case d'un
+   * code découpé). */
+  const otpFields = (all: HTMLInputElement[]): HTMLInputElement[] => {
+    const out: HTMLInputElement[] = [];
+    const covered = new Set<HTMLInputElement>();
+    for (const i of all) {
+      if (covered.has(i) || !isOtpLike(i)) continue;
+      const group = splitGroup(i);
+      for (const c of group) covered.add(c);
+      out.push(group[0] ?? i);
+    }
+    return out;
+  };
+
+  /** Pose un code : d'un coup, ou chiffre par chiffre dans des cases. */
+  const fillCode = (field: HTMLInputElement, code: string) => {
+    const group = splitGroup(field);
+    if (group.length >= code.length) {
+      code.split("").forEach((ch, k) => setValue(group[k], ch));
+      group[Math.min(code.length, group.length) - 1]?.blur();
+    } else setValue(field, code);
+  };
+
   const fill = (msg: { username?: string; password?: string; totp?: string }, preferred?: HTMLInputElement): FillReply => {
     const all = inputs();
     const result: FillReply = { username: false, password: false, totp: false };
     if (msg.totp) {
-      const otp = all.find((i) => i.autocomplete === "one-time-code" || /otp|totp|code|2fa|mfa/.test(`${i.name} ${i.id}`.toLowerCase())) ?? (document.activeElement instanceof HTMLInputElement ? document.activeElement : null);
+      const otp = otpFields(all)[0] ?? (document.activeElement instanceof HTMLInputElement ? document.activeElement : null);
       if (otp) {
-        setValue(otp, msg.totp);
+        fillCode(otp, msg.totp);
         result.totp = true;
       }
       return result;
@@ -140,12 +204,17 @@ declare global {
       :host { all: initial; }
       .btn { position: fixed; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; border-radius: 4px; background: #2563eb; color: #fff; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,.35); font: 0/0 a; }
       .btn:hover { background: #3b82f6; }
-      .menu { position: fixed; z-index: 2; min-width: 220px; max-width: 320px; background: #121215; color: #e7e7ea; border: 1px solid #26262b; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,.45); font: 13px system-ui, -apple-system, "Segoe UI", sans-serif; padding: 4px; overflow: hidden; }
-      .item { display: flex; flex-direction: column; gap: 1px; padding: 6px 8px; border-radius: 6px; cursor: pointer; text-align: left; border: 0; background: none; color: inherit; width: 100%; font: inherit; }
+      .menu { position: fixed; z-index: 2; display: flex; flex-direction: column; box-sizing: border-box; width: 280px; max-width: calc(100vw - 8px); background: #121215; color: #e7e7ea; border: 1px solid #26262b; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,.45); font: 13px system-ui, -apple-system, "Segoe UI", sans-serif; padding: 4px; overflow: hidden; }
+      .list { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: #3f3f46 transparent; }
+      .head { font-size: 10.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: #71717a; padding: 4px 8px 2px; }
+      .item .fill { font-size: 10.5px; color: #60a5fa; }
+      .toast { position: fixed; z-index: 3; box-sizing: border-box; max-width: 320px; display: flex; align-items: center; gap: 8px; background: #121215; color: #e7e7ea; border: 1px solid #26262b; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,.45); font: 12px system-ui, -apple-system, "Segoe UI", sans-serif; padding: 6px 10px; }
+      .item { display: flex; flex-direction: column; gap: 1px; padding: 6px 8px; border-radius: 6px; cursor: pointer; text-align: left; border: 0; background: none; color: inherit; width: 100%; box-sizing: border-box; font: inherit; }
       .item:hover, .item:focus { background: rgba(255,255,255,.08); outline: none; }
       .name { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       .user { font-size: 11px; color: #a1a1aa; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-      .foot { font-size: 10.5px; color: #71717a; padding: 4px 8px 2px; border-top: 1px solid #26262b; margin-top: 2px; }
+      .foot { flex-shrink: 0; font-size: 10.5px; color: #71717a; padding: 4px 8px 2px; border-top: 1px solid #26262b; margin-top: 2px; }
+      .sticky { flex-shrink: 0; border-top: 1px solid #26262b; margin-top: 2px; padding-top: 2px; }
       .veil { position: fixed; z-index: 4; inset: 0; background: rgba(0,0,0,.45); }
       .dialog { position: fixed; z-index: 4; left: 50%; top: 18%; transform: translateX(-50%); width: min(360px, calc(100vw - 32px)); background: #121215; color: #e7e7ea; border: 1px solid #26262b; border-radius: 12px; box-shadow: 0 16px 48px rgba(0,0,0,.55); font: 13px system-ui, -apple-system, "Segoe UI", sans-serif; padding: 14px; }
       .dialog h2 { margin: 0 0 6px; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
@@ -195,9 +264,34 @@ declare global {
     btn.style.top = `${Math.round(r.top + (r.height - 20) / 2)}px`;
   };
 
+  /** Le bouton sous lequel le menu est ouvert : le menu le suit quand la
+   * page défile, au lieu de se fermer. */
+  let menuBtn: HTMLElement | null = null;
+
   const closeMenu = () => {
     menu?.remove();
     menu = null;
+    menuBtn = null;
+  };
+
+  /** Sous le bouton, ou au-dessus quand la place manque en bas ; la liste
+   * défile à l'intérieur quand elle est plus haute que l'espace. */
+  const placeMenu = () => {
+    if (!menu || !menuBtn) return;
+    if (menuBtn.style.display === "none") return closeMenu();
+    const r = menuBtn.getBoundingClientRect();
+    const below = window.innerHeight - r.bottom - 8;
+    const above = r.top - 8;
+    const up = below < 200 && above > below;
+    menu.style.maxHeight = `${Math.max(120, Math.min(420, up ? above : below))}px`;
+    menu.style.left = `${Math.max(4, Math.min(window.innerWidth - menu.offsetWidth - 4, r.right - menu.offsetWidth))}px`;
+    if (up) {
+      menu.style.top = "";
+      menu.style.bottom = `${window.innerHeight - r.top + 4}px`;
+    } else {
+      menu.style.bottom = "";
+      menu.style.top = `${r.bottom + 4}px`;
+    }
   };
 
   const choose = async (m: MatchSummary, input: HTMLInputElement) => {
@@ -208,39 +302,57 @@ declare global {
     fill({ username: c.username, password: c.password }, password);
   };
 
-  const openMenu = (input: HTMLInputElement, btn: HTMLElement) => {
+  /** Une ligne de menu : un nom, une ligne secondaire, une action. */
+  const menuItem = (name: string, sub: string, onClick: () => void, hint?: string) => {
+    const b = document.createElement("button");
+    b.className = "item";
+    b.setAttribute("role", "menuitem");
+    b.innerHTML = `<span class="name"></span><span class="user"></span>`;
+    (b.firstChild as HTMLElement).textContent = name;
+    (b.lastChild as HTMLElement).textContent = sub;
+    if (hint) b.title = hint;
+    b.addEventListener("click", onClick);
+    return b;
+  };
+
+  /** Un menu vide sous `btn` : sa liste défilante, où ajouter les lignes. */
+  const newMenu = (btn: HTMLElement, heading: string | null) => {
     closeMenu();
     const root = ensureHost();
     menu = document.createElement("div");
     menu.className = "menu";
     menu.setAttribute("role", "menu");
-    for (const m of matches) {
-      const b = document.createElement("button");
-      b.className = "item";
-      b.setAttribute("role", "menuitem");
-      b.innerHTML = `<span class="name"></span><span class="user"></span>`;
-      (b.firstChild as HTMLElement).textContent = `${m.favorite ? "★ " : ""}${m.name}`;
-      (b.lastChild as HTMLElement).textContent = m.username || "—";
-      b.addEventListener("click", () => void choose(m, input));
-      menu.appendChild(b);
+    menuBtn = btn;
+    if (heading) {
+      const h = document.createElement("div");
+      h.className = "head";
+      h.textContent = heading;
+      menu.appendChild(h);
     }
-    const add = document.createElement("button");
-    add.className = "item";
-    add.setAttribute("role", "menuitem");
-    add.innerHTML = `<span class="name"></span><span class="user"></span>`;
-    (add.firstChild as HTMLElement).textContent = matches.length ? "+ Nouvel identifiant…" : `+ Enregistrer un identifiant pour ${location.hostname.replace(/^www\./, "")}…`;
-    (add.lastChild as HTMLElement).textContent = matches.length ? "" : "Aucun identifiant GuiVault pour ce site";
-    add.addEventListener("click", () => { closeMenu(); void newLoginDialog(input); });
-    menu.appendChild(add);
+    const list = document.createElement("div");
+    list.className = "list";
+    menu.appendChild(list);
+    root.appendChild(menu);
+    return { menu, list };
+  };
+
+  const openMenu = (input: HTMLInputElement, btn: HTMLElement) => {
+    const { menu: m, list } = newMenu(btn, matches.length ? `${matches.length} identifiant${matches.length > 1 ? "s" : ""} pour ce site` : null);
+    for (const l of matches) list.appendChild(menuItem(`${l.favorite ? "★ " : ""}${l.name}`, l.username || "—", () => void choose(l, input), "Remplir avec cet identifiant"));
+    const sticky = document.createElement("div");
+    if (matches.length) sticky.className = "sticky";
+    sticky.appendChild(menuItem(
+      matches.length ? "+ Nouvel identifiant…" : `+ Enregistrer un identifiant pour ${location.hostname.replace(/^www\./, "")}…`,
+      matches.length ? "" : "Aucun identifiant GuiVault pour ce site",
+      () => { closeMenu(); void newLoginDialog(input); },
+    ));
+    m.appendChild(sticky);
     const foot = document.createElement("div");
     foot.className = "foot";
     foot.textContent = "GuiVault — Ctrl+Maj+L pour remplir";
-    menu.appendChild(foot);
-    const r = btn.getBoundingClientRect();
-    menu.style.left = `${Math.max(4, Math.min(window.innerWidth - 330, r.right - 240))}px`;
-    menu.style.top = `${r.bottom + 4}px`;
-    root.appendChild(menu);
-    (menu.querySelector("button") as HTMLElement | null)?.focus();
+    m.appendChild(foot);
+    placeMenu();
+    (m.querySelector("button") as HTMLElement | null)?.focus();
   };
 
   const isEmailLike = (i: HTMLInputElement) => (i.type || "text").toLowerCase() === "email" || i.autocomplete === "email" || /e-?mail|courriel/.test(hintOf(i));
@@ -250,21 +362,78 @@ declare global {
    * page, sinon le mot de passe lui-même. */
   const anchorFor = (password: HTMLInputElement, all: HTMLInputElement[]) => usernameFor(password, all) ?? all.find((i) => i !== password && isEmailLike(i)) ?? password;
 
-  /** Ce que fait le bouton : verrouillé → le dire ; rien pour ce site →
-   * créer ; un compte → remplir ; plusieurs → menu. */
+  // ─── Codes : le menu du champ de code ────────────────────────────────────
+
+  /** Les identifiants dont on peut proposer le code : ceux du site qui ont
+   * un TOTP, puis le dernier rempli dans l'onglet. */
+  let recent: MatchSummary | null = null;
+  let autoTotp = false;
+  const otpInputs = new Set<HTMLInputElement>();
+  const totpCandidates = () => [...matches.filter((m) => m.hasTotp), ...(recent ? [recent] : [])];
+
+  let toast: HTMLElement | null = null;
+  /** Un mot discret près du champ : ce qui vient d'être fait, et par qui. */
+  const say = (field: HTMLInputElement, text: string) => {
+    toast?.remove();
+    const root = ensureHost();
+    toast = document.createElement("div");
+    toast.className = "toast";
+    toast.setAttribute("role", "status");
+    toast.innerHTML = `<span class="logo">${ICON}</span><span></span>`;
+    (toast.lastChild as HTMLElement).textContent = text;
+    const r = field.getBoundingClientRect();
+    toast.style.left = `${Math.max(4, Math.min(window.innerWidth - 324, r.left))}px`;
+    toast.style.top = `${Math.min(window.innerHeight - 40, r.bottom + 6)}px`;
+    root.appendChild(toast);
+    const mine = toast;
+    setTimeout(() => { if (toast === mine) { toast.remove(); toast = null; } }, 3500);
+  };
+
+  const fillTotp = async (m: MatchSummary, field: HTMLInputElement, auto = false) => {
+    closeMenu();
+    const r = await send<TotpReply>({ type: "guivault-totp", id: m.id }).catch(() => null);
+    if (!r) return;
+    fillCode(field, r.code);
+    say(field, auto ? `Code de « ${m.name} » rempli par GuiVault.` : `Code de « ${m.name} » rempli.`);
+  };
+
+  const openTotpMenu = (field: HTMLInputElement, btn: HTMLElement) => {
+    const list = totpCandidates();
+    const { menu: m, list: box } = newMenu(btn, "Code à usage unique");
+    for (const c of list) box.appendChild(menuItem(`${c.favorite ? "★ " : ""}${c.name}`, c === recent ? `${c.username || "—"} · rempli juste avant` : c.username || "—", () => void fillTotp(c, field), "Remplir le code TOTP de cet identifiant"));
+    if (list.length === 0) {
+      const p = document.createElement("div");
+      p.className = "user";
+      p.style.padding = "6px 8px";
+      p.textContent = "Aucun identifiant de ce site n'a de secret TOTP.";
+      box.appendChild(p);
+    }
+    const foot = document.createElement("div");
+    foot.className = "foot";
+    foot.textContent = "GuiVault — le code change toutes les 30 s";
+    m.appendChild(foot);
+    placeMenu();
+    (m.querySelector("button") as HTMLElement | null)?.focus();
+  };
+
+  /** Ce que fait le bouton : verrouillé → le dire ; un champ de code → les
+   * codes ; sinon le menu des identifiants — même avec un seul, qu'on voit
+   * avant de le remplir. */
   const onButton = (input: HTMLInputElement, btn: HTMLElement) => {
     if (menu) return closeMenu();
     if (locked) return void dialog("GuiVault est verrouillé", "Cliquez sur l'icône GuiVault dans la barre du navigateur pour vous reconnecter, puis revenez ici.", null, "OK", true);
-    if (matches.length === 1) return void choose(matches[0], input);
+    if (otpInputs.has(input)) return openTotpMenu(input, btn);
     openMenu(input, btn);
   };
+
+  const buttonTitle = (input: HTMLInputElement) => (otpInputs.has(input) ? "Code à usage unique (GuiVault)" : matches.length ? "Remplir avec GuiVault" : "Enregistrer dans GuiVault");
 
   const attach = (input: HTMLInputElement) => {
     if (anchors.has(input)) return;
     const root = ensureHost();
     const btn = document.createElement("div");
     btn.className = "btn";
-    btn.title = matches.length ? "Remplir avec GuiVault" : "Enregistrer dans GuiVault";
+    btn.title = buttonTitle(input);
     btn.setAttribute("role", "button");
     btn.setAttribute("aria-label", "GuiVault");
     btn.innerHTML = ICON;
@@ -278,6 +447,7 @@ declare global {
   const detach = (input: HTMLInputElement) => {
     anchors.get(input)?.remove();
     anchors.delete(input);
+    if (menuBtn && !Array.from(anchors.values()).includes(menuBtn)) closeMenu();
   };
 
   let scheduled = false;
@@ -287,7 +457,7 @@ declare global {
     requestAnimationFrame(() => {
       scheduled = false;
       for (const [input, btn] of anchors) place(input, btn);
-      if (menu) closeMenu();
+      placeMenu();
     });
   };
 
@@ -301,6 +471,8 @@ declare global {
   };
 
   let reportedForm: boolean | null = null;
+  /** Le code rempli tout seul une fois par champ, pas à chaque passage. */
+  const autoFilled = new WeakSet<HTMLInputElement>();
 
   /** Repère les champs et pose (ou retire) les boutons ; dit au worker si
    * la page a un formulaire (pour le badge). */
@@ -312,12 +484,39 @@ declare global {
       locked = !!r?.locked;
       enabled = !!r && (r.locked || r.enabled);
       matches = r && !r.locked ? r.logins : [];
-      for (const [, btn] of anchors) btn.title = matches.length ? "Remplir avec GuiVault" : "Enregistrer dans GuiVault";
+      recent = r && !r.locked ? r.recent : null;
+      autoTotp = !!r && !r.locked && r.autoTotp;
+      otpPatterns = [];
+      for (const src of r && !r.locked ? r.otpPatterns : []) {
+        try {
+          otpPatterns.push(new RegExp(src, "i"));
+        } catch {
+          // invalide : déjà signalé dans les réglages
+        }
+      }
     }
     const all = inputs();
-    const fields = enabled ? anchorsWanted(all) : [];
+    // Les champs de code d'abord (seulement s'il y a un code à proposer) :
+    // ils ne comptent ni comme mot de passe ni comme utilisateur.
+    const candidates = totpCandidates();
+    const codes = enabled && !locked && candidates.length ? otpFields(all) : [];
+    otpInputs.clear();
+    const withCodes = codes.length && candidates.length ? codes.slice(0, 2) : [];
+    for (const c of withCodes) otpInputs.add(c);
+    const rest = codes.length ? all.filter((i) => !codes.includes(i) && !splitGroup(i).length) : all;
+    const fields = enabled ? [...anchorsWanted(rest), ...withCodes] : [];
     for (const input of Array.from(anchors.keys())) if (!fields.includes(input)) detach(input);
     for (const input of fields) attach(input);
+    for (const [input, btn] of anchors) btn.title = buttonTitle(input);
+    // Un seul identifiant du site avec un TOTP, un champ de code vide : on
+    // le remplit. Jamais pour « le dernier rempli » d'un autre site — là,
+    // c'est à l'utilisateur de choisir, par le bouton.
+    const own = matches.filter((m) => m.hasTotp);
+    const target = withCodes[0];
+    if (autoTotp && own.length === 1 && target && !target.value && !autoFilled.has(target)) {
+      autoFilled.add(target);
+      void fillTotp(own[0], target, true);
+    }
     const present = all.some((i) => i.type === "password") || fields.length > 0;
     if (present !== reportedForm && window === window.top) {
       reportedForm = present;
@@ -653,10 +852,33 @@ declare global {
       return;
     }
     if (msg.type === "guivault-pick") {
-      const [input] = Array.from(anchors.keys());
+      const input = Array.from(anchors.keys()).find((i) => !otpInputs.has(i));
       const btn = input && anchors.get(input);
       if (input && btn) openMenu(input, btn);
       reply({ username: false, password: false, totp: false });
+      return;
+    }
+    if (msg.type === "guivault-shortcut") {
+      // Le raccourci est un ordre explicite : un seul candidat, on remplit ;
+      // plusieurs, le menu. Un champ de code visible passe avant.
+      lastUrl = "";
+      void scan().then(() => {
+        const none = { username: false, password: false, totp: false };
+        const code = Array.from(otpInputs)[0];
+        const codeBtn = code && anchors.get(code);
+        if (code && codeBtn) {
+          const c = totpCandidates();
+          if (c.length === 1) void fillTotp(c[0], code);
+          else openTotpMenu(code, codeBtn);
+          return reply({ ...none, totp: true });
+        }
+        const input = Array.from(anchors.keys()).find((i) => !otpInputs.has(i));
+        if (matches.length === 1 && input) void choose(matches[0], input);
+        else if (matches.length === 1) void send<CredentialsReply>({ type: "guivault-credentials", id: matches[0].id }).then((c) => c && fill({ username: c.username, password: c.password }));
+        else if (input && matches.length > 1) openMenu(input, anchors.get(input)!);
+        reply(none);
+      });
+      return true;
     }
   });
 })();

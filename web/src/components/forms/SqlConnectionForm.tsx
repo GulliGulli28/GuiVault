@@ -3,7 +3,7 @@ import type { VaultIndex } from "../../lib/entities";
 import { uuid } from "../../lib/bytes";
 import { SQL_ENGINE_LABELS, type DbTunnel, type Payload, type SqlConnection, type SqlEngine } from "../../lib/types";
 import { PasswordInput } from "../ui";
-import { Checkbox, Field, FormShell, GroupSelect, HostSelect, TagsInput, parsePort } from "./common";
+import { Checkbox, Field, FormShell, GroupSelect, HostSelect, TagsInput, parsePort, useSeed } from "./common";
 
 const DEFAULT_PORT: Record<SqlEngine, number> = { mysql: 3306, postgres: 5432, redis: 6379, sqlite: 0, mongodb: 27017 };
 
@@ -19,7 +19,8 @@ export function SqlConnectionForm({ initial, index, defaultGroupId, onSave, onCa
   onSave: (p: Payload) => Promise<void>;
   onCancel: () => void;
 }) {
-  const c = initial?.connection;
+  const seed = useSeed(initial, (p) => (p.kind === "sql-connection" ? p : undefined));
+  const c = seed?.connection;
   const [label, setLabel] = useState(c?.label ?? "");
   const [engine, setEngine] = useState<SqlEngine>(c?.engine ?? "postgres");
   const server = c && c.engine !== "sqlite" && c.engine !== "mongodb" ? c : null;
@@ -28,7 +29,7 @@ export function SqlConnectionForm({ initial, index, defaultGroupId, onSave, onCa
   const [username, setUsername] = useState(server?.username ?? (c?.engine === "mongodb" ? c.username : ""));
   const [database, setDatabase] = useState(server?.database ?? "");
   const [tls, setTls] = useState((c && c.engine !== "sqlite" && c.tls) ?? false);
-  const [password, setPassword] = useState(initial?.password ?? "");
+  const [password, setPassword] = useState(seed?.password ?? "");
   const [path, setPath] = useState(c?.engine === "sqlite" ? c.path : "");
   const [sqliteHostId, setSqliteHostId] = useState<string | null>(c?.engine === "sqlite" ? c.sqliteHostId ?? null : null);
   const [connectionString, setConnectionString] = useState(c?.engine === "mongodb" ? c.connectionString : "");
@@ -77,7 +78,7 @@ export function SqlConnectionForm({ initial, index, defaultGroupId, onSave, onCa
   };
 
   return (
-    <FormShell title={c ? `Modifier « ${c.label} »` : "Nouvelle connexion"} onSave={save} onCancel={onCancel} validate={validate}>
+    <FormShell title={initial ? `Modifier « ${initial.connection.label} »` : "Nouvelle connexion"} onSave={save} onCancel={onCancel} validate={validate}>
       <Field label="Nom">
         <input value={label} onChange={(e) => setLabel(e.target.value)} autoFocus className="input" />
       </Field>

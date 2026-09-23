@@ -39,15 +39,33 @@ maître et le délai de verrouillage.
   minutes dans la mémoire de session du worker, jamais dans la page.
 - **Dans la page** : un bouton GuiVault sur le champ utilisateur (sinon un
   champ e-mail, sinon le mot de passe) de tout formulaire de connexion — y
-  compris les connexions en deux étapes (champ utilisateur seul). Un compte
-  pour le site → il remplit ; plusieurs → un menu ; aucun → un menu
+  compris les connexions en deux étapes (champ utilisateur seul). Il ouvre
+  toujours le menu des identifiants du site — même s'il n'y en a qu'un :
+  on voit lequel avant de remplir, un clic le remplit. Le menu défile quand
+  la liste est longue, s'ouvre au-dessus du champ quand la place manque en
+  dessous, et suit le champ quand la page défile. Aucun compte → un menu
   « Enregistrer un identifiant pour <site>… » qui ouvre **« Nouvel
   identifiant »** dans la page : nom et site préremplis, utilisateur repris
   du champ, mot de passe tapé ou généré par le générateur avec ses réglages
   (les mêmes que le popup, dans les deux sens), vault au choix — enregistré
   puis rempli. Coffre verrouillé → il le dit.
-  **Ctrl+Maj+L** remplit sans ouvrir le popup. Désactivable (« Proposer le
-  remplissage dans les pages »).
+  **Ctrl+Maj+L** remplit sans ouvrir le popup (un seul compte → rempli,
+  plusieurs → le menu, un champ de code visible → le code). Désactivable
+  (« Proposer le remplissage dans les pages »).
+- **Codes à usage unique** (2FA, SSO) : un champ de code reçoit son propre
+  bouton, qui propose les codes TOTP des identifiants du site. Reconnu par
+  `autocomplete="one-time-code"`, par ses mots (« code de vérification »,
+  « 2FA », « OTP », « authenticator », « 6 chiffres »… — `OTP_RE` dans
+  `content.ts`), ou parce qu'il est découpé en cases d'un chiffre (rempli
+  case par case). Pour un champ que la détection rate : Réglages › « Champs
+  de code supplémentaires », une regex par ligne comparée au nom, à l'id et
+  au libellé du champ, ou `regex d'URL => regex de champ`. Un seul
+  identifiant du site a un TOTP → le code est **rempli tout seul**
+  (réglage « Remplir le code tout seul », actif par défaut), avec un mot
+  près du champ pour le dire. **Page de SSO sur un autre domaine** : le
+  dernier identifiant rempli dans l'onglet (10 min) est proposé aussi —
+  proposé seulement, jamais rempli tout seul, puisque son URI ne correspond
+  pas à la page.
 - **Badge** : le nombre d'identifiants pour l'onglet, seulement quand la
   page a un formulaire de connexion sous les yeux.
 - **Codes** : l'authentificateur — tous les codes TOTP du coffre, en
@@ -71,9 +89,19 @@ maître et le délai de verrouillage.
   barre du navigateur et le logo du popup passent en gris tant que le
   coffre est verrouillé.
 - **Réglages** (la roue dentée, une fois connecté) : délai de
-  verrouillage, remplissage dans les pages, et l'apparence — les mêmes
-  réglages que l'interface web et que Guiterm (mode, fond, accent, police,
-  tailles des lignes), retenus par le navigateur pour le popup.
+  verrouillage, remplissage dans les pages, codes à usage unique, et
+  l'apparence — les mêmes réglages que l'interface web et que Guiterm
+  (mode, fond, accent, police, tailles des lignes). Sauf le délai de
+  verrouillage et le serveur, ils **suivent le compte** : chiffrés sous la
+  user key, relus à chaque ouverture du popup et par l'interface web
+  (« Synchroniser les réglages entre mes appareils », désactivable par
+  appareil).
+- **On reprend où on en était** : un clic hors du popup le ferme ; rouvert
+  dans les 15 minutes, il revient au même onglet, à la même fiche, à la même
+  recherche — et un formulaire commencé (nouvel élément ou modification)
+  est toujours repris avec ce qu'on y avait tapé. Gardé dans
+  `chrome.storage.session` (un brouillon peut contenir un secret), effacé
+  au verrouillage.
 
 ## Comment c'est fait
 
@@ -140,7 +168,12 @@ d'URI vérifiée par le service worker sur l'URL que *le navigateur* connaît
 de l'onglet (pas celle que la page prétend) : un identifiant `domain
 example.com` ne sera jamais proposé sur `example.com.attacker.net`
 (domaine enregistrable différent). Le bouton dans la page ne remplit qu'au
-clic ; un site ne peut pas déclencher le remplissage lui-même.
+clic ; un site ne peut pas déclencher le remplissage lui-même. Seule
+exception, le **code TOTP** d'un identifiant du site quand il est le seul :
+rempli sans clic (réglage), car il ne vaut que 30 secondes et pour ce site.
+Le code du « dernier identifiant rempli » sur une page d'un autre domaine
+n'est donné qu'au clic de l'utilisateur, et le service worker vérifie que
+c'est bien celui qu'il a rempli dans *cet* onglet.
 
 ## Ce qui n'est pas là (encore)
 

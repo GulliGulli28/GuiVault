@@ -113,6 +113,18 @@ pub fn item(item_type: &str, ciphertext: &[u8], max: usize) -> Result<(), AppErr
     Ok(())
 }
 
+/// Réglages synchronisés : un blob symétrique de 64 Kio au plus — de quoi
+/// tenir l'apparence, le générateur et des motifs, pas un fichier.
+pub fn settings_blob(bytes: &[u8]) -> Result<(), AppError> {
+    if bytes.len() <= MIN_SYM_BLOB || bytes.len() > 64 * 1024 {
+        return Err(AppError::bad_request(
+            "invalid_blob",
+            "réglages chiffrés : taille invalide",
+        ));
+    }
+    Ok(())
+}
+
 pub fn device_name(name: Option<String>) -> Option<String> {
     name.map(|n| n.trim().chars().take(100).collect::<String>())
         .filter(|n| !n.is_empty())

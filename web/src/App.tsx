@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { currentTokens, setSessionLostHandler, setTokens, setTokensChangedHandler, subscribeEvents } from "./lib/api";
+import { pullSettings, startSettingsSync, stopSettingsSync } from "./lib/syncedSettings";
+import "./lib/settingsSections";
 import { clearWebSession, loadWebSession, saveWebSession, saveWebTokens, touchWebSession, webSessionIdle } from "./lib/persist";
 import { navigate, useRoute } from "./lib/route";
 import { logout, refresh, wipe, type SessionState } from "./lib/session";
@@ -109,11 +111,24 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session !== null, error]);
 
-  // Flux d'événements : un vault modifié ailleurs, une invitation reçue.
+  // Les réglages synchronisés : relus à la connexion, envoyés quand ils
+  // changent ici (`syncedSettings.ts`).
+  useEffect(() => {
+    const s = sessionRef.current;
+    if (!s) return;
+    void startSettingsSync(s.account.userKey);
+    return () => stopSettingsSync();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session !== null]);
+
+  // Flux d'événements : un vault modifié ailleurs, une invitation reçue,
+  // des réglages changés sur un autre appareil.
   useEffect(() => {
     if (!session) return;
     const sub = subscribeEvents((ev) => {
-      if (ev.type === "vault_changed") {
+      if (ev.type === "settings_changed") {
+        void pullSettings();
+      } else if (ev.type === "vault_changed") {
         // `/sync` d'abord : une rotation de clé change la clé du vault, et
         // la page doit relire les items avec la nouvelle, pas l'ancienne.
         void reload().finally(() => setVaultTicks((t) => ({ ...t, [ev.vault_id]: (t[ev.vault_id] ?? 0) + 1 })));

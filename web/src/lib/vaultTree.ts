@@ -4,7 +4,8 @@ import { KIND_LABELS, type GuiVaultEntity, type GuiVaultEntityKind } from "./typ
  * L'arborescence du contenu d'un vault, préparée en une passe. Reprise de
  * `src/lib/vaultTree.ts` de Guiterm (même algorithme, mêmes lignes) pour
  * que le contenu d'un vault se lise pareil dans les deux interfaces. Deux
- * écarts : le seau « Icônes », et `search` dans `matches`.
+ * écarts : les seaux « Runbooks » et « Icônes », et `search` dans
+ * `matches`.
  *
  * Le résultat est une **liste plate de lignes déjà ordonnées et indentées**,
  * comme les deux autres : le composant ne fait que la parcourir.
@@ -57,6 +58,7 @@ export interface VaultTree {
 const BUCKETS: { kind: GuiVaultEntityKind; label: string }[] = [
   { kind: "key", label: "Clés" },
   { kind: "snippet", label: "Snippets" },
+  { kind: "runbook", label: "Runbooks" },
   { kind: "icon", label: "Icônes" },
 ];
 

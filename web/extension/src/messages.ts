@@ -16,6 +16,9 @@ export type ToBackground =
   /** L'utilisateur a choisi un identifiant : ses secrets, si l'URL de
    * l'onglet expéditeur correspond bien. */
   | { type: "guivault-credentials"; id: string }
+  /** Le code TOTP courant d'un identifiant : un de ceux du site, ou le
+   * dernier rempli dans cet onglet (page de SSO sur un autre domaine). */
+  | { type: "guivault-totp"; id: string }
   /** Un formulaire de connexion vient d'être soumis avec ces valeurs. */
   | { type: "guivault-captured"; username: string; password: string }
   /** La page (re)chargée demande s'il y a une saisie à proposer d'enregistrer. */
@@ -46,7 +49,23 @@ export interface Pending {
   defaultVaultId: string;
 }
 
-export type MatchesReply = { locked: true } | { locked: false; enabled: boolean; logins: MatchSummary[] };
+export type MatchesReply =
+  | { locked: true }
+  | {
+      locked: false;
+      enabled: boolean;
+      logins: MatchSummary[];
+      /** Le dernier identifiant rempli dans cet onglet, s'il a un TOTP et
+       * n'est pas déjà dans `logins` : une page de SSO qui suit la connexion
+       * peut demander son code. */
+      recent: MatchSummary | null;
+      /** Remplir le code seul quand un seul identifiant du site a un TOTP. */
+      autoTotp: boolean;
+      /** Motifs de champs de code qui s'appliquent à cette page (sources de
+       * regex, insensibles à la casse). */
+      otpPatterns: string[];
+    };
+export type TotpReply = { code: string } | null;
 export type CredentialsReply = { username: string; password: string; totp: string | null } | null;
 
 /** Vers le script de page. */
@@ -54,7 +73,10 @@ export type ToContent =
   | { type: "guivault-fill"; username?: string; password?: string; totp?: string }
   /** Ouvrir le menu de choix (raccourci clavier avec plusieurs
    * correspondances). */
-  | { type: "guivault-pick" };
+  | { type: "guivault-pick" }
+  /** Le raccourci clavier : la page choisit — un champ de code à remplir,
+   * un seul identifiant, ou le menu. */
+  | { type: "guivault-shortcut" };
 
 export type FillReply = { username: boolean; password: boolean; totp: boolean };
 

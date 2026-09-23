@@ -2,13 +2,14 @@ import { useState } from "react";
 import { uuid } from "../../lib/bytes";
 import type { CustomIcon, Payload } from "../../lib/types";
 import { FileButton } from "../ui";
-import { Field, FormShell } from "./common";
+import { Field, FormShell, useSeed } from "./common";
 
 const MAX_BYTES = 64 * 1024;
 
 export function IconForm({ initial, onSave, onCancel }: { initial?: CustomIcon; onSave: (p: Payload) => Promise<void>; onCancel: () => void }) {
-  const [name, setName] = useState(initial?.name ?? "");
-  const [dataUrl, setDataUrl] = useState(initial?.dataUrl ?? "");
+  const seed = useSeed(initial, (p) => (p.kind === "icon" ? p.icon : undefined));
+  const [name, setName] = useState(seed?.name ?? "");
+  const [dataUrl, setDataUrl] = useState(seed?.dataUrl ?? "");
 
   const loadFile = (file: File | undefined) => {
     if (!file) return;
@@ -22,7 +23,7 @@ export function IconForm({ initial, onSave, onCancel }: { initial?: CustomIcon; 
   };
 
   const save = async () => {
-    const icon: CustomIcon = { id: initial?.id ?? uuid(), name: name.trim(), dataUrl };
+    const icon: CustomIcon = { id: seed?.id ?? uuid(), name: name.trim(), dataUrl };
     await onSave({ kind: "icon", icon });
   };
 

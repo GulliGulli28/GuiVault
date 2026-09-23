@@ -278,6 +278,18 @@ export function openVaultName(vaultKey: Uint8Array, vaultId: string, blob: Uint8
   return utf8.decode(open(vaultKey, blob, itemAad(vaultId, "", "vault-name")));
 }
 
+/** Les réglages synchronisés (JSON) : sous la user key, que seul le compte
+ * ouvre — `seal_user_settings` côté Rust. */
+const AAD_USER_SETTINGS = utf8.encode("guivault/v1/user-settings");
+
+export function sealUserSettings(userKey: Uint8Array, json: string): Uint8Array {
+  return seal(userKey, utf8.encode(json), AAD_USER_SETTINGS);
+}
+
+export function openUserSettings(userKey: Uint8Array, blob: Uint8Array): string {
+  return utf8.decode(open(userKey, blob, AAD_USER_SETTINGS));
+}
+
 // ─── Exports chiffrés ───────────────────────────────────────────────────────
 
 export const AAD_EXPORT = utf8.encode("guivault/v1/export");

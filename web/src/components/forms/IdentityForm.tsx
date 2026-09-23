@@ -3,7 +3,7 @@ import type { VaultIndex } from "../../lib/entities";
 import { emptyIdentity } from "../../lib/items";
 import type { Identity, Payload } from "../../lib/types";
 import { PasswordInput } from "../ui";
-import { Field, FormShell } from "./common";
+import { Field, FormShell, useSeed } from "./common";
 import { SecretFooter, SecretHeader } from "./SecretBits";
 
 // Les champs texte de l'identité — énumérés parce que la signature d'index
@@ -17,7 +17,7 @@ export function IdentityForm({ initial, index, defaultGroupId, onSave, onCancel 
   onSave: (p: Payload) => Promise<void>;
   onCancel: () => void;
 }) {
-  const [identity, setIdentity] = useState<Identity>(initial ?? emptyIdentity(defaultGroupId ?? null));
+  const [identity, setIdentity] = useState<Identity>(useSeed(initial, (p) => (p.kind === "identity" ? p.identity : undefined)) ?? emptyIdentity(defaultGroupId ?? null));
   const text = (key: Key, label: string, opts: { mono?: boolean; autoComplete?: string } = {}) => (
     <Field label={label}>
       <input value={identity[key]} onChange={(e) => setIdentity({ ...identity, [key]: e.target.value })} autoComplete={opts.autoComplete ?? "off"} className={`input ${opts.mono ? "input-mono" : ""}`} />

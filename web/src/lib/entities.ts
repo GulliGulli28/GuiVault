@@ -52,9 +52,31 @@ function parentOf(p: Payload): string | null {
     case "note": return p.note.groupId ?? null;
     case "card": return p.card.groupId ?? null;
     case "identity": return p.identity.groupId ?? null;
+    case "aws": return p.aws.groupId ?? null;
+    case "api-key": return p.apiKey.groupId ?? null;
     default: return null;
   }
 }
+
+/** Le même élément rangé ailleurs (`null` = racine) ; `null` pour un type
+ * qui ne se range pas dans un dossier (clé, snippet, icône). */
+export function withParent(p: Payload, folderId: string | null): Payload | null {
+  switch (p.kind) {
+    case "host": return { ...p, host: { ...p.host, groupId: folderId } };
+    case "group": return { ...p, group: { ...p.group, parentId: folderId } };
+    case "sql-connection": return { ...p, connection: { ...p.connection, groupId: folderId } };
+    case "login": return { ...p, login: { ...p.login, groupId: folderId } };
+    case "note": return { ...p, note: { ...p.note, groupId: folderId } };
+    case "card": return { ...p, card: { ...p.card, groupId: folderId } };
+    case "identity": return { ...p, identity: { ...p.identity, groupId: folderId } };
+    case "aws": return { ...p, aws: { ...p.aws, groupId: folderId } };
+    case "api-key": return { ...p, apiKey: { ...p.apiKey, groupId: folderId } };
+    default: return null;
+  }
+}
+
+/** Les types qui se rangent dans un dossier. */
+export const FOLDERABLE_KINDS = new Set<string>(["host", "group", "sql-connection", "login", "note", "card", "identity", "aws", "api-key"]);
 
 /** Chemin « Prod / Bases » d'un dossier, borné contre un cycle de `parentId`. */
 export function groupPath(groups: Map<string, Group>, groupId: string | null): string {
@@ -127,6 +149,12 @@ function describeEntity(p: Payload): Pick<GuiVaultEntity, "mono" | "icon" | "hos
       return { subtitle: p.snippet.command.split("\n")[0].slice(0, 80) || undefined, mono: true, tags: p.snippet.tags?.length ? p.snippet.tags : undefined };
     case "key":
       return { subtitle: p.passphrase ? "protégée par passphrase" : undefined };
+    case "runbook": {
+      const n = p.runbook.steps.length;
+      return { subtitle: p.runbook.description.split("\n")[0].slice(0, 80) || undefined, badge: `${n} étape${n > 1 ? "s" : ""}` };
+    }
+    case "aws":
+      return { badge: p.aws.authType === "sso" ? "SSO" : "clés" };
     default:
       return {};
   }

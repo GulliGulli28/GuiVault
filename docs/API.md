@@ -45,8 +45,10 @@ Erreurs : `{ "code": "…", "message": "…" }` (+ champs selon le code, ex.
 | `POST /auth/totp/setup` | → `{ secret, otpauth_url }` (en attente jusqu'à `enable`) |
 | `POST /auth/totp/enable` | `{ code }` → `{ recovery_codes }` (8, montrés une seule fois ; autres sessions révoquées) |
 | `POST /auth/totp/disable` | `{ code }` (TOTP ou récupération) → `204` |
-| `GET /events` | flux SSE de `ServerEvent` (`vault_changed`, `invitation_received`, `membership_changed`) — dit *que* quelque chose a changé, le client resynchronise |
+| `GET /events` | flux SSE de `ServerEvent` (`vault_changed`, `invitation_received`, `membership_changed`, `settings_changed`) — dit *que* quelque chose a changé, le client resynchronise |
 | `GET /users/me` | `UserProfile` |
+| `GET /users/me/settings` | `UserSettings` (`{ blob, revision, updated_at }`) ou `null` si aucun appareil n'en a envoyé |
+| `PUT /users/me/settings` | `{ blob, base_revision }` → `UserSettings`, ou `409` `{ code: "revision_mismatch", current }` si `base_revision` n'est pas la dernière (`null` = « je n'en ai lu aucune »). `blob` = `seal_user_settings(user_key, json)`, 64 Kio max. Prévient les autres sessions (`settings_changed`) |
 | `GET /users/me/audit?limit=&before=` | mes actions |
 | `GET /users/lookup?email=` | `{ id, email, public_key, fingerprint }` |
 | `GET /sync` | `{ user, vaults, invitations, server_time }` |
