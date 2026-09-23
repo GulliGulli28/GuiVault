@@ -26,10 +26,9 @@ Règles communes à tous les types :
 — `id`, `name`, `description`, `steps[] { id, title, notes, action, scope
 { tags, groups }, onFailure, approval }`, `action` à tag `kind` (`command
 { command }`, `program { programText }`, `playbook { relayHostId,
-relayHostLabel, playbook, inventory }`). Écrit par l'interface web ; **Guiterm
-ne le synchronise pas encore** : tant que son `Payload` n'a pas de variante
-`Runbook`, `sync.rs` signale ces items (« JSON invalide, ignoré ») sans y
-toucher. L'ajouter là-bas, c'est les retrouver dans son panneau Runbooks.
+relayHostLabel, playbook, inventory }`). Synchronisé par Guiterm comme un
+snippet (`Payload::Runbook`, dans les deux sens) : un runbook écrit ici
+arrive dans son panneau Runbooks, et inversement.
 L'interface web les lit et les écrit (`web/src/lib/types.ts`, formulaires
 dans `web/src/components/forms/`) ; ce dépôt vérifie que ce qu'elle produit
 est relu par `termius-core` (voir `CLAUDE.md`, section vérification).
@@ -59,9 +58,10 @@ text|hidden|boolean }`).
 
 Un accès `aws` est de quoi réécrire `~/.aws/config` (et
 `~/.aws/credentials` pour des clés) sur un autre poste : la fiche web le
-montre prêt à copier (`awsConfigText` dans `web/src/lib/items.ts`), et
-c'est ce que Guiterm écrira pour s'y reconnecter (`aws sso login
---sso-session <ssoSessionName>`).
+montre prêt à copier (`awsConfigText` dans `web/src/lib/items.ts`). Guiterm
+fait les deux sens depuis son panneau Identités AWS (`guivault/aws.rs`) :
+enregistrer une session SSO locale et ses profils dans le coffre, et écrire
+un accès du coffre dans `~/.aws/config` — puis `aws sso login`.
 
 Une **passkey** est le `fido2Credentials` de Bitwarden : `credentialId`,
 `keyType`, `keyAlgorithm`, `keyCurve`, `keyValue` (clé privée PKCS#8 en
