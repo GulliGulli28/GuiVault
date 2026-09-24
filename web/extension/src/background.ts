@@ -13,9 +13,10 @@ import type { Login } from "../../src/lib/types";
 import { setTokensChangedHandler } from "../../src/lib/api";
 import { uuid } from "../../src/lib/bytes";
 import { DEFAULT_GENERATOR, generate, type GeneratorOptions } from "../../src/lib/generator";
-import type { CredentialsReply, FillReply, MatchesReply, MatchSummary, PasskeyToBackground, Pending, ToBackground, ToContent, TotpReply, VaultsReply } from "./messages";
+import type { CredentialsReply, FillReply, MatchesReply, MatchSummary, OffscreenMessage, PasskeyToBackground, Pending, PopupToBackground, ToBackground, ToContent, TotpReply, VaultsReply } from "./messages";
+import { clearClipboardIfUnchanged } from "./clipboardDom";
 import * as passkeys from "./passkeys";
-import { LOCK_ALARM, loadItemsCache, loadSession, loadSettings, lock, noteRecentFill, parseOtpPatterns, recentFill, saveTokens } from "./store";
+import { CLIPBOARD_ALARM, LOCK_ALARM, loadItemsCache, loadSession, loadSettings, lock, noteRecentFill, parseOtpPatterns, recentFill, saveTokens, scheduleClipboardClear, takeClipboardClear } from "./store";
 import { findLogin, saveLogin } from "./vaultops";
 
 // Une écriture depuis ici (enregistrer une passkey) peut rafraîchir les
@@ -184,8 +185,16 @@ async function saveCaptured(tabId: number, vaultId: string): Promise<{ ok: true;
 
 // ─── Messages du script de page ─────────────────────────────────────────────
 
-chrome.runtime.onMessage.addListener((msg: ToBackground | PasskeyToBackground, sender, reply: (r: unknown) => void) => {
+chrome.runtime.onMessage.addListener((msg: ToBackground | PasskeyToBackground | PopupToBackground, sender, reply: (r: unknown) => void) => {
   if (!msg || typeof msg !== "object" || !("type" in msg)) return;
+  // D'une page de l'extension seulement (le popup) : un script de page,
+  // dont l'URL est celle du site, n'a rien à programmer sur le
+  // presse-papiers.
+  if (msg.type === "guivault-clipboard-clear") {
+    if (sender.id !== chrome.runtime.id || !sender.url?.startsWith(chrome.runtime.getURL(""))) return;
+    void scheduleClipboardClear(msg.hash, msg.delayMs).then(() => reply(true));
+    return true;
+  }
   const origin = sender.origin ?? (sender.url ? new URL(sender.url).origin : "");
   (async () => {
     // ── Passkeys : l'origine est celle que le navigateur connaît de
@@ -333,6 +342,30 @@ chrome.commands.onCommand.addListener((command) => {
 
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === LOCK_ALARM) void lock("timeout");
+  if (alarm.name === CLIPBOARD_ALARM) void takeClipboardClear().then((hash) => (hash ? clearClipboard(hash) : undefined));
 });
+
+// ─── Presse-papiers ─────────────────────────────────────────────────────────
+
+/** Chrome : le worker n'a pas de DOM, un document hors écran le fait pour
+ * lui, le temps de l'opération. Firefox : la page d'arrière-plan a un DOM. */
+async function clearClipboard(hash: string) {
+  if (typeof chrome.offscreen === "undefined") {
+    if (typeof document !== "undefined") clearClipboardIfUnchanged(hash);
+    return;
+  }
+  try {
+    if (!(await chrome.offscreen.hasDocument())) {
+      await chrome.offscreen.createDocument({
+        url: "offscreen.html",
+        reasons: [chrome.offscreen.Reason.CLIPBOARD],
+        justification: "Effacer du presse-papiers ce qui a été copié depuis GuiVault",
+      });
+    }
+    await chrome.runtime.sendMessage<OffscreenMessage>({ type: "guivault-offscreen-clipboard-clear", hash });
+  } finally {
+    await chrome.offscreen.closeDocument().catch(() => {});
+  }
+}
 
 chrome.tabs.onRemoved.addListener((tabId) => { void setPending(tabId, null); void setFormPresent(tabId, false); });

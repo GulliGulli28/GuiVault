@@ -1,7 +1,8 @@
 /** Les réglages du web qui suivent le compte (voir `syncedSettings.ts`) :
- * l'apparence et les deux générateurs. Importé pour son effet par l'app et
+ * l'apparence, les deux générateurs et l'effacement du presse-papiers. Importé pour son effet par l'app et
  * par le popup de l'extension. */
 import { applyPreferences, loadPreferences, savePreferences, type AppPreferences } from "./preferences";
+import { CLIPBOARD_KEY } from "./clipboard";
 import { registerSettingsSection } from "./syncedSettings";
 
 registerSettingsSection({
@@ -40,3 +41,4 @@ function jsonSection(key: string, storageKey: string) {
 
 jsonSection("generator", "guivault.generator");
 jsonSection("sshKey", "guivault.sshkey");
+jsonSection("clipboard", CLIPBOARD_KEY);

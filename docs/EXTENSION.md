@@ -79,6 +79,14 @@ maître et le délai de verrouillage.
   ou serveur qui sert une ancienne version), une alerte rouge le dit en
   tête du popup jusqu'à « J'ai compris » — la même que l'interface web
   (`vaultRevisions.ts`, `RollbackBanner.tsx`).
+- **Presse-papiers effacé** : ce que le popup copie (mot de passe, code,
+  utilisateur…) s'efface au bout du délai réglé (30 s par défaut, réglage
+  qui suit le compte, le même que dans l'interface web) — **seulement s'il
+  y est encore** : ce que vous avez copié ailleurs entre-temps n'est pas
+  touché. Le popup se ferme au premier clic ailleurs : c'est le service
+  worker qui s'en charge, par une alarme, avec un document hors écran dans
+  Chrome (un service worker n'a pas de presse-papiers). Il ne garde que
+  l'empreinte SHA-256 de ce qui a été copié, en mémoire de session.
 - **Icône grise** quand il faut se reconnecter (verrouillé, session
   expirée ou révoquée) ; le popup dit pourquoi.
 - **Générateur** : le même que l'interface web.
@@ -117,7 +125,8 @@ maître et le délai de verrouillage.
 | `src/Popup.tsx` | tout l'écran : connexion (+ TOTP), liste, remplissage, générateur, réglages |
 | `src/vaultops.ts` | écrire dans le coffre depuis l'extension (créer, modifier, supprimer, déplacer un identifiant) en tenant le cache d'items à jour |
 | `src/store.ts` | la session dans `chrome.storage.session` (jetons, clés du compte, clés et noms des vaults, items déchiffrés) ; réglages dans `chrome.storage.local` |
-| `src/background.ts` | un service worker qui ne fait qu'écouter l'alarme de verrouillage |
+| `src/background.ts` | le service worker : badge, messages du script de page, raccourci, alarmes de verrouillage et d'effacement du presse-papiers |
+| `offscreen.html`, `src/offscreen.ts`, `src/clipboardDom.ts` | lire et vider le presse-papiers sans focus (`execCommand`) : dans un document hors écran que le worker ouvre le temps de l'opération (Chrome), dans la page d'arrière-plan (Firefox) |
 | `src/content.ts` | le script de page : remplit sur ordre (popup, raccourci) et, chargé sur toutes les pages `http(s)`, repère les champs de mot de passe pour y poser le bouton GuiVault ; l'interface injectée vit dans un shadow DOM |
 | `src/webauthn-shim.ts` | injecté dans le **monde de la page** avant ses scripts (`world: MAIN`) : remplace `navigator.credentials.create/get`, traduit la demande en JSON pour le script isolé, rend un `PublicKeyCredential` (même prototype, `toJSON()`), ou rappelle l'implémentation native |
 | `src/passkeys.ts` | l'authentificateur, côté service worker : ES256/P-256 via WebCrypto, attestation `none` (CBOR maison, `cbor.ts`), assertion signée en DER ; enregistre la passkey dans un identifiant du coffre (`putPayload`) |
@@ -154,7 +163,10 @@ passkeys) n'est pas gérée : le navigateur la fait.
 ## Permissions
 
 `storage`, `alarms`, `activeTab`, `scripting`, `tabs` (l'URL de l'onglet
-actif, pour le badge et le raccourci), et un script sur `http://*/*`,
+actif, pour le badge et le raccourci), `clipboardRead` et `clipboardWrite`
+(vérifier que le presse-papiers contient encore ce qu'on y a copié avant de
+le vider — comme Bitwarden), `offscreen` (Chrome : le document qui le fait
+pour le service worker), et un script sur `http://*/*`,
 `https://*/*` pour proposer le remplissage dans les champs de mot de passe —
 le même périmètre que Bitwarden, pour la même raison. Le script ne lit
 rien de la page : il cherche des `<input type=password>`, demande au

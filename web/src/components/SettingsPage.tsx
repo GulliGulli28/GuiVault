@@ -1,8 +1,9 @@
-import { useEffect, useState, type ComponentType, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type ComponentType, type FormEvent } from "react";
 import type { PageContext } from "../App";
 import { api, errorMessage } from "../lib/api";
 import { navigate, routeHash, type SettingsSection } from "../lib/route";
 import { LOCK_CHOICES, loadLockMinutes, saveLockMinutes } from "../lib/persist";
+import { CLEAR_CHOICES, loadClearSeconds, saveClearSeconds } from "../lib/clipboard";
 import { changePassword } from "../lib/session";
 import type { AuditEntry, Session } from "../lib/types";
 import { AppearanceSettings, SettingsSyncToggle } from "./AppearanceSettings";
@@ -123,6 +124,7 @@ export function SettingsPage({ ctx, section }: { ctx: PageContext; section: Sett
                     {LOCK_CHOICES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
                   </select>
                 </div>
+                <ClipboardSetting />
               </div>
             </section>
           )}
@@ -298,5 +300,47 @@ function TotpDisableDialog({ ctx, onClose }: { ctx: PageContext; onClose: () => 
         </div>
       </form>
     </Modal>
+  );
+}
+
+/** Le délai d'effacement du presse-papiers (`lib/clipboard.ts`), et de quoi
+ * permettre à la page de vérifier ce qu'il contient : sans cette permission,
+ * elle n'efface que si on ne l'a pas quittée depuis la copie. */
+function ClipboardSetting() {
+  const [seconds, setSeconds] = useState(loadClearSeconds);
+  const [read, setRead] = useState<PermissionState | "unsupported" | null>(null);
+  const query = useCallback(() => {
+    navigator.permissions
+      .query({ name: "clipboard-read" as PermissionName })
+      .then((p) => setRead(p.state))
+      .catch(() => setRead("unsupported"));
+  }, []);
+  useEffect(query, [query]);
+  const allow = () => {
+    // Un geste de l'utilisateur : Chrome demande la permission une fois.
+    navigator.clipboard.readText().catch(() => {}).finally(query);
+  };
+  return (
+    <div className="flex flex-wrap items-center gap-2 p-3">
+      <div className="min-w-0 flex-1">
+        <label htmlFor="clipboard-clear" className="text-[12.5px] text-[var(--c-text)]">Effacer ce que GuiVault copie</label>
+        <p className="help-text">
+          Au bout de ce délai, s'il est encore dans le presse-papiers — ce que vous avez copié ailleurs entre-temps n'est pas touché. Le même réglage que dans l'extension, qui, elle, efface même popup fermé.
+          {read === "granted"
+            ? ""
+            : read === "unsupported"
+              ? " Ce navigateur ne laisse pas une page lire le presse-papiers ni y écrire hors d'un clic : l'effacement se fait au premier clic dans GuiVault après le délai, et seulement si vous n'avez pas quitté la page depuis la copie."
+              : " Sans permission de lire le presse-papiers, l'effacement se fait au premier clic dans GuiVault après le délai, et seulement si vous n'avez pas quitté la page depuis la copie."}
+        </p>
+      </div>
+      {(read === "prompt" || read === "denied") && (
+        <button onClick={allow} disabled={read === "denied"} className="btn btn-secondary btn-sm" title={read === "denied" ? "Refusée : à rétablir dans les réglages du site du navigateur" : "Le navigateur demandera la permission"}>
+          {read === "denied" ? "Lecture refusée" : "Autoriser la vérification…"}
+        </button>
+      )}
+      <select id="clipboard-clear" value={seconds} onChange={(e) => { const n = Number(e.target.value); setSeconds(n); saveClearSeconds(n); }} className="input w-auto">
+        {CLEAR_CHOICES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+      </select>
+    </div>
   );
 }

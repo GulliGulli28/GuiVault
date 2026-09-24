@@ -13,7 +13,7 @@ export default defineConfig({
     outDir: "../dist-extension",
     emptyOutDir: true,
     rollupOptions: {
-      input: { popup: "extension/popup.html", background: "extension/src/background.ts" },
+      input: { popup: "extension/popup.html", offscreen: "extension/offscreen.html", background: "extension/src/background.ts" },
       output: { entryFileNames: "[name].js", chunkFileNames: "chunks/[name]-[hash].js", assetFileNames: "assets/[name]-[hash][extname]" },
     },
   },

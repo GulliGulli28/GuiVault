@@ -155,9 +155,33 @@ export type LockReason = "manual" | "timeout" | "expired";
 /** Efface tout ce qui est secret. Le prochain popup demande le mot de
  * passe maître — et dit pourquoi (`reason`). */
 export async function lock(reason: LockReason = "manual") {
+  // Verrouiller n'annule pas l'effacement du presse-papiers en attente.
+  const pending = await chrome.storage.session.get(CLIPBOARD_CLEAR_KEY);
   await chrome.storage.session.clear();
+  if (pending[CLIPBOARD_CLEAR_KEY]) await chrome.storage.session.set(pending);
   await chrome.alarms.clear(LOCK_ALARM);
   await chrome.storage.local.set({ lockReason: reason });
+}
+
+// ─── Presse-papiers ─────────────────────────────────────────────────────────
+
+/** L'effacement du presse-papiers en attente (`lib/clipboard.ts`) : le popup
+ * se ferme au premier clic ailleurs, le service worker s'en charge. Il n'en
+ * garde que l'empreinte (SHA-256) de ce qui a été copié, en mémoire de
+ * session — jamais la valeur, jamais sur disque. */
+export const CLIPBOARD_ALARM = "guivault-clipboard";
+const CLIPBOARD_CLEAR_KEY = "clipboardClear";
+
+export async function scheduleClipboardClear(hash: string, delayMs: number) {
+  await chrome.storage.session.set({ [CLIPBOARD_CLEAR_KEY]: hash });
+  // Une alarme ne part pas avant 30 s.
+  await chrome.alarms.create(CLIPBOARD_ALARM, { when: Date.now() + Math.max(delayMs, 30_000) });
+}
+
+export async function takeClipboardClear(): Promise<string | null> {
+  const r = await chrome.storage.session.get(CLIPBOARD_CLEAR_KEY);
+  await chrome.storage.session.remove(CLIPBOARD_CLEAR_KEY);
+  return typeof r[CLIPBOARD_CLEAR_KEY] === "string" ? (r[CLIPBOARD_CLEAR_KEY] as string) : null;
 }
 
 export async function lockReason(): Promise<LockReason | null> {

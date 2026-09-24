@@ -10,7 +10,7 @@
     "default_icon": { "16": "icons/icon16.png", "32": "icons/icon32.png" }
   },
   "background": { "service_worker": "background.js", "type": "module", "scripts": ["background.js"] },
-  "permissions": ["storage", "alarms", "activeTab", "scripting", "tabs"],
+  "permissions": ["storage", "alarms", "activeTab", "scripting", "tabs", "clipboardRead", "clipboardWrite", "offscreen"],
   "host_permissions": ["http://*/*", "https://*/*"],
   "content_scripts": [
     { "matches": ["http://*/*", "https://*/*"], "js": ["webauthn.js"], "run_at": "document_start", "all_frames": true, "world": "MAIN" },

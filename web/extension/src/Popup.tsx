@@ -19,10 +19,12 @@ import { AppearanceSettings, SettingsSyncToggle } from "../../src/components/App
 import { onSettingsApplied, registerSettingsSection, settingsChanged, startSettingsSync } from "../../src/lib/syncedSettings";
 import "../../src/lib/settingsSections";
 import { Logo } from "../../src/components/Logo";
+import { CLEAR_CHOICES, clipboardHash, loadClearSeconds, saveClearSeconds, setClearScheduler } from "../../src/lib/clipboard";
 import { RollbackBanner } from "../../src/components/RollbackBanner";
 import { copyText, PasswordInput, SecretValue } from "../../src/components/ui";
 import { clearLockReason, lock, lockReason, loadItemsCache, loadPopupState, loadSession, loadSettings, noteRecentFill, parseOtpPatterns, POPUP_STATE_TTL_MS, saveItemsCache, savePopupState, saveSession, saveSettings, saveTokens, touchLock, type ItemsCache, type LockReason, type PopupView, type Settings } from "./store";
 import { deleteItem, saveLogin, savePayload } from "./vaultops";
+import type { PopupToBackground } from "./messages";
 
 /** Les entrées du menu « Nouveau » : les secrets d'abord, puis les entités
  * Guiterm — le même menu que l'interface web. */
@@ -34,6 +36,13 @@ setDeviceLabel("Extension GuiVault");
 
 // Ce qui, des réglages de l'extension, suit le compte : le remplissage et
 // les codes. Le serveur, l'e-mail et le délai de verrouillage restent ici.
+// Le popup se ferme au premier clic ailleurs, et ses minuteries avec :
+// l'effacement du presse-papiers est confié au service worker, qui n'en
+// garde que l'empreinte.
+setClearScheduler((value, delayMs) => {
+  void chrome.runtime.sendMessage<PopupToBackground>({ type: "guivault-clipboard-clear", hash: clipboardHash(value), delayMs }).catch(() => {});
+});
+
 registerSettingsSection({
   key: "extension",
   read: async () => {
@@ -635,6 +644,7 @@ function SettingsView({ settings, onSettings, onBack }: { settings: Settings; on
               <option value={0}>À la fermeture du navigateur</option>
             </select>
           </label>
+          <ClipboardSelect />
           <label className="flex cursor-pointer items-start gap-2 text-[12.5px]">
             <input type="checkbox" checked={settings.inlineAutofill} onChange={(e) => onSettings({ ...settings, inlineAutofill: e.target.checked })} className="mt-0.5" />
             <span>Proposer le remplissage dans les pages<span className="help-text block">Un bouton GuiVault dans les formulaires de connexion quand le coffre a quelque chose pour le site.</span></span>
@@ -786,5 +796,20 @@ function LoginView({ settings, reason, onSettings, onSession }: { settings: Sett
         <button type="submit" disabled={!serverUrl.trim() || !email.trim() || !password || busy !== null} className="btn btn-primary btn-sm">{busy ?? "Déverrouiller"}</button>
       </div>
     </form>
+  );
+}
+
+/** Le délai d'effacement du presse-papiers : un réglage qui suit le compte,
+ * le même que dans l'interface web (`lib/clipboard.ts`). */
+function ClipboardSelect() {
+  const [seconds, setSeconds] = useState(loadClearSeconds);
+  return (
+    <label className="block">
+      <span className="field-label">Effacer ce que GuiVault copie</span>
+      <select value={seconds} onChange={(e) => { const n = Number(e.target.value); setSeconds(n); saveClearSeconds(n); }} className="input">
+        {CLEAR_CHOICES.map((c) => <option key={c.value} value={c.value}>{c.value === 0 ? c.label : `Après ${c.label}`}</option>)}
+      </select>
+      <span className="help-text block">S'il est encore dans le presse-papiers : ce que vous avez copié ailleurs entre-temps n'est pas touché.</span>
+    </label>
   );
 }

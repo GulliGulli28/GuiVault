@@ -87,3 +87,10 @@ export type PasskeyToBackground =
   | { type: "guivault-passkey-assert"; credentialId: string; rpId: string; challenge: string }
   | { type: "guivault-passkey-logins"; rpId: string }
   | { type: "guivault-passkey-register"; rpId: string; rpName: string; userHandle: string; userName: string; userDisplayName: string; challenge: string; loginId: string | null; discoverable: boolean };
+
+/** Du popup au service worker : effacer le presse-papiers dans `delayMs`
+ * s'il contient encore ce qui a pour empreinte `hash` (`lib/clipboard.ts`). */
+export type PopupToBackground = { type: "guivault-clipboard-clear"; hash: string; delayMs: number };
+
+/** Du service worker à son document hors écran (Chrome). */
+export type OffscreenMessage = { type: "guivault-offscreen-clipboard-clear"; hash: string };

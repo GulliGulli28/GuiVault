@@ -73,6 +73,11 @@ HMAC pour les sels fictifs de prelogin.
     `lib/settingsSections.ts` (apparence, générateurs) ; le popup ajoute
     `extension`. Un nouveau réglage partagé = une section, et
     `settingsChanged(key)` là où il s'enregistre.
+  - `lib/clipboard.ts` — tout ce que l'app copie passe par `copyText` et
+    s'efface au bout du délai réglé (section synchronisée `clipboard`),
+    seulement s'il est encore dans le presse-papiers ; le popup de
+    l'extension confie l'effacement au service worker (`setClearScheduler`,
+    document hors écran dans Chrome).
   - `lib/items.ts` (secrets vides, ligne secondaire, recherche, `~/.aws/config`),
     `lib/generator.ts` (+ `wordlist.ts`, liste EFF), `lib/sshkey.ts` (clés
     OpenSSH, testées contre `ssh-keygen`), `lib/totp.ts`, `lib/qr.ts`,

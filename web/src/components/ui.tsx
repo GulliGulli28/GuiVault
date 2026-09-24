@@ -2,6 +2,7 @@
  * entre `GuiVaultPanel` (empreinte, badge de confiance) et `App` (les
  * notifications). */
 import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { copyText } from "../lib/clipboard";
 import { fingerprintTrust, pinFingerprint, type FingerprintTrust } from "../lib/pins";
 import { useModalSurface } from "../hooks/useModalSurface";
 import { ConfirmDialog } from "./ConfirmDialog";
@@ -9,14 +10,8 @@ import { IconCheck, IconClose, IconCopy, IconEye, IconEyeOff, IconUpload } from 
 
 // ─── Presse-papier ───────────────────────────────────────────────────────────
 
-export async function copyText(value: string): Promise<boolean> {
-  try {
-    await navigator.clipboard.writeText(value);
-    return true;
-  } catch {
-    return false;
-  }
-}
+// Ce qui est copié s'efface au bout du délai réglé (`lib/clipboard.ts`).
+export { copyText };
 
 export function CopyButton({ value, label = "Copier", size = 11, className = "" }: { value: string; label?: string; size?: number; className?: string }) {
   const [copied, setCopied] = useState(false);
