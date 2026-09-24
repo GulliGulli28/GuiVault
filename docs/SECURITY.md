@@ -25,7 +25,7 @@ chiffrées.
 | Escalade de rôle | Un admin ne confère pas plus que son rôle ; ne touche pas au propriétaire ; ne change pas son propre rôle. Un seul propriétaire (contrainte en base). |
 | Ancien membre qui garde la clé | Rotation de clé : le serveur exige une enveloppe pour **chaque** membre restant et un chiffré pour **chaque** item vivant, et refuse si la révision a bougé (personne n'écrit avec l'ancienne clé pendant la rotation). Les invitations en attente sont révoquées. |
 | Paramètres KDF affaiblis par un client hostile (compte cassable) ou absurdes (DoS du client) | Bornes vérifiées côté serveur (`KdfParams::is_sane`). |
-| Serveur malveillant qui **dicte des paramètres KDF faibles** au prelogin (`m_cost = 8, t_cost = 1` : la clé d'auth reçue se casse hors ligne, et le mot de passe maître avec) | Les clients appliquent les mêmes bornes avant de dériver (`MasterKey::derive` côté Rust, `deriveMasterKey` / `deriveExportKey` côté web) : hors bornes, rien n'est calculé ni envoyé. Plancher = minimum OWASP (19 MiB, 2 passes). Reste possible : ramener un compte de 64 MiB/3 à ce plancher — voir `ROADMAP.md` (paramètres épinglés). |
+| Serveur malveillant qui **dicte des paramètres KDF faibles** au prelogin (`m_cost = 8, t_cost = 1` : la clé d'auth reçue se casse hors ligne, et le mot de passe maître avec) | Les clients appliquent les mêmes bornes avant de dériver (`MasterKey::derive` côté Rust, `deriveMasterKey` / `deriveExportKey` côté web) : hors bornes, rien n'est calculé ni envoyé. Plancher = minimum OWASP (19 MiB, 2 passes). Au-dessus du plancher, les paramètres sont **épinglés** par appareil (serveur + e-mail) après chaque déverrouillage réussi — qui prouve qu'ils sont les vrais — et un prelogin qui les fait baisser (moins de mémoire ou de passes) est refusé avant de dériver (`KdfParams::weaker_than`, `web/src/lib/kdfPins.ts`). Aucun client ne choisit de paramètres plus faibles que les précédents : une baisse ne peut venir que du serveur. Première connexion depuis un appareil : seul le plancher protège. |
 | Blobs de taille arbitraire | Tailles bornées par champ ; taille max d'item configurable ; limite globale du corps. |
 | Mutex empoisonné, panique, surcharge | Runtime tokio, timeouts de 30 s, arrêt gracieux SIGTERM. |
 
@@ -92,9 +92,9 @@ est installé une fois et vérifiable.
   `sessionStorage` est lisible par un script de cette origine, mais la CSP
   n'en laisse tourner aucun d'autre que l'application, et un script injecté
   dans l'application aurait de toute façon les clés en mémoire. Les items
-  déchiffrés, eux, ne sont jamais stockés. Seules les empreintes épinglées
-  et les préférences d'affichage sont en `localStorage`, elles ne sont pas
-  secrètes.
+  déchiffrés, eux, ne sont jamais stockés. Seules les empreintes épinglées,
+  les paramètres Argon2id épinglés et les préférences d'affichage sont en
+  `localStorage`, ils ne sont pas secrets.
 - La dérivation Argon2id (64 MiB, 3 passes) tourne en JavaScript : une à
   deux secondes à la connexion, comme dans Guiterm.
 - Les mêmes règles d'empreinte s'appliquent : inviter quelqu'un ou faire

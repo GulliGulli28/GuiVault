@@ -187,6 +187,19 @@ impl KdfParams {
         (19_456..=1_048_576).contains(&self.m_cost) && (2..=10).contains(&self.t_cost) && (1..=8).contains(&self.p_cost)
     }
 
+    /// Moins coûteux à attaquer que `pinned` : moins de mémoire ou moins de
+    /// passes. Un client retient les paramètres de sa dernière connexion
+    /// réussie (le déverrouillage de la user key prouve qu'ils sont les
+    /// vrais) et refuse qu'un prelogin les fasse baisser — le plancher de
+    /// [`is_sane`](Self::is_sane) laisse sinon passer un compte de 64 MiB/3
+    /// à 19 MiB/2. Aucun client ne choisit de paramètres plus faibles que
+    /// ceux d'avant (création et changement de mot de passe prennent
+    /// [`KdfParams::default`]), donc une baisse vient du serveur. `p_cost`
+    /// n'entre pas en compte : il répartit le travail sans le réduire.
+    pub fn weaker_than(&self, pinned: &KdfParams) -> bool {
+        self.m_cost < pinned.m_cost || self.t_cost < pinned.t_cost
+    }
+
     fn argon(&self) -> Result<Argon2<'static>, CryptoError> {
         let p = Params::new(self.m_cost, self.t_cost, self.p_cost, Some(KEY_LEN))
             .map_err(|e| CryptoError::KdfParams(e.to_string()))?;
@@ -668,6 +681,17 @@ mod tests {
                 Err(CryptoError::KdfParams(_))
             ));
         }
+    }
+
+    #[test]
+    fn kdf_params_downgrade() {
+        let pinned = KdfParams::default();
+        assert!(!pinned.weaker_than(&pinned));
+        assert!(fast_kdf().weaker_than(&pinned));
+        assert!(KdfParams { t_cost: 2, ..pinned }.weaker_than(&pinned));
+        assert!(!KdfParams { p_cost: 4, ..pinned }.weaker_than(&pinned));
+        // Plus coûteux (changement de mot de passe sur un autre appareil) : accepté.
+        assert!(!pinned.weaker_than(&fast_kdf()));
     }
 
     #[test]

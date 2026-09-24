@@ -30,11 +30,18 @@ paramètres ou formats anciens.
   de `KdfParams::is_sane` (Rust : `MasterKey::derive` ; web :
   `deriveMasterKey`, `deriveExportKey`) — avant d'envoyer quoi que ce soit.
   Guiterm en profite en remontant son épinglage de `guivault-crypto`.
-- [ ] **Paramètres KDF épinglés (TOFU).** Le plancher (19 MiB, 2 passes)
-  laisse encore un serveur passer un compte de 64 MiB/3 à 19 MiB/2
-  (~5× moins cher). Retenir, par e-mail et par appareil, les paramètres vus
-  à la dernière connexion réussie et refuser qu'ils baissent (le
-  changement de mot de passe les remet à jour).
+- [x] **Paramètres KDF épinglés (TOFU), web et extension.** Le plancher
+  (19 MiB, 2 passes) laissait encore un serveur passer un compte de
+  64 MiB/3 à 19 MiB/2 (~5× moins cher). Les paramètres de la dernière
+  connexion réussie sont retenus par serveur + e-mail (`kdfPins.ts`,
+  `localStorage`), épinglés seulement après le déverrouillage de la user
+  key (preuve qu'ils sont les vrais), et un prelogin qui les fait baisser
+  est refusé avant de dériver. Changement de mot de passe : vérifié puis
+  ré-épinglé.
+- [ ] **Paramètres KDF épinglés dans Guiterm.** La règle est dans le crate
+  (`KdfParams::weaker_than`) ; reste à retenir les paramètres dans la
+  config de Guiterm et à les vérifier avant `prepare_login`
+  (`core/src/guivault/account.rs`, connexion et changement de mot de passe).
 - [ ] **Retour en arrière (rollback).** Retenir la dernière révision vue de
   chaque vault (`localStorage` côté web, stockage local de l'extension —
   ce n'est pas secret) et alerter si elle recule. Aujourd'hui le web ne

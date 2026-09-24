@@ -6,6 +6,7 @@ import { api, ApiError, setTokens } from "./api";
 import { fromBase64, toBase64, utf8, uuid, randomBytes } from "./bytes";
 import * as c from "./crypto";
 import { fingerprint as fingerprintOf, type UnlockedAccount } from "./crypto";
+import { pinKdf, requireKdfNotDowngraded } from "./kdfPins";
 import { requirePinned } from "./pins";
 import type { Invitation, Item, LoginResponse, Payload, Role, UserProfile, Vault, VaultMember } from "./types";
 
@@ -73,12 +74,15 @@ export type LoginOutcome =
 export async function login(email: string, password: string): Promise<LoginOutcome> {
   const normalized = email.trim().toLowerCase();
   const pre = await api.prelogin(normalized);
+  requireKdfNotDowngraded(normalized, pre.kdf);
   const master = await c.deriveMasterKey(password, unb64(pre.kdf_salt), pre.kdf);
   const res = await api.login(normalized, b64(master.authKey), deviceName());
   master.authKey.fill(0);
   const finish = async (login: LoginResponse) => {
     setTokens(login);
     const { user, account } = unlock(login, master.stretchedKey);
+    // La user key s'est ouverte : ces paramètres sont les vrais.
+    pinKdf(normalized, pre.kdf);
     return openSession(user, account);
   };
   if (res.kind === "ok") return { kind: "ok", session: await finish(res.login) };
@@ -107,6 +111,7 @@ export async function register(email: string, password: string): Promise<Session
     device_name: deviceName(),
   });
   setTokens(login);
+  pinKdf(normalized, material.kdf);
   return openSession(login.user, account);
 }
 
@@ -131,6 +136,7 @@ export async function changePassword(state: SessionState, current: string, next:
   // La clé d'auth courante prouve qu'on connaît l'ancien mot de passe ; le
   // serveur la vérifie avant de remplacer quoi que ce soit.
   const pre = await api.prelogin(state.user.email);
+  requireKdfNotDowngraded(state.user.email, pre.kdf);
   const old = await c.deriveMasterKey(current, unb64(pre.kdf_salt), pre.kdf);
   const rekey = await c.rekeyAccount(state.account, next);
   await api.changePassword({
@@ -140,6 +146,7 @@ export async function changePassword(state: SessionState, current: string, next:
     auth_key: b64(rekey.authKey),
     protected_user_key: b64(rekey.protectedUserKey),
   });
+  pinKdf(state.user.email, rekey.kdf);
 }
 
 // ─── Vaults ─────────────────────────────────────────────────────────────────
