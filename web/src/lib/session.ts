@@ -204,6 +204,23 @@ export async function refresh(state: SessionState): Promise<string[]> {
   return warnings;
 }
 
+/** Ce que dit l'enveloppe jointe à une invitation, **avant** de l'accepter :
+ * qui remet la clé (`KeyFrom`), `unreadable` si elle ne s'ouvre pas — elle
+ * n'est pas pour ce compte, ou pas pour ce vault : ne pas accepter —, `null`
+ * sans enveloppe (invitation émise avant l'inscription, serveur ancien). */
+export type InvitationKey = KeyFrom | { kind: "unreadable" } | null;
+
+export function invitationKeyFrom(state: SessionState, inv: Invitation): InvitationKey {
+  if (!inv.wrapped_vault_key) return null;
+  try {
+    const { key, sender } = c.unwrapVaultKey(state.account, inv.vault_id, unb64(inv.wrapped_vault_key));
+    key.fill(0);
+    return keyFromSender(state, sender);
+  } catch {
+    return { kind: "unreadable" };
+  }
+}
+
 /** Prendre acte d'un retour en arrière : la révision annoncée par le serveur
  * devient la référence, l'alerte disparaît. */
 export function acceptRollback(state: SessionState, vaultId: string) {

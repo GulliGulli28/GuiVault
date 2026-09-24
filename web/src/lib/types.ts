@@ -98,6 +98,9 @@ export interface Invitation {
   role: Role;
   status: InvitationStatus;
   has_key: boolean;
+  /** L'enveloppe de la clé du vault, adressée à l'invité — pour voir qui la
+   * lui remet avant d'accepter. Absente d'un serveur plus ancien. */
+  wrapped_vault_key?: string | null;
   created_at: string;
   expires_at: string;
 }

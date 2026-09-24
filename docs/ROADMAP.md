@@ -63,10 +63,11 @@ paramètres ou formats anciens.
   expéditeur et destinataire, HKDF, AAD = vault ; écrit par le web,
   l'extension et Guiterm, le format 1 encore lu. Web et Guiterm montrent
   qui a remis la clé (réglages du vault, badge « clé non vérifiée »).
-- [ ] **Empreinte de l'inviteur avant d'accepter.** Aujourd'hui l'invité
-  voit qui lui a remis la clé une fois le vault rejoint. Le serveur
-  pourrait renvoyer l'enveloppe avec l'invitation pour qu'il la vérifie
-  avant d'accepter.
+- [x] **Empreinte de l'inviteur avant d'accepter.** Le serveur joint
+  l'enveloppe à l'invitation (`Invitation.wrapped_vault_key`) ; web et
+  Guiterm l'ouvrent avant d'accepter et montrent l'empreinte de qui remet
+  la clé. Enveloppe illisible, ou clé différente de celle déjà vérifiée
+  pour l'inviteur : « Accepter » est désactivé.
 - [x] **Doc :** `EXTENSION.md` disait « Lecture seule » en tête, alors que
   l'extension crée, modifie et supprime.
 

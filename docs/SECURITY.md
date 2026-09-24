@@ -57,8 +57,11 @@ d'apparence modifié en est un) — pas son contenu.
   membres. Le client montre donc qui a remis la clé (réglages du vault) et
   signale « clé non vérifiée » tant que l'empreinte de l'expéditeur n'est
   pas épinglée : c'est la **vérification de cette empreinte**, par le
-  destinataire, qui ferme la porte. Une enveloppe de format 1 (anonyme,
-  d'avant) ne dit rien de son auteur ; une rotation de clé la remplace.
+  destinataire, qui ferme la porte — dès l'invitation : l'enveloppe y est
+  jointe et s'ouvre avant d'accepter, et une clé différente de celle déjà
+  vérifiée pour l'inviteur bloque l'acceptation. Une enveloppe de format 1
+  (anonyme, d'avant) ne dit rien de son auteur ; une rotation de clé la
+  remplace.
   Contrairement à une signature, l'authentification X25519 ne prouve rien
   à un tiers (le destinataire aurait pu fabriquer l'enveloppe lui-même) —
   inutile ici, où seul le destinataire a besoin de savoir.

@@ -82,7 +82,7 @@ Erreurs : `{ "code": "…", "message": "…" }` (+ champs selon le code, ex.
 |---|---|---|
 | `POST /vaults/{id}/invitations` | admin | `{ email, role, wrapped_vault_key? }` → `201` `Invitation` |
 | `GET /vaults/{id}/invitations` | admin | toutes (avec `invitee_public_key` / `invitee_fingerprint` si inscrit) |
-| `GET /invitations` | invité | mes invitations en attente |
+| `GET /invitations` | invité | mes invitations en attente, avec `wrapped_vault_key` (l'enveloppe qui m'est adressée, pour voir qui me remet la clé avant d'accepter) quand l'inviteur l'a jointe — aussi dans `/sync` |
 | `DELETE /invitations/{id}` | admin | révoque |
 | `POST /invitations/{id}/accept` | invité | → `accepted` (clé présente) ou `awaiting_key` |
 | `POST /invitations/{id}/decline` | invité | |

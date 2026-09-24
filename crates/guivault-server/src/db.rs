@@ -165,6 +165,7 @@ pub struct InvitationRow {
     pub role: String,
     pub status: String,
     pub has_key: bool,
+    pub wrapped_vault_key: Option<Vec<u8>>,
     pub created_at: DateTime<Utc>,
     pub expires_at: DateTime<Utc>,
 }
@@ -172,7 +173,7 @@ pub struct InvitationRow {
 pub const INVITATION_SELECT: &str = "SELECT i.id, i.vault_id, inv.email::text AS inviter_email, i.invitee_email::text AS invitee_email,
             u.public_key AS invitee_public_key, i.role,
             CASE WHEN i.status IN ('pending','awaiting_key') AND i.expires_at < now() THEN 'expired' ELSE i.status END AS status,
-            (i.wrapped_vault_key IS NOT NULL) AS has_key, i.created_at, i.expires_at
+            (i.wrapped_vault_key IS NOT NULL) AS has_key, i.wrapped_vault_key, i.created_at, i.expires_at
      FROM invitations i
      JOIN users inv ON inv.id = i.inviter_user_id
      LEFT JOIN users u ON u.email = i.invitee_email AND u.disabled_at IS NULL";
@@ -202,6 +203,7 @@ impl From<InvitationRow> for Invitation {
             role: Role::parse(&r.role).unwrap_or(Role::Reader),
             status,
             has_key: r.has_key,
+            wrapped_vault_key: r.wrapped_vault_key,
             created_at: r.created_at,
             expires_at: r.expires_at,
         }

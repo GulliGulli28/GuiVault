@@ -466,6 +466,11 @@ pub struct Invitation {
     pub role: Role,
     pub status: InvitationStatus,
     pub has_key: bool,
+    /// L'enveloppe de la clé du vault, adressée à l'invité : il l'ouvre
+    /// **avant** d'accepter pour voir qui la lui remet (format 2, empreinte
+    /// de l'expéditeur). Absente d'un serveur plus ancien.
+    #[serde(default, with = "b64::option", skip_serializing_if = "Option::is_none")]
+    pub wrapped_vault_key: Option<Vec<u8>>,
     pub created_at: DateTime<Utc>,
     pub expires_at: DateTime<Utc>,
 }

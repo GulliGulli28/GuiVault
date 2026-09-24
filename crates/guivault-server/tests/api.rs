@@ -641,6 +641,12 @@ async fn shared_vault_invite_existing_user_roles_and_rotation() {
     let s = bob.sync().await;
     assert_eq!(s.invitations.len(), 1);
     assert_eq!(s.invitations[0].inviter_email, "alice@t.io");
+    // Avant d'accepter, Bob ouvre l'enveloppe qui accompagne l'invitation :
+    // elle vient bien de la clé d'Alice (dont il vérifiera l'empreinte).
+    let envelope = s.invitations[0].wrapped_vault_key.as_deref().expect("enveloppe jointe");
+    let opened = gc::unwrap_vault_key(&bob.account, &vault.id.to_string(), envelope).unwrap();
+    assert_eq!(opened.sender.as_ref(), Some(&alice.account.keypair.public));
+    assert_eq!(opened.key.as_bytes(), vkey.as_bytes());
     let body = status!(
         bob.req(reqwest::Method::POST, &format!("/invitations/{}/accept", inv.id))
             .send()

@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { toBase64 } from "./bytes";
 import * as c from "./crypto";
 import { kdfWeakerThan, pinKdf, pinnedKdf } from "./kdfPins";
-import { acceptRollback, login, refresh, type SessionState } from "./session";
+import { acceptRollback, invitationKeyFrom, login, refresh, type SessionState } from "./session";
 import { observeRevisions } from "./vaultRevisions";
 
 /** Un `localStorage` en mémoire (Node n'en a pas) et un `navigator` pour
@@ -206,4 +206,23 @@ describe("provenance de la clé d'un vault", () => {
     // Liée à son vault : reposée ailleurs, elle ne s'ouvre pas — le vault est écarté.
     expect(from["v-moved"]).toBeUndefined();
   }, 60_000);
+});
+
+describe("enveloppe jointe à une invitation", () => {
+  it("dit qui remet la clé avant d'accepter, et refuse une enveloppe d'un autre vault", () => {
+    const me = c.generateKeyPair();
+    const alice = c.generateKeyPair();
+    const state = { account: { userKey: new Uint8Array(32), keypair: me }, fingerprint: c.fingerprint(me.publicKey) } as unknown as SessionState;
+    const k = new Uint8Array(32).fill(8);
+    const inv = (wrapped: Uint8Array | null) => ({
+      id: "i-1", vault_id: "v-1", inviter_email: "alice@example.com", invitee_email: "me@example.com", invitee_public_key: null,
+      invitee_fingerprint: null, role: "reader" as const, status: "pending" as const, has_key: wrapped !== null,
+      wrapped_vault_key: wrapped && toBase64(wrapped), created_at: "", expires_at: "",
+    });
+    expect(invitationKeyFrom(state, inv(c.wrapVaultKey(alice, me.publicKey, "v-1", k)))).toEqual({ kind: "member", fingerprint: c.fingerprint(alice.publicKey) });
+    expect(invitationKeyFrom(state, inv(c.sealFor(me.publicKey, k)))).toEqual({ kind: "anonymous" });
+    // Le serveur joint l'enveloppe d'un autre vault : elle ne s'ouvre pas.
+    expect(invitationKeyFrom(state, inv(c.wrapVaultKey(alice, me.publicKey, "v-2", k)))).toEqual({ kind: "unreadable" });
+    expect(invitationKeyFrom(state, inv(null))).toBeNull();
+  });
 });
