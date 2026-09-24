@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import { api, errorMessage, setBaseUrl, setSessionLostHandler, setTokensChangedHandler } from "../../src/lib/api";
+import { api, ApiError, errorMessage, setBaseUrl, setSessionLostHandler, setTokensChangedHandler } from "../../src/lib/api";
 import { filterEntities, indexItems, toEntities } from "../../src/lib/entities";
 import { buildVaultTree } from "../../src/lib/vaultTree";
 import { describeSecret } from "../../src/lib/items";
-import { acceptRollback, loadItems, login, payloadEntity, payloadName, refresh, setDeviceLabel, type DecodedItem, type SessionState } from "../../src/lib/session";
+import { openOffline, acceptRollback, loadItems, login, payloadEntity, payloadName, refresh, setDeviceLabel, type DecodedItem, type SessionState } from "../../src/lib/session";
 import { loginMatches } from "../../src/lib/urimatch";
 import { KIND_LABELS, KIND_LABELS_PLURAL, type CustomIcon, type GuiVaultEntity, type ItemKind, type Login, type Payload, type TokenPair } from "../../src/lib/types";
 import { GeneratorPanel } from "../../src/components/GeneratorPanel";
@@ -21,6 +21,8 @@ import "../../src/lib/settingsSections";
 import { Logo } from "../../src/components/Logo";
 import { CLEAR_CHOICES, clipboardHash, loadClearSeconds, saveClearSeconds, setClearScheduler } from "../../src/lib/clipboard";
 import { RollbackBanner } from "../../src/components/RollbackBanner";
+import { OfflineSetting } from "../../src/components/OfflineSetting";
+import { loadOfflineCopy, refreshOfflineCopy, type OfflineCopy } from "../../src/lib/offline";
 import { copyText, PasswordInput, SecretValue } from "../../src/components/ui";
 import { clearLockReason, lock, lockReason, loadItemsCache, loadPopupState, loadSession, loadSettings, noteRecentFill, parseOtpPatterns, POPUP_STATE_TTL_MS, saveItemsCache, savePopupState, saveSession, saveSettings, saveTokens, touchLock, type ItemsCache, type LockReason, type PopupView, type Settings } from "./store";
 import { deleteItem, saveLogin, savePayload } from "./vaultops";
@@ -143,6 +145,19 @@ export function Popup() {
   const sync = useCallback(async (state: SessionState, current: ItemsCache) => {
     setRefreshing(true);
     try {
+      if (state.offline) {
+        // Hors ligne : rien vers le serveur. Le cache d'items vient de la
+        // copie à l'ouverture (`openOffline`), puis reste tel quel — c'est
+        // lui que le service worker lit pour remplir les pages.
+        const next: ItemsCache = { ...current };
+        for (const v of state.vaults) {
+          if (!next[v.id]) next[v.id] = await loadItems(v).then((p) => ({ revision: p.revision, items: p.items }));
+        }
+        setCache(next);
+        await saveItemsCache(next);
+        setScreen({ kind: "vault", state: { ...state } });
+        return;
+      }
       await refresh(state);
       const next: ItemsCache = {};
       for (const v of state.vaults) {
@@ -154,6 +169,8 @@ export function Popup() {
       const stored = (await chrome.storage.session.get("session")).session as { tokens?: TokenPair } | undefined;
       if (stored?.tokens) await saveSession(state, stored.tokens);
       setScreen({ kind: "vault", state: { ...state } });
+      // La copie hors ligne, si elle est activée dans ce navigateur, suit.
+      void refreshOfflineCopy(state).catch(() => {});
     } catch (e) {
       say(errorMessage(e));
     } finally {
@@ -217,7 +234,7 @@ export function Popup() {
       }
       setRestored(true);
       setScreen({ kind: "vault", state: restored.state });
-      void startSettingsSync(restored.state.account.userKey);
+      if (!restored.state.offline) void startSettingsSync(restored.state.account.userKey);
       await touchLock(s.lockMinutes);
       void sync(restored.state, cached);
     })();
@@ -324,6 +341,14 @@ export function Popup() {
           )}
         </span>
       </header>
+      {screen.kind === "vault" && screen.state.offline && (
+        <div role="status" className="shrink-0 p-2 pb-0">
+          <div className="callout callout-warn flex items-center gap-2 text-[11.5px]">
+            <span className="min-w-0 flex-1">Hors ligne — la copie du {new Date(screen.state.offline.savedAt).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}, en lecture seule.</span>
+            <button onClick={() => void doLock()} className="btn btn-secondary btn-sm shrink-0">Se reconnecter</button>
+          </div>
+        </div>
+      )}
       {screen.kind === "vault" && (
         <RollbackBanner compact rollbacks={screen.state.rollbacks} onAccept={(id) => { acceptRollback(screen.state, id); setScreen({ kind: "vault", state: { ...screen.state } }); }} />
       )}
@@ -339,12 +364,12 @@ export function Popup() {
             await touchLock(settings.lockMinutes);
             setRestored(true);
             setScreen({ kind: "vault", state });
-            void startSettingsSync(state.account.userKey);
+            if (!state.offline) void startSettingsSync(state.account.userKey);
             void sync(state, {});
           }}
         />
       ) : view.kind === "settings" ? (
-        <SettingsView settings={settings} onSettings={(s) => { setSettings(s); void saveSettings(s).then(() => settingsChanged("extension")); void touchLock(s.lockMinutes); }} onBack={() => go({ kind: "list" })} />
+        <SettingsView settings={settings} state={screen.kind === "vault" ? screen.state : null} say={say} onSettings={(s) => { setSettings(s); void saveSettings(s).then(() => settingsChanged("extension")); void touchLock(s.lockMinutes); }} onBack={() => go({ kind: "list" })} />
       ) : view.kind === "edit" && current ? (
         <div className="flex min-h-0 flex-1 flex-col">
           <ItemForm
@@ -391,6 +416,7 @@ export function Popup() {
           entry={current}
           index={indexFor(current.vaultId)}
           canFill={canFill}
+          writable={screen.state.vaults.find((v) => v.id === current.vaultId)?.role !== "reader"}
           onBack={() => go({ kind: "list" })}
           onFill={fill}
           onEdit={() => go({ kind: "edit", id: current.item.id })}
@@ -562,14 +588,15 @@ function LoginActions({ entry, canFill, onFill, say }: { entry: LoginEntry; canF
   );
 }
 
-function Detail({ entry, index, canFill, onBack, onFill, onEdit, onDelete, say }: { entry: Entry; index: ReturnType<typeof indexItems>; canFill: boolean; onBack: () => void; onFill: (e: LoginEntry, what: "credentials" | "totp") => Promise<void>; onEdit: () => void; onDelete: () => Promise<void>; say: (m: string) => void }) {
+function Detail({ entry, index, canFill, writable, onBack, onFill, onEdit, onDelete, say }: { entry: Entry; index: ReturnType<typeof indexItems>; canFill: boolean; writable: boolean; onBack: () => void; onFill: (e: LoginEntry, what: "credentials" | "totp") => Promise<void>; onEdit: () => void; onDelete: () => Promise<void>; say: (m: string) => void }) {
   const [confirm, setConfirm] = useState(false);
   const header = (
     <div className="flex shrink-0 items-center gap-1 border-b border-[var(--c-border)] px-2 py-1.5">
       <button onClick={onBack} className="btn btn-ghost btn-sm">←</button>
       <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">{entry.name}</span>
-      <button onClick={onEdit} className="btn btn-secondary btn-sm" title="Modifier"><IconEdit size={11} /> Modifier</button>
-      <button onClick={() => setConfirm(true)} className="btn btn-ghost btn-sm btn-icon hover:text-[var(--c-danger)]" title="Supprimer" aria-label="Supprimer"><IconTrash size={11} /></button>
+      {/* Un vault en lecture (ou la copie hors ligne) ne se modifie pas d'ici. */}
+      {writable && <button onClick={onEdit} className="btn btn-secondary btn-sm" title="Modifier"><IconEdit size={11} /> Modifier</button>}
+      {writable && <button onClick={() => setConfirm(true)} className="btn btn-ghost btn-sm btn-icon hover:text-[var(--c-danger)]" title="Supprimer" aria-label="Supprimer"><IconTrash size={11} /></button>}
     </div>
   );
   const confirmBox = confirm && (
@@ -623,7 +650,7 @@ function Detail({ entry, index, canFill, onBack, onFill, onEdit, onDelete, say }
 /** Les réglages, une fois connecté : le verrouillage et le remplissage
  * (les mêmes que sous « Réglages » à la connexion), et l'apparence — la
  * même page que dans l'interface web et dans Guiterm, en une colonne. */
-function SettingsView({ settings, onSettings, onBack }: { settings: Settings; onSettings: (s: Settings) => void; onBack: () => void }) {
+function SettingsView({ settings, state, say, onSettings, onBack }: { settings: Settings; state: SessionState | null; say: (m: string) => void; onSettings: (s: Settings) => void; onBack: () => void }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex shrink-0 items-center gap-1 border-b border-[var(--c-border)] px-2 py-1.5">
@@ -645,6 +672,7 @@ function SettingsView({ settings, onSettings, onBack }: { settings: Settings; on
             </select>
           </label>
           <ClipboardSelect />
+          {state && <OfflineSetting session={state} notify={say} error={say} compact />}
           <label className="flex cursor-pointer items-start gap-2 text-[12.5px]">
             <input type="checkbox" checked={settings.inlineAutofill} onChange={(e) => onSettings({ ...settings, inlineAutofill: e.target.checked })} className="mt-0.5" />
             <span>Proposer le remplissage dans les pages<span className="help-text block">Un bouton GuiVault dans les formulaires de connexion quand le coffre a quelque chose pour le site.</span></span>
@@ -699,6 +727,33 @@ function LoginView({ settings, reason, onSettings, onSession }: { settings: Sett
   const [totp, setTotp] = useState<{ verify: (code: string) => Promise<SessionState> } | null>(null);
   const [code, setCode] = useState("");
   const [more, setMore] = useState(!settings.serverUrl);
+  /** Le serveur ne répond pas : la copie hors ligne de ce compte, s'il y en
+   * a une dans ce navigateur (`lib/offline.ts`). */
+  const [unreachable, setUnreachable] = useState(false);
+  const [offlineCopy, setOfflineCopy] = useState<OfflineCopy | null>(null);
+  useEffect(() => {
+    const url = serverUrl.trim().replace(/\/+$/, "");
+    const e = email.trim();
+    if (!/^https?:\/\//.test(url) || !e.includes("@")) { setOfflineCopy(null); return; }
+    const t = setTimeout(() => { setBaseUrl(url); void loadOfflineCopy(e).then(setOfflineCopy); }, 250);
+    return () => clearTimeout(t);
+  }, [serverUrl, email]);
+
+  const openCopy = async () => {
+    if (!offlineCopy || !password) return;
+    setError(null);
+    setBusy("Ouverture de la copie…");
+    try {
+      const { session } = await openOffline(offlineCopy, password);
+      onSettings({ ...settings, email: email.trim().toLowerCase(), lockMinutes, inlineAutofill });
+      // Pas de jetons : rien ne part vers le serveur d'une session hors ligne.
+      await onSession(session, { access_token: "", refresh_token: "", access_expires_in: 0 });
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusy(null);
+    }
+  };
 
   // Les jetons de la connexion arrivent par `setTokens` : on les attrape au
   // passage pour les persister avec la session.
@@ -732,7 +787,9 @@ function LoginView({ settings, reason, onSettings, onSession }: { settings: Sett
       if (out.kind === "ok") await finish(out.session, tokensP);
       else setTotp({ verify: async (c) => { const s = await out.verify(c); await finish(s, tokensP); return s; } });
     } catch (err) {
-      setError(errorMessage(err));
+      const down = !(err instanceof ApiError) || err.status >= 500;
+      if (down) setUnreachable(true);
+      setError(down && !(err instanceof ApiError) ? "Serveur injoignable." : errorMessage(err));
     } finally {
       setBusy(null);
     }
@@ -791,8 +848,14 @@ function LoginView({ settings, reason, onSettings, onSession }: { settings: Sett
         </>
       )}
       {error && <p className="callout callout-danger">{error}</p>}
+      {unreachable && offlineCopy && (
+        <div className="callout space-y-1.5 text-[11.5px]">
+          <p>Le serveur ne répond pas. Ce navigateur garde une copie chiffrée de ce compte ({new Date(offlineCopy.savedAt).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}) : elle s'ouvre avec le mot de passe maître, en lecture seule — le remplissage des pages marche.</p>
+          <div className="flex justify-end"><button type="button" onClick={() => void openCopy()} disabled={!password || busy !== null} className="btn btn-secondary btn-sm">Ouvrir la copie hors ligne</button></div>
+        </div>
+      )}
       <div className="flex items-center justify-between gap-2">
-        <span className="help-text">Déchiffré ici, jamais sur disque.</span>
+        <span className="help-text">{offlineCopy ? "Déchiffré ici ; copie chiffrée gardée." : "Déchiffré ici, jamais sur disque."}</span>
         <button type="submit" disabled={!serverUrl.trim() || !email.trim() || !password || busy !== null} className="btn btn-primary btn-sm">{busy ?? "Déverrouiller"}</button>
       </div>
     </form>

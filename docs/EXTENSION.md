@@ -79,6 +79,13 @@ maître et le délai de verrouillage.
   ou serveur qui sert une ancienne version), une alerte rouge le dit en
   tête du popup jusqu'à « J'ai compris » — la même que l'interface web
   (`vaultRevisions.ts`, `RollbackBanner.tsx`).
+- **Hors ligne** : avec la copie hors ligne activée (réglages, désactivée
+  par défaut), un serveur qui ne répond pas n'empêche plus de
+  déverrouiller : « Ouvrir la copie hors ligne » l'ouvre avec le mot de
+  passe maître, en lecture seule — liste, fiches, codes TOTP et
+  **remplissage des pages** comme d'habitude. Une copie chiffrée du compte
+  et des vaults dans l'IndexedDB de l'extension, tenue à jour à chaque
+  synchronisation (`lib/offline.ts`, voir `SECURITY.md`).
 - **Presse-papiers effacé** : ce que le popup copie (mot de passe, code,
   utilisateur…) s'efface au bout du délai réglé (30 s par défaut, réglage
   qui suit le compte, le même que dans l'interface web) — **seulement s'il

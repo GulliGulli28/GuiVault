@@ -35,7 +35,9 @@ serveur puisse jamais lire un secret.
   KeePassXC ; export JSON (chiffré par mot de passe ou en clair) et CSV.
   Recherche dans tous les vaults (**Ctrl+K**), raccourcis clavier (`?`),
   tri par date, **historique** de chaque élément et **corbeille** (30 j),
-  presse-papiers effacé après copie.
+  presse-papiers effacé après copie, **copie hors ligne** chiffrée pour
+  lire son coffre (et remplir dans l'extension) quand le serveur ne répond
+  pas.
   Formats décrits dans [`docs/ITEMS.md`](docs/ITEMS.md).
 - **Extension de navigateur** (Chrome/Edge/Firefox) : les identifiants de
   la page courante, remplissage en un clic ou depuis le champ, codes TOTP,

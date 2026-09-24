@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { toBase64 } from "./bytes";
 import * as c from "./crypto";
 import { kdfWeakerThan, pinKdf, pinnedKdf } from "./kdfPins";
-import { acceptRollback, invitationKeyFrom, login, refresh, type SessionState } from "./session";
+import { acceptRollback, invitationKeyFrom, loadItems, login, openOffline, refresh, wipe, type SessionState } from "./session";
 import { observeRevisions } from "./vaultRevisions";
 
 /** Un `localStorage` en mémoire (Node n'en a pas) et un `navigator` pour
@@ -225,4 +225,38 @@ describe("enveloppe jointe à une invitation", () => {
     expect(invitationKeyFrom(state, inv(c.wrapVaultKey(alice, me.publicKey, "v-2", k)))).toEqual({ kind: "unreadable" });
     expect(invitationKeyFrom(state, inv(null))).toBeNull();
   });
+});
+
+describe("copie hors ligne", () => {
+  it("s'ouvre avec le mot de passe maître, en lecture seule, sans le serveur", async () => {
+    const { material, account } = await c.createAccount("pw");
+    const vaultKey = new Uint8Array(32).fill(3);
+    const itemId = "i-1";
+    const login = { kind: "login", login: { id: itemId, name: "GitHub", groupId: null, tags: [], username: "alice", password: "s3cret", uris: [], totp: "", passkeys: [], passwordHistory: [] } };
+    const at = "2026-01-01T00:00:00Z";
+    const copy = {
+      user: { id: "u-off", email: "off@example.com", public_key: toBase64(material.publicKey), created_at: at },
+      blobs: { kdf: material.kdf, kdf_salt: toBase64(material.kdfSalt), protected_user_key: toBase64(material.protectedUserKey), protected_private_key: toBase64(material.protectedPrivateKey) },
+      vaults: [{ id: "v-1", kind: "personal" as const, name_enc: toBase64(c.sealVaultName(vaultKey, "v-1", "Personnel")), role: "owner" as const, wrapped_vault_key: toBase64(c.wrapVaultKey(account.keypair, material.publicKey, "v-1", vaultKey)), revision: 4, created_at: at, updated_at: at }],
+      items: { "v-1": { revision: 4, items: [{ id: itemId, vault_id: "v-1", item_type: "login", revision: 4, ciphertext: toBase64(c.sealItem(vaultKey, "v-1", itemId, "login", new TextEncoder().encode(JSON.stringify(login)))), deleted: false, created_at: at, updated_at: at }] } },
+      savedAt: at,
+    };
+    // Aucun appel réseau n'est permis.
+    const calls = fakeServer({});
+
+    await expect(openOffline(copy, "mauvais")).rejects.toThrowError(/incorrect/);
+    const { session, warnings } = await openOffline(copy, "pw");
+    expect(warnings).toEqual([]);
+    expect(session.offline).toEqual({ savedAt: at });
+    expect(session.vaults.map((v) => [v.name, v.role])).toEqual([["Personnel", "reader"]]);
+    const page = await loadItems(session.vaults[0]);
+    expect(page.items.map((i) => (i.ok && i.payload.kind === "login" ? i.payload.login.name : "?"))).toEqual(["GitHub"]);
+    expect(calls).toHaveLength(0);
+
+    // Verrouillée, la session ne lit plus la copie.
+    const vault = session.vaults[0];
+    wipe(session);
+    await expect(loadItems(vault)).rejects.toThrow();
+    expect(calls.length).toBeGreaterThan(0);
+  }, 60_000);
 });

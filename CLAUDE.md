@@ -58,6 +58,11 @@ HMAC pour les sels fictifs de prelogin.
     `cargo run -p guivault-crypto --example vectors > web/src/lib/crypto.vectors.json`
     et `GUIVAULT_WRITE_VECTORS=1 npx vitest run` (écrit
     `crates/guivault-crypto/tests/web-vectors.json`).
+  - `lib/offline.ts` — la copie hors ligne (IndexedDB, par appareil,
+    désactivée par défaut) : ce que le serveur garde, ouvert par
+    `session.openOffline` en lecture seule (rôles `reader`) ; `public/sw.js`
+    garde l'interface web pour qu'elle s'ouvre sans le serveur (réseau
+    d'abord, jamais l'API). `OfflineSetting` : le réglage, web et popup.
   - `lib/persist.ts` — la session mise à plat, même format pour l'extension
     (`chrome.storage.session`) et le web (`sessionStorage` : survit au
     rechargement, pas à l'onglet), avec le délai d'inactivité « Verrouiller

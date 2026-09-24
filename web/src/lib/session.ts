@@ -39,6 +39,22 @@ export interface SessionState {
    * vue d'ici (`vaultRevisions.ts`) — à montrer tant qu'on n'en a pas pris
    * acte. */
   rollbacks: VaultRollback[];
+  /** Le compte tel que le serveur le garde — enveloppé, illisible sans le
+   * mot de passe maître : de quoi rouvrir une copie hors ligne
+   * (`offline.ts`). Reçu à la connexion ; absent d'une session reprise
+   * d'avant qu'on le garde. */
+  blobs?: AccountBlobs;
+  /** Session ouverte depuis la copie hors ligne : lecture seule, rien vers
+   * le serveur. */
+  offline?: { savedAt: string };
+}
+
+/** `prelogin` + `LoginResponse`, en base64 comme l'API. */
+export interface AccountBlobs {
+  kdf: c.KdfParams;
+  kdf_salt: string;
+  protected_user_key: string;
+  protected_private_key: string;
 }
 
 /** Un item déchiffré — ou pas : un item illisible (clé d'un autre âge,
@@ -75,8 +91,8 @@ function unlock(login: LoginResponse, stretchedKey: Uint8Array): { user: UserPro
   return { user: login.user, account };
 }
 
-export async function openSession(user: UserProfile, account: UnlockedAccount): Promise<SessionState> {
-  const state: SessionState = { user, account, fingerprint: fingerprintOf(account.keypair.publicKey), vaults: [], invitations: [], rollbacks: [] };
+export async function openSession(user: UserProfile, account: UnlockedAccount, blobs?: AccountBlobs): Promise<SessionState> {
+  const state: SessionState = { user, account, fingerprint: fingerprintOf(account.keypair.publicKey), vaults: [], invitations: [], rollbacks: [], blobs };
   await refresh(state);
   return state;
 }
@@ -97,7 +113,7 @@ export async function login(email: string, password: string): Promise<LoginOutco
     const { user, account } = unlock(login, master.stretchedKey);
     // La user key s'est ouverte : ces paramètres sont les vrais.
     pinKdf(normalized, pre.kdf);
-    return openSession(user, account);
+    return openSession(user, account, { kdf: pre.kdf, kdf_salt: pre.kdf_salt, protected_user_key: login.protected_user_key, protected_private_key: login.protected_private_key });
   };
   if (res.kind === "ok") return { kind: "ok", session: await finish(res.login) };
   const token = res.challenge.totp_token;
@@ -126,7 +142,12 @@ export async function register(email: string, password: string): Promise<Session
   });
   setTokens(login);
   pinKdf(normalized, material.kdf);
-  return openSession(login.user, account);
+  return openSession(login.user, account, {
+    kdf: material.kdf,
+    kdf_salt: b64(material.kdfSalt),
+    protected_user_key: b64(material.protectedUserKey),
+    protected_private_key: b64(material.protectedPrivateKey),
+  });
 }
 
 export async function logout() {
@@ -144,6 +165,7 @@ export function wipe(state: SessionState) {
   state.account.keypair.privateKey.fill(0);
   for (const v of state.vaults) v.key.fill(0);
   state.vaults = [];
+  offlineItems = null;
 }
 
 export async function changePassword(state: SessionState, current: string, next: string) {
@@ -161,6 +183,7 @@ export async function changePassword(state: SessionState, current: string, next:
     protected_user_key: b64(rekey.protectedUserKey),
   });
   pinKdf(state.user.email, rekey.kdf);
+  if (state.blobs) state.blobs = { ...state.blobs, kdf: rekey.kdf, kdf_salt: b64(rekey.kdfSalt), protected_user_key: b64(rekey.protectedUserKey) };
 }
 
 // ─── Vaults ─────────────────────────────────────────────────────────────────
@@ -169,6 +192,21 @@ function keyFromSender(state: SessionState, sender: Uint8Array | null): KeyFrom 
   if (!sender) return { kind: "anonymous" };
   const fingerprint = fingerprintOf(sender);
   return fingerprint === state.fingerprint ? { kind: "self" } : { kind: "member", fingerprint };
+}
+
+function decodeVaults(state: SessionState, raw: Vault[]): { vaults: VaultView[]; warnings: string[] } {
+  const warnings: string[] = [];
+  const vaults: VaultView[] = [];
+  for (const v of raw) {
+    try {
+      vaults.push(decodeVault(state, v));
+    } catch (e) {
+      warnings.push(`Vault ${v.id} illisible : ${e instanceof Error ? e.message : e}`);
+    }
+  }
+  // Personnel d'abord, puis par nom.
+  vaults.sort((a, b) => (a.kind === b.kind ? a.name.localeCompare(b.name) : a.kind === "personal" ? -1 : 1));
+  return { vaults, warnings };
 }
 
 function decodeVault(state: SessionState, v: Vault): VaultView {
@@ -187,17 +225,7 @@ function decodeVault(state: SessionState, v: Vault): VaultView {
  * mais un compte entier ne doit pas se retrouver bloqué par un seul vault. */
 export async function refresh(state: SessionState): Promise<string[]> {
   const res = await api.sync();
-  const warnings: string[] = [];
-  const vaults: VaultView[] = [];
-  for (const v of res.vaults) {
-    try {
-      vaults.push(decodeVault(state, v));
-    } catch (e) {
-      warnings.push(`Vault ${v.id} illisible : ${e instanceof Error ? e.message : e}`);
-    }
-  }
-  // Personnel d'abord, puis par nom.
-  vaults.sort((a, b) => (a.kind === b.kind ? a.name.localeCompare(b.name) : a.kind === "personal" ? -1 : 1));
+  const { vaults, warnings } = decodeVaults(state, res.vaults);
   state.user = res.user;
   state.vaults = vaults;
   state.invitations = res.invitations.filter((i) => i.status === "pending");
@@ -329,7 +357,52 @@ export function decodeItem(vault: VaultView, item: Item): DecodedItem {
   }
 }
 
+// ─── Hors ligne ─────────────────────────────────────────────────────────────
+
+/** Ouverte depuis la copie hors ligne, la session lit ses items là, pas sur
+ * le serveur. */
+let offlineItems: ((vaultId: string) => { items: Item[]; revision: number } | null) | null = null;
+
+/** Ouvre une copie hors ligne (`offline.ts`) avec le mot de passe maître :
+ * la même dérivation que la connexion, sur les paramètres et le compte
+ * enveloppé qu'elle a gardés — sans le serveur, en lecture seule. */
+export async function openOffline(
+  copy: { user: UserProfile; blobs: AccountBlobs; vaults: Vault[]; items: Record<string, { revision: number; items: Item[] }>; savedAt: string },
+  password: string,
+): Promise<{ session: SessionState; warnings: string[] }> {
+  const master = await c.deriveMasterKey(password, unb64(copy.blobs.kdf_salt), copy.blobs.kdf);
+  master.authKey.fill(0);
+  let account: UnlockedAccount;
+  try {
+    account = c.unlockAccount(master.stretchedKey, unb64(copy.blobs.protected_user_key), unb64(copy.blobs.protected_private_key));
+  } catch {
+    throw new Error("Mot de passe maître incorrect.");
+  } finally {
+    master.stretchedKey.fill(0);
+  }
+  const state: SessionState = {
+    user: copy.user,
+    account,
+    fingerprint: fingerprintOf(account.keypair.publicKey),
+    vaults: [],
+    invitations: [],
+    rollbacks: [],
+    blobs: copy.blobs,
+    offline: { savedAt: copy.savedAt },
+  };
+  const { vaults, warnings } = decodeVaults(state, copy.vaults);
+  // Lecture seule : rien ne part vers le serveur, toutes les pages le
+  // voient à travers le rôle.
+  state.vaults = vaults.map((v) => ({ ...v, role: "reader" }));
+  offlineItems = (id) => copy.items[id] ?? null;
+  return { session: state, warnings };
+}
+
 export async function loadItems(vault: VaultView): Promise<{ items: DecodedItem[]; revision: number }> {
+  if (offlineItems) {
+    const stored = offlineItems(vault.id) ?? { items: [], revision: vault.revision };
+    return { items: stored.items.filter((i) => !i.deleted).map((i) => decodeItem(vault, i)), revision: stored.revision };
+  }
   const page = await api.items(vault.id);
   return { items: page.items.filter((i) => !i.deleted).map((i) => decodeItem(vault, i)), revision: page.revision };
 }

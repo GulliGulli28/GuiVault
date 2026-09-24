@@ -7,7 +7,7 @@
  * que celui du popup. */
 import { fromBase64, toBase64 } from "./bytes";
 import { fingerprint } from "./crypto";
-import type { KeyFrom, SessionState, VaultView } from "./session";
+import type { AccountBlobs, KeyFrom, SessionState, VaultView } from "./session";
 import type { TokenPair, UserProfile } from "./types";
 
 interface StoredVault {
@@ -27,6 +27,10 @@ export interface StoredSession {
   user: UserProfile;
   account: { userKey: string; privateKey: string; publicKey: string };
   vaults: StoredVault[];
+  /** Le compte enveloppé (copie hors ligne) — absent d'une session d'avant. */
+  blobs?: AccountBlobs;
+  /** Session ouverte depuis la copie hors ligne (extension). */
+  offline?: { savedAt: string };
 }
 
 export function serializeSession(state: SessionState, tokens: TokenPair): StoredSession {
@@ -35,6 +39,8 @@ export function serializeSession(state: SessionState, tokens: TokenPair): Stored
     user: state.user,
     account: { userKey: toBase64(state.account.userKey), privateKey: toBase64(state.account.keypair.privateKey), publicKey: toBase64(state.account.keypair.publicKey) },
     vaults: state.vaults.map((v) => ({ id: v.id, kind: v.kind, role: v.role, name: v.name, key: toBase64(v.key), keyFrom: v.keyFrom, revision: v.revision, updatedAt: v.updatedAt })),
+    blobs: state.blobs,
+    offline: state.offline,
   };
 }
 
@@ -50,6 +56,8 @@ export function deserializeSession(s: StoredSession): SessionState {
     // Recalculés au prochain `/sync` (ils ne changent la référence qu'une
     // fois acceptés, `vaultRevisions.ts`).
     rollbacks: [],
+    blobs: s.blobs,
+    offline: s.offline,
   };
 }
 

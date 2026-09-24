@@ -5,6 +5,7 @@ import "./lib/settingsSections";
 import { clearWebSession, loadWebSession, saveWebSession, saveWebTokens, touchWebSession, webSessionIdle } from "./lib/persist";
 import { navigate, useRoute } from "./lib/route";
 import { acceptRollback, logout, refresh, wipe, type SessionState } from "./lib/session";
+import { refreshOfflineCopy } from "./lib/offline";
 import { LoginScreen } from "./components/LoginScreen";
 import { Sidebar } from "./components/Sidebar";
 import { VaultPage } from "./components/VaultPage";
@@ -47,12 +48,14 @@ export default function App() {
 
   const reload = useCallback(async () => {
     const s = sessionRef.current;
-    if (!s) return;
+    if (!s || s.offline) return;
     try {
       const warnings = await refresh(s);
       warnings.forEach(error);
       setSession({ ...s });
       if (currentTokens()) saveWebSession(s, currentTokens()!);
+      // La copie hors ligne, si elle est activée sur cet appareil, suit.
+      void refreshOfflineCopy(s).catch(() => {});
     } catch (e) {
       error(e instanceof Error ? e.message : String(e));
     }
@@ -118,7 +121,7 @@ export default function App() {
   // changent ici (`syncedSettings.ts`).
   useEffect(() => {
     const s = sessionRef.current;
-    if (!s) return;
+    if (!s || s.offline) return;
     void startSettingsSync(s.account.userKey);
     return () => stopSettingsSync();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -127,7 +130,7 @@ export default function App() {
   // Flux d'événements : un vault modifié ailleurs, une invitation reçue,
   // des réglages changés sur un autre appareil.
   useEffect(() => {
-    if (!session) return;
+    if (!session || session.offline) return;
     const sub = subscribeEvents((ev) => {
       if (ev.type === "settings_changed") {
         void pullSettings();
@@ -190,7 +193,7 @@ export default function App() {
   if (!ctx) {
     return (
       <div className="h-full overflow-y-auto bg-[var(--c-bg)] text-[var(--c-text)]">
-        <LoginScreen onSession={(s) => { const t = currentTokens(); if (t) saveWebSession(s, t); setSession(s); navigate({ page: "home" }); }} />
+        <LoginScreen onSession={(s) => { const t = currentTokens(); if (t) saveWebSession(s, t); setSession(s); navigate({ page: "home" }); if (!s.offline) void refreshOfflineCopy(s).catch(() => {}); }} />
         <Toasts toasts={toasts} onDismiss={dismiss} />
       </div>
     );
@@ -236,6 +239,16 @@ export default function App() {
       <Sidebar ctx={ctx} route={effective} onLogout={onLogout} onSearch={openSearch} width={sidebar.value} />
       <PaneHandle onMouseDown={sidebar.onMouseDown} />
       <main className={`flex min-w-0 flex-1 flex-col overflow-hidden bg-[var(--c-bg2)] ${sidebar.isDragging ? "pointer-events-none select-none" : ""}`}>
+        {ctx.session.offline && (
+          <div role="status" className="shrink-0 px-4 pt-3">
+            <div className="callout callout-warn flex flex-wrap items-center gap-3 text-[12.5px]">
+              <p className="min-w-0 flex-1">
+                <span className="font-medium">Hors ligne</span> — la copie de cet appareil, mise à jour le {new Date(ctx.session.offline.savedAt).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}. Lecture seule : ce qui a changé depuis sur le serveur n'y est pas.
+              </p>
+              <button onClick={() => void onLogout()} className="btn btn-secondary btn-sm">Se reconnecter</button>
+            </div>
+          </div>
+        )}
         <RollbackBanner rollbacks={ctx.session.rollbacks} onAccept={(id) => { acceptRollback(ctx.session, id); setSession({ ...ctx.session }); }} />
         {page}
       </main>

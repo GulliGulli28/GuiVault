@@ -4,6 +4,7 @@ import { api, errorMessage } from "../lib/api";
 import { navigate, routeHash, type SettingsSection } from "../lib/route";
 import { LOCK_CHOICES, loadLockMinutes, saveLockMinutes } from "../lib/persist";
 import { CLEAR_CHOICES, loadClearSeconds, saveClearSeconds } from "../lib/clipboard";
+import { OfflineSetting } from "./OfflineSetting";
 import { changePassword } from "../lib/session";
 import type { AuditEntry, Session } from "../lib/types";
 import { AppearanceSettings, SettingsSyncToggle } from "./AppearanceSettings";
@@ -125,6 +126,7 @@ export function SettingsPage({ ctx, section }: { ctx: PageContext; section: Sett
                   </select>
                 </div>
                 <ClipboardSetting />
+                <OfflineSetting session={session} notify={ctx.notify} error={ctx.error} />
               </div>
             </section>
           )}

@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { api, errorMessage } from "../lib/api";
-import { login, register, type SessionState } from "../lib/session";
+import { api, ApiError, errorMessage } from "../lib/api";
+import { loadOfflineCopy, type OfflineCopy } from "../lib/offline";
+import { login, openOffline, register, type SessionState } from "../lib/session";
 import type { HealthResponse } from "../lib/types";
 import { Logo } from "./Logo";
 import { PasswordInput } from "./ui";
@@ -18,10 +19,35 @@ export function LoginScreen({ onSession }: { onSession: (s: SessionState) => voi
   const [error, setError] = useState<string | null>(null);
   const [totp, setTotp] = useState<{ verify: (code: string) => Promise<SessionState> } | null>(null);
   const [code, setCode] = useState("");
+  /** Le serveur ne répond pas (page ouverte depuis le cache, erreur réseau,
+   * proxy en 5xx) : la copie hors ligne de ce compte, s'il y en a une. */
+  const [unreachable, setUnreachable] = useState(false);
+  const [offlineCopy, setOfflineCopy] = useState<OfflineCopy | null>(null);
 
   useEffect(() => {
-    api.health().then(setHealth).catch(() => setHealth(null));
+    api.health().then(setHealth).catch(() => { setHealth(null); setUnreachable(true); });
   }, []);
+  useEffect(() => {
+    const e = email.trim();
+    if (!e.includes("@")) { setOfflineCopy(null); return; }
+    const t = setTimeout(() => void loadOfflineCopy(e).then(setOfflineCopy), 250);
+    return () => clearTimeout(t);
+  }, [email]);
+
+  const openCopy = async () => {
+    if (!offlineCopy || !password) return;
+    setError(null);
+    setBusy("Ouverture de la copie…");
+    try {
+      const { session, warnings } = await openOffline(offlineCopy, password);
+      if (warnings.length) setError(warnings.join(" "));
+      onSession(session);
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusy(null);
+    }
+  };
 
   const canRegister = health?.registration !== "closed";
   const mismatch = mode === "register" && confirm.length > 0 && confirm !== password;
@@ -41,7 +67,9 @@ export function LoginScreen({ onSession }: { onSession: (s: SessionState) => voi
         else setTotp({ verify: out.verify });
       }
     } catch (err) {
-      setError(errorMessage(err));
+      const down = !(err instanceof ApiError) || err.status >= 500;
+      if (down) setUnreachable(true);
+      setError(down && !(err instanceof ApiError) ? "Serveur injoignable." : errorMessage(err));
     } finally {
       setBusy(null);
     }
@@ -127,6 +155,14 @@ export function LoginScreen({ onSession }: { onSession: (s: SessionState) => voi
               </>
             )}
             {error && <p className="callout callout-danger">{error}</p>}
+            {mode === "login" && unreachable && offlineCopy && (
+              <div className="callout space-y-2">
+                <p>Le serveur ne répond pas. Cet appareil garde une copie chiffrée de ce compte, mise à jour le {new Date(offlineCopy.savedAt).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })} : elle s'ouvre avec le même mot de passe maître, en lecture seule.</p>
+                <div className="flex justify-end">
+                  <button type="button" onClick={() => void openCopy()} disabled={!password || busy !== null} className="btn btn-secondary btn-sm">Ouvrir la copie hors ligne</button>
+                </div>
+              </div>
+            )}
             <div className="flex items-center justify-between gap-2 pt-1">
               <span className="text-[11px] text-[var(--c-text-faint)]">{health ? `serveur ${health.server_version}` : ""}</span>
               <button type="submit" disabled={!email.trim() || !password || busy !== null} className="btn btn-primary">
@@ -135,7 +171,7 @@ export function LoginScreen({ onSession }: { onSession: (s: SessionState) => voi
             </div>
           </form>
         )}
-        <p className="help-text mt-3 text-center">Le déchiffrement se fait dans ce navigateur. Rien n'est conservé après fermeture de l'onglet.</p>
+        <p className="help-text mt-3 text-center">Le déchiffrement se fait dans ce navigateur. Rien n'est conservé après fermeture de l'onglet — sauf, si vous l'avez activée, une copie chiffrée pour l'accès hors ligne.</p>
       </div>
     </div>
   );

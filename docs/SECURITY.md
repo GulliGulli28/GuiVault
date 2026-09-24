@@ -103,7 +103,25 @@ est installé une fois et vérifiable.
   de domaine tiers, `frame-ancestors 'none'`), sans referrer, et le binaire
   n'embarque aucun script externe — l'application est entièrement dans
   `web/dist`, compilée dans l'image.
-- **Rien n'atteint le disque et rien ne survit à l'onglet** : jetons et
+- **Copie hors ligne** (Paramètres › Sécurité, et réglages du popup de
+  l'extension ; **désactivée par défaut, par appareil**) : pour ouvrir le
+  coffre quand le serveur ne répond pas, en lecture seule. Elle contient ce
+  que le serveur garde, rien de plus — le compte enveloppé (paramètres
+  Argon2id, user key et clé privée scellées), les clés de vault enveloppées,
+  les noms et items chiffrés — dans l'IndexedDB de l'origine (le serveur
+  pour le web, l'extension pour elle). Elle s'ouvre comme la connexion :
+  Argon2id sur le mot de passe maître (plancher compris), puis
+  déchiffrement. Sur le disque, elle vaut une copie de la base : rien
+  d'exploitable sans le mot de passe maître, mais attaquable hors ligne —
+  c'est le compromis de Bitwarden, à ne pas activer sur un ordinateur
+  partagé. Le second facteur ne la protège pas (il protège la session au
+  serveur). Pour que la page s'ouvre sans le serveur, l'interface web
+  garde aussi son code dans le cache du navigateur (`public/sw.js`,
+  service worker) : réseau d'abord pour les pages, cache seulement s'il ne
+  répond pas, jamais l'API — une page en ligne est toujours celle du
+  serveur ; un `sw.js` modifié remplace l'ancien au chargement suivant.
+- **Rien n'atteint le disque et rien ne survit à l'onglet** (hors copie
+  hors ligne activée, ci-dessus) : jetons et
   clés sont dans le `sessionStorage` de l'onglet — la page peut donc se
   recharger sans redemander le mot de passe maître, mais fermer l'onglet
   efface tout, et un autre onglet n'y a pas accès. Un délai d'inactivité
