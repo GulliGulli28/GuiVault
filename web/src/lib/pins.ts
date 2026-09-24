@@ -41,3 +41,10 @@ export function requirePinned(email: string, fingerprint: string) {
     );
   }
 }
+
+/** L'e-mail sous lequel cette empreinte a été vérifiée, s'il y en a un :
+ * pour dire qui a remis la clé d'un vault sans avoir la liste des membres. */
+export function pinnedEmailFor(fingerprint: string): string | null {
+  const found = Object.entries(load()).find(([, fp]) => fp === fingerprint);
+  return found ? found[0] : null;
+}

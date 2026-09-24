@@ -57,11 +57,17 @@ paramètres ou formats anciens.
   vault key, qui porte un compteur et l'empreinte (id → hash du chiffré)
   de chaque item, réécrit par chaque écrivain sous le verrou optimiste
   existant ; un client refuse un item dont le hash ne correspond pas.
-- [ ] **Enveloppes signées.** Les enveloppes de clés de vault sont des
-  boîtes scellées anonymes : le serveur peut en fabriquer une pour un vault
-  de son choix. Signer enveloppes et invitations avec une clé d'identité
-  (nouvel octet de version, sans toucher au `0x01`).
-- [ ] **Doc :** `EXTENSION.md` dit « Lecture seule » en tête, alors que
+- [x] **Enveloppes authentifiées.** Les enveloppes de clés de vault étaient
+  des boîtes scellées anonymes : le serveur pouvait en fabriquer une pour un
+  vault de son choix. Format 2 (`wrap_vault_key`) : X25519 statique entre
+  expéditeur et destinataire, HKDF, AAD = vault ; écrit par le web,
+  l'extension et Guiterm, le format 1 encore lu. Web et Guiterm montrent
+  qui a remis la clé (réglages du vault, badge « clé non vérifiée »).
+- [ ] **Empreinte de l'inviteur avant d'accepter.** Aujourd'hui l'invité
+  voit qui lui a remis la clé une fois le vault rejoint. Le serveur
+  pourrait renvoyer l'enveloppe avec l'invitation pour qu'il la vérifie
+  avant d'accepter.
+- [x] **Doc :** `EXTENSION.md` disait « Lecture seule » en tête, alors que
   l'extension crée, modifie et supprime.
 
 ## 1. Défauts de Bitwarden à combler

@@ -4,6 +4,7 @@ import { api, errorMessage } from "../lib/api";
 import { filterEntities, indexItems, toEntities, withParent } from "../lib/entities";
 import { uuid } from "../lib/bytes";
 import { isSecret } from "../lib/items";
+import { pinnedEmailFor } from "../lib/pins";
 import { navigate } from "../lib/route";
 import { loadItems, moveItem, payloadEntity, payloadName, putPayload, RevisionConflict, type DecodedItem, type VaultView } from "../lib/session";
 import { canWrite, KIND_LABELS, KIND_LABELS_PLURAL, ROLE_HINTS, ROLE_LABELS, type CustomIcon, type GuiVaultEntity, type ItemKind, type Payload } from "../lib/types";
@@ -255,6 +256,17 @@ function VaultBody({ ctx, vault }: { ctx: PageContext; vault: VaultView }) {
       <header className="flex shrink-0 flex-wrap items-center gap-2 border-b border-[var(--c-border)] px-4 py-2.5 pl-4 max-md:pl-11">
         <h1 className="min-w-0 truncate text-[14px] font-semibold text-[var(--c-text)]">{vault.name}</h1>
         <span className="tag" title={ROLE_HINTS[vault.role]}>{vault.kind === "personal" ? "personnel" : ROLE_LABELS[vault.role]}</span>
+        {vault.keyFrom.kind === "member" && !pinnedEmailFor(vault.keyFrom.fingerprint) && (
+          <button
+            type="button"
+            onClick={() => navigate({ page: "vault-settings", id: vault.id })}
+            className="tag"
+            style={{ color: "var(--c-warn)" }}
+            title="La clé de ce vault vous a été remise par quelqu'un dont vous n'avez pas vérifié l'empreinte — voir les réglages du vault"
+          >
+            clé non vérifiée
+          </button>
+        )}
         <span className="hidden text-[11px] text-[var(--c-text-faint)] sm:inline" title={`Révision ${vault.revision}`}>{items ? `${items.length} élément(s)` : ""}</span>
         <div className="ml-auto flex items-center gap-1.5">
           <button onClick={() => void load()} className="btn btn-ghost btn-sm btn-icon" title="Recharger" aria-label="Recharger"><IconRefresh size={13} /></button>

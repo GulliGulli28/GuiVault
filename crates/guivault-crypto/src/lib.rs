@@ -23,9 +23,11 @@
 //! ```
 //!
 //! - Changer le mot de passe maître ne ré-enveloppe que la *user key*.
-//! - Partager un vault = sceller sa *vault key* vers la clé publique X25519 du
-//!   destinataire (boîte scellée libsodium, [`seal_for`]) — le serveur ne
-//!   transporte que des enveloppes.
+//! - Partager un vault = envelopper sa *vault key* pour la clé publique X25519
+//!   du destinataire ([`wrap_vault_key`]) — le serveur ne transporte que des
+//!   enveloppes. Elles sont **authentifiées** (format 2) : le destinataire
+//!   sait quelle clé les a produites, et le serveur ne peut pas en fabriquer
+//!   une au nom d'un membre.
 //! - La clé d'authentification est dérivée par HKDF *à côté* de la clé de
 //!   chiffrement, jamais à partir d'elle : la connaître ne donne rien sur les
 //!   données.
@@ -37,10 +39,14 @@
 //!
 //! - Enveloppe symétrique : `0x01 ‖ nonce(24) ‖ ciphertext‖tag(16)`.
 //! - Boîte scellée : `0x01 ‖ éphémère_pk(32) ‖ ciphertext‖tag(16)`.
+//! - Enveloppe de vault key authentifiée : `0x02 ‖ expéditeur_pk(32) ‖
+//!   enveloppe symétrique` ([`wrap_vault_key`]) ; le format 1 (boîte scellée)
+//!   reste lisible.
 use argon2::password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString};
 use argon2::{Algorithm, Argon2, Params, Version};
 use chacha20poly1305::aead::{Aead, AeadCore, KeyInit, OsRng, Payload};
 use chacha20poly1305::{Key, XChaCha20Poly1305, XNonce};
+use curve25519_dalek::montgomery::MontgomeryPoint;
 use hkdf::Hkdf;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -455,14 +461,103 @@ pub fn rekey_account(account: &UnlockedAccount, new_password: &str) -> Result<Re
 
 // ─── Vaults et items ────────────────────────────────────────────────────────
 
-/// Enveloppe une *vault key* pour un membre : boîte scellée vers sa clé
-/// publique. C'est ce blob qui est stocké sur son appartenance au vault.
-pub fn wrap_vault_key(recipient: &PublicKey, vault_key: &SymmetricKey) -> Result<Vec<u8>, CryptoError> {
-    seal_for(recipient, vault_key.as_bytes())
+/// Enveloppe de vault key authentifiée (format 2).
+const FORMAT_V2: u8 = 0x02;
+const VAULT_KEY_CONTEXT: &[u8] = b"guivault/v2/vault-key";
+
+/// Clé symétrique d'une enveloppe de format 2 : X25519 entre la clé privée
+/// de l'un et la clé publique de l'autre (le même secret des deux côtés),
+/// passé par HKDF avec les deux clés publiques — expéditeur puis
+/// destinataire — pour qu'elle soit propre à ce couple et à ce sens.
+fn vault_envelope_key(
+    own: &PrivateKey,
+    other: &PublicKey,
+    sender: &PublicKey,
+    recipient: &PublicKey,
+) -> Result<SymmetricKey, CryptoError> {
+    let shared = MontgomeryPoint(*other.as_bytes()).mul_clamped(own.to_bytes());
+    // Une clé publique d'ordre faible donne un secret nul, connu de tous.
+    if shared.as_bytes() == &[0u8; 32] {
+        return Err(CryptoError::Decrypt);
+    }
+    let mut info = Vec::with_capacity(VAULT_KEY_CONTEXT.len() + 64);
+    info.extend_from_slice(VAULT_KEY_CONTEXT);
+    info.extend_from_slice(sender.as_bytes());
+    info.extend_from_slice(recipient.as_bytes());
+    let mut out = [0u8; KEY_LEN];
+    Hkdf::<Sha256>::new(None, shared.as_bytes())
+        .expand(&info, &mut out)
+        .expect("32 octets est une longueur HKDF valide");
+    Ok(SymmetricKey(out))
 }
 
-pub fn unwrap_vault_key(account: &UnlockedAccount, wrapped: &[u8]) -> Result<SymmetricKey, CryptoError> {
-    SymmetricKey::from_slice(&unseal(&account.keypair.private, wrapped)?)
+fn vault_envelope_aad(vault_id: &str) -> Vec<u8> {
+    let mut aad = Vec::with_capacity(VAULT_KEY_CONTEXT.len() + 1 + vault_id.len());
+    aad.extend_from_slice(VAULT_KEY_CONTEXT);
+    aad.push(0);
+    aad.extend_from_slice(vault_id.as_bytes());
+    aad
+}
+
+/// Enveloppe une *vault key* pour un membre — c'est ce blob qui est stocké
+/// sur son appartenance au vault. Format 2 :
+/// `0x02 ‖ clé publique de l'expéditeur (32) ‖ enveloppe symétrique`, où
+/// l'enveloppe symétrique est celle de [`seal`] (format 1) sous
+/// [`vault_envelope_key`], AAD = `"guivault/v2/vault-key\0" ‖ vault_id`.
+///
+/// Contrairement à une boîte scellée (format 1, anonyme : n'importe qui
+/// connaissant la clé publique du destinataire — le serveur compris — peut
+/// en fabriquer une), seul le détenteur de la clé privée de l'expéditeur
+/// (ou du destinataire) peut produire cette enveloppe, et elle ne vaut que
+/// pour ce vault : le destinataire sait **qui** lui a remis la clé, et le
+/// vérifie par l'empreinte de `sender`.
+pub fn wrap_vault_key(
+    sender: &KeyPair,
+    recipient: &PublicKey,
+    vault_id: &str,
+    vault_key: &SymmetricKey,
+) -> Result<Vec<u8>, CryptoError> {
+    let key = vault_envelope_key(&sender.private, recipient, &sender.public, recipient)?;
+    let sealed = seal(&key, vault_key.as_bytes(), &vault_envelope_aad(vault_id))?;
+    let mut out = Vec::with_capacity(1 + 32 + sealed.len());
+    out.push(FORMAT_V2);
+    out.extend_from_slice(sender.public.as_bytes());
+    out.extend_from_slice(&sealed);
+    Ok(out)
+}
+
+/// Une vault key ouverte, et qui l'a enveloppée.
+pub struct UnwrappedVaultKey {
+    pub key: SymmetricKey,
+    /// La clé publique de l'expéditeur (format 2) — la sienne pour un vault
+    /// qu'on a créé soi-même. `None` : format 1, boîte scellée anonyme, que
+    /// n'importe qui (serveur compris) a pu produire.
+    pub sender: Option<PublicKey>,
+}
+
+/// Ouvre l'enveloppe de sa vault key, format 1 (anonyme) ou 2 (authentifié,
+/// lié à `vault_id`).
+pub fn unwrap_vault_key(
+    account: &UnlockedAccount,
+    vault_id: &str,
+    wrapped: &[u8],
+) -> Result<UnwrappedVaultKey, CryptoError> {
+    match wrapped.first() {
+        Some(&FORMAT_V1) => Ok(UnwrappedVaultKey {
+            key: SymmetricKey::from_slice(&unseal(&account.keypair.private, wrapped)?)?,
+            sender: None,
+        }),
+        Some(&FORMAT_V2) if wrapped.len() > 33 => {
+            let sender = PublicKey::try_from(&wrapped[1..33]).map_err(|_| CryptoError::Format)?;
+            let key = vault_envelope_key(&account.keypair.private, &sender, &sender, &account.keypair.public)?;
+            let plain = open(&key, &wrapped[33..], &vault_envelope_aad(vault_id))?;
+            Ok(UnwrappedVaultKey {
+                key: SymmetricKey::from_slice(&plain)?,
+                sender: Some(sender),
+            })
+        }
+        _ => Err(CryptoError::Format),
+    }
 }
 
 /// AAD d'un item : lie le chiffré à son vault, son identifiant et son type.
@@ -620,8 +715,11 @@ mod tests {
         let vault_id = "v-1";
         let item = seal_item(&vault_key, vault_id, "i-1", "host", b"{\"host\":\"db1\"}").unwrap();
         let bob_pk = PublicKey::try_from(bob_mat.public_key.as_slice()).unwrap();
-        let wrapped_for_bob = wrap_vault_key(&bob_pk, &vault_key).unwrap();
-        let bob_vault_key = unwrap_vault_key(&bob, &wrapped_for_bob).unwrap();
+        let wrapped_for_bob = wrap_vault_key(&alice.keypair, &bob_pk, vault_id, &vault_key).unwrap();
+        let opened = unwrap_vault_key(&bob, vault_id, &wrapped_for_bob).unwrap();
+        // Bob sait qui lui a remis la clé.
+        assert_eq!(opened.sender.as_ref(), Some(&alice.keypair.public));
+        let bob_vault_key = opened.key;
         assert_eq!(
             open_item(&bob_vault_key, vault_id, "i-1", "host", &item).unwrap(),
             b"{\"host\":\"db1\"}"
@@ -630,7 +728,7 @@ mod tests {
         assert!(open_item(&bob_vault_key, "v-2", "i-1", "host", &item).is_err());
         assert!(open_item(&bob_vault_key, vault_id, "i-1", "ssh-key", &item).is_err());
         // Alice ne peut pas ouvrir l'enveloppe destinée à Bob.
-        assert!(unwrap_vault_key(&alice, &wrapped_for_bob).is_err());
+        assert!(unwrap_vault_key(&alice, vault_id, &wrapped_for_bob).is_err());
 
         // Alice change de mot de passe : sa user key ne bouge pas.
         let rk = rekey_account(&alice, "alice-new-pw").unwrap();
@@ -638,6 +736,49 @@ mod tests {
         let login = prepare_login("alice-new-pw", &rk.kdf_salt, rk.kdf).unwrap();
         let alice3 = unlock_account(&login.stretched_key, &rk.protected_user_key, &mat.protected_private_key).unwrap();
         assert_eq!(alice3.user_key.as_bytes(), alice.user_key.as_bytes());
+    }
+
+    #[test]
+    fn vault_key_envelope_is_authenticated_and_bound_to_its_vault() {
+        let (_, alice) = create_account("a").unwrap();
+        let (_, bob) = create_account("b").unwrap();
+        let mallory = KeyPair::generate();
+        let vault_key = SymmetricKey::random();
+
+        // Soi-même : l'expéditeur est sa propre clé.
+        let own = wrap_vault_key(&alice.keypair, &alice.keypair.public, "v-1", &vault_key).unwrap();
+        assert_eq!(own.len(), 106);
+        let opened = unwrap_vault_key(&alice, "v-1", &own).unwrap();
+        assert_eq!(opened.key.as_bytes(), vault_key.as_bytes());
+        assert_eq!(opened.sender.as_ref(), Some(&alice.keypair.public));
+
+        // Liée à son vault : le serveur ne peut pas la reposer sur un autre.
+        let for_bob = wrap_vault_key(&alice.keypair, &bob.keypair.public, "v-1", &vault_key).unwrap();
+        assert!(unwrap_vault_key(&bob, "v-2", &for_bob).is_err());
+
+        // Mallory (le serveur, par exemple) fabrique une enveloppe et la
+        // signe du nom d'Alice : elle ne s'ouvre pas.
+        let mut forged = wrap_vault_key(&mallory, &bob.keypair.public, "v-1", &SymmetricKey::random()).unwrap();
+        forged[1..33].copy_from_slice(alice.keypair.public.as_bytes());
+        assert!(unwrap_vault_key(&bob, "v-1", &forged).is_err());
+        // Sous son propre nom, elle s'ouvre — mais Bob voit que c'est
+        // Mallory, pas Alice : c'est l'empreinte qui tranche.
+        let honest_mallory = wrap_vault_key(&mallory, &bob.keypair.public, "v-1", &vault_key).unwrap();
+        assert_eq!(
+            unwrap_vault_key(&bob, "v-1", &honest_mallory).unwrap().sender.as_ref(),
+            Some(&mallory.public)
+        );
+
+        // Une clé publique d'ordre faible (point nul) est refusée.
+        let mut weak = for_bob.clone();
+        weak[1..33].copy_from_slice(&[0u8; 32]);
+        assert!(unwrap_vault_key(&bob, "v-1", &weak).is_err());
+
+        // Le format 1 (boîte scellée anonyme) reste lisible, sans expéditeur.
+        let legacy = seal_for(&bob.keypair.public, vault_key.as_bytes()).unwrap();
+        let opened = unwrap_vault_key(&bob, "v-1", &legacy).unwrap();
+        assert_eq!(opened.key.as_bytes(), vault_key.as_bytes());
+        assert!(opened.sender.is_none());
     }
 
     #[test]

@@ -40,6 +40,9 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 argon2 = { version = "0.5", features = ["std"] }
 chacha20poly1305 = "0.10"
 crypto_box = { version = "0.9", features = ["seal", "std"] }
+# X25519 brut pour les enveloppes de vault key authentifiées (format 2) —
+# déjà tiré par `crypto_box`, même version que chez Guiterm.
+curve25519-dalek = "4.1"
 hkdf = "0.12"
 sha2 = "0.10"
 hmac = "0.12"

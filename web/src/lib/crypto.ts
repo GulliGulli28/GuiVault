@@ -32,6 +32,8 @@ export const SALT_LEN = 16;
 export const NONCE_LEN = 24;
 export const TAG_LEN = 16;
 const FORMAT_V1 = 0x01;
+/** Enveloppe de vault key authentifiée (`wrapVaultKey`). */
+const FORMAT_V2 = 0x02;
 
 export class CryptoError extends Error {
   constructor(public readonly kind: "format" | "decrypt" | "kdf", message: string) {
@@ -267,14 +269,69 @@ export async function rekeyAccount(account: UnlockedAccount, newPassword: string
 
 // ─── Vaults et items ────────────────────────────────────────────────────────
 
-export function wrapVaultKey(recipientPk: Uint8Array, vaultKey: Uint8Array): Uint8Array {
-  return sealFor(recipientPk, vaultKey);
+const VAULT_KEY_CONTEXT = utf8.encode("guivault/v2/vault-key");
+
+/** X25519 entre sa clé privée et la clé publique de l'autre (le même secret
+ * des deux côtés), puis HKDF avec les deux clés publiques — expéditeur puis
+ * destinataire. `vault_envelope_key` côté Rust. */
+function vaultEnvelopeKey(ownPrivate: Uint8Array, otherPublic: Uint8Array, senderPk: Uint8Array, recipientPk: Uint8Array): Uint8Array {
+  let shared: Uint8Array;
+  try {
+    shared = x25519.getSharedSecret(ownPrivate, otherPublic);
+  } catch {
+    throw new CryptoError("decrypt", "clé publique d'expéditeur invalide");
+  }
+  // Une clé publique d'ordre faible donne un secret nul, connu de tous.
+  if (shared.every((b) => b === 0)) throw new CryptoError("decrypt", "clé publique d'expéditeur invalide");
+  const key = hkdf(sha256, shared, undefined, concat(VAULT_KEY_CONTEXT, senderPk, recipientPk), KEY_LEN);
+  shared.fill(0);
+  return key;
 }
 
-export function unwrapVaultKey(account: UnlockedAccount, wrapped: Uint8Array): Uint8Array {
-  const k = unseal(account.keypair, wrapped);
-  if (k.length !== KEY_LEN) throw new CryptoError("format", "vault key de taille inattendue");
-  return k;
+function vaultEnvelopeAad(vaultId: string): Uint8Array {
+  return concat(VAULT_KEY_CONTEXT, new Uint8Array([0]), utf8.encode(vaultId));
+}
+
+/** Enveloppe une vault key pour un membre, format 2 :
+ * `0x02 ‖ clé publique de l'expéditeur (32) ‖ enveloppe symétrique` — seul
+ * le détenteur de la clé privée de l'expéditeur a pu la produire, et elle ne
+ * vaut que pour ce vault (AAD). Le format 1, une boîte scellée anonyme, se
+ * lit encore mais ne s'écrit plus : n'importe qui connaissant la clé
+ * publique du destinataire — le serveur compris — pouvait en fabriquer une. */
+export function wrapVaultKey(sender: KeyPair, recipientPk: Uint8Array, vaultId: string, vaultKey: Uint8Array): Uint8Array {
+  const key = vaultEnvelopeKey(sender.privateKey, recipientPk, sender.publicKey, recipientPk);
+  try {
+    return concat(new Uint8Array([FORMAT_V2]), sender.publicKey, seal(key, vaultKey, vaultEnvelopeAad(vaultId)));
+  } finally {
+    key.fill(0);
+  }
+}
+
+/** Une vault key ouverte, et la clé publique de qui l'a enveloppée — `null`
+ * pour le format 1 (anonyme). */
+export interface UnwrappedVaultKey {
+  key: Uint8Array;
+  sender: Uint8Array | null;
+}
+
+export function unwrapVaultKey(account: UnlockedAccount, vaultId: string, wrapped: Uint8Array): UnwrappedVaultKey {
+  let key: Uint8Array;
+  let sender: Uint8Array | null = null;
+  if (wrapped[0] === FORMAT_V1) {
+    key = unseal(account.keypair, wrapped);
+  } else if (wrapped[0] === FORMAT_V2 && wrapped.length > 33) {
+    sender = wrapped.slice(1, 33);
+    const k = vaultEnvelopeKey(account.keypair.privateKey, sender, sender, account.keypair.publicKey);
+    try {
+      key = open(k, wrapped.subarray(33), vaultEnvelopeAad(vaultId));
+    } finally {
+      k.fill(0);
+    }
+  } else {
+    throw new CryptoError("format", "enveloppe de vault key illisible (format ou version inconnus)");
+  }
+  if (key.length !== KEY_LEN) throw new CryptoError("format", "vault key de taille inattendue");
+  return { key, sender };
 }
 
 /** `"guivault/v1/item\0" ‖ vault_id ‖ "\0" ‖ item_id ‖ "\0" ‖ item_type` : le

@@ -11,12 +11,20 @@ import { requirePinned } from "./pins";
 import { acceptRollback as acceptRollbackRevision, observeRevisions, type VaultRollback } from "./vaultRevisions";
 import type { Invitation, Item, LoginResponse, Payload, Role, UserProfile, Vault, VaultMember } from "./types";
 
+/** Qui a remis la clé de ce vault à ce compte : soi-même (vault créé ou
+ * clé renouvelée ici), la détentrice d'une clé publique (enveloppe de format
+ * 2 : `fingerprint` à comparer aux membres et aux empreintes épinglées), ou
+ * on ne sait pas (format 1, boîte scellée anonyme — le serveur a pu la
+ * fabriquer). */
+export type KeyFrom = { kind: "self" } | { kind: "member"; fingerprint: string } | { kind: "anonymous" };
+
 export interface VaultView {
   id: string;
   kind: Vault["kind"];
   role: Role;
   name: string;
   key: Uint8Array;
+  keyFrom: KeyFrom;
   revision: number;
   updatedAt: string;
 }
@@ -111,7 +119,7 @@ export async function register(email: string, password: string): Promise<Session
     personal_vault: {
       id: vaultId,
       name_enc: b64(c.sealVaultName(vaultKey, vaultId, "Personnel")),
-      wrapped_vault_key: b64(c.wrapVaultKey(material.publicKey, vaultKey)),
+      wrapped_vault_key: b64(c.wrapVaultKey(account.keypair, material.publicKey, vaultId, vaultKey)),
     },
     device_name: deviceName(),
   });
@@ -156,15 +164,21 @@ export async function changePassword(state: SessionState, current: string, next:
 
 // ─── Vaults ─────────────────────────────────────────────────────────────────
 
+function keyFromSender(state: SessionState, sender: Uint8Array | null): KeyFrom {
+  if (!sender) return { kind: "anonymous" };
+  const fingerprint = fingerprintOf(sender);
+  return fingerprint === state.fingerprint ? { kind: "self" } : { kind: "member", fingerprint };
+}
+
 function decodeVault(state: SessionState, v: Vault): VaultView {
-  const key = c.unwrapVaultKey(state.account, unb64(v.wrapped_vault_key));
+  const { key, sender } = c.unwrapVaultKey(state.account, v.id, unb64(v.wrapped_vault_key));
   let name: string;
   try {
     name = c.openVaultName(key, v.id, unb64(v.name_enc));
   } catch {
     name = v.kind === "personal" ? "Personnel" : "(nom illisible)";
   }
-  return { id: v.id, kind: v.kind, role: v.role, name, key, revision: v.revision, updatedAt: v.updated_at };
+  return { id: v.id, kind: v.kind, role: v.role, name, key, keyFrom: keyFromSender(state, sender), revision: v.revision, updatedAt: v.updated_at };
 }
 
 /** Recharge vaults et invitations depuis `/sync`. Un vault dont la clé ne
@@ -211,7 +225,7 @@ export async function createVault(state: SessionState, name: string): Promise<Va
   const v = await api.createVault({
     id,
     name_enc: b64(c.sealVaultName(key, id, name)),
-    wrapped_vault_key: b64(c.wrapVaultKey(state.account.keypair.publicKey, key)),
+    wrapped_vault_key: b64(c.wrapVaultKey(state.account.keypair, state.account.keypair.publicKey, id, key)),
   });
   return decodeVault(state, v);
 }
@@ -346,22 +360,22 @@ function publicKeyOf(email: string, publicKeyB64: string, expectedFingerprint: s
 /** Invite `email`. S'il a un compte, son empreinte doit avoir été épinglée
  * et la clé du vault part tout de suite ; sinon l'invitation part sans clé,
  * à compléter après son inscription. */
-export async function invite(vault: VaultView, email: string, role: Role): Promise<Invitation> {
+export async function invite(state: SessionState, vault: VaultView, email: string, role: Role): Promise<Invitation> {
   const normalized = email.trim().toLowerCase();
   const u = await api.lookup(normalized);
   let wrapped: string | undefined;
   if (u) {
     requirePinned(u.email, u.fingerprint);
-    wrapped = b64(c.wrapVaultKey(publicKeyOf(u.email, u.public_key, u.fingerprint), vault.key));
+    wrapped = b64(c.wrapVaultKey(state.account.keypair, publicKeyOf(u.email, u.public_key, u.fingerprint), vault.id, vault.key));
   }
   return api.invite(vault.id, { email: normalized, role, wrapped_vault_key: wrapped });
 }
 
-export async function completeInvitation(vault: VaultView, inv: Invitation): Promise<Invitation> {
+export async function completeInvitation(state: SessionState, vault: VaultView, inv: Invitation): Promise<Invitation> {
   if (!inv.invitee_public_key || !inv.invitee_fingerprint) throw new Error("L'invité n'a pas encore de clé publique.");
   requirePinned(inv.invitee_email, inv.invitee_fingerprint);
   const pk = publicKeyOf(inv.invitee_email, inv.invitee_public_key, inv.invitee_fingerprint);
-  return api.completeInvitation(inv.id, b64(c.wrapVaultKey(pk, vault.key)));
+  return api.completeInvitation(inv.id, b64(c.wrapVaultKey(state.account.keypair, pk, vault.id, vault.key)));
 }
 
 /** Nouvelle clé : chaque item est re-chiffré, une enveloppe est scellée vers
@@ -377,7 +391,7 @@ export async function rotateVaultKey(state: SessionState, vault: VaultView, memb
   });
   const wrapped = members.map((m) => {
     if (m.user_id !== state.user.id) requirePinned(m.email, m.fingerprint);
-    return { user_id: m.user_id, wrapped_vault_key: b64(c.wrapVaultKey(publicKeyOf(m.email, m.public_key, m.fingerprint), newKey)) };
+    return { user_id: m.user_id, wrapped_vault_key: b64(c.wrapVaultKey(state.account.keypair, publicKeyOf(m.email, m.public_key, m.fingerprint), vault.id, newKey)) };
   });
   await api.rotateVaultKey(vault.id, {
     name_enc: b64(c.sealVaultName(newKey, vault.id, vault.name)),

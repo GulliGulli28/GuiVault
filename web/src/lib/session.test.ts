@@ -97,7 +97,7 @@ describe("kdfPins", () => {
 
 describe("retour en arrière d'un vault", () => {
   it("alerte quand /sync annonce une révision plus basse que celle déjà vue, jusqu'à ce qu'on en prenne acte", async () => {
-    const { material } = await c.createAccount("pw");
+    const { material, account } = await c.createAccount("pw");
     const user = { id: "u-rb", email: "carol@example.com", public_key: toBase64(material.publicKey), created_at: "2026-01-01T00:00:00Z" };
     const vaultKey = new Uint8Array(32).fill(9);
     const vault = (revision: number) => ({
@@ -105,7 +105,7 @@ describe("retour en arrière d'un vault", () => {
       kind: "personal",
       name_enc: toBase64(c.sealVaultName(vaultKey, "v-1", "Personnel")),
       role: "owner",
-      wrapped_vault_key: toBase64(c.wrapVaultKey(material.publicKey, vaultKey)),
+      wrapped_vault_key: toBase64(c.wrapVaultKey(account.keypair, material.publicKey, "v-1", vaultKey)),
       revision,
       created_at: "2026-01-01T00:00:00Z",
       updated_at: "2026-01-01T00:00:00Z",
@@ -156,4 +156,54 @@ describe("retour en arrière d'un vault", () => {
     expect(observeRevisions("u-a", [{ id: "v-2", name: "B", revision: 1 }])).toEqual([]);
     expect(observeRevisions("u-a", [{ id: "v-1", name: "A", revision: 9 }])).toEqual([{ vaultId: "v-1", name: "A", known: 10, seen: 9 }]);
   });
+});
+
+describe("provenance de la clé d'un vault", () => {
+  it("dit qui a remis chaque clé : soi-même, un membre (son empreinte), ou personne (ancien format)", async () => {
+    const { material, account } = await c.createAccount("pw");
+    const user = { id: "u-kf", email: "dan@example.com", public_key: toBase64(material.publicKey), created_at: "2026-01-01T00:00:00Z" };
+    const teammate = c.generateKeyPair();
+    const vault = (id: string, wrapped: Uint8Array, key: Uint8Array) => ({
+      id,
+      kind: "shared",
+      name_enc: toBase64(c.sealVaultName(key, id, id)),
+      role: "writer",
+      wrapped_vault_key: toBase64(wrapped),
+      revision: 1,
+      created_at: "2026-01-01T00:00:00Z",
+      updated_at: "2026-01-01T00:00:00Z",
+    });
+    const k = new Uint8Array(32).fill(4);
+    fakeServer({
+      "/auth/prelogin": { kdf: material.kdf, kdf_salt: toBase64(material.kdfSalt) },
+      "/auth/login": {
+        access_token: "a",
+        refresh_token: "r",
+        access_expires_in: 900,
+        user,
+        protected_user_key: toBase64(material.protectedUserKey),
+        protected_private_key: toBase64(material.protectedPrivateKey),
+      },
+      "/sync": {
+        user,
+        vaults: [
+          vault("v-mine", c.wrapVaultKey(account.keypair, material.publicKey, "v-mine", k), k),
+          vault("v-team", c.wrapVaultKey(teammate, material.publicKey, "v-team", k), k),
+          vault("v-old", c.sealFor(material.publicKey, k), k),
+          // Une enveloppe de v-team reposée par le serveur sur un autre vault.
+          vault("v-moved", c.wrapVaultKey(teammate, material.publicKey, "v-team", k), k),
+        ],
+        invitations: [],
+        server_time: "2026-01-01T00:00:00Z",
+      },
+    });
+    const out = await login(user.email, "pw");
+    if (out.kind !== "ok") throw new Error("connexion attendue");
+    const from = Object.fromEntries(out.session.vaults.map((v) => [v.id, v.keyFrom]));
+    expect(from["v-mine"]).toEqual({ kind: "self" });
+    expect(from["v-team"]).toEqual({ kind: "member", fingerprint: c.fingerprint(teammate.publicKey) });
+    expect(from["v-old"]).toEqual({ kind: "anonymous" });
+    // Liée à son vault : reposée ailleurs, elle ne s'ouvre pas — le vault est écarté.
+    expect(from["v-moved"]).toBeUndefined();
+  }, 60_000);
 });

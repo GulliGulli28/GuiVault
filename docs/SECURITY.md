@@ -14,7 +14,7 @@ chiffrées.
 | Fuite de la base (dump, sauvegarde, disque) | Aucune clé côté serveur. Les blobs sont XChaCha20-Poly1305 sous des clés dérivées d'un mot de passe maître via Argon2id (64 MiB, 3 passes). La clé d'authentification est re-hachée (Argon2id) : le dump ne permet pas non plus de se connecter. Les jetons sont stockés hachés (SHA-256). |
 | Serveur malveillant qui **modifie** des données | Chaque blob est AEAD. L'AAD lie un item à son vault, son id et son type : un item déplacé, renommé ou substitué ne s'ouvre plus. |
 | Serveur malveillant qui **rejoue** une ancienne version d'un vault (ou base restaurée depuis une sauvegarde) | Les clients retiennent la dernière révision vue de chaque vault (web et extension : `web/src/lib/vaultRevisions.ts`, `localStorage` ; Guiterm : `SyncState::vault_revisions`) et, si le serveur en annonce une plus basse, le disent en rouge jusqu'à ce que l'utilisateur en prenne acte. Guiterm **suspend** en plus la synchronisation de ce vault (ni pull, ni push, ni suppression) jusqu'à reprise explicite, où sa version fait foi. Non couvert cryptographiquement : voir « Limites ». |
-| Serveur malveillant qui **substitue une clé publique** pour lire un vault partagé | C'est l'attaque principale contre tout système de partage E2E. Défense : l'**empreinte** de la clé publique (`fingerprint`) est renvoyée partout où une clé publique apparaît ; le client DOIT l'afficher et demander une vérification hors bande (voix, messagerie interne) avant le premier partage vers une personne, puis épingler la clé (TOFU) et alerter si elle change. |
+| Serveur malveillant qui **substitue une clé publique** pour lire un vault partagé | C'est l'attaque principale contre tout système de partage E2E. Défense : l'**empreinte** de la clé publique (`fingerprint`) est renvoyée partout où une clé publique apparaît ; le client DOIT l'afficher et demander une vérification hors bande (voix, messagerie interne) avant le premier partage vers une personne, puis épingler la clé (TOFU) et alerter si elle change. Dans l'autre sens, l'enveloppe de la clé de vault est authentifiée (format 2) : le destinataire voit l'empreinte de qui la lui a remise et la vérifie de même. |
 | Vol du mot de passe maître seul (hameçonnage, épaule) | Second facteur TOTP optionnel : sans le code, pas de session. Ne protège pas contre un vol de mot de passe **plus** un dump de base. |
 | Vol d'un jeton d'accès | Durée 15 min. Révocable (sessions). |
 | Vol d'un jeton de rafraîchissement | Rotation à chaque usage ; le rejeu de l'ancien révoque la session entière. |
@@ -49,12 +49,19 @@ d'apparence modifié en est un) — pas son contenu.
   n'est pas authentifiée : un serveur qui sert d'anciens chiffrés sous des
   révisions qui montent passe. Il faudrait un manifeste de vault signé
   (`ROADMAP.md`).
-- **Pas de signature de l'expéditeur** sur les enveloppes de clés (boîte
-  scellée = anonyme). Le serveur ne peut pas *lire* une enveloppe, mais il
-  pourrait en fabriquer une avec une clé de vault de son choix pour un vault
-  qu'il aurait lui-même créé — d'où l'importance de la vérification
-  d'empreinte et du fait que le client n'accepte une invitation que si
-  l'inviteur affiché est attendu.
+- **Vault fabriqué par le serveur.** Un serveur malveillant peut créer un
+  vault avec une clé à lui et y inscrire un utilisateur, pour qu'il y range
+  des secrets. Les enveloppes de format 2 sont authentifiées : il ne peut
+  pas en produire une au nom d'un membre — seulement sous sa propre clé, ou
+  sous une clé qu'il ferait passer pour celle d'un membre dans la liste des
+  membres. Le client montre donc qui a remis la clé (réglages du vault) et
+  signale « clé non vérifiée » tant que l'empreinte de l'expéditeur n'est
+  pas épinglée : c'est la **vérification de cette empreinte**, par le
+  destinataire, qui ferme la porte. Une enveloppe de format 1 (anonyme,
+  d'avant) ne dit rien de son auteur ; une rotation de clé la remplace.
+  Contrairement à une signature, l'authentification X25519 ne prouve rien
+  à un tiers (le destinataire aurait pu fabriquer l'enveloppe lui-même) —
+  inutile ici, où seul le destinataire a besoin de savoir.
 - **Le client est dans la base de confiance.** Un Guiterm compromis a le
   mot de passe maître. Rien côté serveur n'y peut quoi que ce soit.
 - **Le mot de passe maître est irrécupérable.** Pas de réinitialisation, par

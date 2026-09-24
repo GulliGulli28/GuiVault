@@ -132,7 +132,13 @@ impl User {
             personal_vault: CreateVaultRequest {
                 id: personal_id,
                 name_enc: gc::seal_vault_name(&personal_key, &personal_id.to_string(), "Personnel").unwrap(),
-                wrapped_vault_key: gc::wrap_vault_key(&account.keypair.public, &personal_key).unwrap(),
+                wrapped_vault_key: gc::wrap_vault_key(
+                    &account.keypair,
+                    &account.keypair.public,
+                    &personal_id.to_string(),
+                    &personal_key,
+                )
+                .unwrap(),
             },
             device_name: Some("test".into()),
         };
@@ -217,7 +223,9 @@ impl User {
     }
 
     fn vault_key(&self, v: &Vault) -> gc::SymmetricKey {
-        gc::unwrap_vault_key(&self.account, &v.wrapped_vault_key).expect("clé de vault ouvrable")
+        gc::unwrap_vault_key(&self.account, &v.id.to_string(), &v.wrapped_vault_key)
+            .expect("clé de vault ouvrable")
+            .key
     }
 
     async fn create_vault(&self, name: &str) -> (Vault, gc::SymmetricKey) {
@@ -226,7 +234,13 @@ impl User {
         let req = CreateVaultRequest {
             id,
             name_enc: gc::seal_vault_name(&key, &id.to_string(), name).unwrap(),
-            wrapped_vault_key: gc::wrap_vault_key(&self.account.keypair.public, &key).unwrap(),
+            wrapped_vault_key: gc::wrap_vault_key(
+                &self.account.keypair,
+                &self.account.keypair.public,
+                &id.to_string(),
+                &key,
+            )
+            .unwrap(),
         };
         let body = status!(
             self.req(reqwest::Method::POST, "/vaults")
@@ -443,7 +457,7 @@ async fn register_login_unlock_and_personal_vault() {
         personal_vault: CreateVaultRequest {
             id: pid,
             name_enc: gc::seal_vault_name(&k, &pid.to_string(), "P").unwrap(),
-            wrapped_vault_key: gc::wrap_vault_key(&a.keypair.public, &k).unwrap(),
+            wrapped_vault_key: gc::wrap_vault_key(&a.keypair, &a.keypair.public, &pid.to_string(), &k).unwrap(),
         },
         device_name: None,
     };
@@ -596,7 +610,9 @@ async fn shared_vault_invite_existing_user_roles_and_rotation() {
             .json(&CreateInvitationRequest {
                 email: "bob@t.io".into(),
                 role: Role::Reader,
-                wrapped_vault_key: Some(gc::wrap_vault_key(&bob_pk, &vkey).unwrap()),
+                wrapped_vault_key: Some(
+                    gc::wrap_vault_key(&alice.account.keypair, &bob_pk, &vault.id.to_string(), &vkey).unwrap()
+                ),
             })
             .send()
             .await
@@ -762,7 +778,13 @@ async fn shared_vault_invite_existing_user_roles_and_rotation() {
         name_enc: gc::seal_vault_name(&new_key, &vault.id.to_string(), "Équipe infra").unwrap(),
         members: vec![RotatedMemberKey {
             user_id: alice.profile.id,
-            wrapped_vault_key: gc::wrap_vault_key(&alice.account.keypair.public, &new_key).unwrap(),
+            wrapped_vault_key: gc::wrap_vault_key(
+                &alice.account.keypair,
+                &alice.account.keypair.public,
+                &vault.id.to_string(),
+                &new_key,
+            )
+            .unwrap(),
         }],
         items: rotated,
         base_revision: current.revision,
@@ -878,7 +900,7 @@ async fn invite_only_registration_and_deferred_key() {
         personal_vault: CreateVaultRequest {
             id: pid,
             name_enc: gc::seal_vault_name(&k, &pid.to_string(), "P").unwrap(),
-            wrapped_vault_key: gc::wrap_vault_key(&a.keypair.public, &k).unwrap(),
+            wrapped_vault_key: gc::wrap_vault_key(&a.keypair, &a.keypair.public, &pid.to_string(), &k).unwrap(),
         },
         device_name: None,
     };
@@ -964,7 +986,8 @@ async fn invite_only_registration_and_deferred_key() {
         alice
             .req(reqwest::Method::POST, &format!("/invitations/{}/complete", inv.id))
             .json(&CompleteInvitationRequest {
-                wrapped_vault_key: gc::wrap_vault_key(&carol_pk, &vkey).unwrap()
+                wrapped_vault_key: gc::wrap_vault_key(&alice.account.keypair, &carol_pk, &vault.id.to_string(), &vkey)
+                    .unwrap()
             })
             .send()
             .await
@@ -1401,7 +1424,9 @@ async fn events_stream_notifies_vault_members() {
             .json(&CreateInvitationRequest {
                 email: "bob@t.io".into(),
                 role: Role::Writer,
-                wrapped_vault_key: Some(gc::wrap_vault_key(&bob_pk, &vkey).unwrap())
+                wrapped_vault_key: Some(
+                    gc::wrap_vault_key(&alice.account.keypair, &bob_pk, &vault.id.to_string(), &vkey).unwrap()
+                )
             })
             .send()
             .await

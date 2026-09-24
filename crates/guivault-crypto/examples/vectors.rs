@@ -36,7 +36,15 @@ fn main() {
     let item_id = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
     let item = seal_item(&vault_key, vault_id, item_id, "host", br#"{"kind":"host"}"#).unwrap();
     let name = seal_vault_name(&vault_key, vault_id, "Prod bancaire").unwrap();
-    let wrapped = wrap_vault_key(&account.keypair.public, &vault_key).unwrap();
+    // Enveloppes de la vault key pour le compte : format 2, d'un expéditeur
+    // fixe, et format 1 (boîte scellée anonyme, encore lisible).
+    let sender_private = PrivateKey::from([5u8; 32]);
+    let sender = KeyPair {
+        public: sender_private.public_key(),
+        private: sender_private,
+    };
+    let wrapped = wrap_vault_key(&sender, &account.keypair.public, vault_id, &vault_key).unwrap();
+    let wrapped_v1 = seal_for(&account.keypair.public, vault_key.as_bytes()).unwrap();
 
     let v = json!({
         "kdf": {
@@ -65,6 +73,9 @@ fn main() {
             "user_key": hex(account.user_key.as_bytes()),
             "private_key": hex(&account.keypair.private.to_bytes()),
             "wrapped_vault_key": hex(&wrapped),
+            "wrapped_vault_key_v1": hex(&wrapped_v1),
+            "wrap_vault_id": vault_id,
+            "wrap_sender_public": hex(sender.public.as_bytes()),
         },
         "item": {
             "vault_key": hex(vault_key.as_bytes()),

@@ -3,8 +3,10 @@
 `web/extension/` — une extension MV3 (Chrome, Edge, Chromium ; Firefox ≥ 115
 via `browser_specific_settings`) qui réutilise tel quel le code de
 l'interface web (`web/src/lib/*` : crypto, API, session, TOTP, générateur,
-correspondance d'URI). Lecture seule : pour ajouter ou modifier, « Ouvrir le
-coffre » mène à l'interface web du serveur.
+correspondance d'URI) et ses formulaires : on y consulte, crée, modifie et
+supprime les éléments de ses vaults. Le partage, l'import/export et les
+réglages du compte restent dans l'interface web du serveur, qu'« Ouvrir le
+coffre » ouvre.
 
 ## Construire et charger
 

@@ -67,7 +67,7 @@ function Body({ ctx, vault }: { ctx: PageContext; vault: VaultView }) {
   };
 
   const doInvite = () =>
-    act("invite", () => invite(vault, inviteEmail, inviteRole), () => {
+    act("invite", () => invite(session, vault, inviteEmail, inviteRole), () => {
       ctx.notify(`Invitation envoyée à ${inviteEmail.trim()}`);
       setInviteEmail("");
       setLookup(null);
@@ -113,6 +113,8 @@ function Body({ ctx, vault }: { ctx: PageContext; vault: VaultView }) {
         {isPersonal && (
           <p className="callout max-w-2xl">Votre vault personnel n'a ni membres ni invitations : c'est ce qui se synchronise entre vos appareils. Pour partager, créez un vault partagé depuis la barre latérale.</p>
         )}
+
+        {!isPersonal && <KeyProvenance vault={vault} members={members} onPinned={repaint} />}
 
         {!isPersonal && (
           <section className="max-w-2xl space-y-1.5">
@@ -201,7 +203,7 @@ function Body({ ctx, vault }: { ctx: PageContext; vault: VaultView }) {
                         <Fingerprint value={inv.invitee_fingerprint} />
                         <TrustBadge email={inv.invitee_email} fingerprint={inv.invitee_fingerprint} onPinned={repaint} />
                         <button
-                          onClick={() => void act("complete", () => completeInvitation(vault, inv), () => ctx.notify(`Clé transmise à ${inv.invitee_email}`))}
+                          onClick={() => void act("complete", () => completeInvitation(session, vault, inv), () => ctx.notify(`Clé transmise à ${inv.invitee_email}`))}
                           disabled={fingerprintTrust(inv.invitee_email, inv.invitee_fingerprint).kind !== "pinned" || busy !== null}
                           className="btn btn-primary btn-sm"
                         >
@@ -297,5 +299,62 @@ export function AuditList({ entries }: { entries: AuditEntry[] }) {
         </div>
       ))}
     </div>
+  );
+}
+
+/** Qui a remis la clé de ce vault à ce compte (`KeyFrom`). Une enveloppe de
+ * format 2 ne peut avoir été produite que par le détenteur de la clé privée
+ * de son expéditeur : son empreinte, vérifiée, dit que ce vault vient bien
+ * de lui et pas d'un serveur qui l'aurait fabriqué pour qu'on y range des
+ * secrets. */
+function KeyProvenance({ vault, members, onPinned }: { vault: VaultView; members: VaultMember[]; onPinned: () => void }) {
+  const from = vault.keyFrom;
+  if (from.kind === "self") {
+    return (
+      <section className="max-w-2xl space-y-1.5">
+        <Eyebrow>Clé du vault</Eyebrow>
+        <p className="text-[12.5px] text-[var(--c-text-secondary)]">Créée ou renouvelée par vous.</p>
+      </section>
+    );
+  }
+  if (from.kind === "anonymous") {
+    return (
+      <section className="max-w-2xl space-y-1.5">
+        <Eyebrow>Clé du vault</Eyebrow>
+        <p className="callout">
+          Enveloppe à l'ancien format : elle ne dit pas qui vous a remis la clé de ce vault. Un admin peut la renouveler
+          (« Faire tourner la clé ») pour que chaque membre sache de qui il la tient.
+        </p>
+      </section>
+    );
+  }
+  const sender = members.find((m) => m.fingerprint === from.fingerprint);
+  return (
+    <section className="max-w-2xl space-y-1.5">
+      <Eyebrow>Clé du vault</Eyebrow>
+      {sender ? (
+        <>
+          <p className="text-[12.5px] text-[var(--c-text)]">Remise par {sender.email}</p>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Fingerprint value={from.fingerprint} />
+            <TrustBadge email={sender.email} fingerprint={from.fingerprint} onPinned={onPinned} />
+          </div>
+          <p className="help-text">
+            Seul le détenteur de cette clé a pu vous la remettre. Vérifiez son empreinte avant d'y ranger des secrets : c'est ce qui
+            distingue un vault partagé par un collègue d'un vault fabriqué par le serveur.
+          </p>
+        </>
+      ) : (
+        members.length > 0 && (
+          <div className="callout callout-warn space-y-1">
+            <p>
+              Remise par une clé qui n'est celle d'aucun membre actuel. Son auteur a peut-être quitté le vault depuis ; sinon, le
+              serveur est peut-être compromis — n'y rangez rien avant d'avoir vérifié avec les membres.
+            </p>
+            <Fingerprint value={from.fingerprint} />
+          </div>
+        )
+      )}
+    </section>
   );
 }

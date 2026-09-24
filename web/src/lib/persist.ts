@@ -7,7 +7,7 @@
  * que celui du popup. */
 import { fromBase64, toBase64 } from "./bytes";
 import { fingerprint } from "./crypto";
-import type { SessionState, VaultView } from "./session";
+import type { KeyFrom, SessionState, VaultView } from "./session";
 import type { TokenPair, UserProfile } from "./types";
 
 interface StoredVault {
@@ -16,6 +16,8 @@ interface StoredVault {
   role: VaultView["role"];
   name: string;
   key: string;
+  /** Absent d'une session rangée avant l'enveloppe de format 2. */
+  keyFrom?: KeyFrom;
   revision: number;
   updatedAt: string;
 }
@@ -32,7 +34,7 @@ export function serializeSession(state: SessionState, tokens: TokenPair): Stored
     tokens,
     user: state.user,
     account: { userKey: toBase64(state.account.userKey), privateKey: toBase64(state.account.keypair.privateKey), publicKey: toBase64(state.account.keypair.publicKey) },
-    vaults: state.vaults.map((v) => ({ id: v.id, kind: v.kind, role: v.role, name: v.name, key: toBase64(v.key), revision: v.revision, updatedAt: v.updatedAt })),
+    vaults: state.vaults.map((v) => ({ id: v.id, kind: v.kind, role: v.role, name: v.name, key: toBase64(v.key), keyFrom: v.keyFrom, revision: v.revision, updatedAt: v.updatedAt })),
   };
 }
 
@@ -43,7 +45,7 @@ export function deserializeSession(s: StoredSession): SessionState {
     user: s.user,
     account: { userKey: fromBase64(s.account.userKey), keypair: { privateKey, publicKey } },
     fingerprint: fingerprint(publicKey),
-    vaults: s.vaults.map((v) => ({ ...v, key: fromBase64(v.key) })),
+    vaults: s.vaults.map((v) => ({ ...v, key: fromBase64(v.key), keyFrom: v.keyFrom ?? { kind: "anonymous" } })),
     invitations: [],
     // Recalculés au prochain `/sync` (ils ne changent la référence qu'une
     // fois acceptés, `vaultRevisions.ts`).

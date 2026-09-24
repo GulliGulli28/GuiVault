@@ -43,7 +43,15 @@ describe("guivault-crypto interop", () => {
     expect(toHex(acc.userKey)).toBe(v.user_key);
     expect(toHex(acc.keypair.privateKey)).toBe(v.private_key);
     expect(toHex(acc.keypair.publicKey)).toBe(v.public_key);
-    expect(toHex(c.unwrapVaultKey(acc, fromHex(v.wrapped_vault_key)))).toBe(vectors.item.vault_key);
+    // Format 2 : la clé, et qui l'a enveloppée ; lié à son vault.
+    const opened = c.unwrapVaultKey(acc, v.wrap_vault_id, fromHex(v.wrapped_vault_key));
+    expect(toHex(opened.key)).toBe(vectors.item.vault_key);
+    expect(opened.sender && toHex(opened.sender)).toBe(v.wrap_sender_public);
+    expect(() => c.unwrapVaultKey(acc, "autre-vault", fromHex(v.wrapped_vault_key))).toThrow(c.CryptoError);
+    // Format 1 (boîte scellée anonyme) : encore lisible, sans expéditeur.
+    const legacy = c.unwrapVaultKey(acc, v.wrap_vault_id, fromHex(v.wrapped_vault_key_v1));
+    expect(toHex(legacy.key)).toBe(vectors.item.vault_key);
+    expect(legacy.sender).toBeNull();
   }, 30_000);
 
   it("ouvre un item et un nom de vault chiffrés par Rust", () => {
@@ -60,7 +68,9 @@ describe("guivault-crypto interop", () => {
     const again = c.unlockAccount(m.stretchedKey, material.protectedUserKey, material.protectedPrivateKey);
     expect(toHex(again.userKey)).toBe(toHex(account.userKey));
     const vk = new Uint8Array(32).fill(3);
-    expect(toHex(c.unwrapVaultKey(again, c.wrapVaultKey(material.publicKey, vk)))).toBe(toHex(vk));
+    const own = c.unwrapVaultKey(again, "v-1", c.wrapVaultKey(again.keypair, material.publicKey, "v-1", vk));
+    expect(toHex(own.key)).toBe(toHex(vk));
+    expect(own.sender && toHex(own.sender)).toBe(toHex(material.publicKey));
     const rekey = await c.rekeyAccount(account, "pw2");
     const m2 = await c.deriveMasterKey("pw2", rekey.kdfSalt, rekey.kdf);
     expect(toHex(c.open(m2.stretchedKey, rekey.protectedUserKey, utf8.encode("guivault/v1/user-key")))).toBe(toHex(account.userKey));
@@ -89,6 +99,7 @@ describe("guivault-crypto interop", () => {
     const master = await c.deriveMasterKey(password, salt, kdf);
     const key = new Uint8Array(32).fill(5);
     const recipient = c.generateKeyPair();
+    const sender = c.generateKeyPair();
     const vaultKey = new Uint8Array(32).fill(6);
     const vaultId = uuid();
     const itemId = uuid();
@@ -96,6 +107,7 @@ describe("guivault-crypto interop", () => {
       kdf: { password, salt: toHex(salt), params: kdf, stretched_key: toHex(master.stretchedKey), auth_key: toHex(master.authKey) },
       seal: { key: toHex(key), aad: "ctx-web", plaintext: "from the browser", blob: toHex(c.seal(key, utf8.encode("from the browser"), utf8.encode("ctx-web"))) },
       sealed_box: { private: toHex(recipient.privateKey), public: toHex(recipient.publicKey), fingerprint: c.fingerprint(recipient.publicKey), plaintext: "sealed by the browser", blob: toHex(c.sealFor(recipient.publicKey, utf8.encode("sealed by the browser"))) },
+      vault_envelope: { sender_public: toHex(sender.publicKey), recipient_private: toHex(recipient.privateKey), vault_id: vaultId, vault_key: toHex(vaultKey), blob: toHex(c.wrapVaultKey(sender, recipient.publicKey, vaultId, vaultKey)) },
       item: { vault_key: toHex(vaultKey), vault_id: vaultId, item_id: itemId, item_type: "snippet", plaintext: "{\"kind\":\"snippet\"}", blob: toHex(c.sealItem(vaultKey, vaultId, itemId, "snippet", utf8.encode("{\"kind\":\"snippet\"}"))), name: "Équipe réseau", name_blob: toHex(c.sealVaultName(vaultKey, vaultId, "Équipe réseau")) },
     };
     writeFileSync(new URL("../../../crates/guivault-crypto/tests/web-vectors.json", import.meta.url), JSON.stringify(out, null, 2) + "\n");

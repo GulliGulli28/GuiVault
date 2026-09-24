@@ -7,7 +7,7 @@ serveur puisse jamais lire un secret.
 
 - **Zero-knowledge** : chiffrement côté client (XChaCha20-Poly1305, Argon2id,
   X25519). Le serveur ne stocke que des blobs et ne possède aucune clé.
-- **Partage** : la clé d'un vault est scellée vers la clé publique de chaque
+- **Partage** : la clé d'un vault est enveloppée pour la clé publique de chaque
   membre. Rôles `reader` / `writer` / `admin` / `owner`, invitations (y
   compris vers quelqu'un qui n'a pas encore de compte), rotation de clé
   après un départ.

@@ -40,6 +40,24 @@ fn opens_browser_sealed_box() {
 }
 
 #[test]
+fn opens_browser_vault_key_envelope() {
+    let v = &vectors()["vault_envelope"];
+    let private = PrivateKey::try_from(h(&v["recipient_private"]).as_slice()).unwrap();
+    let account = UnlockedAccount {
+        user_key: SymmetricKey::random(),
+        keypair: KeyPair {
+            public: private.public_key(),
+            private,
+        },
+    };
+    let vault_id = v["vault_id"].as_str().unwrap();
+    let opened = unwrap_vault_key(&account, vault_id, &h(&v["blob"])).unwrap();
+    assert_eq!(opened.key.as_bytes().as_slice(), h(&v["vault_key"]));
+    assert_eq!(opened.sender.unwrap().as_bytes().as_slice(), h(&v["sender_public"]));
+    assert!(unwrap_vault_key(&account, "autre-vault", &h(&v["blob"])).is_err());
+}
+
+#[test]
 fn opens_browser_item_and_vault_name() {
     let v = &vectors()["item"];
     let key = SymmetricKey::from_slice(&h(&v["vault_key"])).unwrap();

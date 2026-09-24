@@ -6,8 +6,12 @@ use guivault_protocol::KdfParams;
 
 /// `0x01 ‖ nonce(24) ‖ tag(16)` : le plus petit blob symétrique valide.
 const MIN_SYM_BLOB: usize = 1 + 24 + 16;
-/// `0x01 ‖ pk éphémère(32) ‖ clé(32) ‖ tag(16)` : une clé de vault scellée.
+/// `0x01 ‖ pk éphémère(32) ‖ clé(32) ‖ tag(16)` : une clé de vault scellée
+/// (format 1, anonyme — encore accepté des clients d'avant le format 2).
 const SEALED_KEY_LEN: usize = 1 + 32 + 32 + 16;
+/// `0x02 ‖ pk expéditeur(32) ‖ 0x01 ‖ nonce(24) ‖ clé(32) ‖ tag(16)` : une
+/// clé de vault enveloppée par un membre (format 2, authentifié).
+const AUTHENTICATED_KEY_LEN: usize = 1 + 32 + 1 + 24 + 32 + 16;
 /// Enveloppes de clés : quelques centaines d'octets tout au plus.
 const MAX_KEY_BLOB: usize = 1024;
 
@@ -72,9 +76,16 @@ pub fn key_blob(name: &str, bytes: &[u8]) -> Result<(), AppError> {
     Ok(())
 }
 
-/// Une clé de vault scellée vers une clé publique : taille fixe.
+/// Une clé de vault enveloppée pour un membre : taille fixe selon le format.
+/// Le serveur ne peut rien vérifier de plus — c'est le destinataire qui
+/// authentifie l'expéditeur d'une enveloppe de format 2.
 pub fn wrapped_vault_key(bytes: &[u8]) -> Result<(), AppError> {
-    if bytes.len() != SEALED_KEY_LEN {
+    let expected = match bytes.first() {
+        Some(0x01) => Some(SEALED_KEY_LEN),
+        Some(0x02) => Some(AUTHENTICATED_KEY_LEN),
+        _ => None,
+    };
+    if expected != Some(bytes.len()) {
         return Err(AppError::bad_request(
             "invalid_blob",
             "clé de vault enveloppée : taille invalide",
@@ -128,4 +139,23 @@ pub fn settings_blob(bytes: &[u8]) -> Result<(), AppError> {
 pub fn device_name(name: Option<String>) -> Option<String> {
     name.map(|n| n.trim().chars().take(100).collect::<String>())
         .filter(|n| !n.is_empty())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn wrapped_vault_key_accepts_both_formats_at_their_size() {
+        let v1 = [vec![0x01], vec![0; SEALED_KEY_LEN - 1]].concat();
+        let v2 = [vec![0x02], vec![0; AUTHENTICATED_KEY_LEN - 1]].concat();
+        assert!(wrapped_vault_key(&v1).is_ok());
+        assert!(wrapped_vault_key(&v2).is_ok());
+        // Chaque format à sa taille, pas à celle de l'autre.
+        assert!(wrapped_vault_key(&[&[0x01], &v2[1..]].concat()).is_err());
+        assert!(wrapped_vault_key(&[&[0x02], &v1[1..]].concat()).is_err());
+        assert!(wrapped_vault_key(&v1[..SEALED_KEY_LEN - 1]).is_err());
+        assert!(wrapped_vault_key(&[&[0x03], &v2[1..]].concat()).is_err());
+        assert!(wrapped_vault_key(&[]).is_err());
+    }
 }

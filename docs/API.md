@@ -109,3 +109,16 @@ utilisent `host`, `group`, `key`, `snippet`, `sql-connection`, `icon`, avec
 pour contenu le JSON de `termius_core::guivault::entity::Payload`
 (`{ "kind": "<item_type>", … }`, id de l'entité = id de l'item). Le serveur
 ne le voit jamais.
+
+### Enveloppe d'une clé de vault (`wrapped_vault_key`, côté client)
+
+```
+format 2 (écrit) : 0x02 ‖ sender_pk(32) ‖ 0x01 ‖ nonce(24) ‖ XChaCha20-Poly1305(k, nonce, vault_key, aad)   → 106 octets
+  k   = HKDF-SHA256(X25519(sender_sk, recipient_pk), info = "guivault/v2/vault-key" ‖ sender_pk ‖ recipient_pk)
+  aad = "guivault/v2/vault-key\0" ‖ vault_id
+format 1 (lu)    : 0x01 ‖ boîte scellée libsodium (pk éphémère ‖ XSalsa20-Poly1305)                       →  81 octets
+```
+
+Le serveur n'accepte que ces deux tailles (`invalid_blob` sinon) et ne peut
+rien vérifier d'autre : c'est le destinataire qui authentifie l'expéditeur
+(`sender_pk`, dont il compare l'empreinte à celles qu'il a vérifiées).

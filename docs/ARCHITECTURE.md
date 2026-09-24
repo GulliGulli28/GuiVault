@@ -17,7 +17,7 @@ Trois crates dans un workspace Cargo, et une application web :
 
 | Crate | Rôle | Qui l'utilise |
 |---|---|---|
-| `guivault-crypto` | dérivation de clés, enveloppes, boîtes scellées, cycle de vie du compte | client **et** serveur (le serveur n'en utilise que le hachage des jetons/clé d'auth) |
+| `guivault-crypto` | dérivation de clés, enveloppes (dont celles des vault keys, authentifiées), cycle de vie du compte | client **et** serveur (le serveur n'en utilise que le hachage des jetons/clé d'auth) |
 | `guivault-protocol` | structs JSON des requêtes/réponses | client et serveur |
 | `guivault-items` | formats en clair des secrets (`login`, `note`, `card`, `identity`) — voir `docs/ITEMS.md` | clients seulement (le serveur ne les voit jamais) |
 | `guivault-server` | routes, base, sessions, audit ; sert aussi `web/dist` à `/` | serveur |
@@ -45,7 +45,7 @@ master key (32 o) ─ jamais stockée, jamais envoyée
                                     │ enveloppe
                                     ▼
                                clé privée X25519 ─ protected_private_key
-                                    │ déscelle (boîte scellée libsodium)
+                                    │ ouvre (X25519 avec l'expéditeur, HKDF, XChaCha20-Poly1305)
                                     ▼
                                vault key (32 o, une par vault) ─ wrapped_vault_key (par membre)
                                     │ enveloppe, AAD = "guivault/v1/item" ‖ vault_id ‖ item_id ‖ type
@@ -65,8 +65,16 @@ Conséquences pratiques :
 
 - **Changer de mot de passe** ré-enveloppe la *user key* et rien d'autre.
   Aucun item n'est re-chiffré. Les autres sessions sont révoquées.
-- **Partager un vault** = sceller sa *vault key* vers la clé publique du
-  membre. Le serveur voit passer une enveloppe de 81 octets.
+- **Partager un vault** = envelopper sa *vault key* pour la clé publique du
+  membre. Le serveur voit passer une enveloppe de 106 octets :
+  `0x02 ‖ clé publique de l'expéditeur ‖ enveloppe symétrique`, sous une
+  clé tirée (HKDF) d'un X25519 entre l'expéditeur et le destinataire, liée
+  au vault par l'AAD. Seul le détenteur de la clé privée de l'expéditeur a
+  pu la produire : le destinataire sait **qui** lui a remis la clé (son
+  empreinte, affichée dans les réglages du vault), et le serveur ne peut ni
+  en fabriquer une au nom d'un membre, ni reposer une enveloppe sur un
+  autre vault. Le format 1 (boîte scellée libsodium, anonyme, 81 octets)
+  se lit encore et s'affiche comme tel.
 - **Retirer un membre** supprime son enveloppe, mais il a pu copier la clé :
   le client enchaîne sur une **rotation** (nouvelle vault key, tous les
   items re-chiffrés, nouvelles enveloppes pour chaque membre restant),
