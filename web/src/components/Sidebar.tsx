@@ -5,14 +5,14 @@ import { createVault } from "../lib/session";
 import { errorMessage } from "../lib/api";
 import { ROLE_HINTS, ROLE_LABELS } from "../lib/types";
 import { IconDice, IconIdentity, IconShieldClock } from "./secret-icons";
-import { IconBell, IconPlus, IconVault } from "./ui-icons";
+import { IconBell, IconPlus, IconVault, IconSearch } from "./ui-icons";
 import { Logo } from "./Logo";
 import { Modal } from "./ui";
 
 /** La barre latérale : les vaults, les invitations reçues, le compte. Même
  * vocabulaire que la barre de Guiterm — surface `--c-bg`, lignes `list-row`,
  * marqueur d'accent sur l'élément actif. */
-export function Sidebar({ ctx, route, onLogout, width }: { ctx: PageContext; route: Route; onLogout: () => void; width: number }) {
+export function Sidebar({ ctx, route, onLogout, onSearch, width }: { ctx: PageContext; route: Route; onLogout: () => void; onSearch: () => void; width: number }) {
   const { session } = ctx;
   const [creating, setCreating] = useState(false);
   const [open, setOpen] = useState(false);
@@ -35,6 +35,11 @@ export function Sidebar({ ctx, route, onLogout, width }: { ctx: PageContext; rou
         <Logo size={26} />
         <span className="text-[13px] font-semibold">GuiVault</span>
       </a>
+      <button onClick={onSearch} className="mx-2 mb-1.5 flex items-center gap-2 rounded-md border border-[var(--c-border)] px-2 py-1 text-left text-[12px] text-[var(--c-text-muted)] hover:border-[var(--c-border-strong)] hover:text-[var(--c-text-secondary)]" title="Rechercher dans tous les vaults">
+        <IconSearch size={12} />
+        <span className="flex-1">Rechercher…</span>
+        <span className="kbd">Ctrl K</span>
+      </button>
 
       <div className="sidebar-scroll -mx-1 min-h-0 flex-1 overflow-y-auto px-1">
         <div className="flex items-center justify-between px-2 pb-1 pt-1">

@@ -15,6 +15,7 @@ import { GeneratorPage } from "./components/GeneratorPanel";
 import { ToolsPage } from "./components/ToolsPage";
 import { TotpPage } from "./components/TotpPage";
 import { TrashPage } from "./components/TrashPage";
+import { clearSearchCache, SearchPalette } from "./components/SearchPalette";
 import { RollbackBanner } from "./components/RollbackBanner";
 import { Toasts, useToasts } from "./components/ui";
 import { PaneHandle, usePersistedPane } from "./hooks/usePersistedPane";
@@ -157,6 +158,30 @@ export default function App() {
     navigate({ page: "home" });
   }, []);
 
+  // La recherche globale : Ctrl+K (Cmd+K), partout, même dans un champ.
+  const [search, setSearch] = useState(false);
+  // Stable : `useModalSurface` rend le focus à l'ouvreur quand `onClose`
+  // change, ce qu'une fonction recréée à chaque rendu ferait sans cesse.
+  const closeSearch = useCallback(() => setSearch(false), []);
+  const openSearch = useCallback(() => setSearch(true), []);
+  useEffect(() => {
+    if (!session) {
+      setSearch(false);
+      clearSearchCache();
+      return;
+    }
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setSearch((s) => !s);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+    // `session` identity only matters for connect/disconnect.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session !== null]);
+
   // La barre latérale se redimensionne à la souris, comme dans Guiterm.
   const sidebar = usePersistedPane("sidebar", { initial: 256, min: 200, max: 480, axis: "horizontal", mode: "px" });
 
@@ -179,7 +204,7 @@ export default function App() {
     page = <p className="p-6 text-[12.5px] text-[var(--c-text-muted)]">Reprise de la session…</p>;
   } else switch (effective.page) {
     case "vault":
-      page = <VaultPage key={effective.id} ctx={ctx} vaultId={effective.id} />;
+      page = <VaultPage key={effective.id} ctx={ctx} vaultId={effective.id} itemId={effective.item} />;
       break;
     case "vault-settings":
       page = <VaultSettings key={effective.id} ctx={ctx} vaultId={effective.id} />;
@@ -208,12 +233,13 @@ export default function App() {
 
   return (
     <div className="flex h-full w-full overflow-hidden bg-[var(--c-bg)] text-[var(--c-text)]">
-      <Sidebar ctx={ctx} route={effective} onLogout={onLogout} width={sidebar.value} />
+      <Sidebar ctx={ctx} route={effective} onLogout={onLogout} onSearch={openSearch} width={sidebar.value} />
       <PaneHandle onMouseDown={sidebar.onMouseDown} />
       <main className={`flex min-w-0 flex-1 flex-col overflow-hidden bg-[var(--c-bg2)] ${sidebar.isDragging ? "pointer-events-none select-none" : ""}`}>
         <RollbackBanner rollbacks={ctx.session.rollbacks} onAccept={(id) => { acceptRollback(ctx.session, id); setSession({ ...ctx.session }); }} />
         {page}
       </main>
+      {search && <SearchPalette ctx={ctx} onClose={closeSearch} />}
       <Toasts toasts={toasts} onDismiss={dismiss} />
     </div>
   );

@@ -585,4 +585,7 @@ export interface GuiVaultEntity {
   /** À côté du nom : le moteur d'une connexion, le type d'une clé. */
   badge?: string;
   tags?: string[];
+  /** Dernière écriture et création de l'item, pour les tris par date. */
+  updatedAt?: string;
+  createdAt?: string;
 }

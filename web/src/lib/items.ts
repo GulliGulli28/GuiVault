@@ -138,3 +138,37 @@ export function describeSecret(p: Payload): { subtitle: string; search: string }
       return { subtitle: "", search: "" };
   }
 }
+
+// ─── Copier depuis le clavier ───────────────────────────────────────────────
+
+/** Ce que « c » (et Ctrl+C dans la recherche globale) copie : le secret
+ * principal d'un élément, avec de quoi le dire (« Mot de passe copié »). */
+export function primarySecret(p: Payload): { label: string; value: string } | null {
+  const pick = (label: string, value: string | null | undefined) => (value ? { label, value } : null);
+  switch (p.kind) {
+    case "login": return pick("Mot de passe", p.login.password);
+    case "card": return pick("Numéro de carte", p.card.number);
+    case "api-key": return pick("Secret", p.apiKey.secret);
+    case "aws": return pick("Clé secrète", p.aws.secretAccessKey);
+    case "note": return pick("Contenu", p.note.content);
+    case "host": return pick("Mot de passe", p.secrets?.password);
+    case "sql-connection": return pick("Mot de passe", p.password);
+    case "snippet": return pick("Commande", p.snippet.command);
+    default: return null;
+  }
+}
+
+/** Ce que « u » (et Ctrl+Maj+C) copie : l'identifiant d'un élément. */
+export function primaryUser(p: Payload): { label: string; value: string } | null {
+  const pick = (label: string, value: string | null | undefined) => (value ? { label, value } : null);
+  switch (p.kind) {
+    case "login": return pick("Utilisateur", p.login.username);
+    case "identity": return pick("E-mail", p.identity.email) ?? pick("Utilisateur", p.identity.username);
+    case "api-key": return pick("Identifiant de clé", p.apiKey.keyId);
+    case "aws": return pick("Access key id", p.aws.accessKeyId);
+    case "card": return pick("Titulaire", p.card.cardholderName);
+    case "host": return pick("Utilisateur", p.host.username);
+    case "sql-connection": return pick("Utilisateur", typeof p.connection.username === "string" ? p.connection.username : null);
+    default: return null;
+  }
+}

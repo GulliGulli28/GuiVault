@@ -89,9 +89,14 @@ HMAC pour les sels fictifs de prelogin.
     Playwright, copier `dist-extension` en ajoutant `tabs` et une
     `host_permissions` au manifeste, et ouvrir `popup.html?tab=<id>`.
   - `components/` — une page par route (`VaultPage`, `VaultSettings`,
-    `ToolsPage` import/export, `SettingsPage` apparence/compte/sécurité/
-    sessions, `InvitationsPage`, `GeneratorPanel`), `forms/` un formulaire
-    par type d'item (`SecretBits.tsx` = tronc commun des secrets ;
+    `ToolsPage` import/export, `TrashPage` corbeille, `SettingsPage`
+    apparence/compte/sécurité/sessions, `InvitationsPage`, `GeneratorPanel`),
+    `SearchPalette` (Ctrl+K, tous les vaults), `ItemHistory` (versions d'un
+    élément), `ShortcutsHelp` (« ? ») — les raccourcis à une touche passent
+    par `lib/keyboard.ts` (`plainShortcut` : ni en saisie, ni sous une
+    fenêtre). Un `onClose` passé à une fenêtre (`useModalSurface`) doit être
+    stable (`useCallback`) : le hook rend le focus à l'ouvreur quand il
+    change. `forms/` : un formulaire par type d'item (`SecretBits.tsx` = tronc commun des secrets ;
     `common.tsx` : `FormShell`, et `useSeed` qui reprend un brouillon —
     un nouveau formulaire lit ses valeurs de départ par `useSeed`),
     `IconPicker.tsx` (le sélecteur de Guiterm, sans Tauri : « Mes icônes »

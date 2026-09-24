@@ -34,7 +34,7 @@ export async function savePayload(vaultId: string, payload: Payload, revision?: 
   const id = payloadEntity(payload).id;
   try {
     const item = await putPayload(vault, payload, revision);
-    const decoded: DecodedItem = { id, revision: item.revision, updatedAt: item.updated_at, ok: true, payload };
+    const decoded: DecodedItem = { id, revision: item.revision, updatedAt: item.updated_at, createdAt: item.created_at, ok: true, payload };
     const cache = await loadItemsCache();
     const entry = cache[vaultId] ?? { revision: 0, items: [] };
     entry.items = [...entry.items.filter((i) => i.id !== id), decoded];

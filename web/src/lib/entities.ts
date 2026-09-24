@@ -4,7 +4,7 @@
 import type { DecodedItem } from "./session";
 import { payloadName } from "./session";
 import { describeSecret } from "./items";
-import { SQL_ENGINE_LABELS, type CustomIcon, type Group, type GuiVaultEntity, type Host, type Payload, type PrivateKey, type Snippet, type SqlConnection } from "./types";
+import { KIND_LABELS, SQL_ENGINE_LABELS, type CustomIcon, type Group, type GuiVaultEntity, type Host, type Payload, type PrivateKey, type Snippet, type SqlConnection } from "./types";
 
 export interface VaultIndex {
   groups: Group[];
@@ -115,7 +115,7 @@ export function toEntities(items: DecodedItem[]): GuiVaultEntity[] {
     const parentId = parentOf(it.payload);
     const { subtitle, search } = describeSecret(it.payload);
     const favorite = payloadEntityFavorite(it.payload) || undefined;
-    out.push({ id: it.id, kind: it.payload.kind, name: payloadName(it.payload) || "(sans nom)", path: groupPath(groups, parentId), parentId, subtitle: subtitle || undefined, search: search || undefined, favorite, ...describeEntity(it.payload) });
+    out.push({ id: it.id, kind: it.payload.kind, name: payloadName(it.payload) || "(sans nom)", path: groupPath(groups, parentId), parentId, subtitle: subtitle || undefined, search: search || undefined, favorite, updatedAt: it.updatedAt, createdAt: it.createdAt, ...describeEntity(it.payload) });
   }
   return out;
 }
@@ -179,4 +179,35 @@ export function filterEntities(entities: GuiVaultEntity[], keep: (e: GuiVaultEnt
     }
   }
   return entities.filter((e) => (e.kind === "group" ? wanted.has(e.id) : keep(e)));
+}
+
+// ─── Tris et recherche à plat ───────────────────────────────────────────────
+
+/** « Nom » : l'arborescence des dossiers, comme dans Guiterm. Par date : une
+ * liste à plat, le plus récent en tête — ce qu'on vient de toucher. */
+export type SortMode = "name" | "updated" | "created";
+
+export const SORT_LABELS: Record<SortMode, string> = {
+  name: "Nom (dossiers)",
+  updated: "Modifiés récemment",
+  created: "Créés récemment",
+};
+
+/** Mot à mot, sur les mêmes champs que `matches` de `vaultTree.ts` : tous
+ * les mots doivent correspondre. `extra` : ce qu'un appelant ajoute (le nom
+ * du vault dans la recherche globale). */
+export function matchesQuery(e: GuiVaultEntity, query: string, extra = ""): boolean {
+  const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (terms.length === 0) return true;
+  const haystack = `${e.name} ${e.path} ${KIND_LABELS[e.kind]} ${e.search ?? ""} ${e.subtitle ?? ""} ${(e.tags ?? []).join(" ")} ${extra}`.toLowerCase();
+  return terms.every((t) => haystack.includes(t));
+}
+
+/** Les éléments (sans les dossiers) qui correspondent à `query`, triés par
+ * date, le plus récent en tête ; à date égale, par nom. */
+export function sortedFlat(entities: GuiVaultEntity[], query: string, sort: Exclude<SortMode, "name">): GuiVaultEntity[] {
+  const at = (e: GuiVaultEntity) => (sort === "updated" ? e.updatedAt : e.createdAt ?? e.updatedAt) ?? "";
+  return entities
+    .filter((e) => e.kind !== "group" && matchesQuery(e, query))
+    .sort((a, b) => at(b).localeCompare(at(a)) || a.name.localeCompare(b.name));
 }

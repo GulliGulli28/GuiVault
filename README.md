@@ -33,6 +33,9 @@ serveur puisse jamais lire un secret.
   (Ed25519, RSA, ECDSA, format OpenSSH) ; import depuis
   Bitwarden (JSON en clair ou protégé, CSV), Chrome, Firefox, LastPass,
   KeePassXC ; export JSON (chiffré par mot de passe ou en clair) et CSV.
+  Recherche dans tous les vaults (**Ctrl+K**), raccourcis clavier (`?`),
+  tri par date, **historique** de chaque élément et **corbeille** (30 j),
+  presse-papiers effacé après copie.
   Formats décrits dans [`docs/ITEMS.md`](docs/ITEMS.md).
 - **Extension de navigateur** (Chrome/Edge/Firefox) : les identifiants de
   la page courante, remplissage en un clic ou depuis le champ, codes TOTP,

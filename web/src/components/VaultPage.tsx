@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PageContext } from "../App";
 import { api, errorMessage } from "../lib/api";
-import { filterEntities, indexItems, toEntities, withParent } from "../lib/entities";
+import { filterEntities, indexItems, SORT_LABELS, toEntities, withParent, type SortMode } from "../lib/entities";
+import { plainShortcut } from "../lib/keyboard";
 import { uuid } from "../lib/bytes";
-import { isSecret } from "../lib/items";
+import { isSecret, primarySecret, primaryUser } from "../lib/items";
 import { pinnedEmailFor } from "../lib/pins";
 import { navigate } from "../lib/route";
 import { loadItems, moveItem, payloadEntity, payloadName, putPayload, RevisionConflict, type DecodedItem, type VaultView } from "../lib/session";
@@ -14,6 +15,7 @@ import { ItemView } from "./ItemView";
 import { ItemForm } from "./forms/ItemForm";
 import { IconHistory, IconStar, IconTools } from "./secret-icons";
 import { ItemHistory } from "./ItemHistory";
+import { ShortcutsHelp } from "./ShortcutsHelp";
 import { IconChevronDown, IconCopy, IconEdit, IconFolder, IconPlus, IconRefresh, IconSearch, IconSettings, IconTrash } from "./ui-icons";
 import { copyText, formatWhen, Loading, useDelayed } from "./ui";
 import { PaneHandle, usePersistedPane } from "../hooks/usePersistedPane";
@@ -31,21 +33,58 @@ type Filter = "all" | "favorites" | ItemKind;
 const FILTERS: Filter[] = ["all", "favorites", "login", "note", "card", "identity", "api-key", "aws", "host", "sql-connection", "key", "snippet", "runbook", "group", "icon"];
 
 /** Un vault : son contenu à gauche, la fiche ou le formulaire à droite. */
-export function VaultPage({ ctx, vaultId }: { ctx: PageContext; vaultId: string }) {
+export function VaultPage({ ctx, vaultId, itemId }: { ctx: PageContext; vaultId: string; itemId?: string }) {
   const vault = ctx.session.vaults.find((v) => v.id === vaultId);
   if (!vault) return <p className="p-6 text-[12.5px] text-[var(--c-text-muted)]">Ce vault n'existe pas (ou plus).</p>;
-  return <VaultBody key={vault.id} ctx={ctx} vault={vault} />;
+  return <VaultBody key={vault.id} ctx={ctx} vault={vault} itemId={itemId} />;
 }
 
-function VaultBody({ ctx, vault }: { ctx: PageContext; vault: VaultView }) {
+const SORT_KEY = "guivault.sort";
+
+function loadSort(): SortMode {
+  try {
+    const v = localStorage.getItem(SORT_KEY);
+    return v === "updated" || v === "created" ? v : "name";
+  } catch {
+    return "name";
+  }
+}
+
+function VaultBody({ ctx, vault, itemId }: { ctx: PageContext; vault: VaultView; itemId?: string }) {
   const [items, setItems] = useState<DecodedItem[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string | null>(itemId ?? null);
   const [mode, setMode] = useState<Mode>({ kind: "view" });
+  const [sort, setSortState] = useState<SortMode>(loadSort);
+  const [help, setHelp] = useState(false);
+  // Stable : `useModalSurface` rend le focus à l'ouvreur quand `onClose`
+  // change, ce qu'une fonction recréée à chaque rendu ferait sans cesse.
+  const closeHelp = useCallback(() => setHelp(false), []);
+  const filterRef = useRef<HTMLInputElement>(null);
+  const setSort = (s: SortMode) => {
+    setSortState(s);
+    try {
+      localStorage.setItem(SORT_KEY, s);
+    } catch {
+      // sans stockage, le tri vaut pour la session
+    }
+  };
+  // Ouvert depuis la recherche globale : l'élément demandé, sans filtre qui
+  // le cacherait.
+  useEffect(() => {
+    if (!itemId) return;
+    setSelected(itemId);
+    setMode({ kind: "view" });
+    setQuery("");
+    setFilter("all");
+  }, [itemId]);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [history, setHistory] = useState(false);
+  // Stable, comme `closeHelp` : `useModalSurface` rend le focus à l'ouvreur
+  // quand `onClose` change.
+  const closeHistory = useCallback(() => setHistory(false), []);
   const [moveTo, setMoveTo] = useState<VaultView | null>(null);
   const [newMenu, setNewMenu] = useState(false);
   const [stale, setStale] = useState(false);
@@ -253,6 +292,33 @@ function VaultBody({ ctx, vault }: { ctx: PageContext; vault: VaultView }) {
   const selectedGroupId = current?.ok && current.payload.kind === "group" ? current.id : current?.ok && "groupId" in payloadEntity(current.payload) ? (payloadEntity(current.payload).groupId as string | null) : null;
   const isSecretItem = current?.ok && isSecret(current.payload);
 
+  // ─── Clavier (« ? » pour la liste) ───────────────────────────────────────
+  const shortcutsRef = useRef<(e: KeyboardEvent) => void>(() => {});
+  shortcutsRef.current = (e: KeyboardEvent) => {
+    if (!plainShortcut(e)) return;
+    if (e.key === "/") { e.preventDefault(); filterRef.current?.focus(); return; }
+    if (e.key === "?") { e.preventDefault(); setHelp(true); return; }
+    if (mode.kind !== "view" || !current?.ok) return;
+    const copy = (what: { label: string; value: string } | null) => {
+      if (!what) return;
+      e.preventDefault();
+      void copyText(what.value).then((ok) => ok && ctx.notify(`${what.label} copié.`));
+    };
+    switch (e.key) {
+      case "c": copy(primarySecret(current.payload)); break;
+      case "u": copy(primaryUser(current.payload)); break;
+      case "h": e.preventDefault(); setHistory(true); break;
+      case "e": if (writable) { e.preventDefault(); setMode({ kind: "edit" }); } break;
+      case "f": if (writable && isSecretItem) { e.preventDefault(); void toggleFavorite(); } break;
+      case "Delete": if (writable) { e.preventDefault(); setConfirmDelete(true); } break;
+    }
+  };
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => shortcutsRef.current(e);
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
   return (
     <div className="flex h-full min-h-0 flex-col">
       <header className="flex shrink-0 flex-wrap items-center gap-2 border-b border-[var(--c-border)] px-4 py-2.5 pl-4 max-md:pl-11">
@@ -308,8 +374,11 @@ function VaultBody({ ctx, vault }: { ctx: PageContext; vault: VaultView }) {
             <div className="flex items-center gap-1.5">
               <div className="relative min-w-0 flex-1">
                 <IconSearch size={12} className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[var(--c-text-muted)]" />
-                <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Filtrer…" aria-label="Filtrer" className="input pl-7" />
+                <input ref={filterRef} value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => { if (e.key === "Escape") { e.currentTarget.blur(); if (query) setQuery(""); } }} placeholder="Filtrer…  ( / )" aria-label="Filtrer" className="input pl-7" />
               </div>
+              <select value={sort} onChange={(e) => setSort(e.target.value as SortMode)} className="input w-auto shrink-0 px-1.5" title="Trier" aria-label="Trier">
+                {(Object.keys(SORT_LABELS) as SortMode[]).map((s) => <option key={s} value={s}>{SORT_LABELS[s]}</option>)}
+              </select>
               {writable && (
                 <button onClick={() => { setQuery(""); setFilter("all"); setNaming({ mode: "create", parentId: null }); }} className="btn btn-secondary btn-icon shrink-0" title="Nouveau dossier (à la racine ; le bouton d'un dossier en crée un dedans)" aria-label="Nouveau dossier"><IconFolder size={13} /><IconPlus size={9} className="-ml-1 -mt-2" /></button>
               )}
@@ -340,8 +409,10 @@ function VaultBody({ ctx, vault }: { ctx: PageContext; vault: VaultView }) {
                 selected={selected}
                 onSelect={(id) => { setSelected(id); setMode({ kind: "view" }); }}
                 rowActions={rowActions}
+                sort={sort}
+                keyboard={mode.kind === "view"}
                 emptyMessage={writable ? "Rien ici pour l'instant — « Nouveau » pour commencer, importez un export, ou synchronisez depuis Guiterm." : "Rien ici pour l'instant."}
-                {...(writable ? { folderActions, naming, onName: (n: string) => void submitFolderName(n), onNameCancel: () => setNaming(null), onMove: (id: string, folderId: string | null) => void moveToFolder(id, folderId) } : {})}
+                {...(writable && sort === "name" ? { folderActions, naming, onName: (n: string) => void submitFolderName(n), onNameCancel: () => setNaming(null), onMove: (id: string, folderId: string | null) => void moveToFolder(id, folderId) } : {})}
               />
             )}
           </div>
@@ -433,13 +504,14 @@ function VaultBody({ ctx, vault }: { ctx: PageContext; vault: VaultView }) {
           onCancel={() => setConfirmDelete(false)}
         />
       )}
+      {help && <ShortcutsHelp onClose={closeHelp} />}
       {history && current && (
         <ItemHistory
           vault={vault}
           item={current}
           index={index}
           writable={writable}
-          onClose={() => setHistory(false)}
+          onClose={closeHistory}
           onRestored={() => { setHistory(false); ctx.notify("Version restaurée."); void load(); }}
         />
       )}

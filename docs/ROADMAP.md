@@ -79,7 +79,7 @@ paramètres ou formats anciens.
 | Coffre auto-hébergé injoignable = plus rien (« bloqué à l'aéroport ») | Web 100 % en ligne ; extension en `storage.session` seulement | Cache **chiffré** (blobs + `protected_user_key` en IndexedDB), déverrouillage hors ligne en lecture seule ; PWA installable ; idem extension |
 | ~~Pas d'historique des modifications~~ **fait** | Table `item_versions` (versions chiffrées, `GUIVAULT_ITEM_HISTORY`), corbeille `GUIVAULT_TRASH_DAYS` jours, restauration par renvoi tel quel ; web : « Historique » d'un élément et page Corbeille ; les rotations (web, Guiterm) re-chiffrent l'historique | Guiterm : pas encore d'écran corbeille/historique (le web s'en charge) |
 | ~~Presse-papier jamais effacé (très demandé)~~ **fait** | `lib/clipboard.ts` : effacé au bout du délai (30 s par défaut, section synchronisée `clipboard`) s'il contient encore ce qui a été copié ; extension : service worker + document hors écran ; web : à l'échéance si la page peut vérifier, sinon au clic suivant | — |
-| Tri, doublons, duplication | Rien de tout ça | Tri par modification / création / dernier usage ; rapport de doublons avec fusion ; « Dupliquer » via `useSeed` |
+| Tri, doublons, duplication | **Tri fait** (nom en dossiers, modifiés / créés récemment à plat, retenu par appareil) | Rapport de doublons avec fusion ; « Dupliquer » via `useSeed` ; tri par dernier usage (à tracer côté client) |
 | Re-demande du mot de passe maître pour un élément | — | Drapeau `reprompt` sur l'élément (affichage et copie du secret) |
 | Fonctions « premium » payantes (accès d'urgence, pièces jointes, Send, TOTP) ; +100 % sur Premium en janvier 2026 | Absentes | Gratuites parce qu'auto-hébergées — voir §2 |
 | Interface « datée », pas d'accompagnement | Pas de premier lancement guidé | Assistant d'import à la première connexion, puis une liste « activer la 2FA, installer l'extension, vérifier une empreinte » |
@@ -124,10 +124,16 @@ paramètres ou formats anciens.
 
 ## 4. Interface et ergonomie
 
-- [ ] **Recherche globale** sur tous les vaults et **palette Ctrl+K**
-  (aujourd'hui la recherche se limite au vault ouvert).
-- [ ] **Raccourcis clavier** : `/` chercher, `j`/`k` naviguer, `c`/`p`
-  copier utilisateur / mot de passe, `e` modifier.
+- [x] **Recherche globale** sur tous les vaults et **palette Ctrl+K**
+  (`SearchPalette.tsx`) : éléments (nom, utilisateur, site, tags, chemin,
+  vault) et pages ; Entrée ouvre l'élément dans son vault
+  (`#/vault/<id>/item/<id>`), Ctrl+C copie le mot de passe (ou le secret),
+  Ctrl+Maj+C l'utilisateur. Déchiffré en mémoire seulement, effacé avec la
+  session.
+- [x] **Raccourcis clavier** dans un vault : `/` filtrer, ↑↓ ou `j`/`k`,
+  `c` copier le secret, `u` l'utilisateur, `e` modifier, `h` historique,
+  `f` favori, Suppr, `?` l'aide (`ShortcutsHelp.tsx`) — ignorés pendant
+  la saisie.
 - [ ] **Mobile** : ~16 règles responsive dans tout `components/` —
   quasi inutilisable sur téléphone, et pas d'app. Une vue à un panneau + la
   PWA couvrent déjà consultation, copie et TOTP.

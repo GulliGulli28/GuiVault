@@ -44,9 +44,10 @@ export interface SessionState {
 /** Un item déchiffré — ou pas : un item illisible (clé d'un autre âge,
  * blob altéré) est montré comme tel plutôt que de faire disparaître toute la
  * liste. */
+/** `createdAt` : absent d'un cache rangé avant qu'on le garde (extension). */
 export type DecodedItem =
-  | { id: string; revision: number; updatedAt: string; ok: true; payload: Payload }
-  | { id: string; revision: number; updatedAt: string; ok: false; itemType: string; error: string };
+  | { id: string; revision: number; updatedAt: string; createdAt?: string; ok: true; payload: Payload }
+  | { id: string; revision: number; updatedAt: string; createdAt?: string; ok: false; itemType: string; error: string };
 
 const b64 = toBase64;
 const unb64 = fromBase64;
@@ -312,7 +313,7 @@ export function payloadEntity(p: Payload): Record<string, unknown> & { id: strin
 }
 
 export function decodeItem(vault: VaultView, item: Item): DecodedItem {
-  const base = { id: item.id, revision: item.revision, updatedAt: item.updated_at };
+  const base = { id: item.id, revision: item.revision, updatedAt: item.updated_at, createdAt: item.created_at };
   try {
     const plain = c.openItem(vault.key, vault.id, item.id, item.item_type, unb64(item.ciphertext));
     const payload = JSON.parse(utf8.decode(plain)) as Payload;

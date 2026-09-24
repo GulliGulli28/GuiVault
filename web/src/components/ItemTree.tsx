@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState, type DragEvent, type ReactNode } from "react";
-import { FOLDERABLE_KINDS } from "../lib/entities";
+import { FOLDERABLE_KINDS, sortedFlat, type SortMode } from "../lib/entities";
+import { plainShortcut } from "../lib/keyboard";
 import { hostKindMeta } from "../lib/hostKinds";
 import { ACCENT_COLORS, type UiAccent } from "../lib/preferences";
-import { buildVaultTree, visibleRows } from "../lib/vaultTree";
+import { buildVaultTree, visibleRows, type VaultTree } from "../lib/vaultTree";
 import { KIND_LABELS, type CustomIcon, type GuiVaultEntity, type GuiVaultEntityKind } from "../lib/types";
 import { EntityMono, EntityRow, EntityTags, GroupRow } from "./EntityRow";
 import { HostIcon, hasIcon } from "./icons";
@@ -109,8 +110,12 @@ function FolderNameInput({ depth, initial, onSubmit, onCancel }: { depth: number
  * élément, sous-dossier, renommer), dossier nommé sur place, et
  * glisser-déposer d'un élément ou d'un dossier dans un autre — ou sur la
  * bande « racine » qui apparaît pendant le glisser. */
-export function ItemTree({ entities, customIcons = [], query, selected, onSelect, emptyMessage = "Rien ici pour l'instant.", rowActions, folderActions, naming, onName, onNameCancel, onMove }: {
+export function ItemTree({ entities, customIcons = [], query, selected, onSelect, emptyMessage = "Rien ici pour l'instant.", rowActions, folderActions, naming, onName, onNameCancel, onMove, sort = "name", keyboard = false }: {
   entities: GuiVaultEntity[];
+  /** « name » : l'arborescence ; par date : une liste à plat, sans dossiers. */
+  sort?: SortMode;
+  /** ↑/↓ (ou j/k) parcourent les éléments, hors saisie. */
+  keyboard?: boolean;
   /** Les icônes du vault, pour les hôtes et dossiers qui en portent une. */
   customIcons?: CustomIcon[];
   query: string;
@@ -151,8 +156,32 @@ export function ItemTree({ entities, customIcons = [], query, selected, onSelect
       else next.add(id);
       return next;
     });
-  const tree = useMemo(() => buildVaultTree(entities, query), [entities, query]);
+  const tree = useMemo<VaultTree>(
+    () => sort === "name"
+      ? buildVaultTree(entities, query)
+      : { rows: sortedFlat(entities, query, sort).map((entity) => ({ kind: "entity" as const, id: entity.id, entity, depth: 0 })), visibleKeys: [] },
+    [entities, query, sort],
+  );
   const visible = useMemo(() => visibleRows(tree.rows, collapsed), [tree, collapsed]);
+
+  // ─── Clavier ───────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!keyboard) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      const down = e.key === "ArrowDown" || e.key === "j";
+      const up = e.key === "ArrowUp" || e.key === "k";
+      if ((!down && !up) || !plainShortcut(e)) return;
+      const ids = visible.filter((r) => r.kind === "entity").map((r) => r.id);
+      if (ids.length === 0) return;
+      e.preventDefault();
+      const at = selected ? ids.indexOf(selected) : -1;
+      const next = at < 0 ? (down ? 0 : ids.length - 1) : Math.max(0, Math.min(ids.length - 1, at + (down ? 1 : -1)));
+      onSelect(ids[next]);
+      document.querySelector(`[data-entity-id="${ids[next]}"]`)?.scrollIntoView({ block: "nearest" });
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [keyboard, visible, selected, onSelect]);
 
   // ─── Glisser-déposer ───────────────────────────────────────────────────
   const parents = useMemo(() => new Map(entities.map((e) => [e.id, e.parentId ?? null])), [entities]);
@@ -262,7 +291,7 @@ export function ItemTree({ entities, customIcons = [], query, selected, onSelect
         ) : undefined;
         const draggable = dragProps(entity);
         return (
-          <div key={row.id} {...draggable} className={dragId === entity.id ? "opacity-50" : undefined}>
+          <div key={row.id} {...draggable} data-entity-id={entity.id} className={dragId === entity.id ? "opacity-50" : undefined}>
           <EntityRow
             depth={row.depth}
             active={selected === entity.id}
