@@ -59,6 +59,8 @@ impl TestServer {
             invitation_ttl: Duration::from_secs(86400),
             trust_proxy: guivault_server::config::TrustProxy::No,
             max_item_bytes: 64 * 1024,
+            item_history: 20,
+            trash_days: 30,
             auth_rate_burst: 1000,
             auth_rate_per_second: 1000,
             log_json: false,
@@ -793,6 +795,7 @@ async fn shared_vault_invite_existing_user_roles_and_rotation() {
             .unwrap(),
         }],
         items: rotated,
+        versions: None,
         base_revision: current.revision,
     };
     // Un item manquant → refus.
@@ -1582,6 +1585,235 @@ async fn user_settings_follow_the_account_across_devices() {
             .await
             .unwrap(),
         StatusCode::BAD_REQUEST
+    );
+    server.stop().await;
+}
+
+#[tokio::test]
+async fn item_history_trash_restore_and_rotation() {
+    let Some(server) = TestServer::start_with(RegistrationMode::Open, |c| c.item_history = 3).await else {
+        return;
+    };
+    let alice = User::register(&server, "alice@t.io", "pw").await;
+    let (vault, key) = alice.create_vault("Équipe").await;
+    let vid = vault.id;
+    let open = |key: &gc::SymmetricKey, item_id: Uuid, item_type: &str, ct: &[u8]| {
+        String::from_utf8(gc::open_item(key, &vid.to_string(), &item_id.to_string(), item_type, ct).unwrap()).unwrap()
+    };
+    let put_raw = |item_id: Uuid, ciphertext: Vec<u8>, base_revision: Option<i64>| {
+        alice
+            .req(reqwest::Method::PUT, &format!("/vaults/{vid}/items/{item_id}"))
+            .json(&PutItemRequest {
+                item_type: "note".into(),
+                ciphertext,
+                base_revision,
+            })
+            .send()
+    };
+    let trash_path = format!("/vaults/{vid}/trash");
+    let trash = || alice.get::<Vec<TrashedItem>>(&trash_path);
+
+    // v1 … v5 : l'historique garde les trois dernières versions remplacées.
+    let id = Uuid::new_v4();
+    let mut rev = None;
+    for n in 1..=5 {
+        let expected = if n == 1 { StatusCode::CREATED } else { StatusCode::OK };
+        let body = status!(
+            alice.put_item(vid, &key, id, "note", &format!("v{n}"), rev).await,
+            expected
+        );
+        rev = Some(serde_json::from_str::<Item>(&body).unwrap().revision);
+    }
+    let versions: Vec<ItemVersion> = alice.get(&format!("/vaults/{vid}/items/{id}/versions")).await;
+    let texts: Vec<String> = versions.iter().map(|v| open(&key, id, "note", &v.ciphertext)).collect();
+    assert_eq!(texts, ["v4", "v3", "v2"]);
+    assert_eq!(versions[0].replaced_by.as_deref(), Some("alice@t.io"));
+
+    // Restaurer v2 : la renvoyer telle quelle (même clé, même AAD).
+    let body = status!(
+        put_raw(id, versions[2].ciphertext.clone(), rev).await.unwrap(),
+        StatusCode::OK
+    );
+    let restored: Item = serde_json::from_str(&body).unwrap();
+    assert_eq!(alice.open_item(&key, &restored), "v2");
+
+    // Supprimer → la corbeille, avec la dernière version et qui l'a supprimé.
+    status!(
+        alice
+            .req(reqwest::Method::DELETE, &format!("/vaults/{vid}/items/{id}"))
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::NO_CONTENT
+    );
+    let t = trash().await;
+    assert_eq!(t.len(), 1);
+    assert_eq!(open(&key, id, "note", &t[0].ciphertext), "v2");
+    assert_eq!(t[0].deleted_by.as_deref(), Some("alice@t.io"));
+    assert!(t[0].expires_at > t[0].deleted_at);
+
+    // … d'où il revient (création : base None), et n'y est plus.
+    status!(
+        put_raw(id, t[0].ciphertext.clone(), None).await.unwrap(),
+        StatusCode::CREATED
+    );
+    assert!(trash().await.is_empty());
+
+    // Un déplacement vers un autre vault n'est pas une suppression.
+    let moved = Uuid::new_v4();
+    status!(
+        alice.put_item(vid, &key, moved, "note", "partira", None).await,
+        StatusCode::CREATED
+    );
+    status!(
+        alice
+            .req(
+                reqwest::Method::DELETE,
+                &format!("/vaults/{vid}/items/{moved}?moved=true")
+            )
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::NO_CONTENT
+    );
+    assert!(trash().await.is_empty());
+
+    // Supprimer définitivement ; un item vivant n'est pas dans la corbeille.
+    let gone = Uuid::new_v4();
+    status!(
+        alice.put_item(vid, &key, gone, "note", "à jeter", None).await,
+        StatusCode::CREATED
+    );
+    status!(
+        alice
+            .req(reqwest::Method::DELETE, &format!("/vaults/{vid}/trash/{id}"))
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::NOT_FOUND
+    );
+    status!(
+        alice
+            .req(reqwest::Method::DELETE, &format!("/vaults/{vid}/items/{gone}"))
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::NO_CONTENT
+    );
+    assert_eq!(trash().await.len(), 1);
+    status!(
+        alice
+            .req(reqwest::Method::DELETE, &format!("/vaults/{vid}/trash/{gone}"))
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::NO_CONTENT
+    );
+    assert!(trash().await.is_empty());
+
+    // Une corbeille non vide et un historique, pour la rotation.
+    status!(
+        alice
+            .req(reqwest::Method::DELETE, &format!("/vaults/{vid}/items/{id}"))
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::NO_CONTENT
+    );
+    let all: Vec<ItemVersion> = alice.get(&format!("/vaults/{vid}/versions")).await;
+    assert!(!all.is_empty());
+
+    // Rotation (plus aucun item vivant : seules les versions sont à
+    // re-chiffrer) : toutes sous la nouvelle clé, sinon refus.
+    let rotation =
+        |new_key: &gc::SymmetricKey, versions: Option<Vec<RotatedVersion>>, base: i64| RotateVaultKeyRequest {
+            name_enc: gc::seal_vault_name(new_key, &vid.to_string(), "Équipe").unwrap(),
+            members: vec![RotatedMemberKey {
+                user_id: alice.profile.id,
+                wrapped_vault_key: gc::wrap_vault_key(
+                    &alice.account.keypair,
+                    &alice.account.keypair.public,
+                    &vid.to_string(),
+                    new_key,
+                )
+                .unwrap(),
+            }],
+            items: vec![],
+            versions,
+            base_revision: base,
+        };
+    let new_key = gc::SymmetricKey::random();
+    let reseal = |v: &ItemVersion| RotatedVersion {
+        item_id: v.item_id,
+        revision: v.revision,
+        ciphertext: gc::seal_item(
+            &new_key,
+            &vid.to_string(),
+            &v.item_id.to_string(),
+            &v.item_type,
+            &gc::open_item(
+                &key,
+                &vid.to_string(),
+                &v.item_id.to_string(),
+                &v.item_type,
+                &v.ciphertext,
+            )
+            .unwrap(),
+        )
+        .unwrap(),
+    };
+    let base = alice.get::<Vault>(&format!("/vaults/{vid}")).await.revision;
+    let mut partial: Vec<RotatedVersion> = all.iter().map(reseal).collect();
+    partial.pop();
+    let body = status!(
+        alice
+            .req(reqwest::Method::POST, &format!("/vaults/{vid}/rotate-key"))
+            .json(&rotation(&new_key, Some(partial), base))
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::BAD_REQUEST
+    );
+    assert!(body.contains("incomplete_rotation"), "{body}");
+    status!(
+        alice
+            .req(reqwest::Method::POST, &format!("/vaults/{vid}/rotate-key"))
+            .json(&rotation(&new_key, Some(all.iter().map(reseal).collect()), base))
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::OK
+    );
+    let t = trash().await;
+    assert_eq!(t.len(), 1);
+    assert_eq!(
+        open(&new_key, id, "note", &t[0].ciphertext),
+        "v2",
+        "la corbeille survit à la rotation"
+    );
+    let after: Vec<ItemVersion> = alice.get(&format!("/vaults/{vid}/versions")).await;
+    assert_eq!(after.len(), all.len());
+    for v in &after {
+        open(&new_key, v.item_id, &v.item_type, &v.ciphertext);
+    }
+
+    // Un client d'avant l'historique ne sait pas les re-chiffrer : effacées.
+    let newer_key = gc::SymmetricKey::random();
+    let base = alice.get::<Vault>(&format!("/vaults/{vid}")).await.revision;
+    status!(
+        alice
+            .req(reqwest::Method::POST, &format!("/vaults/{vid}/rotate-key"))
+            .json(&rotation(&newer_key, None, base))
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::OK
+    );
+    assert!(
+        alice
+            .get::<Vec<ItemVersion>>(&format!("/vaults/{vid}/versions"))
+            .await
+            .is_empty()
     );
     server.stop().await;
 }

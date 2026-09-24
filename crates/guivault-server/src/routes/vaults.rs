@@ -406,6 +406,9 @@ pub async fn rotate_key(
     for it in &req.items {
         validate::item("x", &it.ciphertext, state.config.max_item_bytes)?;
     }
+    for v in req.versions.iter().flatten() {
+        validate::item("x", &v.ciphertext, state.config.max_item_bytes)?;
+    }
     db::vault_with_role(&state.db, user.id, vault_id, Role::Admin).await?;
 
     let mut tx = state.db.begin().await?;
@@ -485,6 +488,48 @@ pub async fn rotate_key(
         .execute(&mut *tx)
         .await?;
     }
+    // L'historique et la corbeille : re-chiffrés par le client, ou effacés
+    // s'il ne sait pas le faire (client d'avant l'historique) — le serveur
+    // ne garde pas de versions que plus personne ne saurait ouvrir. La
+    // corbeille expirée part d'abord, pour que l'ensemble attendu ne dépende
+    // pas du moment où l'effacement horaire est passé.
+    db::prune_trash(&mut *tx, state.config.trash_days).await?;
+    match &req.versions {
+        None => {
+            sqlx::query("DELETE FROM item_versions WHERE vault_id = $1")
+                .bind(vault_id)
+                .execute(&mut *tx)
+                .await?;
+        }
+        Some(sent) => {
+            let stored: Vec<(Uuid, i64)> =
+                sqlx::query_as("SELECT item_id, revision FROM item_versions WHERE vault_id = $1")
+                    .bind(vault_id)
+                    .fetch_all(&mut *tx)
+                    .await?;
+            let sent_keys: std::collections::HashSet<(Uuid, i64)> =
+                sent.iter().map(|v| (v.item_id, v.revision)).collect();
+            if stored.iter().any(|k| !sent_keys.contains(k)) {
+                return Err(AppError::bad_request(
+                    "incomplete_rotation",
+                    "il manque une version précédente re-chiffrée",
+                ));
+            }
+            // Celles qui ne sont plus là (expirées entre-temps) sont ignorées.
+            for v in sent {
+                sqlx::query(
+                    "UPDATE item_versions SET ciphertext = $4 WHERE vault_id = $1 AND item_id = $2 AND revision = $3",
+                )
+                .bind(vault_id)
+                .bind(v.item_id)
+                .bind(v.revision)
+                .bind(&v.ciphertext)
+                .execute(&mut *tx)
+                .await?;
+            }
+        }
+    }
+
     // Les invitations en attente portaient l'ancienne clé : elles n'ouvrent
     // plus rien, l'inviteur les recrée.
     sqlx::query("UPDATE invitations SET status = 'revoked', resolved_at = now() WHERE vault_id = $1 AND status IN ('pending','awaiting_key')")

@@ -18,6 +18,7 @@ pub mod audit;
 pub mod auth;
 pub mod events;
 pub mod health;
+pub mod history;
 pub mod invitations;
 pub mod items;
 pub mod sync;
@@ -91,6 +92,10 @@ pub fn router(state: AppState) -> Router {
             get(invitations::list_for_vault).post(invitations::create),
         )
         .route("/vaults/{id}/items", get(items::list))
+        .route("/vaults/{id}/versions", get(history::vault_versions))
+        .route("/vaults/{id}/items/{item_id}/versions", get(history::item_versions))
+        .route("/vaults/{id}/trash", get(history::trash).delete(history::empty_trash))
+        .route("/vaults/{id}/trash/{item_id}", delete(history::purge))
         .route(
             "/vaults/{id}/items/{item_id}",
             put(items::put).get(items::get).delete(items::delete),

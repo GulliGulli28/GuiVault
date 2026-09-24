@@ -115,6 +115,10 @@ pub async fn put(
         ));
     }
 
+    // La version remplacée va dans l'historique.
+    if let Some(c) = current.as_ref().filter(|c| c.deleted_at.is_none()) {
+        db::keep_version(&mut tx, c, user.id, state.config.item_history).await?;
+    }
     let rev = db::bump_revision(&mut *tx, vault_id).await?;
     let created = current.as_ref().is_none_or(|c| c.deleted_at.is_some());
     let row = sqlx::query_as::<_, ItemRow>(
@@ -160,13 +164,24 @@ pub async fn put(
     ))
 }
 
+#[derive(Deserialize)]
+pub struct DeleteQuery {
+    /// L'item part vers un autre vault (même id) : ce n'est pas une
+    /// suppression, il ne va pas dans la corbeille de celui-ci.
+    #[serde(default)]
+    pub moved: bool,
+}
+
 /// Suppression = pierre tombale (le chiffré est effacé, la ligne reste avec
-/// une révision, pour que les autres clients la voient partir).
+/// une révision, pour que les autres clients la voient partir). La dernière
+/// version va dans la corbeille (`routes::history`), sauf pour un
+/// déplacement vers un autre vault.
 pub async fn delete(
     State(state): State<AppState>,
     user: AuthUser,
     ClientIp(ip): ClientIp,
     Path((vault_id, item_id)): Path<(Uuid, Uuid)>,
+    Query(q): Query<DeleteQuery>,
 ) -> ApiResult<StatusCode> {
     db::vault_with_role(&state.db, user.id, vault_id, Role::Writer).await?;
     let mut tx = state.db.begin().await?;
@@ -174,22 +189,29 @@ pub async fn delete(
         .bind(vault_id)
         .execute(&mut *tx)
         .await?;
+    let Some(current) =
+        sqlx::query_as::<_, ItemRow>("SELECT * FROM items WHERE vault_id = $1 AND id = $2 AND deleted_at IS NULL")
+            .bind(vault_id)
+            .bind(item_id)
+            .fetch_optional(&mut *tx)
+            .await?
+    else {
+        return Err(AppError::not_found("item"));
+    };
+    if !q.moved {
+        db::keep_version(&mut tx, &current, user.id, state.config.item_history).await?;
+    }
     let rev = db::bump_revision(&mut *tx, vault_id).await?;
-    let res = sqlx::query(
+    sqlx::query(
         "UPDATE items SET deleted_at = now(), updated_at = now(), revision = $3, ciphertext = ''::bytea
-         WHERE vault_id = $1 AND id = $2 AND deleted_at IS NULL",
+         WHERE vault_id = $1 AND id = $2",
     )
     .bind(vault_id)
     .bind(item_id)
     .bind(rev)
     .execute(&mut *tx)
     .await?;
-    if res.rows_affected() == 0 {
-        // Rien à supprimer : on annule aussi le bump de révision.
-        tx.rollback().await?;
-        return Err(AppError::not_found("item"));
-    }
-    Audit::new("item.delete")
+    Audit::new(if q.moved { "item.move_out" } else { "item.delete" })
         .actor(user.id)
         .vault(vault_id)
         .target(item_id)

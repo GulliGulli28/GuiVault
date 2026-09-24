@@ -12,7 +12,8 @@ import { ConfirmDialog } from "./ConfirmDialog";
 import { EntityIcon, ItemTree, KIND_ICONS, type FolderNaming } from "./ItemTree";
 import { ItemView } from "./ItemView";
 import { ItemForm } from "./forms/ItemForm";
-import { IconStar, IconTools } from "./secret-icons";
+import { IconHistory, IconStar, IconTools } from "./secret-icons";
+import { ItemHistory } from "./ItemHistory";
 import { IconChevronDown, IconCopy, IconEdit, IconFolder, IconPlus, IconRefresh, IconSearch, IconSettings, IconTrash } from "./ui-icons";
 import { copyText, formatWhen, Loading, useDelayed } from "./ui";
 import { PaneHandle, usePersistedPane } from "../hooks/usePersistedPane";
@@ -44,6 +45,7 @@ function VaultBody({ ctx, vault }: { ctx: PageContext; vault: VaultView }) {
   const [selected, setSelected] = useState<string | null>(null);
   const [mode, setMode] = useState<Mode>({ kind: "view" });
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [history, setHistory] = useState(false);
   const [moveTo, setMoveTo] = useState<VaultView | null>(null);
   const [newMenu, setNewMenu] = useState(false);
   const [stale, setStale] = useState(false);
@@ -291,6 +293,7 @@ function VaultBody({ ctx, vault }: { ctx: PageContext; vault: VaultView }) {
               )}
             </div>
           )}
+          <button onClick={() => navigate({ page: "vault-trash", id: vault.id })} className="btn btn-secondary btn-sm btn-icon" title="Corbeille : les éléments supprimés, à restaurer" aria-label="Corbeille"><IconTrash size={13} /></button>
           <button onClick={() => navigate({ page: "vault-tools", id: vault.id })} className="btn btn-secondary btn-sm btn-icon" title="Importer / exporter" aria-label="Importer / exporter"><IconTools size={13} /></button>
           <button onClick={() => navigate({ page: "vault-settings", id: vault.id })} className="btn btn-secondary btn-sm btn-icon" title="Réglages du vault : membres, invitations, clé" aria-label="Réglages du vault"><IconSettings size={13} /></button>
         </div>
@@ -367,6 +370,7 @@ function VaultBody({ ctx, vault }: { ctx: PageContext; vault: VaultView }) {
                 {current.ok && (() => { const entity = entities.find((e) => e.id === current.id); return <span className="flex h-6 w-6 items-center justify-center rounded-md bg-[var(--c-bg3)] text-[var(--c-text-secondary)] [&>.host-icon]:h-[72%] [&>.host-icon]:w-[72%] [&>.host-icon>*]:h-full [&>.host-icon>*]:w-full">{entity ? <EntityIcon entity={entity} customIcons={index.icons} /> : null}</span>; })()}
                 <h2 className="min-w-0 truncate text-[13px] font-semibold text-[var(--c-text)]">{current.ok ? payloadName(current.payload) : "Élément illisible"}</h2>
                 <span className="text-[11px] text-[var(--c-text-faint)]" title={`Révision ${current.revision}`}>{current.ok ? KIND_LABELS[current.payload.kind] : current.itemType} · {formatWhen(current.updatedAt)}</span>
+                <button onClick={() => setHistory(true)} className={`btn btn-ghost btn-sm btn-icon ${writable ? "" : "ml-auto"}`} title="Historique : ses versions précédentes" aria-label="Historique"><IconHistory size={13} /></button>
                 {writable && (
                   <div className="ml-auto flex items-center gap-1">
                     {isSecretItem && current.ok && (() => {
@@ -422,11 +426,21 @@ function VaultBody({ ctx, vault }: { ctx: PageContext; vault: VaultView }) {
       {confirmDelete && current && (
         <ConfirmDialog
           title={`Supprimer « ${current.ok ? payloadName(current.payload) : current.id.slice(0, 8)} » ?`}
-          message={current.ok && current.payload.kind === "group" ? "Le dossier est supprimé ; ce qu'il contient remonte à la racine lors de la prochaine synchronisation de chaque appareil." : "Une pierre tombale est laissée pour que chaque appareil synchronisé le retire à son tour."}
+          message={(current.ok && current.payload.kind === "group" ? "Le dossier est supprimé ; ce qu'il contient remonte à la racine lors de la prochaine synchronisation de chaque appareil." : "Chaque appareil synchronisé le retire à son tour.") + " Il reste dans la corbeille du vault, d'où il peut être restauré."}
           confirmLabel="Supprimer"
           danger
           onConfirm={remove}
           onCancel={() => setConfirmDelete(false)}
+        />
+      )}
+      {history && current && (
+        <ItemHistory
+          vault={vault}
+          item={current}
+          index={index}
+          writable={writable}
+          onClose={() => setHistory(false)}
+          onRestored={() => { setHistory(false); ctx.notify("Version restaurée."); void load(); }}
         />
       )}
       {moveTo && current?.ok && (

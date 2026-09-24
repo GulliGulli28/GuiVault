@@ -63,7 +63,7 @@ Erreurs : `{ "code": "…", "message": "…" }` (+ champs selon le code, ex.
 | `PATCH /vaults/{id}` | admin | `{ name_enc }` |
 | `DELETE /vaults/{id}` | owner | supprime tout (pas le personnel) |
 | `POST /vaults/{id}/leave` | membre non-owner | |
-| `POST /vaults/{id}/rotate-key` | admin | `RotateVaultKeyRequest` → `Vault` |
+| `POST /vaults/{id}/rotate-key` | admin | `RotateVaultKeyRequest` → `Vault` ; `versions` : l'historique et la corbeille re-chiffrés, **tous** (`GET /vaults/{id}/versions`), sinon `400 incomplete_rotation` — absent, ils sont effacés |
 | `GET /vaults/{id}/audit?limit=&before=` | admin | journal |
 
 ## Membres
@@ -95,7 +95,17 @@ Erreurs : `{ "code": "…", "message": "…" }` (+ champs selon le code, ex.
 | `GET /vaults/{id}/items[?since=N]` | membre | `{ items, revision }` — sans `since` : tous les vivants ; avec : modifiés après N, tombales comprises |
 | `GET /vaults/{id}/items/{item_id}` | membre | `Item` |
 | `PUT /vaults/{id}/items/{item_id}` | writer | `{ item_type, ciphertext, base_revision? }` → `201`/`200` `Item`, ou `409` `{ code: "revision_mismatch", current }` |
-| `DELETE /vaults/{id}/items/{item_id}` | writer | tombale |
+| `DELETE /vaults/{id}/items/{item_id}[?moved=true]` | writer | tombale ; la dernière version va dans la corbeille, sauf `moved=true` (l'item part vers un autre vault, même id) |
+| `GET /vaults/{id}/items/{item_id}/versions` | membre | `[ItemVersion]`, du plus récent au plus ancien (`GUIVAULT_ITEM_HISTORY` gardées) |
+| `GET /vaults/{id}/versions` | membre | toutes les `ItemVersion` du vault (ce qu'une rotation re-chiffre) |
+| `GET /vaults/{id}/trash` | membre | `[TrashedItem]` : supprimés depuis moins de `GUIVAULT_TRASH_DAYS` jours, avec leur dernière version et `expires_at` |
+| `DELETE /vaults/{id}/trash/{item_id}` | writer | supprime définitivement un item de la corbeille (404 s'il est vivant) |
+| `DELETE /vaults/{id}/trash` | writer | vide la corbeille |
+
+Restaurer une version (historique ou corbeille) : la renvoyer **telle
+quelle** par `PUT` — même clé, même AAD —, avec la révision courante de
+l'item en `base_revision`, ou sans pour un item de la corbeille (recréé).
+L'élément remplacé passe à son tour dans l'historique.
 
 ### Chiffrement d'un item (côté client)
 

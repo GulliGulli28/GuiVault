@@ -131,6 +131,8 @@ dans [`docs/SECURITY.md`](docs/SECURITY.md).
 | `GUIVAULT_REFRESH_TTL_SECS` | `2592000` | Durée du jeton de rafraîchissement (30 j) |
 | `GUIVAULT_INVITATION_TTL_SECS` | `1209600` | Durée d'une invitation (14 j) |
 | `GUIVAULT_MAX_ITEM_BYTES` | `1048576` | Taille max d'un item chiffré |
+| `GUIVAULT_ITEM_HISTORY` | `20` | Versions précédentes gardées par item (historique, chiffrées) ; `0` : ni historique ni corbeille |
+| `GUIVAULT_TRASH_DAYS` | `30` | Jours qu'un élément supprimé reste dans la corbeille |
 | `GUIVAULT_AUTH_RATE_PER_SECOND` / `_BURST` | `2` / `10` | Rate-limit par IP des routes d'auth |
 | `GUIVAULT_LOG_JSON` | `false` | Journaux en JSON |
 | `RUST_LOG` | `info,sqlx=warn` | Filtre de journalisation |

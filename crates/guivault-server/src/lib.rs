@@ -50,6 +50,20 @@ pub async fn serve(
     shutdown: impl std::future::Future<Output = ()> + Send + 'static,
 ) -> anyhow::Result<()> {
     let db = connect(&config).await?;
+    // La corbeille garde un item supprimé `trash_days` jours, pas plus :
+    // vérifié toutes les heures, que quelqu'un l'ouvre ou non.
+    let (pool, days) = (db.clone(), config.trash_days);
+    tokio::spawn(async move {
+        let mut tick = tokio::time::interval(std::time::Duration::from_secs(3600));
+        loop {
+            tick.tick().await;
+            match db::prune_trash(&pool, days).await {
+                Ok(0) => {}
+                Ok(n) => tracing::info!(versions = n, "corbeille : versions expirées effacées"),
+                Err(e) => tracing::warn!(error = %e, "corbeille : effacement des versions expirées impossible"),
+            }
+        }
+    });
     let listener = tokio::net::TcpListener::bind(config.bind).await?;
     ready(listener.local_addr()?);
     let router = app(config, db);

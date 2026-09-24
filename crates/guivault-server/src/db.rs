@@ -2,8 +2,8 @@
 //! n'ont qu'un seul consommateur gardent leurs requêtes chez elles.
 use crate::error::AppError;
 use chrono::{DateTime, Utc};
-use guivault_protocol::{Invitation, InvitationStatus, Item, Role, UserProfile, Vault, VaultKind};
-use sqlx::PgExecutor;
+use guivault_protocol::{Invitation, InvitationStatus, Item, ItemVersion, Role, UserProfile, Vault, VaultKind};
+use sqlx::{PgConnection, PgExecutor};
 use uuid::Uuid;
 
 #[derive(sqlx::FromRow)]
@@ -138,6 +138,83 @@ impl From<ItemRow> for Item {
             ciphertext: r.ciphertext,
             created_at: r.created_at,
             updated_at: r.updated_at,
+        }
+    }
+}
+
+// ─── Versions précédentes (historique, corbeille) ───────────────────────────
+
+/// Garde la version courante d'un item avant qu'elle soit remplacée ou
+/// supprimée, puis n'en garde que les `keep` dernières. `keep = 0` : pas
+/// d'historique.
+pub async fn keep_version(tx: &mut PgConnection, current: &ItemRow, by: Uuid, keep: usize) -> sqlx::Result<()> {
+    if keep == 0 {
+        return Ok(());
+    }
+    sqlx::query(
+        "INSERT INTO item_versions (vault_id, item_id, revision, item_type, ciphertext, written_at, replaced_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT DO NOTHING",
+    )
+    .bind(current.vault_id)
+    .bind(current.id)
+    .bind(current.revision)
+    .bind(&current.item_type)
+    .bind(&current.ciphertext)
+    .bind(current.updated_at)
+    .bind(by)
+    .execute(&mut *tx)
+    .await?;
+    sqlx::query(
+        "DELETE FROM item_versions WHERE vault_id = $1 AND item_id = $2 AND revision NOT IN (
+            SELECT revision FROM item_versions WHERE vault_id = $1 AND item_id = $2 ORDER BY revision DESC LIMIT $3)",
+    )
+    .bind(current.vault_id)
+    .bind(current.id)
+    .bind(keep as i64)
+    .execute(&mut *tx)
+    .await?;
+    Ok(())
+}
+
+/// Efface de la corbeille ce qui y est depuis plus de `days` jours (tous
+/// vaults confondus) ; rend le nombre de versions effacées.
+pub async fn prune_trash<'e>(db: impl PgExecutor<'e>, days: u32) -> sqlx::Result<u64> {
+    let res = sqlx::query(
+        "DELETE FROM item_versions v USING items i
+         WHERE i.vault_id = v.vault_id AND i.id = v.item_id
+           AND i.deleted_at IS NOT NULL AND i.deleted_at < now() - make_interval(days => $1)",
+    )
+    .bind(days as i32)
+    .execute(db)
+    .await?;
+    Ok(res.rows_affected())
+}
+
+#[derive(sqlx::FromRow)]
+pub struct VersionRow {
+    pub item_id: Uuid,
+    pub revision: i64,
+    pub item_type: String,
+    pub ciphertext: Vec<u8>,
+    pub written_at: DateTime<Utc>,
+    pub replaced_at: DateTime<Utc>,
+    pub replaced_by: Option<String>,
+}
+
+pub const VERSION_SELECT: &str = "SELECT v.item_id, v.revision, v.item_type, v.ciphertext, v.written_at, v.replaced_at,
+            u.email::text AS replaced_by
+     FROM item_versions v LEFT JOIN users u ON u.id = v.replaced_by";
+
+impl From<VersionRow> for ItemVersion {
+    fn from(r: VersionRow) -> Self {
+        ItemVersion {
+            item_id: r.item_id,
+            revision: r.revision,
+            item_type: r.item_type,
+            ciphertext: r.ciphertext,
+            written_at: r.written_at,
+            replaced_at: r.replaced_at,
+            replaced_by: r.replaced_by,
         }
     }
 }

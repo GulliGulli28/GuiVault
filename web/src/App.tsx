@@ -14,6 +14,7 @@ import { InvitationsPage } from "./components/InvitationsPage";
 import { GeneratorPage } from "./components/GeneratorPanel";
 import { ToolsPage } from "./components/ToolsPage";
 import { TotpPage } from "./components/TotpPage";
+import { TrashPage } from "./components/TrashPage";
 import { RollbackBanner } from "./components/RollbackBanner";
 import { Toasts, useToasts } from "./components/ui";
 import { PaneHandle, usePersistedPane } from "./hooks/usePersistedPane";
@@ -188,6 +189,9 @@ export default function App() {
       break;
     case "vault-tools":
       page = <ToolsPage key={effective.id} ctx={ctx} vaultId={effective.id} />;
+      break;
+    case "vault-trash":
+      page = <TrashPage key={effective.id} ctx={ctx} vaultId={effective.id} />;
       break;
     case "invitations":
       page = <InvitationsPage ctx={ctx} />;

@@ -116,6 +116,29 @@ export interface Item {
   updated_at: string;
 }
 
+/** Une version précédente d'un item (historique) : même chiffré, même AAD
+ * que l'item — restaurer, c'est la renvoyer telle quelle. */
+export interface ItemVersion {
+  item_id: string;
+  revision: number;
+  item_type: string;
+  ciphertext: string;
+  written_at: string;
+  replaced_at: string;
+  replaced_by: string | null;
+}
+
+/** Un item de la corbeille, avec sa dernière version. */
+export interface TrashedItem {
+  item_id: string;
+  item_type: string;
+  revision: number;
+  ciphertext: string;
+  deleted_at: string;
+  deleted_by: string | null;
+  expires_at: string;
+}
+
 export interface ItemsPage {
   items: Item[];
   revision: number;

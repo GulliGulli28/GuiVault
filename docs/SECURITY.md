@@ -36,7 +36,13 @@ d'items (`host`, `ssh-key`, `password`…), dates, révisions, IP/user-agent
 des sessions, journal d'audit. Ces métadonnées suffisent à dire « Alice
 partage 12 hôtes et 3 clés avec Bob », jamais lesquels. Des réglages
 synchronisés, il voit la taille du blob et quand il change (chaque réglage
-d'apparence modifié en est un) — pas son contenu.
+d'apparence modifié en est un) — pas son contenu. De l'historique et de la
+corbeille, il garde les versions précédentes **chiffrées** (combien, quand,
+remplacées par qui) : un item supprimé reste récupérable `GUIVAULT_TRASH_DAYS`
+jours, y compris par qui obtiendrait la base **et** la clé du vault — ce que
+« Supprimer définitivement » (corbeille) efface tout de suite. Un ancien
+membre n'y a plus accès (404), et la rotation qui suit son départ
+re-chiffre les versions sous la nouvelle clé.
 
 ## Limites connues
 

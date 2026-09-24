@@ -361,7 +361,28 @@ export async function putPayload(vault: VaultView, payload: Payload, baseRevisio
  * l'autre clé. */
 export async function moveItem(from: VaultView, to: VaultView, item: DecodedItem & { ok: true }) {
   await putPayload(to, item.payload);
-  await api.deleteItem(from.id, item.id);
+  // Pas une suppression : l'item ne va pas dans la corbeille d'ici.
+  await api.deleteItem(from.id, item.id, { moved: true });
+}
+
+// ─── Historique et corbeille ────────────────────────────────────────────────
+
+/** Déchiffre une version précédente (historique ou corbeille) — même clé et
+ * même AAD que l'item : `decodeItem` s'y applique tel quel. */
+export function decodeVersion(vault: VaultView, v: { item_id: string; item_type: string; revision: number; ciphertext: string }, at: string): DecodedItem {
+  return decodeItem(vault, { id: v.item_id, vault_id: vault.id, item_type: v.item_type, revision: v.revision, ciphertext: v.ciphertext, deleted: false, created_at: at, updated_at: at });
+}
+
+/** Restaure une version : la renvoyer telle quelle. `baseRevision` : la
+ * révision courante de l'item, `undefined` s'il est dans la corbeille (il
+ * est alors recréé). */
+export async function restoreVersion(vault: VaultView, v: { item_id: string; item_type: string; ciphertext: string }, baseRevision: number | undefined): Promise<Item> {
+  try {
+    return await api.putItem(vault.id, v.item_id, { item_type: v.item_type, ciphertext: v.ciphertext, base_revision: baseRevision });
+  } catch (e) {
+    if (e instanceof ApiError && e.code === "revision_mismatch") throw new RevisionConflict(Number(e.extra.current));
+    throw e;
+  }
 }
 
 // ─── Partage ────────────────────────────────────────────────────────────────
@@ -401,10 +422,24 @@ export async function completeInvitation(state: SessionState, vault: VaultView, 
 export async function rotateVaultKey(state: SessionState, vault: VaultView, members: VaultMember[]): Promise<void> {
   const fresh = await api.vault(vault.id);
   const page = await api.items(vault.id);
+  const history = await api.vaultVersions(vault.id);
   const newKey = randomBytes(c.KEY_LEN);
   const items = page.items.map((it) => {
     const plain = c.openItem(vault.key, vault.id, it.id, it.item_type, unb64(it.ciphertext));
     return { id: it.id, ciphertext: b64(c.sealItem(newKey, vault.id, it.id, it.item_type, plain)) };
+  });
+  // L'historique et la corbeille suivent la clé. Une version qui ne s'ouvre
+  // plus (altérée) repart telle quelle : illisible avant, illisible après,
+  // mais elle ne bloque pas la rotation.
+  const versions = history.map((v) => {
+    let ciphertext = v.ciphertext;
+    try {
+      const plain = c.openItem(vault.key, vault.id, v.item_id, v.item_type, unb64(v.ciphertext));
+      ciphertext = b64(c.sealItem(newKey, vault.id, v.item_id, v.item_type, plain));
+    } catch {
+      // gardée telle quelle
+    }
+    return { item_id: v.item_id, revision: v.revision, ciphertext };
   });
   const wrapped = members.map((m) => {
     if (m.user_id !== state.user.id) requirePinned(m.email, m.fingerprint);
@@ -414,6 +449,7 @@ export async function rotateVaultKey(state: SessionState, vault: VaultView, memb
     name_enc: b64(c.sealVaultName(newKey, vault.id, vault.name)),
     members: wrapped,
     items,
+    versions,
     base_revision: fresh.revision,
   });
 }

@@ -1,10 +1,7 @@
 /** Le client HTTP de l'API, sans cryptographie — l'équivalent de
  * `core/src/guivault/client.rs` dans Guiterm. Une méthode par route ; les
  * blobs restent en base64, c'est `session.ts` qui chiffre et déchiffre. */
-import type {
-  AuditEntry, HealthResponse, Invitation, Item, ItemsPage, KdfParams, LoginResponse, PreloginResponse, Role,
-  ServerEvent, Session, SyncResponse, TokenPair, TotpChallenge, UserLookupResponse, UserProfile, UserSettings, Vault, VaultMember,
-} from "./types";
+import type { AuditEntry, HealthResponse, Invitation, Item, ItemVersion, ItemsPage, KdfParams, LoginResponse, PreloginResponse, Role, ServerEvent, Session, SyncResponse, TokenPair, TotpChallenge, TrashedItem, UserLookupResponse, UserProfile, UserSettings, Vault, VaultMember } from "./types";
 
 /** L'API : relative dans l'interface embarquée (même origine), absolue dans
  * l'extension (`setBaseUrl`). */
@@ -188,7 +185,7 @@ export const api = {
   renameVault: (id: string, name_enc: string) => authed<Vault>("PATCH", `/vaults/${id}`, { name_enc }),
   deleteVault: (id: string) => authed<void>("DELETE", `/vaults/${id}`),
   leaveVault: (id: string) => authed<void>("POST", `/vaults/${id}/leave`),
-  rotateVaultKey: (id: string, req: { name_enc: string; members: { user_id: string; wrapped_vault_key: string }[]; items: { id: string; ciphertext: string }[]; base_revision: number }) =>
+  rotateVaultKey: (id: string, req: { name_enc: string; members: { user_id: string; wrapped_vault_key: string }[]; items: { id: string; ciphertext: string }[]; versions: { item_id: string; revision: number; ciphertext: string }[]; base_revision: number }) =>
     authed<Vault>("POST", `/vaults/${id}/rotate-key`, req),
   vaultAudit: (id: string, limit = 100) => authed<AuditEntry[]>("GET", `/vaults/${id}/audit?limit=${limit}`),
 
@@ -210,7 +207,13 @@ export const api = {
   // ── Items ──
   items: (vault: string, since?: number) => authed<ItemsPage>("GET", `/vaults/${vault}/items${since === undefined ? "" : `?since=${since}`}`),
   putItem: (vault: string, id: string, req: { item_type: string; ciphertext: string; base_revision?: number }) => authed<Item>("PUT", `/vaults/${vault}/items/${id}`, req),
-  deleteItem: (vault: string, id: string) => authed<void>("DELETE", `/vaults/${vault}/items/${id}`),
+  /** `moved` : l'item part vers un autre vault, pas dans la corbeille. */
+  deleteItem: (vault: string, id: string, opts: { moved?: boolean } = {}) => authed<void>("DELETE", `/vaults/${vault}/items/${id}${opts.moved ? "?moved=true" : ""}`),
+  itemVersions: (vault: string, id: string) => authed<ItemVersion[]>("GET", `/vaults/${vault}/items/${id}/versions`),
+  vaultVersions: (vault: string) => authed<ItemVersion[]>("GET", `/vaults/${vault}/versions`),
+  trash: (vault: string) => authed<TrashedItem[]>("GET", `/vaults/${vault}/trash`),
+  purgeTrashItem: (vault: string, id: string) => authed<void>("DELETE", `/vaults/${vault}/trash/${id}`),
+  emptyTrash: (vault: string) => authed<void>("DELETE", `/vaults/${vault}/trash`),
 };
 
 /** Le flux d'événements. `EventSource` ne sait pas envoyer d'en-tête

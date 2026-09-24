@@ -16,7 +16,7 @@ export function Sidebar({ ctx, route, onLogout, width }: { ctx: PageContext; rou
   const { session } = ctx;
   const [creating, setCreating] = useState(false);
   const [open, setOpen] = useState(false);
-  const activeVault = route.page === "vault" || route.page === "vault-settings" || route.page === "vault-tools" ? route.id : null;
+  const activeVault = route.page === "vault" || route.page === "vault-settings" || route.page === "vault-tools" || route.page === "vault-trash" ? route.id : null;
 
   const go = (r: Route) => {
     navigate(r);

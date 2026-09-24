@@ -401,8 +401,23 @@ pub struct RotateVaultKeyRequest {
     pub name_enc: Vec<u8>,
     pub members: Vec<RotatedMemberKey>,
     pub items: Vec<RotatedItem>,
+    /// Les versions précédentes des items (historique et corbeille),
+    /// re-chiffrées sous la nouvelle clé : **toutes** celles que le serveur
+    /// garde (`GET /vaults/{id}/versions`), sinon 400 `incomplete_rotation`.
+    /// Absent (client d'avant l'historique) : le serveur les efface — il ne
+    /// garde pas de versions que plus personne ne saurait ouvrir.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub versions: Option<Vec<RotatedVersion>>,
     /// Révision attendue du vault : refusé (409) si quelqu'un a écrit entre-temps.
     pub base_revision: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RotatedVersion {
+    pub item_id: Uuid,
+    pub revision: i64,
+    #[serde(with = "b64")]
+    pub ciphertext: Vec<u8>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -476,6 +491,41 @@ pub struct Invitation {
 }
 
 // ─── Items ──────────────────────────────────────────────────────────────────
+
+/// Une version précédente d'un item : ce qu'il était avant d'être modifié
+/// ou supprimé. Même chiffré, même AAD (vault, id, type) : le client
+/// l'ouvre avec la clé du vault, et la restaure en la renvoyant telle
+/// quelle par `PUT`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ItemVersion {
+    pub item_id: Uuid,
+    /// La révision de l'item quand cette version était la sienne.
+    pub revision: i64,
+    pub item_type: String,
+    #[serde(with = "b64")]
+    pub ciphertext: Vec<u8>,
+    pub written_at: DateTime<Utc>,
+    /// Quand elle a été remplacée (ou l'item supprimé), et par qui.
+    pub replaced_at: DateTime<Utc>,
+    pub replaced_by: Option<String>,
+}
+
+/// Un item de la corbeille : supprimé depuis moins de `GUIVAULT_TRASH_DAYS`
+/// jours, avec sa dernière version.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TrashedItem {
+    pub item_id: Uuid,
+    pub item_type: String,
+    /// La révision de sa dernière version — à passer telle quelle pour la
+    /// supprimer définitivement si elle n'a pas changé entre-temps.
+    pub revision: i64,
+    #[serde(with = "b64")]
+    pub ciphertext: Vec<u8>,
+    pub deleted_at: DateTime<Utc>,
+    pub deleted_by: Option<String>,
+    /// Date à laquelle elle sera effacée pour de bon.
+    pub expires_at: DateTime<Utc>,
+}
 
 /// Un item chiffré. `item_type` est en clair (le client filtre sans
 /// déchiffrer) mais lié au chiffré par l'AAD : le serveur ne peut pas le

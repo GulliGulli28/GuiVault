@@ -115,6 +115,11 @@ pub struct Config {
     /// Qui a le droit de poser `X-Forwarded-For` — voir `TrustProxy`.
     pub trust_proxy: TrustProxy,
     pub max_item_bytes: usize,
+    /// Versions précédentes gardées par item (historique) ; `0` : ni
+    /// historique ni corbeille.
+    pub item_history: usize,
+    /// Jours qu'un item supprimé passe dans la corbeille.
+    pub trash_days: u32,
     /// Rafales autorisées sur les routes d'authentification, par IP.
     pub auth_rate_burst: u32,
     pub auth_rate_per_second: u64,
@@ -178,6 +183,8 @@ impl Config {
             invitation_ttl: Duration::from_secs(env_parse("GUIVAULT_INVITATION_TTL_SECS", 14 * 24 * 3600)?),
             trust_proxy: TrustProxy::parse(&env("GUIVAULT_TRUST_PROXY").unwrap_or_default())?,
             max_item_bytes: env_parse("GUIVAULT_MAX_ITEM_BYTES", 1024 * 1024)?,
+            item_history: env_parse("GUIVAULT_ITEM_HISTORY", 20)?,
+            trash_days: env_parse("GUIVAULT_TRASH_DAYS", 30)?,
             auth_rate_burst: env_parse("GUIVAULT_AUTH_RATE_BURST", 10)?,
             auth_rate_per_second: env_parse("GUIVAULT_AUTH_RATE_PER_SECOND", 2)?,
             log_json: env_parse("GUIVAULT_LOG_JSON", false)?,
@@ -228,6 +235,8 @@ mod tests {
             invitation_ttl: Duration::ZERO,
             trust_proxy: TrustProxy::No,
             max_item_bytes: 0,
+            item_history: 0,
+            trash_days: 0,
             auth_rate_burst: 0,
             auth_rate_per_second: 0,
             log_json: false,

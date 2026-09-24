@@ -1,5 +1,5 @@
 /** Un routeur minuscule sur le fragment : `#/vault/<id>`,
- * `#/vault/<id>/settings`, `#/vault/<id>/tools`, `#/settings/<section>`,
+ * `#/vault/<id>/settings`, `#/vault/<id>/tools`, `#/vault/<id>/trash`, `#/settings/<section>`,
  * `#/invitations`, `#/generator`, `#/totp`. `#/account` d'avant mène au
  * compte dans les paramètres. */
 import { useEffect, useState } from "react";
@@ -9,6 +9,7 @@ export type Route =
   | { page: "vault"; id: string }
   | { page: "vault-settings"; id: string }
   | { page: "vault-tools"; id: string }
+  | { page: "vault-trash"; id: string }
   | { page: "settings"; section: SettingsSection }
   | { page: "invitations" }
   | { page: "generator" }
@@ -22,6 +23,7 @@ export function parseRoute(hash: string): Route {
   if (parts[0] === "vault" && parts[1]) {
     if (parts[2] === "settings") return { page: "vault-settings", id: parts[1] };
     if (parts[2] === "tools") return { page: "vault-tools", id: parts[1] };
+    if (parts[2] === "trash") return { page: "vault-trash", id: parts[1] };
     return { page: "vault", id: parts[1] };
   }
   if (parts[0] === "account") return { page: "settings", section: "compte" };
@@ -38,6 +40,7 @@ export function routeHash(r: Route): string {
     case "vault": return `#/vault/${r.id}`;
     case "vault-settings": return `#/vault/${r.id}/settings`;
     case "vault-tools": return `#/vault/${r.id}/tools`;
+    case "vault-trash": return `#/vault/${r.id}/trash`;
     case "settings": return `#/settings/${r.section}`;
     case "invitations": return "#/invitations";
     case "generator": return "#/generator";

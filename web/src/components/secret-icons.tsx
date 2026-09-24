@@ -110,3 +110,14 @@ export function IconShieldClock({ size = 16, className }: P) {
     </svg>
   );
 }
+
+/** L'historique d'un élément : une horloge qui revient en arrière. */
+export function IconHistory({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <path d="M2.5 8a5.5 5.5 0 1 0 1.6-3.9" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" />
+      <path d="M2.2 2.2v2.6h2.6" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M8 5v3.2l2 1.3" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}

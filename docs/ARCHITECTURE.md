@@ -77,8 +77,10 @@ Conséquences pratiques :
   se lit encore et s'affiche comme tel.
 - **Retirer un membre** supprime son enveloppe, mais il a pu copier la clé :
   le client enchaîne sur une **rotation** (nouvelle vault key, tous les
-  items re-chiffrés, nouvelles enveloppes pour chaque membre restant),
-  appliquée atomiquement par le serveur.
+  items **et leurs versions précédentes** re-chiffrés, nouvelles
+  enveloppes pour chaque membre restant), appliquée atomiquement par le
+  serveur. Un client qui ne sait pas re-chiffrer l'historique voit la
+  corbeille et l'historique effacés plutôt que gardés illisibles.
 - **AAD** : le serveur ne peut ni déplacer un item d'un vault à l'autre, ni
   en changer le type, ni échanger deux noms de vaults : le tag AEAD ne
   vérifierait plus.
@@ -88,9 +90,18 @@ Conséquences pratiques :
 ```
 users ──┬── sessions (jetons hachés, rotation, révocation)
         ├── vault_members ── vaults ──┬── items (blobs, révision, tombale)
+        │                             ├── item_versions (historique, corbeille)
         │                             └── invitations
         └── audit_log
 ```
+
+- `item_versions` : ce qu'un item était avant chaque modification, et la
+  dernière version d'un item supprimé — des blobs chiffrés comme les items
+  (même clé, même AAD), que le serveur garde sans les lire. Restaurer, c'est
+  renvoyer une version telle quelle. `GUIVAULT_ITEM_HISTORY` versions par
+  item, `GUIVAULT_TRASH_DAYS` jours dans la corbeille (effacement horaire).
+  Un déplacement vers un autre vault (`DELETE …?moved=true`) n'y laisse
+  rien.
 
 - `users` : e-mail (citext), paramètres KDF + sel, `auth_hash` (PHC
   Argon2id), `protected_user_key`, `public_key`, `protected_private_key`.
