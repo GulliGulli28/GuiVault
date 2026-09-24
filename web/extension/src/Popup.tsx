@@ -3,7 +3,7 @@ import { api, errorMessage, setBaseUrl, setSessionLostHandler, setTokensChangedH
 import { filterEntities, indexItems, toEntities } from "../../src/lib/entities";
 import { buildVaultTree } from "../../src/lib/vaultTree";
 import { describeSecret } from "../../src/lib/items";
-import { loadItems, login, payloadEntity, payloadName, refresh, setDeviceLabel, type DecodedItem, type SessionState } from "../../src/lib/session";
+import { acceptRollback, loadItems, login, payloadEntity, payloadName, refresh, setDeviceLabel, type DecodedItem, type SessionState } from "../../src/lib/session";
 import { loginMatches } from "../../src/lib/urimatch";
 import { KIND_LABELS, KIND_LABELS_PLURAL, type CustomIcon, type GuiVaultEntity, type ItemKind, type Login, type Payload, type TokenPair } from "../../src/lib/types";
 import { GeneratorPanel } from "../../src/components/GeneratorPanel";
@@ -19,6 +19,7 @@ import { AppearanceSettings, SettingsSyncToggle } from "../../src/components/App
 import { onSettingsApplied, registerSettingsSection, settingsChanged, startSettingsSync } from "../../src/lib/syncedSettings";
 import "../../src/lib/settingsSections";
 import { Logo } from "../../src/components/Logo";
+import { RollbackBanner } from "../../src/components/RollbackBanner";
 import { copyText, PasswordInput, SecretValue } from "../../src/components/ui";
 import { clearLockReason, lock, lockReason, loadItemsCache, loadPopupState, loadSession, loadSettings, noteRecentFill, parseOtpPatterns, POPUP_STATE_TTL_MS, saveItemsCache, savePopupState, saveSession, saveSettings, saveTokens, touchLock, type ItemsCache, type LockReason, type PopupView, type Settings } from "./store";
 import { deleteItem, saveLogin, savePayload } from "./vaultops";
@@ -314,6 +315,9 @@ export function Popup() {
           )}
         </span>
       </header>
+      {screen.kind === "vault" && (
+        <RollbackBanner compact rollbacks={screen.state.rollbacks} onAccept={(id) => { acceptRollback(screen.state, id); setScreen({ kind: "vault", state: { ...screen.state } }); }} />
+      )}
 
       {screen.kind === "login" ? (
         <LoginView

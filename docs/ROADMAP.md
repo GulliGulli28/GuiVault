@@ -43,10 +43,20 @@ paramètres ou formats anciens.
   (`accounts.json`, `KnownAccount::kdf`), vérifiés avant `prepare_login` à
   la connexion, au déverrouillage et au changement de mot de passe
   (`core/src/guivault/account.rs`, test `kdf_params_are_pinned_and_a_downgrade_is_refused`).
-- [ ] **Retour en arrière (rollback).** Retenir la dernière révision vue de
-  chaque vault (`localStorage` côté web, stockage local de l'extension —
-  ce n'est pas secret) et alerter si elle recule. Aujourd'hui le web ne
-  retient rien d'une session à l'autre, donc ne peut rien voir.
+- [x] **Retour en arrière (rollback).** Web et extension retiennent la
+  dernière révision vue de chaque vault (`vaultRevisions.ts`,
+  `localStorage`) et affichent une alerte rouge quand le serveur en annonce
+  une plus basse, jusqu'à « J'ai compris ». Guiterm (`sync.rs`) **suspend**
+  en plus la synchro du vault — sans ça, `?since=` sautait en silence tout
+  ce qui s'écrivait ensuite sous des révisions déjà « vues » — jusqu'à
+  « Reprendre la synchronisation » (panneau GuiVault), où ce poste fait foi :
+  versions renvoyées, items perdus recréés, suppressions rejouées.
+- [ ] **Manifeste de vault authentifié.** La révision n'est pas dans l'AAD :
+  un serveur qui sert d'anciens chiffrés sous des révisions qui montent
+  n'est pas détecté. Piste : un item spécial par vault, chiffré sous la
+  vault key, qui porte un compteur et l'empreinte (id → hash du chiffré)
+  de chaque item, réécrit par chaque écrivain sous le verrou optimiste
+  existant ; un client refuse un item dont le hash ne correspond pas.
 - [ ] **Enveloppes signées.** Les enveloppes de clés de vault sont des
   boîtes scellées anonymes : le serveur peut en fabriquer une pour un vault
   de son choix. Signer enveloppes et invitations avec une clé d'identité

@@ -4,7 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { toBase64 } from "./bytes";
 import * as c from "./crypto";
 import { kdfWeakerThan, pinKdf, pinnedKdf } from "./kdfPins";
-import { login } from "./session";
+import { acceptRollback, login, refresh, type SessionState } from "./session";
+import { observeRevisions } from "./vaultRevisions";
 
 /** Un `localStorage` en mémoire (Node n'en a pas) et un `navigator` pour
  * le nom d'appareil. */
@@ -91,5 +92,68 @@ describe("kdfPins", () => {
     pinKdf("Alice@Example.com", c.DEFAULT_KDF);
     expect(pinnedKdf("alice@example.com")).toEqual(c.DEFAULT_KDF);
     expect(pinnedKdf("bob@example.com")).toBeNull();
+  });
+});
+
+describe("retour en arrière d'un vault", () => {
+  it("alerte quand /sync annonce une révision plus basse que celle déjà vue, jusqu'à ce qu'on en prenne acte", async () => {
+    const { material } = await c.createAccount("pw");
+    const user = { id: "u-rb", email: "carol@example.com", public_key: toBase64(material.publicKey), created_at: "2026-01-01T00:00:00Z" };
+    const vaultKey = new Uint8Array(32).fill(9);
+    const vault = (revision: number) => ({
+      id: "v-1",
+      kind: "personal",
+      name_enc: toBase64(c.sealVaultName(vaultKey, "v-1", "Personnel")),
+      role: "owner",
+      wrapped_vault_key: toBase64(c.wrapVaultKey(material.publicKey, vaultKey)),
+      revision,
+      created_at: "2026-01-01T00:00:00Z",
+      updated_at: "2026-01-01T00:00:00Z",
+    });
+    const serve = (revision: number) => ({ user, vaults: [vault(revision)], invitations: [], server_time: "2026-01-01T00:00:00Z" });
+    fakeServer({
+      "/auth/prelogin": { kdf: material.kdf, kdf_salt: toBase64(material.kdfSalt) },
+      "/auth/login": {
+        access_token: "a",
+        refresh_token: "r",
+        access_expires_in: 900,
+        user,
+        protected_user_key: toBase64(material.protectedUserKey),
+        protected_private_key: toBase64(material.protectedPrivateKey),
+      },
+      "/sync": serve(42),
+    });
+    const out = await login(user.email, "pw");
+    if (out.kind !== "ok") throw new Error("connexion attendue");
+    const state: SessionState = out.session;
+    expect(state.rollbacks).toEqual([]);
+
+    // La base a été restaurée (ou le serveur ment) : 42 → 37.
+    fakeServer({ "/sync": serve(37) });
+    await refresh(state);
+    expect(state.rollbacks).toEqual([{ vaultId: "v-1", name: "Personnel", known: 42, seen: 37 }]);
+    // Toujours là au /sync suivant : rien n'a changé la référence.
+    await refresh(state);
+    expect(state.rollbacks).toHaveLength(1);
+
+    // Pris acte : 37 devient la référence, et le vault repart de là.
+    acceptRollback(state, "v-1");
+    expect(state.rollbacks).toEqual([]);
+    await refresh(state);
+    expect(state.rollbacks).toEqual([]);
+    fakeServer({ "/sync": serve(38) });
+    await refresh(state);
+    expect(state.rollbacks).toEqual([]);
+    fakeServer({ "/sync": serve(37) });
+    await refresh(state);
+    expect(state.rollbacks).toEqual([{ vaultId: "v-1", name: "Personnel", known: 38, seen: 37 }]);
+  }, 60_000);
+
+  it("sépare les comptes et les vaults", () => {
+    expect(observeRevisions("u-a", [{ id: "v-1", name: "A", revision: 10 }])).toEqual([]);
+    // Un autre compte (ou un autre vault) n'a rien vu : pas d'alerte.
+    expect(observeRevisions("u-b", [{ id: "v-1", name: "A", revision: 3 }])).toEqual([]);
+    expect(observeRevisions("u-a", [{ id: "v-2", name: "B", revision: 1 }])).toEqual([]);
+    expect(observeRevisions("u-a", [{ id: "v-1", name: "A", revision: 9 }])).toEqual([{ vaultId: "v-1", name: "A", known: 10, seen: 9 }]);
   });
 });

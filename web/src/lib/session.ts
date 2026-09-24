@@ -8,6 +8,7 @@ import * as c from "./crypto";
 import { fingerprint as fingerprintOf, type UnlockedAccount } from "./crypto";
 import { pinKdf, requireKdfNotDowngraded } from "./kdfPins";
 import { requirePinned } from "./pins";
+import { acceptRollback as acceptRollbackRevision, observeRevisions, type VaultRollback } from "./vaultRevisions";
 import type { Invitation, Item, LoginResponse, Payload, Role, UserProfile, Vault, VaultMember } from "./types";
 
 export interface VaultView {
@@ -26,6 +27,10 @@ export interface SessionState {
   fingerprint: string;
   vaults: VaultView[];
   invitations: Invitation[];
+  /** Vaults dont le serveur annonce une révision plus basse que celle déjà
+   * vue d'ici (`vaultRevisions.ts`) — à montrer tant qu'on n'en a pas pris
+   * acte. */
+  rollbacks: VaultRollback[];
 }
 
 /** Un item déchiffré — ou pas : un item illisible (clé d'un autre âge,
@@ -62,7 +67,7 @@ function unlock(login: LoginResponse, stretchedKey: Uint8Array): { user: UserPro
 }
 
 export async function openSession(user: UserProfile, account: UnlockedAccount): Promise<SessionState> {
-  const state: SessionState = { user, account, fingerprint: fingerprintOf(account.keypair.publicKey), vaults: [], invitations: [] };
+  const state: SessionState = { user, account, fingerprint: fingerprintOf(account.keypair.publicKey), vaults: [], invitations: [], rollbacks: [] };
   await refresh(state);
   return state;
 }
@@ -181,7 +186,17 @@ export async function refresh(state: SessionState): Promise<string[]> {
   state.user = res.user;
   state.vaults = vaults;
   state.invitations = res.invitations.filter((i) => i.status === "pending");
+  state.rollbacks = observeRevisions(res.user.id, vaults);
   return warnings;
+}
+
+/** Prendre acte d'un retour en arrière : la révision annoncée par le serveur
+ * devient la référence, l'alerte disparaît. */
+export function acceptRollback(state: SessionState, vaultId: string) {
+  const r = state.rollbacks.find((x) => x.vaultId === vaultId);
+  if (!r) return;
+  acceptRollbackRevision(state.user.id, vaultId, r.seen);
+  state.rollbacks = state.rollbacks.filter((x) => x.vaultId !== vaultId);
 }
 
 export function vaultOf(state: SessionState, id: string): VaultView {

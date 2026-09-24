@@ -72,6 +72,11 @@ maître et le délai de verrouillage.
   direct, avec recherche, et le retrait d'un code (confirmé : sans lui, un
   site qui l'exige encore devient inaccessible). Même vue dans l'interface web (« Authentificateur »),
   où un secret TOTP s'ajoute aussi en déposant ou collant l'image du QR code.
+- **Vault revenu en arrière** : si le serveur annonce pour un vault une
+  révision plus basse que celle déjà vue par l'extension (base restaurée,
+  ou serveur qui sert une ancienne version), une alerte rouge le dit en
+  tête du popup jusqu'à « J'ai compris » — la même que l'interface web
+  (`vaultRevisions.ts`, `RollbackBanner.tsx`).
 - **Icône grise** quand il faut se reconnecter (verrouillé, session
   expirée ou révoquée) ; le popup dit pourquoi.
 - **Générateur** : le même que l'interface web.

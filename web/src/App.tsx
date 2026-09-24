@@ -4,7 +4,7 @@ import { pullSettings, startSettingsSync, stopSettingsSync } from "./lib/syncedS
 import "./lib/settingsSections";
 import { clearWebSession, loadWebSession, saveWebSession, saveWebTokens, touchWebSession, webSessionIdle } from "./lib/persist";
 import { navigate, useRoute } from "./lib/route";
-import { logout, refresh, wipe, type SessionState } from "./lib/session";
+import { acceptRollback, logout, refresh, wipe, type SessionState } from "./lib/session";
 import { LoginScreen } from "./components/LoginScreen";
 import { Sidebar } from "./components/Sidebar";
 import { VaultPage } from "./components/VaultPage";
@@ -14,6 +14,7 @@ import { InvitationsPage } from "./components/InvitationsPage";
 import { GeneratorPage } from "./components/GeneratorPanel";
 import { ToolsPage } from "./components/ToolsPage";
 import { TotpPage } from "./components/TotpPage";
+import { RollbackBanner } from "./components/RollbackBanner";
 import { Toasts, useToasts } from "./components/ui";
 import { PaneHandle, usePersistedPane } from "./hooks/usePersistedPane";
 
@@ -205,7 +206,10 @@ export default function App() {
     <div className="flex h-full w-full overflow-hidden bg-[var(--c-bg)] text-[var(--c-text)]">
       <Sidebar ctx={ctx} route={effective} onLogout={onLogout} width={sidebar.value} />
       <PaneHandle onMouseDown={sidebar.onMouseDown} />
-      <main className={`flex min-w-0 flex-1 flex-col overflow-hidden bg-[var(--c-bg2)] ${sidebar.isDragging ? "pointer-events-none select-none" : ""}`}>{page}</main>
+      <main className={`flex min-w-0 flex-1 flex-col overflow-hidden bg-[var(--c-bg2)] ${sidebar.isDragging ? "pointer-events-none select-none" : ""}`}>
+        <RollbackBanner rollbacks={ctx.session.rollbacks} onAccept={(id) => { acceptRollback(ctx.session, id); setSession({ ...ctx.session }); }} />
+        {page}
+      </main>
       <Toasts toasts={toasts} onDismiss={dismiss} />
     </div>
   );

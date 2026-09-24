@@ -13,7 +13,7 @@ chiffrées.
 |---|---|
 | Fuite de la base (dump, sauvegarde, disque) | Aucune clé côté serveur. Les blobs sont XChaCha20-Poly1305 sous des clés dérivées d'un mot de passe maître via Argon2id (64 MiB, 3 passes). La clé d'authentification est re-hachée (Argon2id) : le dump ne permet pas non plus de se connecter. Les jetons sont stockés hachés (SHA-256). |
 | Serveur malveillant qui **modifie** des données | Chaque blob est AEAD. L'AAD lie un item à son vault, son id et son type : un item déplacé, renommé ou substitué ne s'ouvre plus. |
-| Serveur malveillant qui **rejoue** une ancienne version d'un item | Non couvert cryptographiquement (voir « Limites »). Le client peut détecter un retour en arrière de `revision`. |
+| Serveur malveillant qui **rejoue** une ancienne version d'un vault (ou base restaurée depuis une sauvegarde) | Les clients retiennent la dernière révision vue de chaque vault (web et extension : `web/src/lib/vaultRevisions.ts`, `localStorage` ; Guiterm : `SyncState::vault_revisions`) et, si le serveur en annonce une plus basse, le disent en rouge jusqu'à ce que l'utilisateur en prenne acte. Guiterm **suspend** en plus la synchronisation de ce vault (ni pull, ni push, ni suppression) jusqu'à reprise explicite, où sa version fait foi. Non couvert cryptographiquement : voir « Limites ». |
 | Serveur malveillant qui **substitue une clé publique** pour lire un vault partagé | C'est l'attaque principale contre tout système de partage E2E. Défense : l'**empreinte** de la clé publique (`fingerprint`) est renvoyée partout où une clé publique apparaît ; le client DOIT l'afficher et demander une vérification hors bande (voix, messagerie interne) avant le premier partage vers une personne, puis épingler la clé (TOFU) et alerter si elle change. |
 | Vol du mot de passe maître seul (hameçonnage, épaule) | Second facteur TOTP optionnel : sans le code, pas de session. Ne protège pas contre un vol de mot de passe **plus** un dump de base. |
 | Vol d'un jeton d'accès | Durée 15 min. Révocable (sessions). |
@@ -40,11 +40,15 @@ d'apparence modifié en est un) — pas son contenu.
 
 ## Limites connues
 
-- **Pas de protection contre le rejeu/rollback par le serveur** : un
-  serveur malveillant peut renvoyer une ancienne version chiffrée d'un item
-  (l'AAD ne contient pas la révision, pour que la rotation reste possible
-  sans re-chiffrer sous une révision). Un client soigneux refuse une
-  révision de vault qui recule.
+- **Pas de protection cryptographique contre le rejeu/rollback par le
+  serveur** : un serveur malveillant peut renvoyer une ancienne version
+  chiffrée d'un item (l'AAD ne contient pas la révision, pour que la
+  rotation reste possible sans re-chiffrer sous une révision). Les clients
+  détectent une **révision de vault qui recule** — ce que produit une base
+  restaurée, ou un serveur qui rejoue sans maquiller — mais la révision
+  n'est pas authentifiée : un serveur qui sert d'anciens chiffrés sous des
+  révisions qui montent passe. Il faudrait un manifeste de vault signé
+  (`ROADMAP.md`).
 - **Pas de signature de l'expéditeur** sur les enveloppes de clés (boîte
   scellée = anonyme). Le serveur ne peut pas *lire* une enveloppe, mais il
   pourrait en fabriquer une avec une clé de vault de son choix pour un vault
@@ -93,8 +97,9 @@ est installé une fois et vérifiable.
   n'en laisse tourner aucun d'autre que l'application, et un script injecté
   dans l'application aurait de toute façon les clés en mémoire. Les items
   déchiffrés, eux, ne sont jamais stockés. Seules les empreintes épinglées,
-  les paramètres Argon2id épinglés et les préférences d'affichage sont en
-  `localStorage`, ils ne sont pas secrets.
+  les paramètres Argon2id épinglés, la dernière révision vue de chaque
+  vault et les préférences d'affichage sont en `localStorage`, ils ne sont
+  pas secrets.
 - La dérivation Argon2id (64 MiB, 3 passes) tourne en JavaScript : une à
   deux secondes à la connexion, comme dans Guiterm.
 - Les mêmes règles d'empreinte s'appliquent : inviter quelqu'un ou faire

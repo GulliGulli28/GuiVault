@@ -113,7 +113,8 @@ fait exactement ce que fait Guiterm avec le serveur : dériver les clés du
 mot de passe maître dans le navigateur, déchiffrer les vaults, chiffrer ce
 qu'elle écrit. Le serveur ne voit pas plus de choses qu'avec Guiterm. Rien
 n'est conservé après fermeture de l'onglet (les
-empreintes et les paramètres Argon2id épinglés mis à part) ; le modèle de menace propre au web est
+empreintes, les paramètres Argon2id épinglés et les dernières révisions vues
+des vaults mis à part) ; le modèle de menace propre au web est
 dans [`docs/SECURITY.md`](docs/SECURITY.md).
 
 ### Variables d'environnement
