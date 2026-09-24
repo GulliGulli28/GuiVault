@@ -9,9 +9,33 @@ l'auto-hébergement sans fonctions « premium »).
 Chaque piste respecte la règle n°1 (`CLAUDE.md`) : le serveur ne garde que
 des blobs qu'il ne sait pas lire. Cocher au fur et à mesure.
 
-Ordre conseillé : §0 → presse-papier + corbeille/historique (§1) →
-recherche globale + raccourcis + tri (§4) → hors ligne (§1) → CLI (§3) →
-accès d'urgence et partage éphémère (§2).
+## État (24 septembre 2026)
+
+**Fait** : tout le §0 sauf le manifeste authentifié (plancher et
+paramètres Argon2id épinglés, retour en arrière détecté, enveloppes
+authentifiées, empreinte de l'inviteur), et dans les §1, §3 et §4 : presse-papiers
+effacé, historique et corbeille, copie hors ligne, recherche globale
+(Ctrl+K), raccourcis, tri, CLI `gv`. Chaque point est coché ci-dessous avec
+où il vit dans le code.
+
+**Ensuite, dans cet ordre** — du plus demandé ou du plus exposé au plus
+confortable :
+
+1. **Accès d'urgence et partage éphémère** (§2) : les deux fonctions
+   « premium » de Bitwarden qui manquent encore, zero-knowledge sans
+   compromis (le serveur garde des blobs qu'il ne lit pas, et libère ou
+   expire).
+2. **Remplissage plus fiable** (§1, première ligne) : la plainte n°1 contre
+   Bitwarden — shadow DOM, iframes de connexion, avec un corpus de pages
+   rejoué par Playwright en CI.
+3. **Rapport de santé** (§2) : faibles, réutilisés, fuites (HIBP par
+   k-anonymat), clés d'API et cartes qui expirent.
+4. **Agent SSH dans Guiterm** (§3) : le différenciateur dev/ops.
+5. **Manifeste de vault authentifié** (§0) : à concevoir ensemble avant de
+   l'écrire (chaque écriture devient deux, sous le verrou optimiste ; tous
+   les clients à la fois).
+6. **Exploitation** (§5 : administration, sauvegardes vérifiées, SMTP,
+   suppression de compte) et **mobile** (§4).
 
 ## 0. Sécurité face à un serveur malveillant
 
@@ -111,12 +135,13 @@ paramètres ou formats anciens.
   essaie les clés une par une, sans lien hôte → clé, et casse régulièrement
   la signature Git. Ici chaque hôte connaît sa clé : la bonne présentée,
   confirmation à chaque usage, signature des commits.
-- [ ] **CLI `guivault`** (Rust, réutilise les crates) :
-  - `guivault run -- cmd` avec des références `gv://vault/élément/champ`
-    (comme `op run` de 1Password) ;
-  - `credential_process` AWS depuis les éléments `aws` (plus d'identifiants
-    AWS en clair sur disque) ;
-  - `git credential helper`.
+- [x] **CLI `gv`** (`crates/guivault-cli`, `docs/CLI.md`) : `login`,
+  `unlock` (session dans `GUIVAULT_SESSION`, modèle de la CLI Bitwarden),
+  `get` par référence `gv://vault/élément/champ`, `run -- cmd` (variables
+  `gv://` remplacées, comme `op run`), `aws credential-process`,
+  `git-credential`. Cache chiffré, lisible sans le serveur ; verrou pour
+  que deux `gv` ne fassent pas tourner le même jeton. Reste : écrire
+  (`gv set`), les codes TOTP à la volée pour un `ssh`, la complétion.
 - [ ] Runbooks et snippets qui **référencent des secrets**, résolus au
   moment de l'exécution.
 - [ ] **Mode voyage** : le serveur exclut certains vaults de `/sync` pour

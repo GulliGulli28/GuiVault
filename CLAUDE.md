@@ -29,6 +29,12 @@ HMAC pour les sels fictifs de prelogin.
   inconnus conservés (`flatten extra`), tout absent = défaut. Fixtures
   `tests/web-items.json` écrites par `GUIVAULT_WRITE_VECTORS=1 npx vitest
   run` : changer un type ici, c'est le changer là-bas, et régénérer.
+- `crates/guivault-cli` — `gv`, le coffre en ligne de commande
+  (`docs/CLI.md`) : une bibliothèque (`login`, `unlock`, `sync`, `resolve`,
+  `aws_credential_process`, `git_credential` ; `store.rs` ce qui est gardé
+  sur le disque, `vault.rs` les champs lus génériquement dans le JSON des
+  items) et `main.rs` (arguments à la main, invites sur le terminal). Son
+  test `tests/cli.rs` lance un vrai serveur, comme `tests/api.rs`.
 - `crates/guivault-server` — `routes/` (une route par domaine), `db.rs`
   (lignes et requêtes partagées), `auth.rs` (extracteur `AuthUser`,
   jetons), `sessions.rs`, `validate.rs` (tailles des blobs), `audit.rs`,

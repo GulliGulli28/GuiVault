@@ -43,6 +43,10 @@ serveur puisse jamais lire un secret.
   la page courante, remplissage en un clic ou depuis le champ, codes TOTP,
   passkeys, authentificateur (codes TOTP), générateur —
   [`docs/EXTENSION.md`](docs/EXTENSION.md).
+- **En ligne de commande** (`gv`) : lire un secret par référence
+  (`gv://vault/élément/champ`), lancer une commande avec ses secrets en
+  variables (`gv run`), `credential_process` AWS, credential helper Git —
+  [`docs/CLI.md`](docs/CLI.md).
 - **Une seule image Docker**, Rust/axum/PostgreSQL. Même stack que Guiterm.
 
 Voir [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) pour le fonctionnement,
@@ -157,6 +161,7 @@ cargo test                # unitaires + intégration bout en bout
 cargo clippy --all-targets
 cd web && npm install && npm test && npm run build   # interface web
 cd web && npm run build:ext                          # extension → web/dist-extension/
+cargo build --release -p guivault-cli                # gv → target/release/gv
 ```
 
 L'interface web est embarquée dans le binaire au moment de `cargo build`
@@ -174,16 +179,21 @@ Structure :
 - `crates/guivault-server` — le serveur (axum + sqlx/PostgreSQL), qui sert
   aussi l'interface web.
 - `crates/guivault-items` — les formats en clair des secrets (identifiants,
-  notes, cartes, identités), pour qu'un client Rust les lise sans les
-  redéfinir. Testé contre ce que l'interface web écrit.
+  notes, cartes, identités, accès AWS, clés d'API), pour qu'un client Rust
+  les lise sans les redéfinir. Testé contre ce que l'interface web écrit.
+- `crates/guivault-cli` — `gv`, le coffre en ligne de commande
+  ([`docs/CLI.md`](docs/CLI.md)).
 - `web/` — l'interface web (Vite + React + TypeScript). `src/lib/crypto.ts`
   est le port de `guivault-crypto` ; des vecteurs générés par le crate
   Rust (et réciproquement) garantissent que les deux lisent les mêmes
-  blobs.
+  blobs. `web/extension/` : l'extension de navigateur, sur le même code.
 
-Guiterm consommera `guivault-crypto` et `guivault-protocol` en dépendances
-git : une réponse qui change casse la compilation des deux côtés au lieu de
-diverger.
+Guiterm consomme `guivault-crypto`, `guivault-protocol` et `guivault-items`
+en dépendances git, épinglées sur un commit : une réponse qui change casse
+la compilation des deux côtés au lieu de diverger.
+
+Les pistes d'amélioration, ce qui est fait et ce qui reste :
+[`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Licence
 

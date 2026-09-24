@@ -145,6 +145,22 @@ est installé une fois et vérifiable.
   jeton porteur ; l'en-tête `Access-Control-Allow-Origin: *` n'expose donc
   rien. Voir `docs/EXTENSION.md` pour le modèle de menace de l'extension.
 
+## Ligne de commande (`gv`)
+
+Même cryptographie, même plancher Argon2id et mêmes paramètres épinglés
+que les autres clients. Ce qu'elle garde sur le disque (`0700`/`0600`,
+détail dans `docs/CLI.md`) : le compte **enveloppé** et les jetons
+(`account.json`), un cache des vaults **chiffré** (lisible sans le serveur),
+et la user key + clé privée scellées sous une clé de session aléatoire
+(`session.json`) que seule la coquille détient (`GUIVAULT_SESSION`, comme
+`BW_SESSION` chez Bitwarden). Qui lit l'environnement de vos processus, ou
+d'une commande lancée par `gv run`, lit ces secrets : c'est le prix d'une
+session sans mot de passe à chaque commande. `gv lock` rend la clé de
+session inutile, `gv logout` révoque la session au serveur et efface tout.
+Les jetons de rafraîchissement tournent à chaque usage ; un verrou empêche
+deux `gv` de faire tourner le même (le serveur y verrait un vol et
+révoquerait la session).
+
 ## Déploiement
 
 - **TLS obligatoire** devant le serveur. Sans TLS, les jetons et la clé

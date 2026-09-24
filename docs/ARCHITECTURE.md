@@ -3,31 +3,40 @@
 ## Vue d'ensemble
 
 ```
-┌──────────────────────┐        HTTPS (JSON)        ┌──────────────────────┐
-│  Guiterm (client)    │ ◀────────────────────────▶ │  guivault-server     │
-│                      │                            │  (axum)              │
-│  mot de passe maître │   blobs chiffrés, jetons   │                      │
-│  ▼ guivault-crypto   │   opaques, métadonnées     │  aucune clé          │
-│  clés en mémoire     │                            │  ▼ sqlx              │
-└──────────────────────┘                            │  PostgreSQL          │
-                                                    └──────────────────────┘
+┌──────────────────────────┐      HTTPS (JSON)      ┌──────────────────────┐
+│  Clients                 │ ◀────────────────────▶ │  guivault-server     │
+│  Guiterm · web ·         │                        │  (axum)              │
+│  extension · gv (CLI)    │  blobs chiffrés,       │                      │
+│                          │  jetons opaques,       │  aucune clé          │
+│  mot de passe maître     │  métadonnées           │  ▼ sqlx              │
+│  ▼ guivault-crypto       │                        │  PostgreSQL          │
+│  clés en mémoire         │                        └──────────────────────┘
+└──────────────────────────┘
 ```
 
-Trois crates dans un workspace Cargo, et une application web :
+Cinq crates dans un workspace Cargo, une application web et son extension
+de navigateur — quatre clients, une seule cryptographie :
 
 | Crate | Rôle | Qui l'utilise |
 |---|---|---|
 | `guivault-crypto` | dérivation de clés, enveloppes (dont celles des vault keys, authentifiées), cycle de vie du compte | client **et** serveur (le serveur n'en utilise que le hachage des jetons/clé d'auth) |
 | `guivault-protocol` | structs JSON des requêtes/réponses | client et serveur |
-| `guivault-items` | formats en clair des secrets (`login`, `note`, `card`, `identity`) — voir `docs/ITEMS.md` | clients seulement (le serveur ne les voit jamais) |
-| `guivault-server` | routes, base, sessions, audit ; sert aussi `web/dist` à `/` | serveur |
-| `web/` | second client, dans le navigateur (Vite + React) ; `src/lib/crypto.ts` porte `guivault-crypto` en TypeScript | utilisateur sans Guiterm sous la main |
+| `guivault-items` | formats en clair des secrets (`login`, `note`, `card`, `identity`, `aws`, `api-key`) — voir `docs/ITEMS.md` | clients seulement (le serveur ne les voit jamais) |
+| `guivault-server` | routes, base, sessions, audit, historique et corbeille ; sert aussi `web/dist` à `/` | serveur |
+| `guivault-cli` | `gv`, le coffre en ligne de commande : lire un secret par référence, `gv run`, `credential_process` AWS, credential helper Git — voir `docs/CLI.md` | développeurs, scripts, CI |
+| `web/` | client dans le navigateur (Vite + React) ; `src/lib/crypto.ts` porte `guivault-crypto` en TypeScript | utilisateur sans Guiterm sous la main ; gestionnaire de mots de passe |
+| `web/extension/` | extension de navigateur (MV3) : remplissage, TOTP, passkeys — le code de `web/src/lib` — voir `docs/EXTENSION.md` | navigation de tous les jours |
 
-Le client web et Guiterm sont interchangeables : mêmes formats de blobs
+Les clients sont interchangeables : mêmes formats de blobs
 (vérifiés par des vecteurs croisés, `crates/guivault-crypto/examples/vectors.rs`
 et `tests/web_interop.rs`), même JSON d'items (celui de
 `termius_core::guivault::entity::Payload`), même règle d'empreintes. Ce que
 l'un écrit, l'autre le lit à la synchronisation suivante.
+
+Chacun peut garder une copie **chiffrée** de ce que le serveur garde, pour
+lire sans lui : Guiterm son workspace, l'interface web et l'extension leur
+copie hors ligne (IndexedDB, à activer par appareil), `gv` son cache. Aucun
+ne garde de secret en clair sur le disque.
 
 ## Hiérarchie de clés
 

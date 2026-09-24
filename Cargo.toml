@@ -5,6 +5,7 @@ members = [
     "crates/guivault-protocol",
     "crates/guivault-items",
     "crates/guivault-server",
+    "crates/guivault-cli",
 ]
 
 [workspace.package]

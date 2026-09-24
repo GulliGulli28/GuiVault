@@ -1,0 +1,33 @@
+[package]
+name = "guivault-cli"
+description = "gv : le coffre GuiVault en ligne de commande — lire un secret, lancer une commande avec ses secrets en variables, credential_process AWS, credential helper Git."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+# `guivault` est déjà le serveur : `gv`, court comme `op` ou `bw`.
+name = "gv"
+path = "src/main.rs"
+
+[dependencies]
+guivault-crypto.workspace = true
+guivault-protocol.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+uuid.workspace = true
+base64.workspace = true
+anyhow.workspace = true
+chrono = { version = "0.4", features = ["serde"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "blocking"] }
+url = "2"
+totp-rs = { version = "5", features = ["otpauth"] }
+# Le mot de passe maître sans écho, sur le terminal (pas sur la sortie :
+# `eval "$(gv unlock)"` ne doit capturer que l'export).
+rpassword = "7"
+
+[dev-dependencies]
+guivault-server = { path = "../guivault-server" }
+tokio.workspace = true
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "tls-rustls", "postgres"] }
