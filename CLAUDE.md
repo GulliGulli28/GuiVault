@@ -3,7 +3,8 @@
 Serveur de coffre zero-knowledge pour Guiterm (`~/gui-termius`, même auteur,
 même stack : Rust 2024 / axum / sqlx / PostgreSQL, rustls uniquement). Voir
 `README.md`, `docs/ARCHITECTURE.md` (fonctionnement), `docs/SECURITY.md`
-(modèle de menace), `docs/API.md` (routes).
+(modèle de menace), `docs/API.md` (routes), `docs/ROADMAP.md` (pistes
+d'amélioration, à cocher au fur et à mesure).
 
 ## Règle n°1
 

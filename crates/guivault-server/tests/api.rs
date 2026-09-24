@@ -424,6 +424,9 @@ async fn register_login_unlock_and_personal_vault() {
         .unwrap();
     assert_eq!(p1.kdf_salt, p2.kdf_salt);
     assert_eq!(p1.kdf_salt.len(), 16);
+    // Les paramètres fictifs passent le plancher des clients : sinon un
+    // e-mail inconnu échouerait côté client avant le 401, et se trahirait.
+    assert!(p1.kdf.is_sane());
 
     // Doublon d'e-mail.
     let (m, a) = gc::create_account("x").unwrap();

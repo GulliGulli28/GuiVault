@@ -66,6 +66,21 @@ describe("guivault-crypto interop", () => {
     expect(toHex(c.open(m2.stretchedKey, rekey.protectedUserKey, utf8.encode("guivault/v1/user-key")))).toBe(toHex(account.userKey));
   }, 60_000);
 
+  it("refuse de dériver hors des bornes de `KdfParams::is_sane`", async () => {
+    // Les cas du test Rust `kdf_params_bounds`, plus des valeurs non entières.
+    expect(c.kdfParamsSane(c.DEFAULT_KDF)).toBe(true);
+    expect(c.kdfParamsSane({ m_cost: 19_456, t_cost: 2, p_cost: 1 })).toBe(true);
+    expect(c.kdfParamsSane({ m_cost: 1024, t_cost: 1, p_cost: 1 })).toBe(false);
+    expect(c.kdfParamsSane({ m_cost: 65536, t_cost: 1, p_cost: 1 })).toBe(false);
+    expect(c.kdfParamsSane({ m_cost: 65536.5, t_cost: 3, p_cost: 1 })).toBe(false);
+    // Ce qu'un serveur compromis renverrait au prelogin, et de quoi figer l'onglet.
+    const salt = new Uint8Array(16);
+    for (const bad of [{ m_cost: 8, t_cost: 1, p_cost: 1 }, { m_cost: 4 * 1_048_576, t_cost: 3, p_cost: 1 }]) {
+      await expect(c.deriveMasterKey("pw", salt, bad)).rejects.toThrowError(/refusés/);
+      await expect(c.deriveExportKey("pw", salt, bad)).rejects.toThrowError(/refusés/);
+    }
+  });
+
   it("écrit des vecteurs pour le test Rust (GUIVAULT_WRITE_VECTORS)", async () => {
     if (!process.env.GUIVAULT_WRITE_VECTORS) return;
     const kdf = { m_cost: 19_456, t_cost: 2, p_cost: 1 };

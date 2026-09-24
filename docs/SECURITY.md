@@ -25,6 +25,7 @@ chiffrées.
 | Escalade de rôle | Un admin ne confère pas plus que son rôle ; ne touche pas au propriétaire ; ne change pas son propre rôle. Un seul propriétaire (contrainte en base). |
 | Ancien membre qui garde la clé | Rotation de clé : le serveur exige une enveloppe pour **chaque** membre restant et un chiffré pour **chaque** item vivant, et refuse si la révision a bougé (personne n'écrit avec l'ancienne clé pendant la rotation). Les invitations en attente sont révoquées. |
 | Paramètres KDF affaiblis par un client hostile (compte cassable) ou absurdes (DoS du client) | Bornes vérifiées côté serveur (`KdfParams::is_sane`). |
+| Serveur malveillant qui **dicte des paramètres KDF faibles** au prelogin (`m_cost = 8, t_cost = 1` : la clé d'auth reçue se casse hors ligne, et le mot de passe maître avec) | Les clients appliquent les mêmes bornes avant de dériver (`MasterKey::derive` côté Rust, `deriveMasterKey` / `deriveExportKey` côté web) : hors bornes, rien n'est calculé ni envoyé. Plancher = minimum OWASP (19 MiB, 2 passes). Reste possible : ramener un compte de 64 MiB/3 à ce plancher — voir `ROADMAP.md` (paramètres épinglés). |
 | Blobs de taille arbitraire | Tailles bornées par champ ; taille max d'item configurable ; limite globale du corps. |
 | Mutex empoisonné, panique, surcharge | Runtime tokio, timeouts de 30 s, arrêt gracieux SIGTERM. |
 

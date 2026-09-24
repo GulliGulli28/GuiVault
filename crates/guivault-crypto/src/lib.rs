@@ -175,8 +175,14 @@ impl Default for KdfParams {
 }
 
 impl KdfParams {
-    /// Bornes acceptées par le serveur : refuse un client qui demanderait des
-    /// paramètres trop faibles (compte cassable) ou absurdes (DoS du client).
+    /// Bornes acceptées des deux côtés. Le serveur refuse un client qui
+    /// demanderait des paramètres trop faibles (compte cassable) ou absurdes ;
+    /// le client refuse de dériver hors de ces bornes ([`MasterKey::derive`]),
+    /// parce que c'est le serveur qui lui dicte les paramètres au prelogin :
+    /// un serveur compromis qui répondrait `m_cost = 8, t_cost = 1`
+    /// obtiendrait une clé d'auth assez bon marché pour casser le mot de passe
+    /// maître hors ligne. Le plancher est le minimum de l'OWASP pour Argon2id
+    /// (19 MiB, 2 passes) ; le plafond évite qu'on fige le client.
     pub fn is_sane(&self) -> bool {
         (19_456..=1_048_576).contains(&self.m_cost) && (2..=10).contains(&self.t_cost) && (1..=8).contains(&self.p_cost)
     }
@@ -194,7 +200,15 @@ impl KdfParams {
 pub struct MasterKey([u8; KEY_LEN]);
 
 impl MasterKey {
+    /// Refuse des paramètres hors de [`KdfParams::is_sane`] avant tout calcul :
+    /// rien n'est dérivé, donc rien n'est envoyé au serveur.
     pub fn derive(password: &str, salt: &[u8], params: KdfParams) -> Result<Self, CryptoError> {
+        if !params.is_sane() {
+            return Err(CryptoError::KdfParams(format!(
+                "m_cost={}, t_cost={}, p_cost={} hors des bornes acceptées (serveur compromis ou mal configuré ?)",
+                params.m_cost, params.t_cost, params.p_cost
+            )));
+        }
         let argon = params.argon()?;
         let mut key = [0u8; KEY_LEN];
         argon
@@ -628,6 +642,32 @@ mod tests {
         assert_eq!(fp, fingerprint(&kp.public));
         assert_eq!(fp.split('-').count(), 8);
         assert_ne!(fp, fingerprint(&KeyPair::generate().public));
+    }
+
+    #[test]
+    fn derive_refuses_params_out_of_bounds() {
+        // Ce qu'un serveur compromis renverrait au prelogin pour rendre la clé
+        // d'auth cassable — et, à l'opposé, de quoi figer le client.
+        let weak = KdfParams {
+            m_cost: 8,
+            t_cost: 1,
+            p_cost: 1,
+        };
+        let huge = KdfParams {
+            m_cost: 4 * 1_048_576,
+            t_cost: 3,
+            p_cost: 1,
+        };
+        for params in [weak, huge] {
+            assert!(matches!(
+                MasterKey::derive("pw", &random_salt(), params),
+                Err(CryptoError::KdfParams(_))
+            ));
+            assert!(matches!(
+                prepare_login("pw", &random_salt(), params),
+                Err(CryptoError::KdfParams(_))
+            ));
+        }
     }
 
     #[test]

@@ -48,6 +48,27 @@ export interface KdfParams {
 /** ~64 MiB, 3 passes : les valeurs de `KdfParams::default()` côté Rust. */
 export const DEFAULT_KDF: KdfParams = { m_cost: 65536, t_cost: 3, p_cost: 1 };
 
+/** Les bornes de `KdfParams::is_sane` côté Rust. Ce sont les paramètres que
+ * le serveur renvoie au prelogin : un serveur compromis qui répondrait
+ * `m_cost = 8, t_cost = 1` obtiendrait une clé d'auth assez bon marché pour
+ * casser le mot de passe maître hors ligne. Plancher = minimum de l'OWASP
+ * pour Argon2id (19 MiB, 2 passes) ; le plafond évite de figer l'onglet. */
+export function kdfParamsSane(p: KdfParams): boolean {
+  const within = (v: number, lo: number, hi: number) => Number.isInteger(v) && v >= lo && v <= hi;
+  return within(p.m_cost, 19_456, 1_048_576) && within(p.t_cost, 2, 10) && within(p.p_cost, 1, 8);
+}
+
+/** Avant tout calcul : rien n'est dérivé, donc rien n'est envoyé. */
+function requireSaneKdf(p: KdfParams) {
+  if (!kdfParamsSane(p)) {
+    throw new CryptoError(
+      "kdf",
+      `Paramètres de dérivation refusés (Argon2id m=${p.m_cost} Kio, t=${p.t_cost}, p=${p.p_cost}) : hors des bornes acceptées. ` +
+        "Le serveur est peut-être compromis ou mal configuré — rien n'a été envoyé.",
+    );
+  }
+}
+
 // ─── Enveloppe symétrique ────────────────────────────────────────────────────
 
 export function seal(key: Uint8Array, plaintext: Uint8Array, aad: Uint8Array): Uint8Array {
@@ -83,6 +104,7 @@ export interface MasterKey {
  * prend une à deux secondes dans un navigateur, et la variante `Async` de
  * noble rend la main régulièrement pour ne pas figer l'interface. */
 export async function deriveMasterKey(password: string, salt: Uint8Array, params: KdfParams): Promise<MasterKey> {
+  requireSaneKdf(params);
   let master: Uint8Array;
   try {
     master = await argon2idAsync(utf8.encode(password), salt, {
@@ -298,6 +320,8 @@ export const AAD_EXPORT = utf8.encode("guivault/v1/export");
  * libellé propre, pour qu'un export et un compte ayant le même mot de
  * passe n'aient pas la même clé. */
 export async function deriveExportKey(password: string, salt: Uint8Array, params: KdfParams): Promise<Uint8Array> {
+  // Les paramètres viennent du fichier importé : mêmes bornes.
+  requireSaneKdf(params);
   let master: Uint8Array;
   try {
     master = await argon2idAsync(utf8.encode(password), salt, { m: params.m_cost, t: params.t_cost, p: params.p_cost, dkLen: KEY_LEN });
