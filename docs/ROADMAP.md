@@ -38,10 +38,11 @@ paramètres ou formats anciens.
   key (preuve qu'ils sont les vrais), et un prelogin qui les fait baisser
   est refusé avant de dériver. Changement de mot de passe : vérifié puis
   ré-épinglé.
-- [ ] **Paramètres KDF épinglés dans Guiterm.** La règle est dans le crate
-  (`KdfParams::weaker_than`) ; reste à retenir les paramètres dans la
-  config de Guiterm et à les vérifier avant `prepare_login`
-  (`core/src/guivault/account.rs`, connexion et changement de mot de passe).
+- [x] **Paramètres KDF épinglés dans Guiterm.** Même règle
+  (`KdfParams::weaker_than`), retenus dans le registre des comptes
+  (`accounts.json`, `KnownAccount::kdf`), vérifiés avant `prepare_login` à
+  la connexion, au déverrouillage et au changement de mot de passe
+  (`core/src/guivault/account.rs`, test `kdf_params_are_pinned_and_a_downgrade_is_refused`).
 - [ ] **Retour en arrière (rollback).** Retenir la dernière révision vue de
   chaque vault (`localStorage` côté web, stockage local de l'extension —
   ce n'est pas secret) et alerter si elle recule. Aujourd'hui le web ne
