@@ -1,5 +1,6 @@
 use crate::config::Config;
 use crate::events::Broadcaster;
+use crate::mail::Mailer;
 use crate::routes::lookups::Lookups;
 use sqlx::PgPool;
 use std::sync::Arc;
@@ -11,4 +12,6 @@ pub struct AppState {
     pub events: Broadcaster,
     /// Client HTTP et cache des relais du rapport de santé.
     pub lookups: Arc<Lookups>,
+    /// E-mails facultatifs : sans SMTP, `send` ne fait rien.
+    pub mail: Arc<Mailer>,
 }

@@ -287,9 +287,12 @@ table : une migration qui en crée une l'y ajoute.
 ## Ce qui n'est pas encore là
 
 - **WebAuthn / clés de sécurité** en second facteur.
-- **Emails** d'invitation : l'invitation est visible dans le client de
-  l'invité ; rien n'est envoyé par courrier — ni l'alerte d'une demande
-  d'accès d'urgence, que le donneur découvre à sa connexion.
+- **E-mails** : facultatifs (`src/mail.rs`, `GUIVAULT_SMTP_URL`) —
+  invitations, inscriptions ouvertes, connexion depuis une IP nouvelle,
+  mot de passe et second facteur, étapes de l'accès d'urgence — y compris
+  son ouverture au bout du délai, guettée toutes les cinq minutes
+  (`routes::emergency::notify_opened`, colonne `opened_notice_at`).
+  Envoyés après la transaction, en arrière-plan ; rien n'en dépend.
 - **Vérification d'e-mail** à l'inscription.
 - **Vault personnel** : il ne se supprime qu'avec le compte
   (`DELETE /users/me`).

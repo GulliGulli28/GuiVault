@@ -211,6 +211,13 @@ pub async fn enable(
         .write(&mut *tx)
         .await?;
     tx.commit().await?;
+    crate::mail::security(
+        &state,
+        &user.email,
+        "Second facteur activé sur votre compte GuiVault",
+        "Le second facteur (codes TOTP) vient d'être activé sur votre compte GuiVault ; vos autres sessions ont été déconnectées. \
+         Gardez vos codes de récupération en lieu sûr.",
+    );
     Ok(Json(TotpEnableResponse { recovery_codes: codes }))
 }
 
@@ -248,6 +255,13 @@ pub async fn disable(
         .write(&mut *tx)
         .await?;
     tx.commit().await?;
+    crate::mail::security(
+        &state,
+        &user.email,
+        "Second facteur désactivé sur votre compte GuiVault",
+        "Le second facteur (codes TOTP) vient d'être désactivé sur votre compte GuiVault : votre mot de passe maître suffit \
+         désormais à s'y connecter.",
+    );
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -348,13 +362,15 @@ pub async fn verify(
         .bind(&token_hash)
         .execute(&mut *tx)
         .await?;
+    let device = validate::device_name(ch.device_name);
+    let agent = headers.get(header::USER_AGENT).and_then(|v| v.to_str().ok());
     let (_, tokens) = sessions::create(
         &mut *tx,
         &state.config,
         NewSession {
             user_id: user.id,
-            device_name: validate::device_name(ch.device_name),
-            user_agent: headers.get(header::USER_AGENT).and_then(|v| v.to_str().ok()),
+            device_name: device.clone(),
+            user_agent: agent,
             ip,
         },
     )
@@ -366,6 +382,7 @@ pub async fn verify(
         .write(&mut *tx)
         .await?;
     tx.commit().await?;
+    crate::mail::login_alert(&state, user.id, &user.email, ip, device.as_deref(), agent).await;
 
     Ok(Json(LoginResponse {
         tokens,

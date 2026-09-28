@@ -298,13 +298,14 @@ pub async fn login(
         return Ok((StatusCode::ACCEPTED, Json(challenge)).into_response());
     }
 
+    let device = validate::device_name(req.device_name);
     let mut tx = state.db.begin().await?;
     let (_, tokens) = sessions::create(
         &mut *tx,
         &state.config,
         NewSession {
             user_id: row.id,
-            device_name: validate::device_name(req.device_name),
+            device_name: device.clone(),
             user_agent: user_agent(&headers),
             ip,
         },
@@ -312,6 +313,7 @@ pub async fn login(
     .await?;
     Audit::new("user.login").actor(row.id).ip(ip).write(&mut *tx).await?;
     tx.commit().await?;
+    crate::mail::login_alert(&state, row.id, &row.email, ip, device.as_deref(), user_agent(&headers)).await;
 
     Ok(Json(LoginResponse {
         tokens,
@@ -460,5 +462,11 @@ pub async fn change_password(
         .write(&mut *tx)
         .await?;
     tx.commit().await?;
+    crate::mail::security(
+        &state,
+        &user.email,
+        "Votre mot de passe maître GuiVault a changé",
+        "Le mot de passe maître de votre compte GuiVault vient d'être changé ; vos autres sessions ont été déconnectées.",
+    );
     Ok(StatusCode::NO_CONTENT)
 }

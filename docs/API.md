@@ -21,7 +21,7 @@ Erreurs : `{ "code": "…", "message": "…" }` (+ champs selon le code, ex.
 `already_granted`, `emergency_not_granted`, `self_grant`, `no_vaults`,
 `duplicate_vault`, `lookups_disabled`, `lookup_failed`, `totp_required`, `owns_shared_vaults`,
 `account_disabled`, `quota_exceeded`, `ip_not_allowed`, `self_action`, `target_is_admin`,
-`backups_disabled`, `backup_running`, `invalid_*`, `internal`.
+`backups_disabled`, `backup_running`, `mail_disabled`, `mail_failed`, `invalid_*`, `internal`.
 
 Partout : `403 ip_not_allowed` si l'adresse du client n'est pas dans
 `GUIVAULT_ALLOWED_IPS` (sauf `GET /health`).
@@ -128,7 +128,7 @@ jamais un contenu. Chaque action écrit une ligne d'audit `admin.*`.
 
 | | |
 |---|---|
-| `GET /admin/overview` | `AdminOverview` : comptes (désactivés, admins), vaults (partagés), items et octets vivants, liens, sessions actives, inscriptions ouvertes, mode d'inscription, quota par défaut, plages d'IP |
+| `GET /admin/overview` | `AdminOverview` : comptes (désactivés, admins), vaults (partagés), items et octets vivants, liens, sessions actives, inscriptions ouvertes, mode d'inscription, quota par défaut, plages d'IP, `mail_enabled` / `mail_error` |
 | `GET /admin/users` | `[AdminUserInfo]` : e-mail, dates, `disabled_at`, `is_admin`, `totp_enabled`, `last_seen_at`, sessions actives, vaults possédés / rejoints, items et octets dans les vaults possédés, `quota_bytes` (propre, `null` = celui du serveur, `0` = aucun), `effective_quota_bytes` |
 | `POST /admin/users/{id}/disable` | → `AdminUserInfo`. Plus de connexion (`account_disabled`), sessions révoquées ; rien d'effacé. `400 self_action` sur soi, `409 target_is_admin` sur un administrateur |
 | `POST /admin/users/{id}/enable` | → `AdminUserInfo` |
@@ -138,7 +138,20 @@ jamais un contenu. Chaque action écrit une ligne d'audit `admin.*`.
 | `POST /admin/registrations` | `{ email, days? }` (1–90, 14 par défaut) → `201`. Autorise cette adresse à s'inscrire une fois, quel que soit le mode ; renouvelle si elle l'était. `409 email_taken` si le compte existe |
 | `DELETE /admin/registrations/{email}` | → `204` |
 | `GET /admin/backups` | `BackupsStatus { enabled, dir, interval_hours, keep, restore_check, running, runs: [BackupRun] }` — les 20 derniers passages (`triggered_by` `schedule`/`admin`/`shell`, fichier, octets, lignes, SHA-256, `verified` `file`/`restore`, `error`) |
+| `POST /admin/mail-test` | → `204` : un e-mail d'essai à l'administrateur, **attendu** (le seul) ; `502 mail_failed` avec la réponse du serveur SMTP, `400 mail_disabled` sans e-mails (ou réglage illisible) |
 | `POST /admin/backups` | → `202` : une sauvegarde démarre en arrière-plan (suivre `GET`). `400 backups_disabled` sans `GUIVAULT_BACKUP_DIR`, `409 backup_running` |
+
+**E-mails** (facultatifs, `GUIVAULT_SMTP_URL`) : aucune route n'attend un
+envoi ni n'échoue à cause de lui, sauf l'essai ci-dessus. Partent après la
+transaction : `POST /vaults/{id}/invitations` (à l'invité),
+`POST /admin/registrations` (à l'adresse), `POST /auth/login` et
+`/auth/totp/verify` depuis une IP jamais vue du compte en 90 jours (au
+titulaire), `POST /auth/password`, `/auth/totp/enable|disable`,
+`/admin/users/{id}/disable`, les suppressions de compte (au titulaire),
+`/emergency` et ses étapes `accept`, `request`, `approve`, `reject` (à
+l'autre partie) — et, sans route, l'ouverture d'un accès d'urgence au bout
+du délai (aux deux, une fois, vérifiée toutes les cinq minutes). Au plus 30 e-mails par heure vers d'autres adresses par
+compte.
 
 **Quota** : `PUT …/items/{id}` qui ferait dépasser au propriétaire du vault
 son quota (chiffrés vivants de tous ses vaults, ni historique ni tombales)

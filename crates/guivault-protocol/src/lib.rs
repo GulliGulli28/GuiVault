@@ -754,6 +754,12 @@ pub struct AdminOverview {
     pub allowed_ips: Vec<String>,
     #[serde(default)]
     pub admin_allowed_ips: Vec<String>,
+    /// E-mails configurés et utilisables (`GUIVAULT_SMTP_URL`).
+    #[serde(default)]
+    pub mail_enabled: bool,
+    /// Demandés mais inutilisables : pourquoi.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mail_error: Option<String>,
 }
 
 /// Un compte vu par l'administrateur : des métadonnées, jamais un contenu.

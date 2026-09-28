@@ -297,5 +297,16 @@ pub(crate) async fn delete_account(
             .await?;
     }
     tracing::info!(user = %user_id, vaults = owned, transferred = transferred.len(), "compte supprimé");
+    crate::mail::notice(
+        state,
+        email,
+        "Votre compte GuiVault a été supprimé",
+        &if by_admin.is_some() {
+            "Un administrateur du serveur a supprimé votre compte GuiVault et ce qui n'appartenait qu'à lui."
+                .to_string()
+        } else {
+            "Votre compte GuiVault a été supprimé, avec ce qui n'appartenait qu'à lui.".to_string()
+        },
+    );
     Ok(owned)
 }

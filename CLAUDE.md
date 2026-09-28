@@ -40,6 +40,10 @@ HMAC pour les sels fictifs de prelogin.
   jetons), `sessions.rs`, `validate.rs` (tailles des blobs), `audit.rs`,
   `admin.rs` (`guivault admin grant|revoke|list` : le rôle d'administrateur
   ne se donne que depuis le shell ; les routes sont dans `routes/admin.rs`),
+  `mail.rs` (e-mails facultatifs : envoyés après la transaction, en
+  arrière-plan — **rien ne doit en dépendre**, une route n'attend jamais
+  un envoi ; ni secret, ni nom de vault, ni autre lien que
+  `GUIVAULT_PUBLIC_URL` dans un message),
   `backup.rs` (sauvegardes vérifiées, `guivault backup` ; **une migration
   qui crée une table l'ajoute à `backup::TABLES`**, dans l'ordre des clés
   étrangères — sinon les sauvegardes échouent, c'est voulu),

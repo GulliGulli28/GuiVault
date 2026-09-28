@@ -27,10 +27,9 @@ confortable :
    l'écrire (chaque écriture devient deux, sous le verrou optimiste ; tous
    les clients à la fois) — proposition et questions dans
    [`MANIFESTE.md`](MANIFESTE.md).
-2. **Exploitation** (§5 : **SMTP**
-   facultatif — qui compléterait l'accès d'urgence d'une alerte par
-   e-mail, sans que rien n'en dépende) et
-   **mobile** (§4).
+2. **Mobile** (§4) : l'exploitation (§5) est faite — administration,
+   sauvegardes vérifiées, SMTP facultatif, plages d'IP, suppression de
+   compte.
 
 ## 0. Sécurité face à un serveur malveillant
 
@@ -206,8 +205,14 @@ paramètres ou formats anciens.
   ensuite) ; automatique (`GUIVAULT_BACKUP_*`, activée par le compose),
   `guivault backup create|verify|restore`, suivie dans l'administration
   (`backup_runs`, alerte si échouée ou trop vieille).
-- [ ] **SMTP optionnel** : invitations, alertes de nouvelle connexion
-  (demande ouverte chez Bitwarden).
+- [x] **SMTP optionnel** — `src/mail.rs` (`lettre`, rustls) : invitations,
+  inscriptions ouvertes, alerte de connexion depuis une IP jamais vue,
+  mot de passe et second facteur, compte désactivé ou supprimé, chaque
+  étape de l'accès d'urgence. **Jamais bloquant** : envoi en arrière-plan
+  après la transaction, SMTP injoignable ou mal réglé sans effet sur les
+  actions (testé), e-mail d'essai dans l'administration. L'ouverture d'un
+  accès d'urgence au bout du délai est guettée toutes les cinq minutes et
+  prévient les deux parties, une fois (`emergency::notify_opened`).
 - [x] **Restriction par plages d'IP** — `GUIVAULT_ALLOWED_IPS` (tout le
   serveur sauf `/api/v1/health`, couche `restrict_ips` dans
   `routes/mod.rs`) et `GUIVAULT_ADMIN_ALLOWED_IPS` (l'administration),

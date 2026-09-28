@@ -199,6 +199,7 @@ export const api = {
   adminCloseRegistration: (email: string) => authed<void>("DELETE", `/admin/registrations/${q(email)}`),
   adminBackups: () => authed<BackupsStatus>("GET", "/admin/backups"),
   adminBackupNow: () => authed<void>("POST", "/admin/backups"),
+  adminMailTest: () => authed<void>("POST", "/admin/mail-test"),
   myAudit: (limit = 100) => authed<AuditEntry[]>("GET", `/users/me/audit?limit=${limit}`),
   settings: () => authed<UserSettings | null>("GET", "/users/me/settings"),
   putSettings: (blob: string, base_revision: number | null) => authed<UserSettings>("PUT", "/users/me/settings", { blob, base_revision }),

@@ -142,6 +142,29 @@ pub struct BackupConfig {
     pub verify_database_url: Option<String>,
 }
 
+/// E-mails facultatifs (`GUIVAULT_SMTP_*`), voir `crate::mail`.
+#[derive(Clone)]
+pub struct MailConfig {
+    /// `smtps://utilisateur:motdepasse@hote:465`, ou `smtp://…:587?tls=required`
+    /// (STARTTLS) ; identifiants encodés comme dans une URL.
+    pub smtp_url: String,
+    /// L'expéditeur : `GuiVault <coffre@exemple.fr>`.
+    pub from: String,
+    /// L'adresse publique du serveur, citée dans les messages
+    /// (`GUIVAULT_PUBLIC_URL`).
+    pub public_url: Option<String>,
+}
+
+impl std::fmt::Debug for MailConfig {
+    // Pas d'identifiants SMTP dans un journal.
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MailConfig")
+            .field("from", &self.from)
+            .field("public_url", &self.public_url)
+            .finish_non_exhaustive()
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Config {
     pub database_url: String,
@@ -192,6 +215,8 @@ pub struct Config {
     /// Sauvegardes automatiques ; `None` : seulement à la main
     /// (`guivault backup create`).
     pub backup: Option<BackupConfig>,
+    /// E-mails ; `None` : aucun, et rien n'en dépend.
+    pub mail: Option<MailConfig>,
     /// Rafales autorisées sur les routes d'authentification, par IP.
     pub auth_rate_burst: u32,
     pub auth_rate_per_second: u64,
@@ -283,6 +308,11 @@ impl Config {
                     })
                 }
             },
+            mail: env("GUIVAULT_SMTP_URL").map(|smtp_url| MailConfig {
+                smtp_url,
+                from: env("GUIVAULT_SMTP_FROM").unwrap_or_default(),
+                public_url: env("GUIVAULT_PUBLIC_URL").map(|u| u.trim_end_matches('/').to_string()),
+            }),
             auth_rate_burst: env_parse("GUIVAULT_AUTH_RATE_BURST", 10)?,
             auth_rate_per_second: env_parse("GUIVAULT_AUTH_RATE_PER_SECOND", 2)?,
             log_json: env_parse("GUIVAULT_LOG_JSON", false)?,
@@ -343,6 +373,7 @@ mod tests {
             admin_allowed_ips: IpAllowList::default(),
             quota_bytes: 0,
             backup: None,
+            mail: None,
             auth_rate_burst: 0,
             auth_rate_per_second: 0,
             log_json: false,

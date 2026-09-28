@@ -18,6 +18,8 @@ const DEFAULT_DB: &str = "postgres://guivault:test@localhost:55432/guivault_test
 
 struct TestServer {
     base: String,
+    /// La configuration du serveur lancé (pour ses tâches de fond).
+    config: Config,
     db_name: String,
     admin_url: String,
     shutdown: Option<tokio::sync::oneshot::Sender<()>>,
@@ -69,11 +71,13 @@ impl TestServer {
             admin_allowed_ips: Default::default(),
             quota_bytes: 0,
             backup: None,
+            mail: None,
             auth_rate_burst: 1000,
             auth_rate_per_second: 1000,
             log_json: false,
         };
         tweak(&mut config);
+        let kept = config.clone();
         let (addr_tx, addr_rx) = tokio::sync::oneshot::channel::<SocketAddr>();
         let (stop_tx, stop_rx) = tokio::sync::oneshot::channel::<()>();
         tokio::spawn(async move {
@@ -86,6 +90,7 @@ impl TestServer {
         let addr = addr_rx.await.unwrap();
         Some(TestServer {
             base: format!("http://{addr}/api/v1"),
+            config: kept,
             db_name,
             admin_url,
             shutdown: Some(stop_tx),
@@ -3373,5 +3378,498 @@ async fn admin_starts_a_backup_and_follows_it() {
     assert_eq!((run.verified.as_deref(), run.error.as_deref()), (Some("file"), None));
     assert!(dir.join(run.file.unwrap()).exists());
     let _ = std::fs::remove_dir_all(&dir);
+    server.stop().await;
+}
+
+/// Un serveur SMTP de test : accepte tout et garde chaque message brut.
+struct FakeSmtp {
+    url: String,
+    mails: std::sync::Arc<std::sync::Mutex<Vec<String>>>,
+}
+
+impl FakeSmtp {
+    async fn start() -> FakeSmtp {
+        use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("smtp://{}", listener.local_addr().unwrap());
+        let mails = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let store = mails.clone();
+        tokio::spawn(async move {
+            while let Ok((stream, _)) = listener.accept().await {
+                let store = store.clone();
+                tokio::spawn(async move {
+                    let (r, mut w) = stream.into_split();
+                    let mut lines = BufReader::new(r).lines();
+                    w.write_all(b"220 faux ESMTP\r\n").await.unwrap();
+                    while let Ok(Some(line)) = lines.next_line().await {
+                        let cmd = line.to_ascii_uppercase();
+                        if cmd.starts_with("EHLO") {
+                            w.write_all(b"250-faux\r\n250 8BITMIME\r\n").await.unwrap();
+                        } else if cmd == "DATA" {
+                            w.write_all(b"354 allez\r\n").await.unwrap();
+                            let mut data = String::new();
+                            while let Ok(Some(l)) = lines.next_line().await {
+                                if l == "." {
+                                    break;
+                                }
+                                data.push_str(l.strip_prefix('.').filter(|_| l.starts_with("..")).unwrap_or(&l));
+                                data.push_str("\r\n");
+                            }
+                            store.lock().unwrap().push(data);
+                            w.write_all(b"250 recu\r\n").await.unwrap();
+                        } else if cmd == "QUIT" {
+                            let _ = w.write_all(b"221 au revoir\r\n").await;
+                            break;
+                        } else {
+                            w.write_all(b"250 OK\r\n").await.unwrap();
+                        }
+                    }
+                });
+            }
+        });
+        FakeSmtp { url, mails }
+    }
+
+    /// Attend au moins `n` messages (l'envoi part en arrière-plan).
+    async fn wait(&self, n: usize) -> Vec<Received> {
+        for _ in 0..100 {
+            if self.mails.lock().unwrap().len() >= n {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
+        self.mails.lock().unwrap().iter().map(|m| Received::parse(m)).collect()
+    }
+}
+
+/// Un message reçu, en-têtes et corps décodés (RFC 2047, quoted-printable,
+/// base64 : ce que `lettre` choisit selon le texte).
+#[derive(Debug)]
+struct Received {
+    to: String,
+    subject: String,
+    body: String,
+}
+
+impl Received {
+    fn parse(raw: &str) -> Received {
+        use base64::Engine;
+        let b64 = |s: &str| {
+            base64::engine::general_purpose::STANDARD
+                .decode(s.split_whitespace().collect::<String>())
+                .unwrap()
+        };
+        let (head, body) = raw.split_once("\r\n\r\n").unwrap();
+        let mut headers: Vec<(String, String)> = Vec::new();
+        for line in head.split("\r\n") {
+            if line.starts_with([' ', '\t']) {
+                // Dépliage (RFC 5322) : seul le saut de ligne disparaît.
+                headers.last_mut().unwrap().1.push_str(line);
+            } else if let Some((k, v)) = line.split_once(':') {
+                headers.push((k.to_ascii_lowercase(), v.trim().to_string()));
+            }
+        }
+        let header = |k: &str| {
+            headers
+                .iter()
+                .find(|(h, _)| h == k)
+                .map(|(_, v)| v.clone())
+                .unwrap_or_default()
+        };
+        let qp = |s: &str, underscore: bool| {
+            let s = s.replace("=\r\n", "");
+            let bytes = s.as_bytes();
+            let mut out = Vec::new();
+            let mut i = 0;
+            while i < bytes.len() {
+                if bytes[i] == b'='
+                    && i + 2 < bytes.len()
+                    && let Ok(b) = u8::from_str_radix(&s[i + 1..i + 3], 16)
+                {
+                    out.push(b);
+                    i += 3;
+                    continue;
+                }
+                out.push(if underscore && bytes[i] == b'_' { b' ' } else { bytes[i] });
+                i += 1;
+            }
+            out
+        };
+        // Mots encodés `=?utf-8?b?…?=` / `=?utf-8?q?…?=` : l'espace entre deux
+        // d'entre eux ne compte pas, les autres si.
+        let mut subject = Vec::new();
+        let mut previous_encoded = None;
+        for word in header("subject").split_whitespace() {
+            let encoded = word.strip_prefix("=?").and_then(|w| w.strip_suffix("?="));
+            if previous_encoded.is_some() && !(previous_encoded == Some(true) && encoded.is_some()) {
+                subject.push(b' ');
+            }
+            match encoded {
+                Some(enc) => {
+                    let mut parts = enc.splitn(3, '?');
+                    let (_, kind, data) = (parts.next(), parts.next().unwrap(), parts.next().unwrap());
+                    subject.extend(if kind.eq_ignore_ascii_case("b") {
+                        b64(data)
+                    } else {
+                        qp(data, true)
+                    });
+                }
+                None => subject.extend(word.as_bytes()),
+            }
+            previous_encoded = Some(encoded.is_some());
+        }
+        let body = match header("content-transfer-encoding").to_ascii_lowercase().as_str() {
+            "quoted-printable" => qp(body, false),
+            "base64" => b64(body),
+            _ => body.as_bytes().to_vec(),
+        };
+        Received {
+            to: header("to"),
+            subject: String::from_utf8(subject).unwrap(),
+            body: String::from_utf8(body).unwrap().replace("\r\n", "\n"),
+        }
+    }
+}
+
+/// Connexion en se disant venir de `from` (derrière un proxy de confiance).
+async fn login_from(server: &TestServer, email: &str, password: &str, from: &str) -> StatusCode {
+    let http = Client::new();
+    let pre: PreloginResponse = http
+        .post(format!("{}/auth/prelogin", server.base))
+        .json(&PreloginRequest { email: email.into() })
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    let lm = gc::prepare_login(password, &pre.kdf_salt, pre.kdf).unwrap();
+    http.post(format!("{}/auth/login", server.base))
+        .header("x-forwarded-for", from)
+        .header("user-agent", "Firefox de test")
+        .json(&LoginRequest {
+            email: email.into(),
+            auth_key: lm.auth_key.as_bytes().to_vec(),
+            device_name: Some("portable".into()),
+        })
+        .send()
+        .await
+        .unwrap()
+        .status()
+}
+
+#[tokio::test]
+async fn mail_goes_out_when_configured_and_never_blocks() {
+    use guivault_server::config::{MailConfig, TrustProxy};
+    let smtp = FakeSmtp::start().await;
+    let url = smtp.url.clone();
+    let Some(server) = TestServer::start_with(RegistrationMode::Open, move |c| {
+        c.trust_proxy = TrustProxy::parse("127.0.0.1").unwrap();
+        c.mail = Some(MailConfig {
+            smtp_url: url,
+            from: "GuiVault <coffre@vault.test>".into(),
+            public_url: Some("https://vault.test".into()),
+        });
+    })
+    .await
+    else {
+        return;
+    };
+    let alice = User::register(&server, "alice@t.io", "pw-alice").await;
+    let bob = User::register(&server, "bob@t.io", "pw-bob").await;
+    assert!(smtp.wait(1).await.is_empty(), "l'inscription n'envoie rien");
+
+    // Une invitation vers quelqu'un qui n'a pas de compte.
+    let (team, _) = alice.create_vault("Équipe").await;
+    status!(
+        alice
+            .req(reqwest::Method::POST, &format!("/vaults/{}/invitations", team.id))
+            .json(&CreateInvitationRequest {
+                email: "carol@t.io".into(),
+                role: Role::Writer,
+                wrapped_vault_key: None,
+            })
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::CREATED
+    );
+    let mails = smtp.wait(1).await;
+    let m = &mails[0];
+    assert_eq!(m.to, "carol@t.io");
+    assert_eq!(m.subject, "alice@t.io vous invite dans un vault GuiVault");
+    assert!(
+        m.body.contains("rôle « éditeur »") && m.body.contains("créez-le avec cette adresse"),
+        "{}",
+        m.body
+    );
+    assert!(
+        m.body.contains("https://vault.test") && m.body.contains("empreinte"),
+        "{}",
+        m.body
+    );
+    assert!(!m.body.contains("Équipe"), "jamais le nom d'un vault (chiffré)");
+
+    // Connexion depuis une adresse inconnue : alerte ; la même ensuite, ou
+    // celle de l'inscription : rien.
+    assert_eq!(
+        login_from(&server, "alice@t.io", "pw-alice", "203.0.113.7").await,
+        StatusCode::OK
+    );
+    let mails = smtp.wait(2).await;
+    let m = &mails[1];
+    assert_eq!(
+        (m.to.as_str(), m.subject.as_str()),
+        ("alice@t.io", "Nouvelle connexion à votre compte GuiVault")
+    );
+    assert!(m.body.contains("203.0.113.7") && m.body.contains("« portable »") && m.body.contains("Firefox de test"));
+    assert_eq!(
+        login_from(&server, "alice@t.io", "pw-alice", "203.0.113.7").await,
+        StatusCode::OK
+    );
+    User::login(&server, "alice@t.io", "pw-alice").await.unwrap();
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    assert_eq!(smtp.mails.lock().unwrap().len(), 2, "adresse déjà vue : pas d'alerte");
+
+    // Accès d'urgence : chaque étape prévient l'autre partie.
+    let personal = alice
+        .sync()
+        .await
+        .vaults
+        .into_iter()
+        .find(|v| v.kind == VaultKind::Personal)
+        .unwrap();
+    let lookup: UserLookupResponse = alice.get("/users/lookup?email=bob@t.io").await;
+    let bob_pk = gc::PublicKey::try_from(lookup.public_key.as_slice()).unwrap();
+    let envelope = EmergencyVaultKey {
+        vault_id: personal.id,
+        wrapped_vault_key: gc::wrap_emergency_key(
+            &alice.account.keypair,
+            &bob_pk,
+            &personal.id.to_string(),
+            &alice.vault_key(&personal),
+        )
+        .unwrap(),
+    };
+    let grant: EmergencyGrant = serde_json::from_str(&status!(
+        alice
+            .req(reqwest::Method::POST, "/emergency")
+            .json(&CreateEmergencyGrantRequest {
+                grantee_id: bob.profile.id,
+                wait_days: 3,
+                vaults: vec![envelope],
+            })
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::CREATED
+    ))
+    .unwrap();
+    for (who, action) in [(&bob, "accept"), (&bob, "request"), (&alice, "reject")] {
+        status!(
+            who.req(reqwest::Method::POST, &format!("/emergency/{}/{action}", grant.id))
+                .send()
+                .await
+                .unwrap(),
+            StatusCode::OK
+        );
+    }
+    let mails = smtp.wait(6).await;
+    let got: Vec<(&str, &str)> = mails[2..].iter().map(|m| (m.to.as_str(), m.subject.as_str())).collect();
+    assert_eq!(
+        got,
+        vec![
+            ("bob@t.io", "alice@t.io vous désigne comme contact d'urgence"),
+            ("alice@t.io", "bob@t.io a accepté d'être votre contact d'urgence"),
+            ("alice@t.io", "bob@t.io demande l'accès d'urgence à votre coffre"),
+            ("bob@t.io", "alice@t.io a refusé votre demande d'accès d'urgence"),
+        ]
+    );
+    assert!(
+        mails[4]
+            .body
+            .contains("Sans refus de votre part, il lui sera ouvert le"),
+        "{}",
+        mails[4].body
+    );
+
+    // Nouvelle demande, puis le délai s'écoule sans réponse : les deux
+    // parties sont prévenues par la tâche de fond — une seule fois.
+    status!(
+        bob.req(reqwest::Method::POST, &format!("/emergency/{}/request", grant.id))
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::OK
+    );
+    let db = server.db().await;
+    let background = guivault_server::app_state(server.config.clone(), db.clone());
+    assert_eq!(
+        guivault_server::routes::emergency::notify_opened(&background)
+            .await
+            .unwrap(),
+        0
+    );
+    sqlx::query("UPDATE emergency_grants SET requested_at = now() - interval '4 days' WHERE id = $1")
+        .bind(grant.id)
+        .execute(&db)
+        .await
+        .unwrap();
+    assert_eq!(
+        guivault_server::routes::emergency::notify_opened(&background)
+            .await
+            .unwrap(),
+        1
+    );
+    assert_eq!(
+        guivault_server::routes::emergency::notify_opened(&background)
+            .await
+            .unwrap(),
+        0
+    );
+    let mails = smtp.wait(9).await;
+    assert_eq!(mails[6].subject, "bob@t.io demande l'accès d'urgence à votre coffre");
+    // Les deux avis partent ensemble : dans n'importe quel ordre.
+    let mut got: Vec<(&str, &str)> = mails[7..9]
+        .iter()
+        .map(|m| (m.to.as_str(), m.subject.as_str()))
+        .collect();
+    got.sort();
+    assert_eq!(
+        got,
+        vec![
+            (
+                "alice@t.io",
+                "bob@t.io a maintenant accès à votre coffre (accès d'urgence)"
+            ),
+            ("bob@t.io", "L'accès d'urgence au coffre de alice@t.io vous est ouvert"),
+        ]
+    );
+
+    // L'administration : état et e-mail d'essai.
+    guivault_server::admin::set_admin(&server.db().await, "alice@t.io", true)
+        .await
+        .unwrap();
+    let overview: AdminOverview = alice.get("/admin/overview").await;
+    assert!(overview.mail_enabled && overview.mail_error.is_none());
+    status!(
+        alice
+            .req(reqwest::Method::POST, "/admin/mail-test")
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::NO_CONTENT
+    );
+    let mails = smtp.wait(10).await;
+    assert_eq!(mails[9].subject, "Essai d'envoi GuiVault");
+    server.stop().await;
+
+    // SMTP qui accepte la connexion et ne répond jamais : un envoi attendu
+    // bloquerait au moins 20 s (délai de `lettre`). L'invitation et la
+    // connexion (qui déclencherait une alerte) répondent quand même.
+    let hole = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let hole_addr = hole.local_addr().unwrap();
+    let Some(server) = TestServer::start_with(RegistrationMode::Open, move |c| {
+        c.trust_proxy = TrustProxy::parse("127.0.0.1").unwrap();
+        c.mail = Some(MailConfig {
+            smtp_url: format!("smtp://{hole_addr}"),
+            from: "GuiVault <coffre@vault.test>".into(),
+            public_url: None,
+        });
+    })
+    .await
+    else {
+        return;
+    };
+    let alice = User::register(&server, "alice@t.io", "pw-alice").await;
+    let (team, _) = alice.create_vault("Équipe").await;
+    let started = std::time::Instant::now();
+    status!(
+        alice
+            .req(reqwest::Method::POST, &format!("/vaults/{}/invitations", team.id))
+            .json(&CreateInvitationRequest {
+                email: "carol@t.io".into(),
+                role: Role::Reader,
+                wrapped_vault_key: None,
+            })
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::CREATED
+    );
+    assert!(
+        started.elapsed() < Duration::from_secs(10),
+        "l'envoi n'est jamais attendu"
+    );
+    assert_eq!(
+        login_from(&server, "alice@t.io", "pw-alice", "198.51.100.4").await,
+        StatusCode::OK
+    );
+    assert!(
+        started.elapsed() < Duration::from_secs(15),
+        "l'alerte de connexion non plus"
+    );
+    server.stop().await;
+    drop(hole);
+
+    // SMTP injoignable : l'e-mail d'essai, lui, le dit.
+    let closed = {
+        let l = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        l.local_addr().unwrap()
+    };
+    let Some(server) = TestServer::start_with(RegistrationMode::Open, move |c| {
+        c.mail = Some(MailConfig {
+            smtp_url: format!("smtp://{closed}"),
+            from: "GuiVault <coffre@vault.test>".into(),
+            public_url: None,
+        });
+    })
+    .await
+    else {
+        return;
+    };
+    let alice = User::register(&server, "alice@t.io", "pw-alice").await;
+    guivault_server::admin::set_admin(&server.db().await, "alice@t.io", true)
+        .await
+        .unwrap();
+    let body = status!(
+        alice
+            .req(reqwest::Method::POST, "/admin/mail-test")
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::BAD_GATEWAY
+    );
+    assert!(body.contains("mail_failed"), "{body}");
+    server.stop().await;
+
+    // Réglage illisible : le serveur démarre quand même, sans e-mails, et le dit.
+    let Some(server) = TestServer::start_with(RegistrationMode::Open, |c| {
+        c.mail = Some(MailConfig {
+            smtp_url: "n'importe quoi".into(),
+            from: "GuiVault <coffre@vault.test>".into(),
+            public_url: None,
+        });
+    })
+    .await
+    else {
+        return;
+    };
+    let alice = User::register(&server, "alice@t.io", "pw-alice").await;
+    guivault_server::admin::set_admin(&server.db().await, "alice@t.io", true)
+        .await
+        .unwrap();
+    let overview: AdminOverview = alice.get("/admin/overview").await;
+    assert!(!overview.mail_enabled);
+    assert!(overview.mail_error.unwrap().contains("GUIVAULT_SMTP_URL"));
+    let body = status!(
+        alice
+            .req(reqwest::Method::POST, "/admin/mail-test")
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::BAD_REQUEST
+    );
+    assert!(body.contains("mail_disabled"), "{body}");
     server.stop().await;
 }

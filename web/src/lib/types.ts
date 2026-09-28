@@ -70,6 +70,10 @@ export interface AdminOverview {
   default_quota_bytes: number;
   allowed_ips: string[];
   admin_allowed_ips: string[];
+  /** E-mails configurés et utilisables ; sinon `mail_error` dit pourquoi
+   * (absent : pas demandés). */
+  mail_enabled?: boolean;
+  mail_error?: string;
 }
 
 export interface AdminUserInfo {

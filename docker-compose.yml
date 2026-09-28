@@ -54,6 +54,10 @@ services:
       GUIVAULT_BACKUP_INTERVAL_HOURS: ${GUIVAULT_BACKUP_INTERVAL_HOURS:-24}
       GUIVAULT_BACKUP_KEEP: ${GUIVAULT_BACKUP_KEEP:-7}
       GUIVAULT_BACKUP_VERIFY_DATABASE_URL: ${GUIVAULT_BACKUP_VERIFY_DATABASE_URL-postgres://guivault:${POSTGRES_PASSWORD}@db:5432/guivault_restore_check}
+      # E-mails, facultatifs (rien n'en dépend) : voir .env.example.
+      GUIVAULT_SMTP_URL: ${GUIVAULT_SMTP_URL:-}
+      GUIVAULT_SMTP_FROM: ${GUIVAULT_SMTP_FROM:-}
+      GUIVAULT_PUBLIC_URL: ${GUIVAULT_PUBLIC_URL:-}
       GUIVAULT_LOG_JSON: "true"
       RUST_LOG: ${RUST_LOG:-info,sqlx=warn}
     volumes:

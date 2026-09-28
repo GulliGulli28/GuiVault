@@ -106,6 +106,8 @@ pub async fn overview(State(state): State<AppState>, _admin: Admin) -> ApiResult
         default_quota_bytes: state.config.quota_bytes,
         allowed_ips: state.config.allowed_ips.to_strings(),
         admin_allowed_ips: state.config.admin_allowed_ips.to_strings(),
+        mail_enabled: state.mail.enabled(),
+        mail_error: state.mail.error().map(str::to_string),
     }))
 }
 
@@ -217,7 +219,7 @@ pub async fn disable(
     admin: Admin,
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<AdminUserInfo>> {
-    target(&state, &admin, id).await?;
+    let info = target(&state, &admin, id).await?;
     let mut tx = state.db.begin().await?;
     let changed = sqlx::query("UPDATE users SET disabled_at = now() WHERE id = $1 AND disabled_at IS NULL")
         .bind(id)
@@ -237,6 +239,15 @@ pub async fn disable(
             .await?;
     }
     tx.commit().await?;
+    if changed > 0 {
+        crate::mail::notice(
+            &state,
+            &info.email,
+            "Votre compte GuiVault a été désactivé",
+            "Un administrateur du serveur a désactivé votre compte GuiVault : vos sessions sont fermées et vous ne pouvez \
+             plus vous connecter. Rien n'est effacé ; adressez-vous à lui.",
+        );
+    }
     Ok(Json(user_info(&state, id).await?))
 }
 
@@ -383,6 +394,7 @@ pub async fn create_registration(
         .write(&mut *tx)
         .await?;
     tx.commit().await?;
+    crate::mail::registration_opened(&state, (admin.user.id, &admin.user.email), &email, expires_at);
     Ok((
         StatusCode::CREATED,
         Json(RegistrationInvite {
@@ -487,4 +499,45 @@ pub async fn backup_now(State(state): State<AppState>, admin: Admin) -> ApiResul
         let _ = crate::backup::run(&db, &cfg, &url, crate::backup::Trigger::Admin).await;
     });
     Ok(StatusCode::ACCEPTED)
+}
+
+// ─── E-mails ────────────────────────────────────────────────────────────────
+
+/// Un e-mail d'essai à l'administrateur, attendu : le seul envoi dont
+/// l'échec remonte (`502 mail_failed`, avec la réponse du serveur SMTP).
+pub async fn mail_test(State(state): State<AppState>, admin: Admin) -> ApiResult<StatusCode> {
+    if !state.mail.enabled() {
+        return Err(AppError::bad_request(
+            "mail_disabled",
+            state
+                .mail
+                .error()
+                .map(|e| format!("e-mails inutilisables : {e}"))
+                .unwrap_or_else(|| "pas d'e-mails sur ce serveur (GUIVAULT_SMTP_URL)".into()),
+        ));
+    }
+    let sent = state
+        .mail
+        .send_now(crate::mail::Mail {
+            to: admin.user.email.clone(),
+            subject: "Essai d'envoi GuiVault".into(),
+            body:
+                "Les e-mails de ce serveur GuiVault fonctionnent : invitations, alertes de connexion, accès d'urgence."
+                    .into(),
+        })
+        .await;
+    Audit::new("admin.mail_test")
+        .actor(admin.user.id)
+        .ip(admin.ip)
+        .meta(serde_json::json!({ "ok": sent.is_ok() }))
+        .write(&state.db)
+        .await?;
+    match sent {
+        Ok(()) => Ok(StatusCode::NO_CONTENT),
+        Err(e) => Err(AppError::new(
+            StatusCode::BAD_GATEWAY,
+            "mail_failed",
+            format!("envoi impossible : {e:#}"),
+        )),
+    }
 }

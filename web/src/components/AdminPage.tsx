@@ -80,11 +80,12 @@ export function AdminPage({ ctx }: { ctx: PageContext }) {
           <p className="callout callout-danger max-w-3xl">{denied}</p>
         ) : users === null || overview === null ? (slow ? <Loading /> : null) : (
           <>
-            <ServerSummary overview={overview} />
+            <ServerSummary overview={overview} ctx={ctx} />
             <BackupsSection ctx={ctx} />
             <RegistrationsSection
               registrations={registrations ?? []}
               registration={overview.registration}
+              mailEnabled={Boolean(overview.mail_enabled)}
               onChange={() => { api.adminRegistrations().then(setRegistrations).catch(() => {}); api.adminOverview().then(setOverview).catch(() => {}); }}
               ctx={ctx}
             />
@@ -192,8 +193,20 @@ function Stat({ label, value, detail }: { label: string; value: string; detail?:
   );
 }
 
-function ServerSummary({ overview: o }: { overview: AdminOverview }) {
+function ServerSummary({ overview: o, ctx }: { overview: AdminOverview; ctx: PageContext }) {
   const ips = (list: string[]) => (list.length ? list.join(", ") : "toutes");
+  const [testing, setTesting] = useState(false);
+  const mailTest = async () => {
+    setTesting(true);
+    try {
+      await api.adminMailTest();
+      ctx.notify("E-mail d'essai envoyé : regardez votre boîte.");
+    } catch (e) {
+      ctx.error(errorMessage(e));
+    } finally {
+      setTesting(false);
+    }
+  };
   return (
     <section className="max-w-3xl space-y-1.5">
       <Eyebrow>Serveur</Eyebrow>
@@ -207,6 +220,22 @@ function ServerSummary({ overview: o }: { overview: AdminOverview }) {
         <p>Inscriptions : <span className="text-[var(--c-text)]">{REGISTRATION_LABELS[o.registration]}</span> <span className="text-[var(--c-text-muted)]">(GUIVAULT_REGISTRATION)</span></p>
         <p>Quota par défaut : <span className="text-[var(--c-text)]">{o.default_quota_bytes > 0 ? formatBytes(o.default_quota_bytes) : "aucun"}</span> <span className="text-[var(--c-text-muted)]">(GUIVAULT_QUOTA_MB)</span></p>
         <p>Adresses admises : <span className="text-[var(--c-text)]">{ips(o.allowed_ips)}</span> ; pour l'administration : <span className="text-[var(--c-text)]">{ips(o.admin_allowed_ips)}</span></p>
+        <p className="flex flex-wrap items-center gap-x-2">
+          <span>
+            E-mails :{" "}
+            {o.mail_enabled ? (
+              <span className="text-[var(--c-text)]">activés</span>
+            ) : o.mail_error ? (
+              <span className="text-[var(--c-danger)]">inutilisables — {o.mail_error}</span>
+            ) : (
+              <span className="text-[var(--c-text)]">aucun</span>
+            )}{" "}
+            <span className="text-[var(--c-text-muted)]">(GUIVAULT_SMTP_URL, facultatif : rien n'en dépend)</span>
+          </span>
+          {o.mail_enabled && (
+            <button onClick={() => void mailTest()} disabled={testing} className="btn btn-ghost btn-sm">{testing ? "Envoi…" : "Envoyer un e-mail d'essai"}</button>
+          )}
+        </p>
         <p className="text-[var(--c-text-muted)]">GuiVault {o.server_version}</p>
       </div>
     </section>
@@ -304,9 +333,10 @@ function BackupsSection({ ctx }: { ctx: PageContext }) {
 
 const DAYS = [7, 14, 30, 90];
 
-function RegistrationsSection({ registrations, registration, onChange, ctx }: {
+function RegistrationsSection({ registrations, registration, mailEnabled, onChange, ctx }: {
   registrations: RegistrationInvite[];
   registration: AdminOverview["registration"];
+  mailEnabled: boolean;
   onChange: () => void;
   ctx: PageContext;
 }) {
@@ -333,7 +363,8 @@ function RegistrationsSection({ registrations, registration, onChange, ctx }: {
       <p className="help-text">
         {registration === "open"
           ? "Les inscriptions sont ouvertes à tous : inutile d'autoriser une adresse."
-          : "Autorisez une adresse à créer son compte malgré des inscriptions " + REGISTRATION_LABELS[registration] + ". Donnez-lui l'adresse de ce serveur : l'autorisation sert une fois."}
+          : "Autorisez une adresse à créer son compte malgré des inscriptions " + REGISTRATION_LABELS[registration] + ". " +
+            (mailEnabled ? "Un e-mail l'en prévient" : "Donnez-lui l'adresse de ce serveur") + " ; l'autorisation sert une fois."}
       </p>
       <form onSubmit={submit} className="flex flex-wrap items-end gap-2">
         <Field label="Adresse e-mail" className="min-w-[220px] flex-1">

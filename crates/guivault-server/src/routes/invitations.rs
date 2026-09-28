@@ -113,6 +113,14 @@ pub async fn create(
         .await?;
     let row = fetch(&mut *tx, id).await?;
     tx.commit().await?;
+    crate::mail::invitation(
+        &state,
+        (user.id, &user.email),
+        &email,
+        crate::mail::role_label(req.role),
+        invitee.is_some(),
+        row.expires_at,
+    );
     if let Some(inv) = &invitee {
         state.events.publish(
             vec![inv.id],

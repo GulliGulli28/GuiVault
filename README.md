@@ -151,6 +151,22 @@ ouvertes à une adresse — utile en `invite_only` sans vault à partager, ou
 en `closed`. Un administrateur voit des métadonnées, jamais un contenu, et
 ne peut ni désactiver ni supprimer un autre administrateur.
 
+### E-mails (facultatifs)
+
+Avec `GUIVAULT_SMTP_URL` et `GUIVAULT_SMTP_FROM`, le serveur prévient :
+l'invité d'un vault (et lui dit de créer son compte s'il n'en a pas), une
+adresse à qui l'administration ouvre l'inscription, le titulaire d'un
+compte à chaque connexion depuis une adresse IP jamais vue (90 jours), à
+chaque changement de mot de passe maître ou de second facteur, et les deux
+parties d'un accès d'urgence à chaque étape — surtout le donneur quand son
+contact **demande** l'accès, avec la date à laquelle il sera ouvert sans
+refus, puis les deux quand il s'ouvre. **Rien n'en dépend** : sans SMTP, avec un SMTP mal réglé ou en
+panne, chaque action réussit quand même (l'envoi part après, en
+arrière-plan ; un échec est journalisé) et tout reste visible dans les
+clients. Un message ne contient ni secret, ni nom de vault, ni autre lien
+que `GUIVAULT_PUBLIC_URL`. Administration › Serveur dit si les e-mails
+marchent et envoie un e-mail d'essai.
+
 ### Interface web
 
 Le binaire sert à `/` une application (React, même charte que Guiterm) qui
@@ -184,6 +200,9 @@ dans [`docs/SECURITY.md`](docs/SECURITY.md).
 | `GUIVAULT_QUOTA_MB` | `0` | Quota de stockage par compte (Mio de chiffrés dans les vaults qu'il possède) ; `0` : aucun. Modifiable compte par compte dans l'administration |
 | `GUIVAULT_ALLOWED_IPS` | — | Plages (IP/CIDR, séparées par des virgules) seules servies : API, interface, liens de partage ; `/api/v1/health` reste joignable. Vide : toutes |
 | `GUIVAULT_ADMIN_ALLOWED_IPS` | — | Plages d'où l'administration (`/admin`) répond ; vide : toutes |
+| `GUIVAULT_SMTP_URL` | — | E-mails, facultatifs : `smtps://utilisateur:motdepasse@hote:465` ou `smtp://…:587?tls=required` (STARTTLS). Sans lui, ou injoignable, tout fonctionne pareil |
+| `GUIVAULT_SMTP_FROM` | — | Expéditeur, ex. `GuiVault <coffre@exemple.fr>` (requis avec `GUIVAULT_SMTP_URL`) |
+| `GUIVAULT_PUBLIC_URL` | — | L'adresse publique du serveur, citée dans les e-mails |
 | `GUIVAULT_BACKUP_DIR` | — (`/backups` avec le compose) | Dossier des sauvegardes automatiques ; vide : aucune |
 | `GUIVAULT_BACKUP_INTERVAL_HOURS` / `_KEEP` | `24` / `7` | Fréquence ; nombre gardé |
 | `GUIVAULT_BACKUP_VERIFY_DATABASE_URL` | — (réglée par le compose) | Base d'essai où chaque sauvegarde est restaurée et comparée — **effacée à chaque fois** : vide ou réservée à ça (créée si absente sur le même Postgres) |

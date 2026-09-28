@@ -292,6 +292,7 @@ pub async fn create(
     let out = with_vaults(&mut tx, g).await?;
     tx.commit().await?;
     notify(&state, &out);
+    crate::mail::emergency(&state, "emergency.create", &out);
     Ok((StatusCode::CREATED, Json(out)))
 }
 
@@ -391,6 +392,7 @@ async fn transition(
     let out = with_vaults(&mut tx, g).await?;
     tx.commit().await?;
     notify(state, &out);
+    crate::mail::emergency(state, action, &out);
     Ok(Json(out))
 }
 
@@ -454,7 +456,7 @@ pub async fn request(
                 _ => Err(AppError::conflict("already_requested", "une demande est déjà en cours")),
             }
         },
-        "UPDATE emergency_grants SET requested_at = now(), approved_at = NULL WHERE id = $1",
+        "UPDATE emergency_grants SET requested_at = now(), approved_at = NULL, opened_notice_at = NULL WHERE id = $1",
     )
     .await
 }
@@ -480,7 +482,7 @@ pub async fn approve(
                 _ => Err(AppError::conflict("not_requested", "aucune demande en cours")),
             }
         },
-        "UPDATE emergency_grants SET approved_at = now() WHERE id = $1",
+        "UPDATE emergency_grants SET approved_at = now(), opened_notice_at = now() WHERE id = $1",
     )
     .await
 }
@@ -696,6 +698,34 @@ pub async fn on_rotation(
 
 /// La propriété du vault change de mains : l'ancien propriétaire ne le
 /// confie plus. Le nouveau le confiera à ses propres contacts s'il le veut.
+async fn grant_for(state: &AppState, id: Uuid, user_id: Uuid) -> ApiResult<EmergencyGrant> {
+    let mut conn = state.db.acquire().await?;
+    let g = fetch(&mut *conn, id, user_id).await?;
+    with_vaults(&mut conn, g).await
+}
+
+/// Les accès d'urgence dont le délai vient de s'écouler, sans accord
+/// anticipé : les deux parties sont prévenues (une fois). Appelé par la
+/// boucle horaire du serveur.
+pub async fn notify_opened(state: &AppState) -> anyhow::Result<usize> {
+    let due: Vec<(Uuid, Uuid)> = sqlx::query_as(
+        "UPDATE emergency_grants SET opened_notice_at = now()
+         WHERE requested_at IS NOT NULL AND approved_at IS NULL AND opened_notice_at IS NULL
+           AND requested_at + make_interval(days => wait_days) <= now()
+         RETURNING id, grantor_id",
+    )
+    .fetch_all(&state.db)
+    .await?;
+    for (id, grantor) in &due {
+        let out = grant_for(state, *id, *grantor)
+            .await
+            .map_err(|e| anyhow::anyhow!("{}", e.message))?;
+        notify(state, &out);
+        crate::mail::emergency(state, "emergency.opened", &out);
+    }
+    Ok(due.len())
+}
+
 pub async fn on_transfer(db: &mut PgConnection, vault_id: Uuid, old_owner: Uuid) -> sqlx::Result<()> {
     sqlx::query(
         "DELETE FROM emergency_vault_keys WHERE vault_id = $1

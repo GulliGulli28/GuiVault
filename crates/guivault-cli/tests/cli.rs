@@ -62,6 +62,7 @@ impl Server {
             admin_allowed_ips: Default::default(),
             quota_bytes: 0,
             backup: None,
+            mail: None,
             auth_rate_burst: 1000,
             auth_rate_per_second: 1000,
             log_json: false,
