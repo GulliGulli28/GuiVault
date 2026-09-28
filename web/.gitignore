@@ -2,3 +2,5 @@ node_modules
 dist
 *.tsbuildinfo
 dist-extension
+test-results
+playwright-report

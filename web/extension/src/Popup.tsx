@@ -24,9 +24,9 @@ import { RollbackBanner } from "../../src/components/RollbackBanner";
 import { OfflineSetting } from "../../src/components/OfflineSetting";
 import { loadOfflineCopy, refreshOfflineCopy, type OfflineCopy } from "../../src/lib/offline";
 import { copyText, PasswordInput, SecretValue } from "../../src/components/ui";
-import { clearLockReason, lock, lockReason, loadItemsCache, loadPopupState, loadSession, loadSettings, noteRecentFill, parseOtpPatterns, POPUP_STATE_TTL_MS, saveItemsCache, savePopupState, saveSession, saveSettings, saveTokens, touchLock, type ItemsCache, type LockReason, type PopupView, type Settings } from "./store";
+import { clearLockReason, lock, lockReason, loadItemsCache, loadPopupState, loadSession, loadSettings, parseOtpPatterns, POPUP_STATE_TTL_MS, saveItemsCache, savePopupState, saveSession, saveSettings, saveTokens, touchLock, type ItemsCache, type LockReason, type PopupView, type Settings } from "./store";
 import { deleteItem, saveLogin, savePayload } from "./vaultops";
-import type { PopupToBackground } from "./messages";
+import type { FillTabReply, PopupToBackground } from "./messages";
 
 /** Les entrées du menu « Nouveau » : les secrets d'abord, puis les entités
  * Guiterm — le même menu que l'interface web. */
@@ -283,17 +283,25 @@ export function Popup() {
   const forPage = useMemo(() => (canFill ? logins.filter((e) => loginMatches(e.login, pageUrl!)) : []), [logins, pageUrl, canFill]);
   const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
 
-  const fill = async (e: LoginEntry, what: "credentials" | "totp") => {
+  /** Le seul formulaire est dans un cadre servi par un autre site que
+   * l'identifiant : on demande avant d'y mettre un mot de passe. */
+  const [frameConfirm, setFrameConfirm] = useState<{ entry: LoginEntry; what: "credentials" | "totp"; frameId: number; host: string } | null>(null);
+
+  /** Le service worker choisit le cadre où remplir (jamais tous : un cadre
+   * tiers n'a pas à recevoir le mot de passe du site). */
+  const fill = async (e: LoginEntry, what: "credentials" | "totp", frameId?: number) => {
     if (tabId == null) return;
     try {
-      await chrome.scripting.executeScript({ target: { tabId }, files: ["content.js"] });
-      const msg = what === "totp" ? { type: "guivault-fill", totp: e.login.totp ? await currentTotp(e.login.totp) : "" } : { type: "guivault-fill", username: e.login.username, password: e.login.password };
-      const r = (await chrome.tabs.sendMessage(tabId, msg)) as { username: boolean; password: boolean; totp: boolean } | undefined;
-      if (!r) say("Pas de réponse de la page.");
-      else if (what === "totp") say(r.totp ? "Code rempli." : "Aucun champ de code trouvé.");
-      else say(r.password ? (r.username ? "Rempli." : "Mot de passe rempli (utilisateur non trouvé).") : r.username ? "Utilisateur rempli (pas de champ mot de passe)." : "Aucun champ de connexion trouvé sur cette page.");
-      if (r?.password || r?.username) void noteRecentFill(tabId, e.login.id);
-      if (r?.password || r?.username || r?.totp) window.close();
+      const r = await chrome.runtime.sendMessage<PopupToBackground, FillTabReply>({ type: "guivault-fill-tab", tabId, loginId: e.login.id, what, frameId });
+      if (!r) return say("Pas de réponse de la page.");
+      if (!r.ok) {
+        if (r.reason === "confirm") return setFrameConfirm({ entry: e, what, frameId: r.frameId, host: r.frameHost });
+        return say(r.reason === "locked" ? "GuiVault est verrouillé." : r.reason === "no-page" ? "Impossible de remplir sur cette page." : r.reason === "not-found" ? "Identifiant introuvable." : what === "totp" ? "Aucun champ de code trouvé." : "Aucun champ de connexion trouvé sur cette page.");
+      }
+      const f = r.filled;
+      if (what === "totp") say(f.totp ? "Code rempli." : "Aucun champ de code trouvé.");
+      else say(f.password ? (f.username ? "Rempli." : "Mot de passe rempli (utilisateur non trouvé).") : f.username ? "Utilisateur rempli (pas de champ mot de passe)." : "Aucun champ de connexion trouvé sur cette page.");
+      if (f.password || f.username || f.totp) window.close();
     } catch (err) {
       say(`Impossible sur cette page : ${errorMessage(err)}`);
     }
@@ -532,15 +540,18 @@ export function Popup() {
           </div>
         </>
       )}
+      {frameConfirm && (
+        <div role="alertdialog" aria-label="Remplir dans un cadre" className="callout callout-warn m-2 shrink-0 space-y-2 text-[12px]">
+          <p>Le formulaire de cette page est dans un cadre servi par <span className="font-medium">{frameConfirm.host}</span>, qui ne correspond pas à « {frameConfirm.entry.login.name} ». Ne remplissez que si c'est bien la connexion de ce site, pas une publicité ou un widget.</p>
+          <div className="flex justify-end gap-2">
+            <button onClick={() => setFrameConfirm(null)} className="btn btn-ghost btn-sm">Annuler</button>
+            <button onClick={() => { const c = frameConfirm; setFrameConfirm(null); void fill(c.entry, c.what, c.frameId); }} className="btn btn-primary btn-sm">Remplir quand même</button>
+          </div>
+        </div>
+      )}
       {notice && <div role="status" className="shrink-0 border-t border-[var(--c-border)] bg-[var(--c-bg)] px-3 py-1.5 text-[11.5px] text-[var(--c-text-secondary)]">{notice}</div>}
     </div>
   );
-}
-
-async function currentTotp(secret: string): Promise<string> {
-  const { parseTotp, totpCode } = await import("../../src/lib/totp");
-  const p = parseTotp(secret);
-  return p ? totpCode(p) : "";
 }
 
 /** Une section repliable : « Identifiants sur cette page », ou un vault. */

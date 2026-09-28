@@ -52,8 +52,31 @@ maître et le délai de verrouillage.
   (les mêmes que le popup, dans les deux sens), vault au choix — enregistré
   puis rempli. Coffre verrouillé → il le dit.
   **Ctrl+Maj+L** remplit sans ouvrir le popup (un seul compte → rempli,
-  plusieurs → le menu, un champ de code visible → le code). Désactivable
-  (« Proposer le remplissage dans les pages »).
+  plusieurs → le menu, un champ de code visible → le code), dans le cadre
+  qui a le focus. Désactivable (« Proposer le remplissage dans les
+  pages »).
+- **Pages modernes** : les champs sont cherchés à travers les **shadow
+  roots**, ouvertes et fermées (`chrome.dom.openOrClosedShadowRoot`, les
+  composants web des design systems), imbriquées, ou créées après le
+  chargement ; leurs libellés sont lus dans leur propre arbre. La saisie
+  produit les événements d'une frappe (`input` `composed`, clavier,
+  `change`) par le setter natif : un composant ou un champ contrôlé (React)
+  voit la valeur. **Inscription** (mot de passe + confirmation, ou
+  `autocomplete="new-password"`) : un identifiant choisi remplit les deux,
+  et le menu propose « Générer un mot de passe et enregistrer… » (le
+  générateur ouvert, sa valeur déjà dans le formulaire). **Changement de
+  mot de passe** : seul le mot de passe actuel est rempli, jamais le
+  nouveau.
+- **Cadres** (connexion servie par un fournisseur d'identité, widget,
+  publicité) : chaque cadre est **son propre site**. Il ne reçoit que les
+  identifiants de *son* URL — celle que le navigateur connaît du cadre. Les
+  identifiants de la page qui l'héberge lui sont proposés à part, « à
+  confirmer » : les choisir ouvre une confirmation qui nomme les deux sites.
+  « Remplir » dans le popup ne vise qu'**un** cadre (celui qui a le focus,
+  sinon celui qui a le formulaire) : la page elle-même ou un cadre dont
+  l'URL correspond à l'identifiant ; un formulaire seul dans le cadre d'un
+  autre site demande confirmation dans le popup. Un identifiant enregistré
+  depuis un cadre vaut pour le cadre et pour la page.
 - **Codes à usage unique** (2FA, SSO) : un champ de code reçoit son propre
   bouton, qui propose les codes TOTP des identifiants du site. Reconnu par
   `autocomplete="one-time-code"`, par ses mots (« code de vérification »,
@@ -134,7 +157,10 @@ maître et le délai de verrouillage.
 | `src/store.ts` | la session dans `chrome.storage.session` (jetons, clés du compte, clés et noms des vaults, items déchiffrés) ; réglages dans `chrome.storage.local` |
 | `src/background.ts` | le service worker : badge, messages du script de page, raccourci, alarmes de verrouillage et d'effacement du presse-papiers |
 | `offscreen.html`, `src/offscreen.ts`, `src/clipboardDom.ts` | lire et vider le presse-papiers sans focus (`execCommand`) : dans un document hors écran que le worker ouvre le temps de l'opération (Chrome), dans la page d'arrière-plan (Firefox) |
-| `src/content.ts` | le script de page : remplit sur ordre (popup, raccourci) et, chargé sur toutes les pages `http(s)`, repère les champs de mot de passe pour y poser le bouton GuiVault ; l'interface injectée vit dans un shadow DOM |
+| `src/content.ts` | le script de page, dans chaque cadre : remplit sur ordre (popup, raccourci) et, chargé sur toutes les pages `http(s)`, repère les champs de mot de passe pour y poser le bouton GuiVault ; l'interface injectée vit dans une shadow root fermée et n'obéit qu'aux vrais clics |
+| `src/dom.ts` | la page vue par le script : parcours à travers les shadow roots, libellés, élément actif réel, saisie qui ressemble à une frappe, rôle des champs de mot de passe (actuel, nouveau) |
+| `src/frames.ts` | quel site décide pour un cadre (`senderUrl`), où remplir un identifiant du popup (`pickFrame`), à quel cadre confier le raccourci — pur, testé par `frames.test.ts` |
+| `e2e/` | le corpus de pages piégeuses et son scénario Playwright (voir « Tester ») |
 | `src/webauthn-shim.ts` | injecté dans le **monde de la page** avant ses scripts (`world: MAIN`) : remplace `navigator.credentials.create/get`, traduit la demande en JSON pour le script isolé, rend un `PublicKeyCredential` (même prototype, `toJSON()`), ou rappelle l'implémentation native |
 | `src/passkeys.ts` | l'authentificateur, côté service worker : ES256/P-256 via WebCrypto, attestation `none` (CBOR maison, `cbor.ts`), assertion signée en DER ; enregistre la passkey dans un identifiant du coffre (`putPayload`) |
 | `src/messages.ts` | les messages page ↔ service worker : la page reçoit des *noms* d'identifiants, et le mot de passe d'un seul, à sa demande, après que le worker a revérifié l'URL de l'onglet expéditeur |
@@ -174,12 +200,14 @@ actif, pour le badge et le raccourci), `clipboardRead` et `clipboardWrite`
 (vérifier que le presse-papiers contient encore ce qu'on y a copié avant de
 le vider — comme Bitwarden), `offscreen` (Chrome : le document qui le fait
 pour le service worker), et un script sur `http://*/*`,
-`https://*/*` pour proposer le remplissage dans les champs de mot de passe —
-le même périmètre que Bitwarden, pour la même raison. Le script ne lit
-rien de la page : il cherche des `<input type=password>`, demande au
-service worker s'il y a des identifiants pour l'URL (des noms, pas de mot
-de passe), et ne reçoit le mot de passe d'un compte que quand on le choisit.
-Coffre verrouillé ou sans rien pour le site : il n'ajoute rien à la page.
+`https://*/*` (tous les cadres) pour proposer le remplissage dans les champs
+de mot de passe — le même périmètre que Bitwarden, pour la même raison. Le
+script ne lit rien de la page : il cherche des `<input type=password>`,
+demande au service worker s'il y a des identifiants pour l'URL de son cadre
+(des noms, pas de mot de passe), et ne reçoit le mot de passe d'un compte
+que quand on le choisit. Coffre verrouillé ou sans rien pour le site : il
+n'ajoute rien à la page. `scripting` sert aussi à demander à chaque cadre
+ce qu'il montre (`__guivaultFrameInfo`) avant de remplir depuis le popup.
 
 ## Modèle de menace
 
@@ -189,12 +217,20 @@ chaque chargement. Reste que le mot de passe maître est saisi dans le
 navigateur, et que les clés vivent dans sa mémoire tant que la session
 n'est pas verrouillée — un navigateur compromis a tout.
 
-Le remplissage n'écrit que dans l'onglet visé, après une correspondance
+Le remplissage n'écrit que dans le cadre visé, après une correspondance
 d'URI vérifiée par le service worker sur l'URL que *le navigateur* connaît
-de l'onglet (pas celle que la page prétend) : un identifiant `domain
-example.com` ne sera jamais proposé sur `example.com.attacker.net`
-(domaine enregistrable différent). Le bouton dans la page ne remplit qu'au
-clic ; un site ne peut pas déclencher le remplissage lui-même. Seule
+**du cadre** (pas celle que la page prétend, ni celle de l'onglet) : un
+identifiant `domain example.com` ne sera jamais proposé sur
+`example.com.attacker.net` (domaine enregistrable différent), ni dans une
+publicité ou un widget d'un autre site hébergé par `example.com` — sauf
+confirmation explicite, qui nomme le cadre et la page. Avant, un cadre
+tiers recevait les identifiants de l'onglet, et « Remplir » dans le popup
+écrivait dans tous les cadres à la fois.
+
+Le bouton dans la page ne remplit qu'au clic, et l'interface injectée est
+dans une shadow root **fermée** dont chaque action exige un événement
+`isTrusted` : un script de la page ne peut ni y lire les noms des comptes,
+ni y cliquer à la place de l'utilisateur, ni déclencher le remplissage. Seule
 exception, le **code TOTP** d'un identifiant du site quand il est le seul :
 rempli sans clic (réglage), car il ne vaut que 30 secondes et pour ce site.
 Le code du « dernier identifiant rempli » sur une page d'un autre domaine
@@ -203,11 +239,15 @@ c'est bien celui qu'il a rempli dans *cet* onglet.
 
 ## Ce qui n'est pas là (encore)
 
-- Détection plus fine des formulaires (inscription vs connexion, iframes
-  de connexion tierces). Le champ utilisateur est reconnu par ses attributs,
-  son libellé (`for`, englobant, `aria-labelledby`) et le texte qui le
-  précède, contre une liste de mots (`USERNAME_RE` dans `content.ts`) ;
-  un champ qu'elle rate est un mot à ajouter là.
+- Détection par heuristique : le champ utilisateur est reconnu par ses
+  attributs, son libellé (`for`, englobant, `aria-labelledby`, attribut
+  `label` de l'hôte d'un composant) et le texte qui le précède, contre une
+  liste de mots (`USERNAME_RE` dans `content.ts`) ; un champ qu'elle rate
+  est un mot à ajouter là — et une page à ajouter au corpus (`e2e/`).
+- Pas de « faire confiance à ce cadre pour ce site » : un fournisseur
+  d'identité sur un autre domaine que le site demande confirmation tant
+  que son URL n'est pas dans l'identifiant (l'ajouter à l'identifiant la
+  supprime).
 - Le partage (membres, invitations, rotation), l'import/export et les
   réglages du compte : l'interface web.
 - Passkeys : pas de compteur de signatures, pas de médiation
@@ -217,14 +257,39 @@ c'est bien celui qu'il a rempli dans *cet* onglet.
 
 ## Tester
 
-Il n'y a pas de test automatisé de l'extension dans le CI : Chromium doit
-être lancé avec `--load-extension`, avec une copie du manifeste qui ajoute
-`tabs` et une permission d'hôte (le popup ouvert comme une page n'a pas
-`activeTab`). Le scénario joué à la main lors du développement : connexion,
-identifiant de la page, remplissage utilisateur + mot de passe, réouverture
-sans mot de passe, bouton dans la page → menu → remplissage, badge,
-remplissage du TOTP, recherche, copie, verrouillage (bouton et badge
-disparus) ; puis, sur une page WebAuthn de test, création d'une passkey,
-authentification **vérifiée par le site** (signature ECDSA contrôlée avec
-la clé publique de l'attestation), passkey visible dans l'interface web,
-et retour au natif sans candidat.
+**Le corpus** (`web/extension/e2e/`, dans le CI) : l'extension construite
+chargée dans un vrai Chromium (Playwright, sans tête), face à des pages de
+connexion piégeuses servies sous plusieurs faux domaines — `bank.test`,
+`login.provider.test`, `ads.test` pointent tous vers un petit serveur local
+(`server.ts`, `--host-resolver-rules`), ce qui donne de vrais cadres d'un
+autre site. La session est amorcée directement dans
+`chrome.storage.session` (des identifiants déchiffrés), sans serveur
+GuiVault. Chaque cas clique le bouton GuiVault là où il est posé et choisit
+au clavier — le menu est dans une racine fermée, que le test ne peut pas
+plus fouiller qu'une page.
+
+```bash
+cd web && npm run test:ext        # construit l'extension puis rejoue le corpus
+```
+
+Les cas : formulaire classique ; libellés seuls à côté d'une lettre
+d'information ; shadow root ouverte, fermée, imbriquée, créée après le
+chargement (le composant doit *voir* la saisie) ; champs contrôlés à la
+React ; inscription (mot de passe + confirmation) ; changement de mot de
+passe (l'actuel seul) ; connexion en deux étapes ; code à six cases rempli
+tout seul ; cadre du même site ; cadre d'un fournisseur d'identité ; cadre
+publicitaire (confirmation, Échap n'écrit rien) ; « Remplir » du popup qui
+épargne le cadre publicitaire, et qui demande confirmation quand le seul
+formulaire y est ; interface injectée hors d'atteinte de la page. Rejoué
+contre le code d'avant, 10 des 17 échouent. **Un site qui résiste** : le
+réduire à une page dans `e2e/fixtures/<domaine>/`, lui écrire un cas dans
+`autofill.spec.ts`, puis corriger.
+
+**À la main** (ce que le corpus ne couvre pas) : Chromium lancé avec
+`--load-extension` sur `web/dist-extension` ; connexion, identifiant de la
+page, remplissage utilisateur + mot de passe, réouverture sans mot de
+passe, badge, remplissage du TOTP, recherche, copie, verrouillage (bouton
+et badge disparus) ; puis, sur une page WebAuthn de test, création d'une
+passkey, authentification **vérifiée par le site** (signature ECDSA
+contrôlée avec la clé publique de l'attestation), passkey visible dans
+l'interface web, et retour au natif sans candidat.

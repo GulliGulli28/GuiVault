@@ -15,13 +15,23 @@
  *    suit sur un autre domaine. Avec un seul candidat du site, le code est
  *    rempli tout seul (réglage « Remplir le code tout seul »).
  *
- * L'interface injectée vit dans un shadow DOM, hors du style de la page. */
+ * La page est vue à travers ses **shadow roots** (ouvertes et fermées,
+ * `dom.ts`) ; chaque **cadre** a son propre script, qui ne reçoit que les
+ * identifiants de son site — ceux de l'onglet seulement après confirmation.
+ * L'interface injectée vit dans une shadow root fermée, hors du style et de
+ * la portée des scripts de la page, et n'obéit qu'aux vrais clics
+ * (`isTrusted`) : une page ne peut pas choisir un identifiant à la place de
+ * l'utilisateur. */
 import { DEFAULT_GENERATOR, generate, type GeneratorOptions } from "../../src/lib/generator";
-import type { CredentialsReply, FillReply, MatchesReply, MatchSummary, PasskeyToBackground, Pending, ToBackground, ToContent, TotpReply, VaultsReply } from "./messages";
+import { collect, deepActiveElement, eventElement, eventInput, hintOf, HOST_ID, isSignup, passwordsToFill, setValue, usable, usableInputs, visible } from "./dom";
+import type { CredentialsReply, FillReply, FrameInfo, MatchesReply, MatchSummary, PasskeyToBackground, Pending, ToBackground, ToContent, TotpReply, VaultsReply } from "./messages";
 
 declare global {
   interface Window {
     __guivaultFill?: boolean;
+    /** Ce que ce cadre montre, pour que le service worker choisisse où
+     * remplir (`chrome.scripting.executeScript`, monde isolé). */
+    __guivaultFrameInfo?: () => FrameInfo;
   }
 }
 
@@ -31,37 +41,16 @@ declare global {
 
   // ─── Formulaire ──────────────────────────────────────────────────────────
 
-  const visible = (el: HTMLElement) => {
-    const r = el.getBoundingClientRect();
-    const st = getComputedStyle(el);
-    return r.width > 0 && r.height > 0 && st.visibility !== "hidden" && st.display !== "none";
-  };
+  /** Les champs utilisables de la page, shadow roots comprises. */
+  const inputs = () => usableInputs();
 
-  const inputs = () => Array.from(document.querySelectorAll<HTMLInputElement>("input")).filter((i) => !i.disabled && !i.readOnly && visible(i));
+  /** Les champs du même formulaire que `anchor` : ceux de son `<form>`, ou,
+   * sans formulaire (page moderne, shadow DOM), ceux qui n'en ont pas —
+   * pas le champ d'une newsletter voisine. */
+  const sameForm = (anchor: HTMLInputElement, all: HTMLInputElement[]) => all.filter((i) => i.form === anchor.form);
 
-  /** Pose une valeur comme le ferait l'utilisateur : par le setter natif
-   * (React garde son propre état sinon) puis les événements `input` et
-   * `change`. */
-  const setValue = (el: HTMLInputElement, value: string) => {
-    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
-    el.focus();
-    if (setter) setter.call(el, value);
-    else el.value = value;
-    el.dispatchEvent(new Event("input", { bubbles: true }));
-    el.dispatchEvent(new Event("change", { bubbles: true }));
-  };
-
-  /** Tout ce qui nomme un champ, pour le reconnaître : attributs, libellé
-   * associé (`for`, englobant, `aria-labelledby`), texte juste avant. */
-  const hintOf = (i: HTMLInputElement): string => {
-    const parts: (string | null | undefined)[] = [i.name, i.id, i.autocomplete, i.placeholder, i.getAttribute("aria-label"), i.title, i.className];
-    for (const id of (i.getAttribute("aria-labelledby") ?? "").split(/\s+/).filter(Boolean)) parts.push(document.getElementById(id)?.textContent);
-    if (i.id) for (const l of Array.from(document.querySelectorAll<HTMLLabelElement>("label"))) if (l.htmlFor === i.id) parts.push(l.textContent);
-    parts.push(i.closest("label")?.textContent);
-    const prev = i.previousElementSibling ?? i.parentElement?.previousElementSibling;
-    if (prev && prev.textContent && prev.textContent.length < 60) parts.push(prev.textContent);
-    return parts.filter(Boolean).join(" ").toLowerCase().replace(/\s+/g, " ");
-  };
+  /** Un clic d'utilisateur, pas un `click()` de la page. */
+  const onTrustedClick = (el: HTMLElement, f: () => void) => el.addEventListener("click", (e) => { if (e.isTrusted) f(); });
 
   const USERNAME_RE = /user|usr|login|log-in|signin|sign-in|e-?mail|courriel|identif|ident\b|compte|account|pseudo|nickname|member|membre|customer|client|phone|tel|mobile|portable|matricule|\bid\b|nom d'utilisateur|adresse/;
   const NOT_USERNAME_RE = /search|recherch|captcha|otp|one-time|code|zip|postal|city|ville|street|rue|firstname|lastname|prénom|surname|card|carte|cvv|iban|coupon|promo|filter|filtre|query|\bq\b/;
@@ -77,17 +66,19 @@ declare global {
   };
 
   /** Le champ utilisateur qui va avec un champ mot de passe : le champ texte
-   * qui le précède dans le même formulaire, sinon le premier qui y
-   * ressemble, sinon le champ actif. */
+   * qui le précède dans le même formulaire (dans l'ordre de lecture, shadow
+   * roots comprises), sinon le premier qui y ressemble, sinon le champ
+   * actif. */
   const usernameFor = (password: HTMLInputElement | undefined, all: HTMLInputElement[]) => {
-    const scope = password?.form ? Array.from(password.form.querySelectorAll<HTMLInputElement>("input")).filter((i) => visible(i)) : all;
+    const scope = password ? sameForm(password, all) : all;
     const before = password ? scope.slice(0, scope.indexOf(password)).reverse() : scope;
+    const active = deepActiveElement();
     return (
       before.find(isUsernameLike) ??
       before.find((i) => ["text", "email"].includes((i.type || "text").toLowerCase())) ??
       all.find(isUsernameLike) ??
       all.find((i) => i !== password && isEmailLike(i)) ??
-      (document.activeElement instanceof HTMLInputElement && document.activeElement.type !== "password" ? document.activeElement : null)
+      (active instanceof HTMLInputElement && active.type !== "password" ? active : null)
     );
   };
 
@@ -150,24 +141,31 @@ declare global {
     } else setValue(field, code);
   };
 
-  const fill = (msg: { username?: string; password?: string; totp?: string }, preferred?: HTMLInputElement): FillReply => {
+  /** Remplit un identifiant (ou un code). `anchor` : le champ dont on a
+   * cliqué le bouton — son formulaire décide des mots de passe à remplir
+   * (le mot de passe actuel d'un changement de mot de passe, les deux d'une
+   * inscription), et c'est lui l'utilisateur s'il n'est pas un mot de passe
+   * (connexion en deux étapes). */
+  const fill = (msg: { username?: string; password?: string; totp?: string }, anchor?: HTMLInputElement): FillReply => {
     const all = inputs();
     const result: FillReply = { username: false, password: false, totp: false };
     if (msg.totp) {
-      const otp = otpFields(all)[0] ?? (document.activeElement instanceof HTMLInputElement ? document.activeElement : null);
+      const active = deepActiveElement();
+      const otp = otpFields(all)[0] ?? (active instanceof HTMLInputElement ? active : null);
       if (otp) {
         fillCode(otp, msg.totp);
         result.totp = true;
       }
       return result;
     }
-    const password = preferred ?? all.find((i) => i.type === "password");
-    if (password && msg.password) {
-      setValue(password, msg.password);
-      result.password = true;
+    const ref = anchor ?? all.find((i) => i.type === "password");
+    const passwords = ref ? passwordsToFill(sameForm(ref, all).filter((i) => i.type === "password")) : [];
+    if (msg.password) {
+      for (const p of passwords) setValue(p, msg.password);
+      result.password = passwords.length > 0;
     }
     if (msg.username) {
-      const user = usernameFor(password, all);
+      const user = anchor && anchor.type !== "password" ? anchor : usernameFor(passwords[0], all);
       if (user) {
         setValue(user, msg.username);
         result.username = true;
@@ -185,6 +183,9 @@ declare global {
   let menu: HTMLElement | null = null;
   const anchors = new Map<HTMLInputElement, HTMLElement>();
   let matches: MatchSummary[] = [];
+  /** Dans un cadre d'un autre site que l'onglet : les identifiants de
+   * l'onglet, à confirmer avant de remplir. */
+  let parent: { host: string; frameHost: string; logins: MatchSummary[] } | null = null;
   let locked = false;
   let enabled = false;
   let lastUrl = "";
@@ -196,9 +197,11 @@ declare global {
   const ensureHost = () => {
     if (shadow) return shadow;
     host = document.createElement("div");
-    host.id = "guivault-inline";
+    host.id = HOST_ID;
     host.style.cssText = "all:initial;position:fixed;left:0;top:0;width:0;height:0;z-index:2147483647;";
-    shadow = host.attachShadow({ mode: "open" });
+    // Fermée : les scripts de la page n'y lisent pas les noms des comptes et
+    // n'y cliquent pas.
+    shadow = host.attachShadow({ mode: "closed" });
     const style = document.createElement("style");
     style.textContent = `
       :host { all: initial; }
@@ -294,12 +297,22 @@ declare global {
     }
   };
 
-  const choose = async (m: MatchSummary, input: HTMLInputElement) => {
+  const choose = async (m: MatchSummary, input: HTMLInputElement, crossFrame = false) => {
     closeMenu();
-    const c = await send<CredentialsReply>({ type: "guivault-credentials", id: m.id });
+    if (crossFrame && parent) {
+      const ok = await dialog(
+        `Remplir dans ${parent.frameHost} ?`,
+        `Ce formulaire est servi par ${parent.frameHost}, dans la page de ${parent.host}. « ${m.name} » est un identifiant de ${parent.host} : ne continuez que si ce cadre est bien la connexion de ce site, pas une publicité ou un widget.`,
+        null,
+        "Remplir quand même",
+        false,
+        "Annuler",
+      );
+      if (ok === null) return;
+    }
+    const c = await send<CredentialsReply>({ type: "guivault-credentials", id: m.id, crossFrame });
     if (!c) return;
-    const password = input.type === "password" ? input : (input.form ? Array.from(input.form.querySelectorAll<HTMLInputElement>("input[type=password]")).find(visible) : undefined) ?? inputs().find((i) => i.type === "password");
-    fill({ username: c.username, password: c.password }, password);
+    fill({ username: c.username, password: c.password }, input);
   };
 
   /** Une ligne de menu : un nom, une ligne secondaire, une action. */
@@ -311,7 +324,7 @@ declare global {
     (b.firstChild as HTMLElement).textContent = name;
     (b.lastChild as HTMLElement).textContent = sub;
     if (hint) b.title = hint;
-    b.addEventListener("click", onClick);
+    onTrustedClick(b, onClick);
     return b;
   };
 
@@ -336,15 +349,30 @@ declare global {
     return { menu, list };
   };
 
+  /** Le formulaire de `input` crée-t-il un mot de passe (inscription,
+   * nouveau mot de passe) plutôt qu'il n'en demande un ? */
+  const signupFor = (input: HTMLInputElement) => {
+    const all = inputs();
+    return isSignup(sameForm(input, all).filter((i) => i.type === "password"));
+  };
+
   const openMenu = (input: HTMLInputElement, btn: HTMLElement) => {
     const { menu: m, list } = newMenu(btn, matches.length ? `${matches.length} identifiant${matches.length > 1 ? "s" : ""} pour ce site` : null);
     for (const l of matches) list.appendChild(menuItem(`${l.favorite ? "★ " : ""}${l.name}`, l.username || "—", () => void choose(l, input), "Remplir avec cet identifiant"));
+    if (parent?.logins.length) {
+      const h = document.createElement("div");
+      h.className = "head";
+      h.textContent = `De ${parent.host} — cadre servi par ${parent.frameHost}`;
+      list.appendChild(h);
+      for (const l of parent.logins) list.appendChild(menuItem(`${l.favorite ? "★ " : ""}${l.name}`, `${l.username || "—"} · à confirmer`, () => void choose(l, input, true), `Identifiant de ${parent!.host}, dans un cadre de ${parent!.frameHost} : GuiVault demandera confirmation`));
+    }
+    const signup = signupFor(input);
     const sticky = document.createElement("div");
-    if (matches.length) sticky.className = "sticky";
+    if (matches.length || parent?.logins.length) sticky.className = "sticky";
     sticky.appendChild(menuItem(
-      matches.length ? "+ Nouvel identifiant…" : `+ Enregistrer un identifiant pour ${location.hostname.replace(/^www\./, "")}…`,
-      matches.length ? "" : "Aucun identifiant GuiVault pour ce site",
-      () => { closeMenu(); void newLoginDialog(input); },
+      signup ? "+ Générer un mot de passe et enregistrer…" : matches.length ? "+ Nouvel identifiant…" : `+ Enregistrer un identifiant pour ${location.hostname.replace(/^www\./, "")}…`,
+      signup ? "Formulaire d'inscription ou de nouveau mot de passe" : matches.length ? "" : "Aucun identifiant GuiVault pour ce site",
+      () => { closeMenu(); void newLoginDialog(input, signup); },
     ));
     m.appendChild(sticky);
     const foot = document.createElement("div");
@@ -438,7 +466,7 @@ declare global {
     btn.setAttribute("aria-label", "GuiVault");
     btn.innerHTML = ICON;
     btn.addEventListener("mousedown", (e) => e.preventDefault());
-    btn.addEventListener("click", () => onButton(input, btn));
+    onTrustedClick(btn, () => onButton(input, btn));
     root.appendChild(btn);
     anchors.set(input, btn);
     place(input, btn);
@@ -484,6 +512,7 @@ declare global {
       locked = !!r?.locked;
       enabled = !!r && (r.locked || r.enabled);
       matches = r && !r.locked ? r.logins : [];
+      parent = r && !r.locked ? r.parent : null;
       recent = r && !r.locked ? r.recent : null;
       autoTotp = !!r && !r.locked && r.autoTotp;
       otpPatterns = [];
@@ -495,7 +524,11 @@ declare global {
         }
       }
     }
-    const all = inputs();
+    // Un seul parcours de la page : les champs, et les shadow roots à
+    // écouter désormais.
+    const found = collect();
+    watchRoots(found.roots);
+    const all = found.inputs.filter(usable);
     // Les champs de code d'abord (seulement s'il y a un code à proposer) :
     // ils ne comptent ni comme mot de passe ni comme utilisateur.
     const candidates = totpCandidates();
@@ -518,7 +551,7 @@ declare global {
       void fillTotp(own[0], target, true);
     }
     const present = all.some((i) => i.type === "password") || fields.length > 0;
-    if (present !== reportedForm && window === window.top) {
+    if (present !== reportedForm) {
       reportedForm = present;
       void send({ type: "guivault-form", present }).catch(() => null);
     }
@@ -530,6 +563,21 @@ declare global {
     scanTimer = window.setTimeout(() => void scan(), 250);
   };
 
+  // Les shadow roots : le document n'entend ni leurs mutations, ni leurs
+  // `submit` (pas `composed`). On les écoute une à une à mesure qu'on les
+  // découvre.
+  const MUTATIONS: MutationObserverInit = { childList: true, subtree: true, attributes: true, attributeFilter: ["type", "style", "class", "hidden"] };
+  const observer = new MutationObserver(scheduleScan);
+  const watched = new WeakSet<ShadowRoot>();
+  const watchRoots = (roots: ShadowRoot[]) => {
+    for (const r of roots) {
+      if (watched.has(r)) continue;
+      watched.add(r);
+      observer.observe(r, MUTATIONS);
+      r.addEventListener("submit", onSubmit, true);
+    }
+  };
+
   // Verrouillage, déverrouillage, nouvel item : le service worker n'a pas de
   // canal vers la page, mais la prochaine URL ou mutation relance la
   // question ; `storage` n'est pas accessible d'ici sans permission, d'où
@@ -537,7 +585,10 @@ declare global {
   const start = () => {
     void scan();
     if (window === window.top) askPending();
-    new MutationObserver(scheduleScan).observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ["type", "style", "class", "hidden"] });
+    observer.observe(document.documentElement, MUTATIONS);
+    // Un champ qui prend le focus : peut-être né dans une shadow root qu'on
+    // ne surveillait pas encore.
+    document.addEventListener("focusin", scheduleScan, true);
     window.addEventListener("scroll", reposition, true);
     window.addEventListener("resize", reposition);
     document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeMenu(); }, true);
@@ -555,23 +606,39 @@ declare global {
   // bannière. Le mot de passe ne repasse jamais par la page : la bannière
   // ne montre que l'utilisateur.
 
+  /** Le mot de passe saisi (celui du formulaire qui compte : l'actuel d'un
+   * changement de mot de passe, le premier d'une inscription), et
+   * l'utilisateur qui va avec. */
   const capture = (form: HTMLFormElement | null, trigger: HTMLInputElement | null) => {
-    const scope = form ? Array.from(form.querySelectorAll<HTMLInputElement>("input")).filter(visible) : inputs();
-    const password = (trigger?.type === "password" ? trigger : undefined) ?? scope.find((i) => i.type === "password" && i.value);
+    const all = inputs();
+    const scope = form ? all.filter((i) => i.form === form) : trigger ? sameForm(trigger, all) : all;
+    const password = passwordsToFill(scope.filter((i) => i.type === "password" && i.value))[0];
     if (!password?.value) return;
-    const user = usernameFor(password, scope);
+    const user = usernameFor(password, all);
     void send<{ ok: boolean } | null>({ type: "guivault-captured", username: user?.value.trim() ?? "", password: password.value }).catch(() => null);
   };
 
-  document.addEventListener("submit", (e) => capture(e.target instanceof HTMLFormElement ? e.target : null, null), true);
+  /** `submit` n'est pas `composed` : écouté sur le document et sur chaque
+   * shadow root. */
+  function onSubmit(e: Event) {
+    const form = eventElement(e);
+    capture(form instanceof HTMLFormElement ? form : null, null);
+  }
+  document.addEventListener("submit", onSubmit, true);
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && e.target instanceof HTMLInputElement && e.target.type === "password") capture(e.target.form, e.target);
+    if (e.key !== "Enter") return;
+    const i = eventInput(e);
+    if (i && i.type === "password") capture(i.form, i);
   }, true);
   document.addEventListener("click", (e) => {
-    const t = e.target instanceof Element ? e.target.closest("button, input[type=submit], [role=button]") : null;
-    if (!t) return;
-    const form = t.closest("form");
-    const password = (form ? Array.from(form.querySelectorAll<HTMLInputElement>("input[type=password]")) : inputs().filter((i) => i.type === "password")).find((i) => visible(i) && i.value);
+    const el = eventElement(e);
+    const t = el?.closest("button, input[type=submit], [role=button]");
+    // Une racine fermée ne laisse voir que son hôte : un clic dessus peut
+    // être celui de son bouton de connexion.
+    const opaqueHost = !t && !!el && el.tagName.includes("-");
+    if (!t && !opaqueHost) return;
+    const form = t?.closest("form") ?? null;
+    const password = (form ? inputs().filter((i) => i.form === form) : inputs()).find((i) => i.type === "password" && visible(i) && i.value);
     if (password) capture(form, password);
   }, true);
 
@@ -610,8 +677,8 @@ declare global {
     actions.append(later, save);
     banner.appendChild(actions);
     const close = () => { banner?.remove(); banner = null; };
-    later.addEventListener("click", () => { void send({ type: "guivault-dismiss-captured" }); close(); });
-    save.addEventListener("click", () => {
+    onTrustedClick(later, () => { void send({ type: "guivault-dismiss-captured" }); close(); });
+    onTrustedClick(save, () => {
       save.disabled = true;
       void send<{ ok: true; name: string } | { ok: false; error: string }>({ type: "guivault-save-captured", vaultId: select?.value ?? p.defaultVaultId }).then((r) => {
         (banner?.querySelector(".text") as HTMLElement | null)?.replaceChildren(document.createTextNode(r.ok ? `« ${r.name} » enregistré dans GuiVault.` : `Échec : ${r.error}`));
@@ -636,8 +703,9 @@ declare global {
   interface Choice { value: string; label: string; sub: string }
 
   /** Une boîte de dialogue dans le shadow DOM : titre, texte, choix
-   * (facultatif), Continuer / Utiliser le navigateur. */
-  const dialog = (title: string, text: string, choices: Choice[] | null, primary: string, okOnly = false): Promise<string | null> =>
+   * (facultatif), Continuer / `secondary` (« Utiliser le navigateur » pour
+   * les passkeys). */
+  const dialog = (title: string, text: string, choices: Choice[] | null, primary: string, okOnly = false, secondary = "Utiliser le navigateur"): Promise<string | null> =>
     new Promise((resolve) => {
       const root = ensureHost();
       const veil = document.createElement("div");
@@ -665,7 +733,7 @@ declare global {
       row.className = "row";
       const cancel = document.createElement("button");
       cancel.className = "b b-ghost";
-      cancel.textContent = "Utiliser le navigateur";
+      cancel.textContent = secondary;
       const ok = document.createElement("button");
       ok.className = "b b-primary";
       ok.textContent = primary;
@@ -677,21 +745,23 @@ declare global {
         box.remove();
         resolve(v);
       };
-      cancel.addEventListener("click", () => done(null));
-      ok.addEventListener("click", () => done(select ? select.value : ""));
+      onTrustedClick(cancel, () => done(null));
+      onTrustedClick(ok, () => done(select ? select.value : ""));
       box.addEventListener("keydown", (e) => { if (e.key === "Escape") done(null); });
       root.append(veil, box);
       ok.focus();
     });
 
   /** Créer un identifiant depuis la page : nom et site préremplis,
-   * utilisateur repris du champ, mot de passe tapé ou généré ; enregistré
-   * dans le vault choisi puis rempli dans le formulaire. */
-  const newLoginDialog = async (input: HTMLInputElement) => {
+   * utilisateur repris du champ, mot de passe tapé ou généré (`generated` :
+   * formulaire d'inscription, le générateur est ouvert et sa valeur déjà
+   * dans le champ) ; enregistré dans le vault choisi puis rempli dans le
+   * formulaire — mot de passe et confirmation. */
+  const newLoginDialog = async (input: HTMLInputElement, generated = false) => {
     const v = await send<VaultsReply>({ type: "guivault-vaults" }).catch(() => null);
     if (!v || v.locked) return void dialog("GuiVault est verrouillé", "Cliquez sur l'icône GuiVault dans la barre du navigateur pour vous reconnecter.", null, "OK", true);
     const all = inputs();
-    const password = input.type === "password" ? input : (input.form ? Array.from(input.form.querySelectorAll<HTMLInputElement>("input[type=password]")).find(visible) : undefined) ?? all.find((i) => i.type === "password");
+    const password = input.type === "password" ? input : sameForm(input, all).find((i) => i.type === "password") ?? all.find((i) => i.type === "password");
     const user = input.type === "password" ? usernameFor(input, all) : input;
     const root = ensureHost();
     const veil = document.createElement("div");
@@ -746,9 +816,9 @@ declare global {
     }
     if (v.vaults.length <= 1) q(".vault").hidden = true;
     const close = () => { veil.remove(); box.remove(); };
-    q("[data-act=cancel]").addEventListener("click", close);
+    onTrustedClick(q("[data-act=cancel]"), close);
     box.addEventListener("keydown", (e) => { if (e.key === "Escape") close(); });
-    q("[data-act=show]").addEventListener("click", () => { const p = q<HTMLInputElement>("[name=password]"); p.type = p.type === "password" ? "text" : "password"; });
+    onTrustedClick(q("[data-act=show]"), () => { const p = q<HTMLInputElement>("[name=password]"); p.type = p.type === "password" ? "text" : "password"; });
     // Le générateur, avec ses réglages (les mêmes que le popup) : replié
     // derrière le dé, il produit une valeur à chaque changement.
     const gen = q<HTMLElement>(".gen");
@@ -777,24 +847,34 @@ declare global {
       render();
       void send({ type: "guivault-generator-options-set", options: opts }).catch(() => null);
     };
-    for (const b of Array.from(gen.querySelectorAll<HTMLButtonElement>("[data-mode]"))) b.addEventListener("click", () => update({ mode: b.dataset.mode as GeneratorOptions["mode"] }));
+    for (const b of Array.from(gen.querySelectorAll<HTMLButtonElement>("[data-mode]"))) onTrustedClick(b, () => update({ mode: b.dataset.mode as GeneratorOptions["mode"] }));
     q("[name=length]").addEventListener("input", (e) => update({ length: Number((e.target as HTMLInputElement).value) }));
     for (const k of ["lowercase", "uppercase", "digits", "symbols", "avoidAmbiguous"] as const) q(`[name=${k}]`).addEventListener("change", (e) => update({ [k]: (e.target as HTMLInputElement).checked }));
     q("[name=words]").addEventListener("input", (e) => update({ words: Number((e.target as HTMLInputElement).value) }));
     q("[name=separator]").addEventListener("input", (e) => update({ separator: (e.target as HTMLInputElement).value }));
     q("[name=capitalize]").addEventListener("change", (e) => update({ capitalize: (e.target as HTMLInputElement).checked }));
     q("[name=includeNumber]").addEventListener("change", (e) => update({ includeNumber: (e.target as HTMLInputElement).checked }));
-    q("[data-act=regen]").addEventListener("click", () => { genValue.textContent = generate(opts); });
-    q("[data-act=use]").addEventListener("click", () => { const p = q<HTMLInputElement>("[name=password]"); p.value = genValue.textContent ?? ""; p.type = "text"; gen.hidden = true; });
-    q("[data-act=gen]").addEventListener("click", () => {
-      if (!gen.hidden) { gen.hidden = true; return; }
-      void send<{ options: GeneratorOptions }>({ type: "guivault-generator-options" }).catch(() => null).then((r) => {
+    onTrustedClick(q("[data-act=regen]"), () => { genValue.textContent = generate(opts); });
+    onTrustedClick(q("[data-act=use]"), () => { const p = q<HTMLInputElement>("[name=password]"); p.value = genValue.textContent ?? ""; p.type = "text"; gen.hidden = true; });
+    const openGenerator = () =>
+      send<{ options: GeneratorOptions }>({ type: "guivault-generator-options" }).catch(() => null).then((r) => {
         if (r?.options) opts = { ...DEFAULT_GENERATOR, ...r.options, password: { ...DEFAULT_GENERATOR.password, ...r.options.password }, passphrase: { ...DEFAULT_GENERATOR.passphrase, ...r.options.passphrase } };
         render();
         gen.hidden = false;
       });
+    onTrustedClick(q("[data-act=gen]"), () => {
+      if (!gen.hidden) { gen.hidden = true; return; }
+      void openGenerator();
     });
-    q("[data-act=save]").addEventListener("click", () => {
+    // Inscription : un mot de passe généré d'emblée, visible, qu'on peut
+    // regénérer ou remplacer.
+    if (generated) {
+      void openGenerator().then(() => {
+        const p = q<HTMLInputElement>("[name=password]");
+        if (!p.value) { p.value = genValue.textContent ?? ""; p.type = "text"; }
+      });
+    }
+    onTrustedClick(q("[data-act=save]"), () => {
       const body = { type: "guivault-create-login" as const, vaultId: select.value, name: q<HTMLInputElement>("[name=name]").value, username: q<HTMLInputElement>("[name=username]").value, password: q<HTMLInputElement>("[name=password]").value, uri: q<HTMLInputElement>("[name=uri]").value };
       if (!body.password) { const err = q(".err"); err.textContent = "Il faut un mot de passe (tapez-le ou générez-le)."; err.hidden = false; return; }
       (q("[data-act=save]") as HTMLButtonElement).disabled = true;
@@ -844,6 +924,17 @@ declare global {
   });
 
   // ─── Ordres du popup et du raccourci ─────────────────────────────────────
+
+  window.__guivaultFrameInfo = () => {
+    const all = inputs();
+    return {
+      url: location.href,
+      password: all.some((i) => i.type === "password"),
+      username: all.some(isUsernameLike),
+      otp: otpFields(all).length > 0,
+      focused: document.hasFocus(),
+    };
+  };
 
   chrome.runtime.onMessage.addListener((msg: ToContent, _sender, reply: (r: FillReply) => void) => {
     if (!msg || typeof msg !== "object") return;

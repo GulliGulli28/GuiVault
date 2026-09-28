@@ -15,25 +15,24 @@ des blobs qu'il ne sait pas lire. Cocher au fur et à mesure.
 paramètres Argon2id épinglés, retour en arrière détecté, enveloppes
 authentifiées, empreinte de l'inviteur) ; dans les §1, §3 et §4 : presse-papiers
 effacé, historique et corbeille, copie hors ligne, recherche globale
-(Ctrl+K), raccourcis, tri, CLI `gv` ; dans le §2 : **accès d'urgence** et
-**liens de partage** (web). Chaque point est coché ci-dessous avec où il
+(Ctrl+K), raccourcis, tri, CLI `gv`, **remplissage fiable** de l'extension
+(shadow DOM, cadres, corpus rejoué en CI) ; dans le §2 : **accès d'urgence**
+et **liens de partage** (web). Chaque point est coché ci-dessous avec où il
 vit dans le code.
 
 **Ensuite, dans cet ordre** — du plus demandé ou du plus exposé au plus
 confortable :
 
-1. **Remplissage plus fiable** (§1, première ligne) : la plainte n°1 contre
-   Bitwarden — shadow DOM, iframes de connexion, avec un corpus de pages
-   rejoué par Playwright en CI.
-2. **Rapport de santé** (§2) : faibles, réutilisés, fuites (HIBP par
+1. **Rapport de santé** (§2) : faibles, réutilisés, fuites (HIBP par
    k-anonymat), clés d'API et cartes qui expirent.
-3. **Agent SSH dans Guiterm** (§3) : le différenciateur dev/ops.
-4. **Manifeste de vault authentifié** (§0) : à concevoir ensemble avant de
+2. **Agent SSH dans Guiterm** (§3) : le différenciateur dev/ops.
+3. **Manifeste de vault authentifié** (§0) : à concevoir ensemble avant de
    l'écrire (chaque écriture devient deux, sous le verrou optimiste ; tous
    les clients à la fois).
-5. **Exploitation** (§5 : administration, sauvegardes vérifiées, **SMTP** —
-   qui compléterait l'accès d'urgence d'une alerte par e-mail —,
-   suppression de compte) et **mobile** (§4).
+4. **Exploitation** (§5 : administration, sauvegardes vérifiées, **SMTP**
+   facultatif — qui compléterait l'accès d'urgence d'une alerte par
+   e-mail, sans que rien n'en dépende —, suppression de compte) et
+   **mobile** (§4).
 
 ## 0. Sécurité face à un serveur malveillant
 
@@ -97,7 +96,7 @@ paramètres ou formats anciens.
 
 | Reproche fréquent | Chez nous aujourd'hui | Piste |
 |---|---|---|
-| Remplissage peu fiable (plainte n°1 ; sites en shadow DOM cités) | `content.ts` ne parcourt pas les `shadowRoot`, ni les iframes de connexion tierces | Parcourir les shadow roots ouverts et les iframes ; corpus de pages de connexion rejoué par Playwright en CI |
+| ~~Remplissage peu fiable (plainte n°1 ; sites en shadow DOM cités)~~ **fait** | `extension/src/dom.ts` : shadow roots ouvertes et fermées (`chrome.dom.openOrClosedShadowRoot`), imbriquées ou tardives, saisie `composed` ; `frames.ts` : chaque cadre est son propre site (identifiants de l'onglet seulement confirmés, « Remplir » du popup vers un seul cadre — un cadre tiers recevait avant le mot de passe du site) ; inscription et changement de mot de passe reconnus ; interface injectée fermée, clics `isTrusted`. Corpus `extension/e2e` (17 cas, Playwright, CI) | « Faire confiance à ce cadre » pour un fournisseur d'identité ; Firefox dans le corpus ; pages réelles anonymisées au fil des signalements |
 | ~~Coffre auto-hébergé injoignable = plus rien (« bloqué à l'aéroport »)~~ **fait** | `lib/offline.ts` : copie chiffrée en IndexedDB (par appareil, désactivée par défaut), ouverte avec le mot de passe maître en lecture seule — web (interface gardée par `public/sw.js`) et extension (le remplissage marche) | Écrire hors ligne et resynchroniser ; manifeste PWA installable ; Guiterm |
 | ~~Pas d'historique des modifications~~ **fait** | Table `item_versions` (versions chiffrées, `GUIVAULT_ITEM_HISTORY`), corbeille `GUIVAULT_TRASH_DAYS` jours, restauration par renvoi tel quel ; web : « Historique » d'un élément et page Corbeille ; les rotations (web, Guiterm) re-chiffrent l'historique | Guiterm : pas encore d'écran corbeille/historique (le web s'en charge) |
 | ~~Presse-papier jamais effacé (très demandé)~~ **fait** | `lib/clipboard.ts` : effacé au bout du délai (30 s par défaut, section synchronisée `clipboard`) s'il contient encore ce qui a été copié ; extension : service worker + document hors écran ; web : à l'échéance si la page peut vérifier, sinon au clic suivant | — |

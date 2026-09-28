@@ -104,9 +104,15 @@ HMAC pour les sels fictifs de prelogin.
     `lib/importers.ts` / `lib/exporters.ts` (formats dans `docs/ITEMS.md`).
   - `extension/` — l'extension de navigateur (MV3), même `node_modules`,
     importe `../../src/lib/*` et quelques composants. `docs/EXTENSION.md`.
-    Le popup ouvert comme une page n'a pas `activeTab` : pour un test
-    Playwright, copier `dist-extension` en ajoutant `tabs` et une
-    `host_permissions` au manifeste, et ouvrir `popup.html?tab=<id>`.
+    Le script de page (`content.ts`) voit la page par `dom.ts` (shadow
+    roots, y compris fermées) ; ce qui décide pour un cadre — son URL à lui,
+    jamais celle de l'onglet sans confirmation — est dans `frames.ts`.
+    **Corpus** : `extension/e2e/` (pages piégeuses sous de faux domaines
+    `*.test`, l'extension réelle chargée, session amorcée sans serveur),
+    `npm run test:ext`, dans le CI ; un site qui résiste = une page de plus
+    dans `e2e/fixtures/` et un cas dans `autofill.spec.ts`. Le popup ouvert
+    comme une page n'a pas `activeTab` : pour un test Playwright du popup,
+    ouvrir `popup.html?tab=<id>`.
   - `components/` — une page par route (`VaultPage`, `VaultSettings`,
     `ToolsPage` import/export, `TrashPage` corbeille, `SettingsPage`
     apparence/compte/sécurité/sessions, `InvitationsPage`, `GeneratorPanel`),
@@ -135,6 +141,7 @@ cargo clippy --all-targets           # doit être vide
 cargo fmt --all --check              # le CI le bloque (max_width = 120)
 cd web && npm test && npm run lint && npm run build   # Node 20 via nvm (`source ~/.nvm/nvm.sh`)
 cd web && npm run build:ext                           # extension (dist-extension/, non embarquée)
+cd web && npm run test:ext                            # corpus de remplissage (Playwright, Chromium)
 docker build -f docker/Dockerfile -t guivault:dev .
 ```
 

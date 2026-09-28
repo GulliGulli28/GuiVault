@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "lint": "eslint .",
-    "build:ext": "vite build -c vite.extension.config.ts && vite build -c vite.content.config.ts && vite build -c vite.shim.config.ts"
+    "build:ext": "vite build -c vite.extension.config.ts && vite build -c vite.content.config.ts && vite build -c vite.shim.config.ts",
+    "test:ext": "npm run build:ext && playwright test -c extension/e2e"
   },
   "dependencies": {
     "@fontsource/jetbrains-mono": "^5.2.8",
@@ -23,6 +24,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "1.61.1",
     "@types/chrome": "^0.3.0",
     "@types/node": "^26.6.1",
     "@types/react": "^19.2.17",

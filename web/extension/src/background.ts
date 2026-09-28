@@ -13,7 +13,8 @@ import type { Login } from "../../src/lib/types";
 import { setTokensChangedHandler } from "../../src/lib/api";
 import { uuid } from "../../src/lib/bytes";
 import { DEFAULT_GENERATOR, generate, type GeneratorOptions } from "../../src/lib/generator";
-import type { CredentialsReply, FillReply, MatchesReply, MatchSummary, OffscreenMessage, PasskeyToBackground, Pending, PopupToBackground, ToBackground, ToContent, TotpReply, VaultsReply } from "./messages";
+import type { CredentialsReply, FillReply, FillTabReply, FrameInfo, MatchesReply, MatchSummary, OffscreenMessage, PasskeyToBackground, Pending, PopupToBackground, ToBackground, ToContent, TotpReply, VaultsReply } from "./messages";
+import { hostOf, parentUrl, pickFrame, senderUrl, shortcutFrame, type FrameCandidate } from "./frames";
 import { clearClipboardIfUnchanged } from "./clipboardDom";
 import * as passkeys from "./passkeys";
 import { CLIPBOARD_ALARM, LOCK_ALARM, loadItemsCache, loadSession, loadSettings, lock, noteRecentFill, parseOtpPatterns, recentFill, saveTokens, scheduleClipboardClear, takeClipboardClear } from "./store";
@@ -56,20 +57,32 @@ async function updateIcon() {
 
 // ─── Badge ──────────────────────────────────────────────────────────────────
 
-/** Les onglets où le script de page a vu un formulaire de connexion : le
- * badge ne compte que là — un site où l'on a des identifiants mais pas de
- * formulaire sous les yeux n'a rien à signaler. */
-async function formPresent(tabId: number): Promise<boolean> {
+/** Les cadres où le script de page a vu un formulaire de connexion, par
+ * onglet (`frameId` → URL du cadre) : le badge ne compte que là — un site
+ * où l'on a des identifiants mais pas de formulaire sous les yeux n'a rien
+ * à signaler. */
+type Forms = Record<string, Record<string, string>>;
+
+async function formFrames(tabId: number): Promise<Record<string, string>> {
   const r = await chrome.storage.session.get("forms");
-  return !!((r.forms as Record<string, boolean> | undefined) ?? {})[tabId];
+  return ((r.forms as Forms | undefined) ?? {})[tabId] ?? {};
 }
 
-async function setFormPresent(tabId: number, present: boolean) {
+/** `frameId` absent : on oublie tout l'onglet (nouvelle page). */
+async function setFormPresent(tabId: number, present: boolean, frameId?: number, url?: string) {
   const r = await chrome.storage.session.get("forms");
-  const all = (r.forms as Record<string, boolean> | undefined) ?? {};
-  if (all[tabId] === present) return;
-  if (present) all[tabId] = true;
-  else delete all[tabId];
+  const all = (r.forms as Forms | undefined) ?? {};
+  const frames = { ...(all[tabId] ?? {}) };
+  if (frameId === undefined) {
+    if (!all[tabId]) return;
+    delete all[tabId];
+  } else {
+    if (present === (frameId in frames) && (!present || frames[frameId] === url)) return;
+    if (present && url) frames[frameId] = url;
+    else delete frames[frameId];
+    if (Object.keys(frames).length) all[tabId] = frames;
+    else delete all[tabId];
+  }
   await chrome.storage.session.set({ forms: all });
 }
 
@@ -80,8 +93,16 @@ async function updateBadge(tabId: number) {
   } catch {
     return;
   }
-  const m = (await formPresent(tabId)) ? await matchesFor(url) : null;
-  const text = m && m.length > 0 ? String(m.length) : "";
+  // Ce qui correspond à l'onglet, et à chaque cadre qui montre un
+  // formulaire (une connexion servie dans un cadre par son fournisseur).
+  const frames = await formFrames(tabId);
+  let count = 0;
+  if (Object.keys(frames).length) {
+    const ids = new Set<string>();
+    for (const u of new Set([url, ...Object.values(frames)])) for (const l of (await matchesFor(u)) ?? []) ids.add(l.id);
+    count = ids.size;
+  }
+  const text = count > 0 ? String(count) : "";
   await chrome.action.setBadgeText({ tabId, text }).catch(() => {});
   if (text) await chrome.action.setBadgeBackgroundColor({ tabId, color: "#2563eb" }).catch(() => {});
 }
@@ -114,7 +135,11 @@ void updateIcon();
 // par onglet), la page suivante la demande et l'affiche.
 
 interface Captured {
+  /** L'URL du cadre où le formulaire a été soumis. */
   url: string;
+  /** Celle de l'onglet quand c'est un autre site (connexion dans un cadre) :
+   * l'identifiant enregistré vaudra pour les deux. */
+  parentUrl?: string;
   username: string;
   password: string;
   mode: "new" | "update";
@@ -142,22 +167,15 @@ async function setPending(tabId: number, c: Captured | null) {
 
 /** Une saisie vaut la peine d'être proposée si aucun identifiant du site
  * n'a déjà ce couple, ou si l'un a ce nom mais un autre mot de passe. */
-async function classify(url: string, username: string, password: string): Promise<Pick<Captured, "mode" | "loginId" | "loginName"> | null> {
-  const m = await matchesFor(url);
-  if (!m) return null;
+async function classify(urls: string[], username: string, password: string): Promise<Pick<Captured, "mode" | "loginId" | "loginName"> | null> {
+  const lists = await Promise.all(urls.map((u) => matchesFor(u)));
+  if (lists.some((l) => l === null)) return null;
+  const m = [...new Map(lists.flatMap((l) => l ?? []).map((l) => [l.id, l])).values()];
   const same = m.find((l) => l.username.toLowerCase() === username.toLowerCase());
   if (same && same.password === password) return null;
   if (same) return { mode: "update", loginId: same.id, loginName: same.name };
   if (m.some((l) => l.password === password && !l.username)) return null;
   return { mode: "new", loginId: null, loginName: null };
-}
-
-function hostOf(url: string): string {
-  try {
-    return new URL(url).host;
-  } catch {
-    return url;
-  }
 }
 
 async function saveCaptured(tabId: number, vaultId: string): Promise<{ ok: true; name: string } | { ok: false; error: string }> {
@@ -173,14 +191,71 @@ async function saveCaptured(tabId: number, vaultId: string): Promise<{ ok: true;
       await setPending(tabId, null);
       return { ok: true, name: login.name };
     }
-    const host = hostOf(c.url);
-    const login: Login = { id: uuid(), name: host.replace(/^www\./, ""), groupId: null, tags: [], username: c.username, password: c.password, uris: [{ uri: new URL(c.url).origin, match: null }], totp: null, passkeys: [], passwordHistory: [] };
+    const host = hostOf(c.parentUrl ?? c.url);
+    const login: Login = { id: uuid(), name: host.replace(/^www\./, ""), groupId: null, tags: [], username: c.username, password: c.password, uris: urisFor(c.url, c.parentUrl), totp: null, passkeys: [], passwordHistory: [] };
     await saveLogin(vaultId, login);
     await setPending(tabId, null);
     return { ok: true, name: login.name };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) };
   }
+}
+
+/** Les URI d'un identifiant créé dans un cadre : celle du cadre, et celle
+ * de l'onglet si c'est un autre site — rempli ensuite sans confirmation
+ * dans ce cadre, et proposé dans le popup sur la page. */
+function urisFor(url: string, parent?: string): Login["uris"] {
+  const origin = new URL(url).origin;
+  const uris: Login["uris"] = [{ uri: origin, match: null }];
+  if (parent) {
+    const p = new URL(parent).origin;
+    if (p !== origin) uris.unshift({ uri: p, match: null });
+  }
+  return uris;
+}
+
+/** Ce que chaque cadre de l'onglet montre (après y avoir mis le script de
+ * page s'il n'y était pas). Un cadre inaccessible (autre schéma, page du
+ * navigateur) est simplement absent. */
+async function tabFrames(tabId: number): Promise<FrameCandidate[]> {
+  await chrome.scripting.executeScript({ target: { tabId, allFrames: true }, files: ["content.js"] }).catch(() => undefined);
+  const results = await chrome.scripting
+    .executeScript({ target: { tabId, allFrames: true }, func: () => (window as Window & { __guivaultFrameInfo?: () => FrameInfo }).__guivaultFrameInfo?.() ?? null })
+    .catch(() => [] as chrome.scripting.InjectionResult<FrameInfo | null>[]);
+  return results.flatMap((r) => (r.result ? [{ frameId: r.frameId, info: r.result as FrameInfo }] : []));
+}
+
+/** Le popup demande de remplir un identifiant dans l'onglet : le worker
+ * choisit **un** cadre — jamais tous à la fois, un cadre tiers n'a pas à
+ * recevoir le mot de passe du site. */
+async function fillTab(tabId: number, loginId: string, what: "credentials" | "totp", confirmedFrame?: number): Promise<FillTabReply> {
+  const all = await logins();
+  if (!all) return { ok: false, reason: "locked" };
+  const login = all.find((l) => l.id === loginId);
+  if (!login) return { ok: false, reason: "not-found" };
+  let tab: chrome.tabs.Tab;
+  try {
+    tab = await chrome.tabs.get(tabId);
+  } catch {
+    return { ok: false, reason: "no-page" };
+  }
+  if (!tab.url || !/^https?:/.test(tab.url)) return { ok: false, reason: "no-page" };
+  const frames = await tabFrames(tabId);
+  let frameId: number;
+  if (confirmedFrame !== undefined && frames.some((f) => f.frameId === confirmedFrame)) {
+    frameId = confirmedFrame;
+  } else {
+    const pick = pickFrame(frames, (u) => loginMatches(login, u), what);
+    if (!pick) return { ok: false, reason: "no-fields" };
+    if ("confirm" in pick) return { ok: false, reason: "confirm", frameId: pick.confirm, frameHost: pick.host };
+    frameId = pick.fill;
+  }
+  const p = what === "totp" && login.totp ? parseTotp(login.totp) : null;
+  const msg: ToContent = what === "totp" ? { type: "guivault-fill", totp: p ? await totpCode(p) : "" } : { type: "guivault-fill", username: login.username, password: login.password };
+  const filled = await chrome.tabs.sendMessage<ToContent, FillReply | undefined>(tabId, msg, { frameId }).catch(() => undefined);
+  if (!filled) return { ok: false, reason: "no-fields" };
+  if (filled.username || filled.password) await noteRecentFill(tabId, login.id);
+  return { ok: true, filled };
 }
 
 // ─── Messages du script de page ─────────────────────────────────────────────
@@ -193,6 +268,13 @@ chrome.runtime.onMessage.addListener((msg: ToBackground | PasskeyToBackground | 
   if (msg.type === "guivault-clipboard-clear") {
     if (sender.id !== chrome.runtime.id || !sender.url?.startsWith(chrome.runtime.getURL(""))) return;
     void scheduleClipboardClear(msg.hash, msg.delayMs).then(() => reply(true));
+    return true;
+  }
+  // Remplir depuis le popup : une page de l'extension seulement — un script
+  // de page n'ordonne pas de remplir un autre onglet.
+  if (msg.type === "guivault-fill-tab") {
+    if (sender.id !== chrome.runtime.id || !sender.url?.startsWith(chrome.runtime.getURL(""))) return;
+    void fillTab(msg.tabId, msg.loginId, msg.what, msg.frameId).then(reply, (e) => reply({ ok: false, reason: "no-fields", error: String(e) }));
     return true;
   }
   const origin = sender.origin ?? (sender.url ? new URL(sender.url).origin : "");
@@ -218,20 +300,25 @@ chrome.runtime.onMessage.addListener((msg: ToBackground | PasskeyToBackground | 
       return reply({ attestation: await passkeys.register({ ...req, origin }) });
     }
     if (msg.type === "guivault-matches") {
-      // L'URL est celle que le navigateur connaît de l'expéditeur, pas
-      // celle que la page prétend.
-      const url = sender.tab?.url ?? sender.url ?? msg.url;
+      // L'URL est celle que le navigateur connaît de l'expéditeur — du
+      // **cadre**, pas de l'onglet : un cadre tiers ne reçoit pas les
+      // identifiants du site qui l'héberge. Ceux-là, il ne les a qu'à
+      // confirmer (`parent`).
+      const url = senderUrl(sender);
       const m = await matchesFor(url);
       if (!m) return reply({ locked: true } satisfies MatchesReply);
+      const top = parentUrl(sender);
+      const fromTop = top ? ((await matchesFor(top)) ?? []).filter((l) => !m.some((x) => x.id === l.id)) : [];
+      const parent = top && url && fromTop.length ? { host: hostOf(top), frameHost: hostOf(url), logins: fromTop.map(summary) } : null;
       const settings = await loadSettings();
       const tabId = sender.tab?.id;
       const recentId = tabId != null ? await recentFill(tabId) : null;
       const recent = recentId && !m.some((l) => l.id === recentId) ? (await logins())?.find((l) => l.id === recentId && l.totp) ?? null : null;
       const otpPatterns = parseOtpPatterns(settings.otpPatterns).rules.filter((r) => !r.url || (url ? r.url.test(url) : false)).map((r) => r.field.source);
-      return reply({ locked: false, enabled: settings.inlineAutofill, logins: m.map(summary), recent: recent ? summary(recent) : null, autoTotp: settings.autoTotp, otpPatterns } satisfies MatchesReply);
+      return reply({ locked: false, enabled: settings.inlineAutofill, logins: m.map(summary), parent, recent: recent ? summary(recent) : null, autoTotp: settings.autoTotp, otpPatterns } satisfies MatchesReply);
     }
     if (msg.type === "guivault-totp") {
-      const url = sender.tab?.url ?? sender.url;
+      const url = senderUrl(sender);
       const tabId = sender.tab?.id;
       const m = await matchesFor(url);
       let l = m?.find((x) => x.id === msg.id);
@@ -243,11 +330,13 @@ chrome.runtime.onMessage.addListener((msg: ToBackground | PasskeyToBackground | 
     }
     if (msg.type === "guivault-captured") {
       const tabId = sender.tab?.id;
-      const url = sender.tab?.url ?? sender.url;
+      const url = senderUrl(sender);
       if (tabId == null || !url || !msg.password) return reply(null);
-      const cls = await classify(url, msg.username, msg.password);
+      const top = parentUrl(sender);
+      const parentOther = top && new URL(top).origin !== new URL(url).origin ? top : undefined;
+      const cls = await classify(parentOther ? [url, parentOther] : [url], msg.username, msg.password);
       if (!cls) return reply(null);
-      await setPending(tabId, { url, username: msg.username, password: msg.password, ...cls, at: Date.now() });
+      await setPending(tabId, { url, parentUrl: parentOther, username: msg.username, password: msg.password, ...cls, at: Date.now() });
       return reply({ ok: true });
     }
     if (msg.type === "guivault-pending") {
@@ -258,7 +347,8 @@ chrome.runtime.onMessage.addListener((msg: ToBackground | PasskeyToBackground | 
       if (!c || !s) return reply(null);
       const vaults = s.state.vaults.filter((v) => v.role !== "reader").map((v) => ({ id: v.id, name: v.name }));
       const personal = s.state.vaults.find((v) => v.kind === "personal");
-      const p: Pending = { host: hostOf(c.url), username: c.username, mode: c.mode, loginName: c.loginName, vaults, defaultVaultId: personal?.id ?? vaults[0]?.id ?? "" };
+      const host = c.parentUrl ? `${hostOf(c.parentUrl)} (formulaire de ${hostOf(c.url)})` : hostOf(c.url);
+      const p: Pending = { host, username: c.username, mode: c.mode, loginName: c.loginName, vaults, defaultVaultId: personal?.id ?? vaults[0]?.id ?? "" };
       return reply(p);
     }
     if (msg.type === "guivault-save-captured") {
@@ -271,8 +361,9 @@ chrome.runtime.onMessage.addListener((msg: ToBackground | PasskeyToBackground | 
       return reply({ ok: true });
     }
     if (msg.type === "guivault-form") {
-      if (sender.tab?.id != null && sender.frameId === 0) {
-        await setFormPresent(sender.tab.id, msg.present);
+      const url = senderUrl(sender);
+      if (sender.tab?.id != null && url) {
+        await setFormPresent(sender.tab.id, msg.present, sender.frameId ?? 0, url);
         await updateBadge(sender.tab.id);
       }
       return reply({ ok: true });
@@ -300,9 +391,15 @@ chrome.runtime.onMessage.addListener((msg: ToBackground | PasskeyToBackground | 
       return reply({ password: generate(opts) });
     }
     if (msg.type === "guivault-create-login") {
-      if (!sender.tab?.url) return reply({ ok: false, error: "pas d'onglet" });
-      const uri = msg.uri.trim() || new URL(sender.tab.url).origin;
-      const login: Login = { id: uuid(), name: msg.name.trim() || hostOf(uri), groupId: null, tags: [], username: msg.username.trim(), password: msg.password, uris: [{ uri, match: null }], totp: null, passkeys: [], passwordHistory: [] };
+      const url = senderUrl(sender);
+      if (!sender.tab?.url || !url) return reply({ ok: false, error: "pas d'onglet" });
+      const uri = msg.uri.trim() || new URL(url).origin;
+      // Créé dans un cadre d'un autre site : l'identifiant vaut aussi pour
+      // la page qui l'héberge.
+      const top = parentUrl(sender);
+      const uris: Login["uris"] = [{ uri, match: null }];
+      if (top && new URL(top).origin !== new URL(url).origin && !msg.uri.includes(new URL(top).host)) uris.unshift({ uri: new URL(top).origin, match: null });
+      const login: Login = { id: uuid(), name: msg.name.trim() || hostOf(uri), groupId: null, tags: [], username: msg.username.trim(), password: msg.password, uris, totp: null, passkeys: [], passwordHistory: [] };
       try {
         await saveLogin(msg.vaultId, login);
         return reply({ ok: true, name: login.name });
@@ -311,9 +408,12 @@ chrome.runtime.onMessage.addListener((msg: ToBackground | PasskeyToBackground | 
       }
     }
     if (msg.type === "guivault-credentials") {
-      const url = sender.tab?.url ?? sender.url;
-      const m = await matchesFor(url);
-      const l = m?.find((x) => x.id === msg.id);
+      // Un identifiant du cadre ; ou, confirmé par l'utilisateur dans la
+      // page (clic réel), un identifiant de l'onglet qui l'héberge.
+      const m = await matchesFor(senderUrl(sender));
+      let l = m?.find((x) => x.id === msg.id);
+      const top = parentUrl(sender);
+      if (!l && msg.crossFrame && top) l = (await matchesFor(top))?.find((x) => x.id === msg.id);
       if (!l) return reply(null);
       if (sender.tab?.id != null) await noteRecentFill(sender.tab.id, l.id);
       const p = l.totp ? parseTotp(l.totp) : null;
@@ -332,11 +432,11 @@ chrome.commands.onCommand.addListener((command) => {
     if (!tab?.id) return;
     const m = await matchesFor(tab.url);
     if (!m || !tab.url || !/^https?:/.test(tab.url)) return;
-    // La page décide (elle sait si elle montre un champ de code) ; le
-    // script de page est d'ordinaire déjà là, l'injecter n'en crée pas un
-    // second.
-    await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["content.js"] });
-    await chrome.tabs.sendMessage<ToContent, FillReply | undefined>(tab.id, { type: "guivault-shortcut" }).catch(() => undefined);
+    // Un seul cadre décide (celui qui a le focus, sinon celui qui a un
+    // formulaire), avec ses propres correspondances ; le script de page y
+    // est d'ordinaire déjà, l'injecter n'en crée pas un second.
+    const frameId = shortcutFrame(await tabFrames(tab.id));
+    await chrome.tabs.sendMessage<ToContent, FillReply | undefined>(tab.id, { type: "guivault-shortcut" }, { frameId }).catch(() => undefined);
   })();
 });
 

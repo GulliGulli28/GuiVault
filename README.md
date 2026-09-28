@@ -48,7 +48,9 @@ serveur puisse jamais lire un secret.
   les clés lui sont enveloppées côté client, le serveur ne sait que les
   garder et les remettre.
 - **Extension de navigateur** (Chrome/Edge/Firefox) : les identifiants de
-  la page courante, remplissage en un clic ou depuis le champ, codes TOTP,
+  la page courante, remplissage en un clic ou depuis le champ — y compris
+  dans les composants web (shadow DOM) et les cadres de connexion, sans
+  jamais donner le mot de passe d'un site à un cadre tiers —, codes TOTP,
   passkeys, authentificateur (codes TOTP), générateur —
   [`docs/EXTENSION.md`](docs/EXTENSION.md).
 - **En ligne de commande** (`gv`) : lire un secret par référence

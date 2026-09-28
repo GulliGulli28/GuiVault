@@ -1,0 +1,7 @@
+<!doctype html><meta charset="utf-8"><title>Banque — code</title><script src="/kit.js"></script>
+<p>Saisissez le code de vérification à 6 chiffres.</p>
+<div class="cells" aria-label="Code de vérification"></div>
+<script>
+  const box = document.querySelector(".cells");
+  for (let i = 0; i < 6; i++) { const c = document.createElement("input"); c.maxLength = 1; c.inputMode = "numeric"; c.style.width = "2em"; box.appendChild(c); field("c" + i, c); }
+</script>

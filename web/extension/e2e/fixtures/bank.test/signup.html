@@ -1,0 +1,8 @@
+<!doctype html><meta charset="utf-8"><title>Banque — inscription</title><script src="/kit.js"></script>
+<form onsubmit="event.preventDefault()">
+  <label>E-mail <input id="u" type="email" autocomplete="username"></label>
+  <label>Choisissez un mot de passe <input id="p1" type="password" autocomplete="new-password"></label>
+  <label>Confirmez le mot de passe <input id="p2" type="password" autocomplete="new-password"></label>
+  <button>Créer mon compte</button>
+</form>
+<script>field("username", u); field("password", p1); field("confirm", p2);</script>

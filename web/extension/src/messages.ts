@@ -13,9 +13,11 @@ export interface MatchSummary {
 export type ToBackground =
   /** La page demande ce qui lui correspond. */
   | { type: "guivault-matches"; url: string }
-  /** L'utilisateur a choisi un identifiant : ses secrets, si l'URL de
-   * l'onglet expéditeur correspond bien. */
-  | { type: "guivault-credentials"; id: string }
+  /** L'utilisateur a choisi un identifiant : ses secrets, si l'URL du
+   * cadre expéditeur correspond bien — ou, avec `crossFrame`, si celle de
+   * l'onglet correspond et que l'utilisateur a confirmé remplir un cadre
+   * servi par un autre site. */
+  | { type: "guivault-credentials"; id: string; crossFrame?: boolean }
   /** Le code TOTP courant d'un identifiant : un de ceux du site, ou le
    * dernier rempli dans cet onglet (page de SSO sur un autre domaine). */
   | { type: "guivault-totp"; id: string }
@@ -25,7 +27,7 @@ export type ToBackground =
   | { type: "guivault-pending" }
   | { type: "guivault-save-captured"; vaultId: string }
   | { type: "guivault-dismiss-captured" }
-  /** La page dit si elle a un formulaire de connexion (pour le badge). */
+  /** Le cadre dit s'il a un formulaire de connexion (pour le badge). */
   | { type: "guivault-form"; present: boolean }
   /** Les vaults où créer un identifiant depuis la page. */
   | { type: "guivault-vaults" }
@@ -54,7 +56,13 @@ export type MatchesReply =
   | {
       locked: false;
       enabled: boolean;
+      /** Les identifiants de l'URL **du cadre** (celle que le navigateur
+       * connaît, pas celle que la page prétend). */
       logins: MatchSummary[];
+      /** Dans un cadre servi par un autre site que l'onglet : les
+       * identifiants de l'onglet, à ne remplir qu'après confirmation (le
+       * cadre pourrait être une publicité ou un widget tiers). */
+      parent: { host: string; frameHost: string; logins: MatchSummary[] } | null;
       /** Le dernier identifiant rempli dans cet onglet, s'il a un TOTP et
        * n'est pas déjà dans `logins` : une page de SSO qui suit la connexion
        * peut demander son code. */
@@ -88,9 +96,32 @@ export type PasskeyToBackground =
   | { type: "guivault-passkey-logins"; rpId: string }
   | { type: "guivault-passkey-register"; rpId: string; rpName: string; userHandle: string; userName: string; userDisplayName: string; challenge: string; loginId: string | null; discoverable: boolean };
 
-/** Du popup au service worker : effacer le presse-papiers dans `delayMs`
- * s'il contient encore ce qui a pour empreinte `hash` (`lib/clipboard.ts`). */
-export type PopupToBackground = { type: "guivault-clipboard-clear"; hash: string; delayMs: number };
+/** Ce qu'un cadre dit de lui (`window.__guivaultFrameInfo`, lu par
+ * `chrome.scripting.executeScript` dans chaque cadre) : de quoi choisir où
+ * remplir sans envoyer un secret à tous. */
+export interface FrameInfo {
+  url: string;
+  password: boolean;
+  username: boolean;
+  otp: boolean;
+  focused: boolean;
+}
+
+/** Du popup au service worker :
+ * - effacer le presse-papiers dans `delayMs` s'il contient encore ce qui a
+ *   pour empreinte `hash` (`lib/clipboard.ts`) ;
+ * - remplir un identifiant dans l'onglet : le worker choisit le cadre
+ *   (`pickFrame`) ; `frameId` : celui que l'utilisateur a confirmé. */
+export type PopupToBackground =
+  | { type: "guivault-clipboard-clear"; hash: string; delayMs: number }
+  | { type: "guivault-fill-tab"; tabId: number; loginId: string; what: "credentials" | "totp"; frameId?: number };
+
+export type FillTabReply =
+  | { ok: true; filled: FillReply }
+  | { ok: false; reason: "locked" | "not-found" | "no-page" | "no-fields" }
+  /** Le seul formulaire est dans un cadre d'un autre site que l'identifiant :
+   * à confirmer (renvoyer avec `frameId`). */
+  | { ok: false; reason: "confirm"; frameId: number; frameHost: string };
 
 /** Du service worker à son document hors écran (Chrome). */
 export type OffscreenMessage = { type: "guivault-offscreen-clipboard-clear"; hash: string };

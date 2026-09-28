@@ -27,7 +27,8 @@
   },
   "include": [
     "src",
-    "extension/src"
+    "extension/src",
+    "extension/e2e"
   ],
   "references": [
     {

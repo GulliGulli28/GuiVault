@@ -1,0 +1,9 @@
+<!doctype html><meta charset="utf-8"><title>Banque — libellés seuls</title><script src="/kit.js"></script>
+<form id="news" onsubmit="event.preventDefault()"><label>Votre e-mail pour la lettre <input id="news-mail" type="email"></label><button>S'abonner</button></form>
+<hr>
+<form onsubmit="event.preventDefault()">
+  <label for="a">Identifiant client</label><input id="a" type="text">
+  <label for="b">Code secret</label><input id="b" type="password">
+  <button>Valider</button>
+</form>
+<script>field("username", a); field("password", b); field("newsletter", document.getElementById("news-mail"));</script>
