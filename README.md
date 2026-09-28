@@ -39,6 +39,14 @@ serveur puisse jamais lire un secret.
   lire son coffre (et remplir dans l'extension) quand le serveur ne répond
   pas.
   Formats décrits dans [`docs/ITEMS.md`](docs/ITEMS.md).
+- **Liens de partage** éphémères (« Send ») : un texte ou un élément transmis
+  à quelqu'un sans compte, chiffré dans le navigateur, la clé dans le lien
+  (jamais vue par le serveur), avec expiration, nombre d'ouvertures et mot
+  de passe facultatif.
+- **Accès d'urgence** : désigner un proche qui pourra lire certains de vos
+  vaults si vous ne refusez pas sa demande avant la fin d'un délai choisi —
+  les clés lui sont enveloppées côté client, le serveur ne sait que les
+  garder et les remettre.
 - **Extension de navigateur** (Chrome/Edge/Firefox) : les identifiants de
   la page courante, remplissage en un clic ou depuis le champ, codes TOTP,
   passkeys, authentificateur (codes TOTP), générateur —
@@ -142,6 +150,7 @@ dans [`docs/SECURITY.md`](docs/SECURITY.md).
 | `GUIVAULT_MAX_ITEM_BYTES` | `1048576` | Taille max d'un item chiffré |
 | `GUIVAULT_ITEM_HISTORY` | `20` | Versions précédentes gardées par item (historique, chiffrées) ; `0` : ni historique ni corbeille |
 | `GUIVAULT_TRASH_DAYS` | `30` | Jours qu'un élément supprimé reste dans la corbeille |
+| `GUIVAULT_SEND_MAX_DAYS` | `30` | Durée de vie maximale d'un lien de partage (jours) ; `0` : liens désactivés, routes publiques comprises |
 | `GUIVAULT_AUTH_RATE_PER_SECOND` / `_BURST` | `2` / `10` | Rate-limit par IP des routes d'auth |
 | `GUIVAULT_LOG_JSON` | `false` | Journaux en JSON |
 | `RUST_LOG` | `info,sqlx=warn` | Filtre de journalisation |

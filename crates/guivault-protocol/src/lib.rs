@@ -67,6 +67,10 @@ pub struct HealthResponse {
     pub protocol_version: u32,
     pub server_version: String,
     pub registration: RegistrationMode,
+    /// Durée de vie maximale d'un lien de partage, en jours ; `0` : liens
+    /// désactivés sur ce serveur (ou serveur d'avant les liens).
+    #[serde(default)]
+    pub send_max_days: u32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -202,6 +206,9 @@ pub enum ServerEvent {
     MembershipChanged { vault_id: Uuid },
     /// Vos réglages synchronisés ont changé (depuis un autre appareil).
     SettingsChanged { revision: i64 },
+    /// Un accès d'urgence où vous êtes l'une des deux parties a changé
+    /// (désignation, acceptation, demande, accord, refus, retrait).
+    EmergencyChanged { grant_id: Uuid },
 }
 
 /// Les réglages synchronisés d'un utilisateur (apparence, générateur,
@@ -408,6 +415,13 @@ pub struct RotateVaultKeyRequest {
     /// garde pas de versions que plus personne ne saurait ouvrir.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub versions: Option<Vec<RotatedVersion>>,
+    /// Les enveloppes d'urgence du vault, ré-enveloppées sous la nouvelle clé
+    /// (`wrap_emergency_key`) pour **tous** les contacts qui le couvrent —
+    /// seul le propriétaire peut les produire (le contact vérifie que c'est
+    /// lui l'expéditeur). Absent (autre rôle, client plus ancien) : elles
+    /// sont marquées à renouveler, et le propriétaire les refait plus tard.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub emergency: Option<Vec<RotatedEmergencyKey>>,
     /// Révision attendue du vault : refusé (409) si quelqu'un a écrit entre-temps.
     pub base_revision: i64,
 }
@@ -418,6 +432,13 @@ pub struct RotatedVersion {
     pub revision: i64,
     #[serde(with = "b64")]
     pub ciphertext: Vec<u8>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RotatedEmergencyKey {
+    pub grant_id: Uuid,
+    #[serde(with = "b64")]
+    pub wrapped_vault_key: Vec<u8>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -488,6 +509,192 @@ pub struct Invitation {
     pub wrapped_vault_key: Option<Vec<u8>>,
     pub created_at: DateTime<Utc>,
     pub expires_at: DateTime<Utc>,
+}
+
+// ─── Accès d'urgence ────────────────────────────────────────────────────────
+//
+// Un utilisateur (le « donneur ») désigne un proche (le « contact ») et lui
+// enveloppe la clé de certains de ses vaults (`wrap_emergency_key`). Le
+// serveur garde ces enveloppes sans pouvoir les ouvrir, et ne les remet au
+// contact qu'après qu'il a demandé l'accès **et** que le délai d'attente
+// s'est écoulé sans refus du donneur (ou que celui-ci a accordé plus tôt).
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EmergencyStatus {
+    /// Désigné, pas encore accepté par le contact.
+    Invited,
+    /// Accepté ; aucune demande en cours.
+    Accepted,
+    /// Le contact a demandé l'accès : il l'aura à `access_at` sauf refus.
+    Requested,
+    /// Accès accordé (délai écoulé, ou accord du donneur) : le contact lit
+    /// les vaults couverts, jusqu'à ce que le donneur reprenne la main.
+    Granted,
+}
+
+/// L'une des deux parties, avec sa clé publique : chacune vérifie l'empreinte
+/// de l'autre hors bande, comme pour un partage de vault.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EmergencyParty {
+    pub id: Uuid,
+    pub email: String,
+    #[serde(with = "b64")]
+    pub public_key: Vec<u8>,
+    pub fingerprint: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EmergencyVaultRef {
+    pub vault_id: Uuid,
+    /// Faux : la clé du vault a tourné sans que le donneur ré-enveloppe pour
+    /// ce contact — ce vault ne lui serait pas remis.
+    pub has_key: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EmergencyGrant {
+    pub id: Uuid,
+    pub grantor: EmergencyParty,
+    pub grantee: EmergencyParty,
+    /// Délai entre la demande et l'accès, en jours.
+    pub wait_days: u32,
+    pub status: EmergencyStatus,
+    pub requested_at: Option<DateTime<Utc>>,
+    /// Quand l'accès est (ou a été) accordé : fin du délai, ou accord
+    /// anticipé. `None` sans demande en cours.
+    pub access_at: Option<DateTime<Utc>>,
+    pub vaults: Vec<EmergencyVaultRef>,
+    pub created_at: DateTime<Utc>,
+}
+
+/// `GET /emergency` : ceux que j'ai désignés, et ceux qui m'ont désigné.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EmergencyOverview {
+    pub granted_by_me: Vec<EmergencyGrant>,
+    pub granted_to_me: Vec<EmergencyGrant>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EmergencyVaultKey {
+    pub vault_id: Uuid,
+    /// `wrap_emergency_key` du donneur vers le contact.
+    #[serde(with = "b64")]
+    pub wrapped_vault_key: Vec<u8>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateEmergencyGrantRequest {
+    /// Le contact, déjà inscrit (sa clé publique vient de `/users/lookup`,
+    /// empreinte vérifiée).
+    pub grantee_id: Uuid,
+    pub wait_days: u32,
+    /// Des vaults dont le donneur est propriétaire.
+    pub vaults: Vec<EmergencyVaultKey>,
+}
+
+/// Changer le délai, ou l'ensemble des vaults couverts (remplacé en entier :
+/// c'est aussi ainsi qu'on renouvelle une enveloppe après une rotation).
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct UpdateEmergencyGrantRequest {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub wait_days: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub vaults: Option<Vec<EmergencyVaultKey>>,
+}
+
+/// Un vault remis au contact une fois l'accès accordé : de quoi l'ouvrir
+/// (`unwrap_emergency_key`) et en lire les items, en lecture seule.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EmergencyVault {
+    pub id: Uuid,
+    pub kind: VaultKind,
+    #[serde(with = "b64")]
+    pub name_enc: Vec<u8>,
+    #[serde(with = "b64")]
+    pub wrapped_vault_key: Vec<u8>,
+    pub revision: i64,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+// ─── Liens de partage (éphémères) ───────────────────────────────────────────
+//
+// Un contenu chiffré sous une clé tirée d'un secret qui ne voyage que dans le
+// fragment de l'URL (`#/send/<id>/<secret>`) — voir `guivault_crypto::send_keys`.
+// Le serveur garde le chiffré, l'expiration et le compte des vues ; il ne
+// remet le chiffré qu'à qui présente la clé d'accès, tirée du même secret.
+
+/// Le mot de passe facultatif d'un lien : de quoi le dériver
+/// (`send_password_key`).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SendPassword {
+    pub kdf: KdfParams,
+    #[serde(with = "b64")]
+    pub salt: Vec<u8>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateSendRequest {
+    /// Choisi par le client : il est dans l'AAD du contenu.
+    pub id: Uuid,
+    #[serde(with = "b64")]
+    pub ciphertext: Vec<u8>,
+    /// SHA-256 de la clé d'accès (`token_hash`) — jamais la clé.
+    #[serde(with = "b64")]
+    pub access_hash: Vec<u8>,
+    /// Ce que l'auteur garde pour lui, sous sa user key (`seal_send_owner`).
+    #[serde(with = "b64")]
+    pub owner_blob: Vec<u8>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub password: Option<SendPassword>,
+    /// Nombre d'ouvertures au plus ; `None` : jusqu'à l'expiration.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_views: Option<u32>,
+    /// Durée de vie, en secondes (une heure au moins, `send_max_days` au plus).
+    pub expires_in_secs: u64,
+}
+
+/// Un lien, vu par son auteur (`GET /sends`).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SendSummary {
+    pub id: Uuid,
+    #[serde(with = "b64")]
+    pub owner_blob: Vec<u8>,
+    pub has_password: bool,
+    pub max_views: Option<u32>,
+    pub views: u32,
+    pub created_at: DateTime<Utc>,
+    pub expires_at: DateTime<Utc>,
+    pub last_viewed_at: Option<DateTime<Utc>>,
+    /// Encore ouvrable : ni expiré, ni épuisé.
+    pub available: bool,
+}
+
+/// `GET /sends/{id}/access`, sans authentification : ce qu'il faut savoir
+/// avant d'ouvrir un lien.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SendInfo {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub password: Option<SendPassword>,
+    pub expires_at: DateTime<Utc>,
+    /// Ouvertures restantes ; `None` : sans limite.
+    pub views_left: Option<u32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SendAccessRequest {
+    #[serde(with = "b64")]
+    pub access_key: Vec<u8>,
+}
+
+/// `POST /sends/{id}/access` : le contenu chiffré — une vue de consommée.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SendContent {
+    #[serde(with = "b64")]
+    pub ciphertext: Vec<u8>,
+    pub expires_at: DateTime<Utc>,
+    pub views_left: Option<u32>,
 }
 
 // ─── Items ──────────────────────────────────────────────────────────────────

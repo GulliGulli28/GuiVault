@@ -5,7 +5,7 @@
  * `web_interop` ouvre. */
 import { describe, expect, it } from "vitest";
 import { writeFileSync } from "node:fs";
-import { fromHex, toHex, utf8, uuid } from "./bytes";
+import { fromHex, randomBytes, toHex, utf8, uuid } from "./bytes";
 import * as c from "./crypto";
 import vectors from "./crypto.vectors.json";
 
@@ -52,6 +52,30 @@ describe("guivault-crypto interop", () => {
     const legacy = c.unwrapVaultKey(acc, v.wrap_vault_id, fromHex(v.wrapped_vault_key_v1));
     expect(toHex(legacy.key)).toBe(vectors.item.vault_key);
     expect(legacy.sender).toBeNull();
+    // Enveloppe d'urgence : même clé, même expéditeur, contexte à part.
+    const emergency = c.unwrapEmergencyKey(acc, v.wrap_vault_id, fromHex(v.emergency_key));
+    expect(toHex(emergency.key)).toBe(vectors.item.vault_key);
+    expect(emergency.sender && toHex(emergency.sender)).toBe(v.wrap_sender_public);
+    expect(() => c.unwrapVaultKey(acc, v.wrap_vault_id, fromHex(v.emergency_key))).toThrow(c.CryptoError);
+    expect(() => c.unwrapEmergencyKey(acc, v.wrap_vault_id, fromHex(v.wrapped_vault_key))).toThrow(c.CryptoError);
+    expect(() => c.unwrapEmergencyKey(acc, v.wrap_vault_id, fromHex(v.wrapped_vault_key_v1))).toThrowError(/format/);
+  }, 30_000);
+
+  it("ouvre un lien de partage Rust, avec et sans mot de passe", async () => {
+    const v = vectors.send;
+    const keys = c.sendKeys(fromHex(v.secret));
+    expect(toHex(keys.access)).toBe(v.access_key);
+    expect(toHex(c.sendAccessHash(keys))).toBe(v.access_hash);
+    expect(utf8.decode(c.openSend(keys, v.id, fromHex(v.blob)))).toBe(v.plaintext);
+    expect(() => c.openSend(keys, "autre-lien", fromHex(v.blob))).toThrow(c.CryptoError);
+    const pw = await c.sendPasswordKey(v.password, fromHex(v.password_salt), v.password_kdf);
+    const locked = c.sendKeys(fromHex(v.secret), pw);
+    expect(toHex(locked.access)).toBe(v.locked_access_key);
+    expect(utf8.decode(c.openSend(locked, v.id, fromHex(v.locked_blob)))).toBe(v.plaintext);
+    expect(() => c.openSend(keys, v.id, fromHex(v.locked_blob))).toThrow(c.CryptoError);
+    expect(c.openSendOwner(fromHex(v.owner_key), v.id, fromHex(v.owner_blob))).toBe(v.owner_plaintext);
+    expect(() => c.sendKeys(new Uint8Array(8))).toThrow(c.CryptoError);
+    await expect(c.sendPasswordKey("x", new Uint8Array(16), { m_cost: 8, t_cost: 1, p_cost: 1 })).rejects.toThrowError(/refusés/);
   }, 30_000);
 
   it("ouvre un item et un nom de vault chiffrés par Rust", () => {
@@ -103,11 +127,26 @@ describe("guivault-crypto interop", () => {
     const vaultKey = new Uint8Array(32).fill(6);
     const vaultId = uuid();
     const itemId = uuid();
+    const sendSecret = randomBytes(c.SEND_SECRET_LEN);
+    const sendId = uuid();
+    const sendSalt = randomBytes(16);
+    const sendPassword = "lien du navigateur";
+    const sendLocked = c.sendKeys(sendSecret, await c.sendPasswordKey(sendPassword, sendSalt, kdf));
+    const ownerKey = new Uint8Array(32).fill(8);
     const out = {
       kdf: { password, salt: toHex(salt), params: kdf, stretched_key: toHex(master.stretchedKey), auth_key: toHex(master.authKey) },
       seal: { key: toHex(key), aad: "ctx-web", plaintext: "from the browser", blob: toHex(c.seal(key, utf8.encode("from the browser"), utf8.encode("ctx-web"))) },
       sealed_box: { private: toHex(recipient.privateKey), public: toHex(recipient.publicKey), fingerprint: c.fingerprint(recipient.publicKey), plaintext: "sealed by the browser", blob: toHex(c.sealFor(recipient.publicKey, utf8.encode("sealed by the browser"))) },
-      vault_envelope: { sender_public: toHex(sender.publicKey), recipient_private: toHex(recipient.privateKey), vault_id: vaultId, vault_key: toHex(vaultKey), blob: toHex(c.wrapVaultKey(sender, recipient.publicKey, vaultId, vaultKey)) },
+      vault_envelope: { sender_public: toHex(sender.publicKey), recipient_private: toHex(recipient.privateKey), vault_id: vaultId, vault_key: toHex(vaultKey), blob: toHex(c.wrapVaultKey(sender, recipient.publicKey, vaultId, vaultKey)), emergency_blob: toHex(c.wrapEmergencyKey(sender, recipient.publicKey, vaultId, vaultKey)) },
+      send: {
+        secret: toHex(sendSecret), id: sendId, plaintext: "partagé depuis le navigateur",
+        access_hash: toHex(c.sendAccessHash(c.sendKeys(sendSecret))),
+        blob: toHex(c.sealSend(c.sendKeys(sendSecret), sendId, utf8.encode("partagé depuis le navigateur"))),
+        password: sendPassword, password_salt: toHex(sendSalt), password_kdf: kdf,
+        locked_access_hash: toHex(c.sendAccessHash(sendLocked)),
+        locked_blob: toHex(c.sealSend(sendLocked, sendId, utf8.encode("partagé depuis le navigateur"))),
+        owner_key: toHex(ownerKey), owner_plaintext: "{\"name\":\"Clé\"}", owner_blob: toHex(c.sealSendOwner(ownerKey, sendId, "{\"name\":\"Clé\"}")),
+      },
       item: { vault_key: toHex(vaultKey), vault_id: vaultId, item_id: itemId, item_type: "snippet", plaintext: "{\"kind\":\"snippet\"}", blob: toHex(c.sealItem(vaultKey, vaultId, itemId, "snippet", utf8.encode("{\"kind\":\"snippet\"}"))), name: "Équipe réseau", name_blob: toHex(c.sealVaultName(vaultKey, vaultId, "Équipe réseau")) },
     };
     writeFileSync(new URL("../../../crates/guivault-crypto/tests/web-vectors.json", import.meta.url), JSON.stringify(out, null, 2) + "\n");

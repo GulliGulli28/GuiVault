@@ -1,7 +1,13 @@
 /** Le client HTTP de l'API, sans cryptographie — l'équivalent de
  * `core/src/guivault/client.rs` dans Guiterm. Une méthode par route ; les
  * blobs restent en base64, c'est `session.ts` qui chiffre et déchiffre. */
-import type { AuditEntry, HealthResponse, Invitation, Item, ItemVersion, ItemsPage, KdfParams, LoginResponse, PreloginResponse, Role, ServerEvent, Session, SyncResponse, TokenPair, TotpChallenge, TrashedItem, UserLookupResponse, UserProfile, UserSettings, Vault, VaultMember } from "./types";
+import type { AuditEntry, EmergencyGrant, EmergencyOverview, EmergencyVault, HealthResponse, Invitation, Item, ItemVersion, ItemsPage, KdfParams, LoginResponse, PreloginResponse, Role, SendContent, SendInfo, SendPassword, SendSummary, ServerEvent, Session, SyncResponse, TokenPair, TotpChallenge, TrashedItem, UserLookupResponse, UserProfile, UserSettings, Vault, VaultMember } from "./types";
+
+/** Une enveloppe de clé de vault pour un contact d'urgence. */
+export interface EmergencyVaultKey {
+  vault_id: string;
+  wrapped_vault_key: string;
+}
 
 /** L'API : relative dans l'interface embarquée (même origine), absolue dans
  * l'extension (`setBaseUrl`). */
@@ -185,7 +191,7 @@ export const api = {
   renameVault: (id: string, name_enc: string) => authed<Vault>("PATCH", `/vaults/${id}`, { name_enc }),
   deleteVault: (id: string) => authed<void>("DELETE", `/vaults/${id}`),
   leaveVault: (id: string) => authed<void>("POST", `/vaults/${id}/leave`),
-  rotateVaultKey: (id: string, req: { name_enc: string; members: { user_id: string; wrapped_vault_key: string }[]; items: { id: string; ciphertext: string }[]; versions: { item_id: string; revision: number; ciphertext: string }[]; base_revision: number }) =>
+  rotateVaultKey: (id: string, req: { name_enc: string; members: { user_id: string; wrapped_vault_key: string }[]; items: { id: string; ciphertext: string }[]; versions: { item_id: string; revision: number; ciphertext: string }[]; emergency?: { grant_id: string; wrapped_vault_key: string }[]; base_revision: number }) =>
     authed<Vault>("POST", `/vaults/${id}/rotate-key`, req),
   vaultAudit: (id: string, limit = 100) => authed<AuditEntry[]>("GET", `/vaults/${id}/audit?limit=${limit}`),
 
@@ -214,6 +220,24 @@ export const api = {
   trash: (vault: string) => authed<TrashedItem[]>("GET", `/vaults/${vault}/trash`),
   purgeTrashItem: (vault: string, id: string) => authed<void>("DELETE", `/vaults/${vault}/trash/${id}`),
   emptyTrash: (vault: string) => authed<void>("DELETE", `/vaults/${vault}/trash`),
+
+  // ── Liens de partage ──
+  sends: () => authed<SendSummary[]>("GET", "/sends"),
+  createSend: (req: { id: string; ciphertext: string; access_hash: string; owner_blob: string; password?: SendPassword; max_views?: number; expires_in_secs: number }) =>
+    authed<SendSummary>("POST", "/sends", req),
+  deleteSend: (id: string) => authed<void>("DELETE", `/sends/${id}`),
+  /** Sans compte : ce que le destinataire d'un lien appelle. */
+  sendInfo: (id: string) => raw<SendInfo>("GET", `/sends/${id}/access`, undefined, false),
+  openSend: (id: string, access_key: string) => raw<SendContent>("POST", `/sends/${id}/access`, { access_key }, false),
+
+  // ── Accès d'urgence ──
+  emergency: () => authed<EmergencyOverview>("GET", "/emergency"),
+  createEmergency: (req: { grantee_id: string; wait_days: number; vaults: EmergencyVaultKey[] }) => authed<EmergencyGrant>("POST", "/emergency", req),
+  updateEmergency: (id: string, req: { wait_days?: number; vaults?: EmergencyVaultKey[] }) => authed<EmergencyGrant>("PATCH", `/emergency/${id}`, req),
+  deleteEmergency: (id: string) => authed<void>("DELETE", `/emergency/${id}`),
+  emergencyAction: (id: string, action: "accept" | "request" | "approve" | "reject") => authed<EmergencyGrant>("POST", `/emergency/${id}/${action}`),
+  emergencyVaults: (id: string) => authed<EmergencyVault[]>("GET", `/emergency/${id}/vaults`),
+  emergencyItems: (id: string, vault: string) => authed<ItemsPage>("GET", `/emergency/${id}/vaults/${vault}/items`),
 };
 
 /** Le flux d'événements. `EventSource` ne sait pas envoyer d'en-tête

@@ -7,9 +7,9 @@ import { fromBase64, toBase64, utf8, uuid, randomBytes } from "./bytes";
 import * as c from "./crypto";
 import { fingerprint as fingerprintOf, type UnlockedAccount } from "./crypto";
 import { pinKdf, requireKdfNotDowngraded } from "./kdfPins";
-import { requirePinned } from "./pins";
+import { fingerprintTrust, requirePinned } from "./pins";
 import { acceptRollback as acceptRollbackRevision, observeRevisions, type VaultRollback } from "./vaultRevisions";
-import type { Invitation, Item, LoginResponse, Payload, Role, UserProfile, Vault, VaultMember } from "./types";
+import type { EmergencyGrant, EmergencyOverview, Invitation, Item, LoginResponse, Payload, Role, UserProfile, Vault, VaultMember } from "./types";
 
 /** Qui a remis la clé de ce vault à ce compte : soi-même (vault créé ou
  * clé renouvelée ici), la détentrice d'une clé publique (enveloppe de format
@@ -27,6 +27,9 @@ export interface VaultView {
   keyFrom: KeyFrom;
   revision: number;
   updatedAt: string;
+  /** Vault remis par un accès d'urgence (lecture seule) : la désignation, et
+   * qui l'a confié. Absent pour un vault dont on est membre. */
+  emergency?: { grantId: string; grantor: string };
 }
 
 export interface SessionState {
@@ -35,6 +38,11 @@ export interface SessionState {
   fingerprint: string;
   vaults: VaultView[];
   invitations: Invitation[];
+  /** Les accès d'urgence, dans les deux sens ; `null` : serveur qui ne les
+   * connaît pas (ou session hors ligne). */
+  emergency: EmergencyOverview | null;
+  /** Les vaults qu'un accès d'urgence accordé nous remet, en lecture. */
+  emergencyVaults: VaultView[];
   /** Vaults dont le serveur annonce une révision plus basse que celle déjà
    * vue d'ici (`vaultRevisions.ts`) — à montrer tant qu'on n'en a pas pris
    * acte. */
@@ -92,7 +100,7 @@ function unlock(login: LoginResponse, stretchedKey: Uint8Array): { user: UserPro
 }
 
 export async function openSession(user: UserProfile, account: UnlockedAccount, blobs?: AccountBlobs): Promise<SessionState> {
-  const state: SessionState = { user, account, fingerprint: fingerprintOf(account.keypair.publicKey), vaults: [], invitations: [], rollbacks: [], blobs };
+  const state: SessionState = { user, account, fingerprint: fingerprintOf(account.keypair.publicKey), vaults: [], invitations: [], emergency: null, emergencyVaults: [], rollbacks: [], blobs };
   await refresh(state);
   return state;
 }
@@ -164,7 +172,9 @@ export function wipe(state: SessionState) {
   state.account.userKey.fill(0);
   state.account.keypair.privateKey.fill(0);
   for (const v of state.vaults) v.key.fill(0);
+  for (const v of state.emergencyVaults) v.key.fill(0);
   state.vaults = [];
+  state.emergencyVaults = [];
   offlineItems = null;
 }
 
@@ -230,7 +240,69 @@ export async function refresh(state: SessionState): Promise<string[]> {
   state.vaults = vaults;
   state.invitations = res.invitations.filter((i) => i.status === "pending");
   state.rollbacks = observeRevisions(res.user.id, vaults);
+  warnings.push(...(await refreshEmergency(state)));
   return warnings;
+}
+
+/** Les accès d'urgence, et les vaults de ceux qui sont accordés. Une
+ * enveloppe n'est ouverte que si elle vient bien de qui nous a désigné — la
+ * clé publique épinglée ici quand on a accepté —, sinon le serveur pourrait
+ * nous glisser un vault à lui sous le nom d'un proche. */
+async function refreshEmergency(state: SessionState): Promise<string[]> {
+  let overview: EmergencyOverview;
+  try {
+    overview = await api.emergency();
+  } catch (e) {
+    // Serveur d'avant l'accès d'urgence.
+    if (e instanceof ApiError && e.status === 404) {
+      state.emergency = null;
+      return [];
+    }
+    // Un raté ici ne doit pas faire échouer toute la synchronisation : on
+    // garde ce qu'on avait.
+    return [`Accès d'urgence : ${e instanceof Error ? e.message : e}`];
+  }
+  const warnings: string[] = [];
+  const vaults: VaultView[] = [];
+  for (const g of overview.granted_to_me.filter((g) => g.status === "granted")) {
+    if (fingerprintTrust(g.grantor.email, g.grantor.fingerprint).kind !== "pinned") continue;
+    let remote;
+    try {
+      remote = await api.emergencyVaults(g.id);
+    } catch (e) {
+      warnings.push(`Accès d'urgence de ${g.grantor.email} : ${e instanceof Error ? e.message : e}`);
+      continue;
+    }
+    for (const v of remote) {
+      try {
+        const { key, sender } = c.unwrapEmergencyKey(state.account, v.id, unb64(v.wrapped_vault_key));
+        if (!sender || fingerprintOf(sender) !== g.grantor.fingerprint) {
+          key.fill(0);
+          warnings.push(`Accès d'urgence de ${g.grantor.email} : un vault ne vient pas de cette personne — écarté.`);
+          continue;
+        }
+        let name: string;
+        try {
+          name = c.openVaultName(key, v.id, unb64(v.name_enc));
+        } catch {
+          name = v.kind === "personal" ? "Personnel" : "(nom illisible)";
+        }
+        vaults.push({ id: v.id, kind: v.kind, role: "reader", name, key, keyFrom: { kind: "member", fingerprint: g.grantor.fingerprint }, revision: v.revision, updatedAt: v.updated_at, emergency: { grantId: g.id, grantor: g.grantor.email } });
+      } catch (e) {
+        warnings.push(`Accès d'urgence de ${g.grantor.email} : vault ${v.id} illisible (${e instanceof Error ? e.message : e}).`);
+      }
+    }
+  }
+  for (const v of state.emergencyVaults) v.key.fill(0);
+  state.emergency = overview;
+  state.emergencyVaults = vaults;
+  return warnings;
+}
+
+/** Un vault de la session, qu'on en soit membre ou qu'un accès d'urgence le
+ * remette. */
+export function findVault(state: SessionState, id: string): VaultView | undefined {
+  return state.vaults.find((v) => v.id === id) ?? state.emergencyVaults.find((v) => v.id === id);
 }
 
 /** Ce que dit l'enveloppe jointe à une invitation, **avant** de l'accepter :
@@ -386,6 +458,8 @@ export async function openOffline(
     fingerprint: fingerprintOf(account.keypair.publicKey),
     vaults: [],
     invitations: [],
+    emergency: null,
+    emergencyVaults: [],
     rollbacks: [],
     blobs: copy.blobs,
     offline: { savedAt: copy.savedAt },
@@ -403,7 +477,7 @@ export async function loadItems(vault: VaultView): Promise<{ items: DecodedItem[
     const stored = offlineItems(vault.id) ?? { items: [], revision: vault.revision };
     return { items: stored.items.filter((i) => !i.deleted).map((i) => decodeItem(vault, i)), revision: stored.revision };
   }
-  const page = await api.items(vault.id);
+  const page = vault.emergency ? await api.emergencyItems(vault.emergency.grantId, vault.id) : await api.items(vault.id);
   return { items: page.items.filter((i) => !i.deleted).map((i) => decodeItem(vault, i)), revision: page.revision };
 }
 
@@ -524,6 +598,55 @@ export async function rotateVaultKey(state: SessionState, vault: VaultView, memb
     members: wrapped,
     items,
     versions,
+    emergency: vault.role === "owner" ? await rotatedEmergencyKeys(state, vault.id, newKey) : undefined,
     base_revision: fresh.revision,
   });
+}
+
+/** Les contacts d'urgence qui couvrent ce vault, ré-enveloppés sous la
+ * nouvelle clé — tous, ou aucun si l'un n'a pas son empreinte épinglée sur
+ * cet appareil : le serveur marque alors les enveloppes à renouveler, et
+ * la page « Accès d'urgence » les refait d'un appareil qui les connaît. */
+async function rotatedEmergencyKeys(state: SessionState, vaultId: string, newKey: Uint8Array): Promise<{ grant_id: string; wrapped_vault_key: string }[] | undefined> {
+  let grants: EmergencyGrant[];
+  try {
+    grants = (await api.emergency()).granted_by_me.filter((g) => g.vaults.some((v) => v.vault_id === vaultId));
+  } catch {
+    return undefined;
+  }
+  if (grants.some((g) => fingerprintTrust(g.grantee.email, g.grantee.fingerprint).kind !== "pinned")) return undefined;
+  return grants.map((g) => ({
+    grant_id: g.id,
+    wrapped_vault_key: b64(c.wrapEmergencyKey(state.account.keypair, publicKeyOf(g.grantee.email, g.grantee.public_key, g.grantee.fingerprint), vaultId, newKey)),
+  }));
+}
+
+// ─── Accès d'urgence (côté donneur) ─────────────────────────────────────────
+
+/** Enveloppe chacun de ces vaults (dont on est propriétaire) pour le contact,
+ * dont l'empreinte doit être épinglée. */
+export function emergencyEnvelopes(state: SessionState, grantee: { email: string; public_key: string; fingerprint: string }, vaultIds: string[]): { vault_id: string; wrapped_vault_key: string }[] {
+  requirePinned(grantee.email, grantee.fingerprint);
+  const pk = publicKeyOf(grantee.email, grantee.public_key, grantee.fingerprint);
+  return vaultIds.map((id) => {
+    const v = vaultOf(state, id);
+    if (v.role !== "owner") throw new Error(`« ${v.name} » : seuls les vaults dont vous êtes propriétaire se confient.`);
+    return { vault_id: id, wrapped_vault_key: b64(c.wrapEmergencyKey(state.account.keypair, pk, id, v.key)) };
+  });
+}
+
+/** Les désignations dont une enveloppe est à renouveler (clé du vault
+ * tournée ailleurs) et qu'on peut refaire d'ici : on renvoie l'ensemble,
+ * ré-enveloppé. Rend le nombre de désignations réparées. */
+export async function repairEmergencyKeys(state: SessionState): Promise<number> {
+  let repaired = 0;
+  for (const g of state.emergency?.granted_by_me ?? []) {
+    if (g.vaults.every((v) => v.has_key)) continue;
+    if (fingerprintTrust(g.grantee.email, g.grantee.fingerprint).kind !== "pinned") continue;
+    const ids = g.vaults.map((v) => v.vault_id).filter((id) => state.vaults.some((v) => v.id === id && v.role === "owner"));
+    if (ids.length === 0) continue;
+    await api.updateEmergency(g.id, { vaults: emergencyEnvelopes(state, g.grantee, ids) });
+    repaired++;
+  }
+  return repaired;
 }

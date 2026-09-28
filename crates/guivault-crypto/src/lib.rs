@@ -41,7 +41,10 @@
 //! - Boîte scellée : `0x01 ‖ éphémère_pk(32) ‖ ciphertext‖tag(16)`.
 //! - Enveloppe de vault key authentifiée : `0x02 ‖ expéditeur_pk(32) ‖
 //!   enveloppe symétrique` ([`wrap_vault_key`]) ; le format 1 (boîte scellée)
-//!   reste lisible.
+//!   reste lisible. Même format sous un autre contexte pour l'accès
+//!   d'urgence ([`wrap_emergency_key`]).
+//! - Lien de partage : enveloppe symétrique sous une clé tirée du secret du
+//!   lien et du mot de passe facultatif ([`send_keys`]).
 use argon2::password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString};
 use argon2::{Algorithm, Argon2, Params, Version};
 use chacha20poly1305::aead::{Aead, AeadCore, KeyInit, OsRng, Payload};
@@ -464,12 +467,17 @@ pub fn rekey_account(account: &UnlockedAccount, new_password: &str) -> Result<Re
 /// Enveloppe de vault key authentifiée (format 2).
 const FORMAT_V2: u8 = 0x02;
 const VAULT_KEY_CONTEXT: &[u8] = b"guivault/v2/vault-key";
+/// Même enveloppe, remise à un contact d'urgence ([`wrap_emergency_key`]).
+const EMERGENCY_KEY_CONTEXT: &[u8] = b"guivault/v2/emergency-key";
 
 /// Clé symétrique d'une enveloppe de format 2 : X25519 entre la clé privée
 /// de l'un et la clé publique de l'autre (le même secret des deux côtés),
 /// passé par HKDF avec les deux clés publiques — expéditeur puis
 /// destinataire — pour qu'elle soit propre à ce couple et à ce sens.
+/// `context` sépare les usages : une enveloppe d'urgence n'ouvre rien comme
+/// enveloppe de membre, et inversement.
 fn vault_envelope_key(
+    context: &[u8],
     own: &PrivateKey,
     other: &PublicKey,
     sender: &PublicKey,
@@ -480,8 +488,8 @@ fn vault_envelope_key(
     if shared.as_bytes() == &[0u8; 32] {
         return Err(CryptoError::Decrypt);
     }
-    let mut info = Vec::with_capacity(VAULT_KEY_CONTEXT.len() + 64);
-    info.extend_from_slice(VAULT_KEY_CONTEXT);
+    let mut info = Vec::with_capacity(context.len() + 64);
+    info.extend_from_slice(context);
     info.extend_from_slice(sender.as_bytes());
     info.extend_from_slice(recipient.as_bytes());
     let mut out = [0u8; KEY_LEN];
@@ -491,12 +499,52 @@ fn vault_envelope_key(
     Ok(SymmetricKey(out))
 }
 
-fn vault_envelope_aad(vault_id: &str) -> Vec<u8> {
-    let mut aad = Vec::with_capacity(VAULT_KEY_CONTEXT.len() + 1 + vault_id.len());
-    aad.extend_from_slice(VAULT_KEY_CONTEXT);
+fn vault_envelope_aad(context: &[u8], vault_id: &str) -> Vec<u8> {
+    let mut aad = Vec::with_capacity(context.len() + 1 + vault_id.len());
+    aad.extend_from_slice(context);
     aad.push(0);
     aad.extend_from_slice(vault_id.as_bytes());
     aad
+}
+
+fn wrap_format2(
+    context: &[u8],
+    sender: &KeyPair,
+    recipient: &PublicKey,
+    vault_id: &str,
+    vault_key: &SymmetricKey,
+) -> Result<Vec<u8>, CryptoError> {
+    let key = vault_envelope_key(context, &sender.private, recipient, &sender.public, recipient)?;
+    let sealed = seal(&key, vault_key.as_bytes(), &vault_envelope_aad(context, vault_id))?;
+    let mut out = Vec::with_capacity(1 + 32 + sealed.len());
+    out.push(FORMAT_V2);
+    out.extend_from_slice(sender.public.as_bytes());
+    out.extend_from_slice(&sealed);
+    Ok(out)
+}
+
+fn unwrap_format2(
+    context: &[u8],
+    account: &UnlockedAccount,
+    vault_id: &str,
+    wrapped: &[u8],
+) -> Result<UnwrappedVaultKey, CryptoError> {
+    if wrapped.first() != Some(&FORMAT_V2) || wrapped.len() <= 33 {
+        return Err(CryptoError::Format);
+    }
+    let sender = PublicKey::try_from(&wrapped[1..33]).map_err(|_| CryptoError::Format)?;
+    let key = vault_envelope_key(
+        context,
+        &account.keypair.private,
+        &sender,
+        &sender,
+        &account.keypair.public,
+    )?;
+    let plain = open(&key, &wrapped[33..], &vault_envelope_aad(context, vault_id))?;
+    Ok(UnwrappedVaultKey {
+        key: SymmetricKey::from_slice(&plain)?,
+        sender: Some(sender),
+    })
 }
 
 /// Enveloppe une *vault key* pour un membre — c'est ce blob qui est stocké
@@ -517,13 +565,7 @@ pub fn wrap_vault_key(
     vault_id: &str,
     vault_key: &SymmetricKey,
 ) -> Result<Vec<u8>, CryptoError> {
-    let key = vault_envelope_key(&sender.private, recipient, &sender.public, recipient)?;
-    let sealed = seal(&key, vault_key.as_bytes(), &vault_envelope_aad(vault_id))?;
-    let mut out = Vec::with_capacity(1 + 32 + sealed.len());
-    out.push(FORMAT_V2);
-    out.extend_from_slice(sender.public.as_bytes());
-    out.extend_from_slice(&sealed);
-    Ok(out)
+    wrap_format2(VAULT_KEY_CONTEXT, sender, recipient, vault_id, vault_key)
 }
 
 /// Une vault key ouverte, et qui l'a enveloppée.
@@ -547,17 +589,34 @@ pub fn unwrap_vault_key(
             key: SymmetricKey::from_slice(&unseal(&account.keypair.private, wrapped)?)?,
             sender: None,
         }),
-        Some(&FORMAT_V2) if wrapped.len() > 33 => {
-            let sender = PublicKey::try_from(&wrapped[1..33]).map_err(|_| CryptoError::Format)?;
-            let key = vault_envelope_key(&account.keypair.private, &sender, &sender, &account.keypair.public)?;
-            let plain = open(&key, &wrapped[33..], &vault_envelope_aad(vault_id))?;
-            Ok(UnwrappedVaultKey {
-                key: SymmetricKey::from_slice(&plain)?,
-                sender: Some(sender),
-            })
-        }
-        _ => Err(CryptoError::Format),
+        _ => unwrap_format2(VAULT_KEY_CONTEXT, account, vault_id, wrapped),
     }
+}
+
+/// Enveloppe une *vault key* pour un contact d'urgence : même format 2 que
+/// [`wrap_vault_key`] (`0x02 ‖ clé publique de l'expéditeur ‖ enveloppe
+/// symétrique`), sous un autre contexte (`"guivault/v2/emergency-key"`, dans
+/// le HKDF et l'AAD). Le serveur la garde sans pouvoir l'ouvrir et ne la
+/// remet au contact qu'une fois l'accès accordé ; le contexte l'empêche de
+/// la faire passer pour une enveloppe de membre (ce qui ouvrirait le vault
+/// sans attendre), et le contact vérifie que l'expéditeur est bien celui
+/// qui l'a désigné.
+pub fn wrap_emergency_key(
+    sender: &KeyPair,
+    recipient: &PublicKey,
+    vault_id: &str,
+    vault_key: &SymmetricKey,
+) -> Result<Vec<u8>, CryptoError> {
+    wrap_format2(EMERGENCY_KEY_CONTEXT, sender, recipient, vault_id, vault_key)
+}
+
+/// Inverse de [`wrap_emergency_key`] — format 2 seulement.
+pub fn unwrap_emergency_key(
+    account: &UnlockedAccount,
+    vault_id: &str,
+    wrapped: &[u8],
+) -> Result<UnwrappedVaultKey, CryptoError> {
+    unwrap_format2(EMERGENCY_KEY_CONTEXT, account, vault_id, wrapped)
 }
 
 /// AAD d'un item : lie le chiffré à son vault, son identifiant et son type.
@@ -615,6 +674,78 @@ pub fn seal_user_settings(user_key: &SymmetricKey, json: &[u8]) -> Result<Vec<u8
 
 pub fn open_user_settings(user_key: &SymmetricKey, blob: &[u8]) -> Result<Vec<u8>, CryptoError> {
     open(user_key, blob, AAD_USER_SETTINGS)
+}
+
+// ─── Partage éphémère (liens) ───────────────────────────────────────────────
+
+/// Octets de secret d'un lien de partage. Ils voyagent dans le fragment de
+/// l'URL (`#…`), que le navigateur n'envoie jamais au serveur.
+pub const SEND_SECRET_LEN: usize = 16;
+
+/// Les deux clés d'un lien de partage, tirées de son secret (et de son mot
+/// de passe s'il en a un) :
+/// - `enc` chiffre le contenu ([`seal_send`]) ;
+/// - `access` se présente au serveur pour obtenir le chiffré. Il n'en garde
+///   que le SHA-256 ([`token_hash`]) : qui n'a que l'identifiant du lien —
+///   le serveur compris — n'a rien à présenter, et ne consomme pas de vue.
+pub struct SendKeys {
+    pub enc: SymmetricKey,
+    pub access: SymmetricKey,
+}
+
+/// Le mot de passe facultatif d'un lien : Argon2id (mêmes bornes que le mot
+/// de passe maître, [`KdfParams::is_sane`] — les paramètres viennent du
+/// serveur) sur un sel propre au lien, puis HKDF sous un libellé à lui.
+pub fn send_password_key(password: &str, salt: &[u8], params: KdfParams) -> Result<SymmetricKey, CryptoError> {
+    let master = MasterKey::derive(password, salt, params)?;
+    Ok(SymmetricKey(master.expand(b"guivault/v1/send/password")))
+}
+
+/// Le mot de passe entre dans la dérivation des deux clés : le lien seul
+/// n'ouvre rien, pas même pour un serveur qui l'aurait vu passer.
+pub fn send_keys(secret: &[u8], password_key: Option<&SymmetricKey>) -> Result<SendKeys, CryptoError> {
+    if secret.len() < SEND_SECRET_LEN {
+        return Err(CryptoError::Format);
+    }
+    let mut ikm = secret.to_vec();
+    if let Some(p) = password_key {
+        ikm.extend_from_slice(p.as_bytes());
+    }
+    let hk = Hkdf::<Sha256>::new(None, &ikm);
+    ikm.zeroize();
+    let mut enc = [0u8; KEY_LEN];
+    let mut access = [0u8; KEY_LEN];
+    hk.expand(b"guivault/v1/send/enc", &mut enc)
+        .expect("32 octets est une longueur HKDF valide");
+    hk.expand(b"guivault/v1/send/access", &mut access)
+        .expect("32 octets est une longueur HKDF valide");
+    Ok(SendKeys {
+        enc: SymmetricKey(enc),
+        access: SymmetricKey(access),
+    })
+}
+
+fn send_aad(context: &str, send_id: &str) -> Vec<u8> {
+    format!("{context}\0{send_id}").into_bytes()
+}
+
+/// Le contenu d'un lien (JSON choisi par les clients), lié à son identifiant.
+pub fn seal_send(keys: &SendKeys, send_id: &str, plaintext: &[u8]) -> Result<Vec<u8>, CryptoError> {
+    seal(&keys.enc, plaintext, &send_aad("guivault/v1/send", send_id))
+}
+
+pub fn open_send(keys: &SendKeys, send_id: &str, blob: &[u8]) -> Result<Vec<u8>, CryptoError> {
+    open(&keys.enc, blob, &send_aad("guivault/v1/send", send_id))
+}
+
+/// Ce que l'auteur d'un lien garde pour lui (un nom, le secret du lien pour
+/// le recopier plus tard) : sous sa *user key*.
+pub fn seal_send_owner(user_key: &SymmetricKey, send_id: &str, json: &[u8]) -> Result<Vec<u8>, CryptoError> {
+    seal(user_key, json, &send_aad("guivault/v1/send-owner", send_id))
+}
+
+pub fn open_send_owner(user_key: &SymmetricKey, send_id: &str, blob: &[u8]) -> Result<Vec<u8>, CryptoError> {
+    open(user_key, blob, &send_aad("guivault/v1/send-owner", send_id))
 }
 
 #[cfg(test)]
@@ -779,6 +910,71 @@ mod tests {
         let opened = unwrap_vault_key(&bob, "v-1", &legacy).unwrap();
         assert_eq!(opened.key.as_bytes(), vault_key.as_bytes());
         assert!(opened.sender.is_none());
+    }
+
+    #[test]
+    fn emergency_envelope_is_its_own_kind() {
+        let (_, alice) = create_account("a").unwrap();
+        let (_, bob) = create_account("b").unwrap();
+        let vault_key = SymmetricKey::random();
+        let wrapped = wrap_emergency_key(&alice.keypair, &bob.keypair.public, "v-1", &vault_key).unwrap();
+        // Même taille qu'une enveloppe de membre : le serveur la valide pareil.
+        assert_eq!(wrapped.len(), 106);
+        let opened = unwrap_emergency_key(&bob, "v-1", &wrapped).unwrap();
+        assert_eq!(opened.key.as_bytes(), vault_key.as_bytes());
+        assert_eq!(opened.sender.as_ref(), Some(&alice.keypair.public));
+        assert!(unwrap_emergency_key(&bob, "v-2", &wrapped).is_err());
+        // Pas interchangeable avec une enveloppe de membre, dans aucun sens :
+        // le serveur ne peut pas l'installer comme appartenance au vault.
+        assert!(unwrap_vault_key(&bob, "v-1", &wrapped).is_err());
+        let member = wrap_vault_key(&alice.keypair, &bob.keypair.public, "v-1", &vault_key).unwrap();
+        assert!(unwrap_emergency_key(&bob, "v-1", &member).is_err());
+        // Le format 1 (anonyme) n'existe pas pour l'urgence.
+        let legacy = seal_for(&bob.keypair.public, vault_key.as_bytes()).unwrap();
+        assert!(matches!(
+            unwrap_emergency_key(&bob, "v-1", &legacy),
+            Err(CryptoError::Format)
+        ));
+    }
+
+    #[test]
+    fn send_link_keys_content_and_password() {
+        let secret = random_bytes(SEND_SECRET_LEN);
+        let keys = send_keys(&secret, None).unwrap();
+        let blob = seal_send(&keys, "s-1", b"{\"kind\":\"text\"}").unwrap();
+        // Le destinataire recalcule les mêmes clés depuis le lien.
+        let again = send_keys(&secret, None).unwrap();
+        assert_eq!(again.access.as_bytes(), keys.access.as_bytes());
+        assert_eq!(open_send(&again, "s-1", &blob).unwrap(), b"{\"kind\":\"text\"}");
+        assert!(open_send(&again, "s-2", &blob).is_err());
+        assert_ne!(keys.enc.as_bytes(), keys.access.as_bytes());
+        assert!(send_keys(&secret[..8], None).is_err());
+
+        // Avec mot de passe : les deux clés changent, un mauvais mot de passe
+        // n'ouvre rien et ne donne pas la bonne clé d'accès.
+        let salt = random_salt();
+        let pw = send_password_key("s3cret", &salt, fast_kdf()).unwrap();
+        let locked = send_keys(&secret, Some(&pw)).unwrap();
+        assert_ne!(locked.access.as_bytes(), keys.access.as_bytes());
+        let blob = seal_send(&locked, "s-1", b"x").unwrap();
+        assert!(open_send(&keys, "s-1", &blob).is_err());
+        let wrong = send_keys(&secret, Some(&send_password_key("oops", &salt, fast_kdf()).unwrap())).unwrap();
+        assert_ne!(wrong.access.as_bytes(), locked.access.as_bytes());
+        assert!(open_send(&wrong, "s-1", &blob).is_err());
+        // Paramètres imposés par le serveur : mêmes bornes que le compte.
+        let weak = KdfParams {
+            m_cost: 8,
+            t_cost: 1,
+            p_cost: 1,
+        };
+        assert!(send_password_key("s3cret", &salt, weak).is_err());
+
+        // La fiche de l'auteur, sous sa user key, liée au lien.
+        let uk = SymmetricKey::random();
+        let owner = seal_send_owner(&uk, "s-1", b"{}").unwrap();
+        assert_eq!(open_send_owner(&uk, "s-1", &owner).unwrap(), b"{}");
+        assert!(open_send_owner(&uk, "s-2", &owner).is_err());
+        assert!(open_user_settings(&uk, &owner).is_err());
     }
 
     #[test]

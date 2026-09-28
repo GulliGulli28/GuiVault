@@ -5,7 +5,7 @@ import { indexItems } from "../lib/entities";
 import { download, exportCsv, exportEncrypted, exportJson } from "../lib/exporters";
 import { importFile, NeedsPassword, resolveFolders, type ImportResult } from "../lib/importers";
 import { navigate } from "../lib/route";
-import { loadItems, putPayload, type DecodedItem, type VaultView } from "../lib/session";
+import { findVault, loadItems, putPayload, type DecodedItem, type VaultView } from "../lib/session";
 import { canWrite, KIND_LABELS_PLURAL, type ItemKind } from "../lib/types";
 import { PasswordStrength } from "./PasswordStrength";
 import { GroupSelect } from "./forms/common";
@@ -16,7 +16,7 @@ import { Eyebrow, Field, FileButton, PasswordInput } from "./ui";
  * déchiffre tout ici et produit un fichier — en clair (à manier comme tel)
  * ou protégé par un mot de passe. */
 export function ToolsPage({ ctx, vaultId }: { ctx: PageContext; vaultId: string }) {
-  const vault = ctx.session.vaults.find((v) => v.id === vaultId);
+  const vault = findVault(ctx.session, vaultId);
   if (!vault) return <p className="p-6 text-[12.5px] text-[var(--c-text-muted)]">Ce vault n'existe pas (ou plus).</p>;
   return <Body key={vault.id} ctx={ctx} vault={vault} />;
 }
@@ -40,7 +40,7 @@ function Body({ ctx, vault }: { ctx: PageContext; vault: VaultView }) {
         {writable ? (
           <ImportSection ctx={ctx} vault={vault} groups={index.groups} onDone={reload} />
         ) : (
-          <p className="callout max-w-2xl">Vous êtes lecteur de ce vault : pas d'import possible, l'export reste disponible.</p>
+          <p className="callout max-w-2xl">{vault.emergency ? `Confié par ${vault.emergency.grantor} (accès d'urgence) : lecture seule, l'export reste disponible.` : "Vous êtes lecteur de ce vault : pas d'import possible, l'export reste disponible."}</p>
         )}
         <ExportSection ctx={ctx} vault={vault} items={items} />
       </div>

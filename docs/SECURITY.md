@@ -26,6 +26,9 @@ chiffrées.
 | Ancien membre qui garde la clé | Rotation de clé : le serveur exige une enveloppe pour **chaque** membre restant et un chiffré pour **chaque** item vivant, et refuse si la révision a bougé (personne n'écrit avec l'ancienne clé pendant la rotation). Les invitations en attente sont révoquées. |
 | Paramètres KDF affaiblis par un client hostile (compte cassable) ou absurdes (DoS du client) | Bornes vérifiées côté serveur (`KdfParams::is_sane`). |
 | Serveur malveillant qui **dicte des paramètres KDF faibles** au prelogin (`m_cost = 8, t_cost = 1` : la clé d'auth reçue se casse hors ligne, et le mot de passe maître avec) | Les clients appliquent les mêmes bornes avant de dériver (`MasterKey::derive` côté Rust, `deriveMasterKey` / `deriveExportKey` côté web) : hors bornes, rien n'est calculé ni envoyé. Plancher = minimum OWASP (19 MiB, 2 passes). Au-dessus du plancher, les paramètres sont **épinglés** par appareil (serveur + e-mail) après chaque déverrouillage réussi — qui prouve qu'ils sont les vrais — et un prelogin qui les fait baisser (moins de mémoire ou de passes) est refusé avant de dériver (`KdfParams::weaker_than` ; web : `web/src/lib/kdfPins.ts` ; Guiterm : `KnownAccount::kdf` dans `accounts.json`). Aucun client ne choisit de paramètres plus faibles que les précédents : une baisse ne peut venir que du serveur. Première connexion depuis un appareil : seul le plancher protège. |
+| Lien de partage intercepté ou transféré | Le lien porte la clé (fragment `#…`, jamais envoyé au serveur ni dans un `Referer` : `Referrer-Policy: no-referrer`). Expiration obligatoire (`GUIVAULT_SEND_MAX_DAYS`), nombre d'ouvertures borné, et un **mot de passe** facultatif qui entre dans la dérivation des clés : sans lui, le lien seul n'ouvre rien. La page n'ouvre le contenu qu'au clic (« Ouvrir ») — l'aperçu d'une messagerie ne consomme pas de vue — puis retire le secret de la barre d'adresse. |
+| Serveur (ou voleur de la base) qui veut lire un lien de partage | Il n'a que le chiffré et `SHA-256(access_key)` ; la clé de contenu et la clé d'accès sont tirées d'un secret de 128 bits qu'il ne voit jamais. Avec un mot de passe, même le lien complet ne suffit pas : il faudrait aussi casser un Argon2id 64 MiB. Il ne remet le chiffré qu'à qui présente `access_key` (qui n'a que l'identifiant ne peut ni lire, ni consommer une vue), efface le chiffré à la dernière vue et la ligne à l'expiration. Mot de passe deviné en ligne : frein par IP des routes d'authentification. |
+| **Accès d'urgence** détourné par le serveur | Le serveur garde des enveloppes (`wrap_emergency_key`) qu'il ne sait pas ouvrir : au pire, il les remet **au contact choisi** avant la fin du délai — jamais à lui-même ni à un tiers. Le donneur enveloppe vers une clé dont il a vérifié l'empreinte (comme pour un partage), et le contact n'ouvre qu'une enveloppe dont l'expéditeur est l'empreinte qu'il a épinglée en acceptant : un vault fabriqué par le serveur « au nom » du donneur est écarté. Le contexte propre à l'urgence (HKDF et AAD) empêche d'installer l'enveloppe comme appartenance au vault. Rien de comparable à la récupération de compte critiquée chez Bitwarden, où le serveur garde de quoi rouvrir le coffre. |
 | Blobs de taille arbitraire | Tailles bornées par champ ; taille max d'item configurable ; limite globale du corps. |
 | Mutex empoisonné, panique, surcharge | Runtime tokio, timeouts de 30 s, arrêt gracieux SIGTERM. |
 
@@ -43,6 +46,13 @@ jours, y compris par qui obtiendrait la base **et** la clé du vault — ce que
 « Supprimer définitivement » (corbeille) efface tout de suite. Un ancien
 membre n'y a plus accès (404), et la rotation qui suit son départ
 re-chiffre les versions sous la nouvelle clé.
+
+Des **liens de partage**, il voit qui en crée, quand, leur taille, s'ils ont
+un mot de passe, leurs expirations et chaque ouverture (date, IP) — pas leur
+contenu ni leur nom (dans la fiche de l'auteur, sous sa user key). De
+l'**accès d'urgence**, il voit qui a désigné qui, pour quels vaults, le
+délai, et chaque étape (acceptation, demande, accord, refus) — ce qu'il faut
+pour appliquer le délai.
 
 ## Limites connues
 
@@ -71,6 +81,14 @@ re-chiffre les versions sous la nouvelle clé.
   Contrairement à une signature, l'authentification X25519 ne prouve rien
   à un tiers (le destinataire aurait pu fabriquer l'enveloppe lui-même) —
   inutile ici, où seul le destinataire a besoin de savoir.
+- **Le délai de l'accès d'urgence est appliqué par le serveur**, pas par la
+  cryptographie : un serveur compromis peut remettre les enveloppes au
+  contact sans attendre (le contact étant, par construction, quelqu'un à qui
+  le donneur a déjà confié ses clés). Sans alerte par e-mail (pas de SMTP
+  encore), le donneur découvre une demande à sa connexion suivante : le
+  délai doit en tenir compte. Ce que le contact a lu pendant un accès
+  accordé, il a pu le garder : reprendre la main n'efface pas sa mémoire,
+  une rotation de clé si.
 - **Le client est dans la base de confiance.** Un Guiterm compromis a le
   mot de passe maître. Rien côté serveur n'y peut quoi que ce soit.
 - **Le mot de passe maître est irrécupérable.** Pas de réinitialisation, par

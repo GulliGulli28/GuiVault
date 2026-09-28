@@ -16,6 +16,17 @@ export function fromBase64(s: string): Uint8Array {
   return out;
 }
 
+/** base64url sans remplissage : ce qui tient dans une URL sans échappement
+ * (le secret d'un lien de partage). */
+export function toBase64Url(bytes: Uint8Array): string {
+  return toBase64(bytes).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+export function fromBase64Url(s: string): Uint8Array {
+  const std = s.replace(/-/g, "+").replace(/_/g, "/");
+  return fromBase64(std + "=".repeat((4 - (std.length % 4)) % 4));
+}
+
 export function toHex(bytes: Uint8Array): string {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 }

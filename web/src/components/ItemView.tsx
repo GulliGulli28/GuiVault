@@ -13,8 +13,9 @@ import { CopyButton, Eyebrow, formatWhen, Row, SecretValue } from "./ui";
 import { ACTION_LABELS, APPROVAL_LABELS, ON_FAILURE_LABELS } from "./forms/RunbookForm";
 
 /** La fiche d'une entité, en lecture : ce que Guiterm montre dans ses
- * panneaux, secrets masqués et copiables. */
-export function ItemView({ payload, index }: { payload: Payload; index: VaultIndex }) {
+ * panneaux, secrets masqués et copiables. `shared` : reçue par un lien de
+ * partage — sans le rangement (dossier, tags) de qui l'a envoyée. */
+export function ItemView({ payload, index, shared }: { payload: Payload; index: VaultIndex; shared?: boolean }) {
   const groups = new Map(index.groups.map((g) => [g.id, g]));
   const hostLabel = (id: string | null | undefined) => (id ? index.hosts.find((h) => h.id === id)?.label ?? `hôte inconnu (${id.slice(0, 8)})` : null);
 
@@ -153,7 +154,7 @@ export function ItemView({ payload, index }: { payload: Payload; index: VaultInd
               </Row>
             )}
           </Section>
-          <SecretCommon base={l} groups={groups} />
+          <SecretCommon base={l} groups={groups} shared={shared} />
           {l.passkeys.length > 0 && (
             <Section title="Passkeys">
               {l.passkeys.map((k) => (
@@ -177,7 +178,7 @@ export function ItemView({ payload, index }: { payload: Payload; index: VaultInd
       return (
         <div className="space-y-4">
           <pre className="card whitespace-pre-wrap break-words p-3 font-sans text-[12.5px] leading-relaxed text-[var(--c-text)]">{n.content || <Muted>(vide)</Muted>}</pre>
-          <SecretCommon base={n} groups={groups} withoutNotes />
+          <SecretCommon base={n} groups={groups} shared={shared} withoutNotes />
         </div>
       );
     }
@@ -191,7 +192,7 @@ export function ItemView({ payload, index }: { payload: Payload; index: VaultInd
             <Row label="Expiration"><Copyable value={[cd.expMonth, cd.expYear].filter(Boolean).join(" / ")} mono /></Row>
             <Row label="Code">{cd.code ? <SecretValue value={cd.code} /> : <Muted>—</Muted>}</Row>
           </Section>
-          <SecretCommon base={cd} groups={groups} />
+          <SecretCommon base={cd} groups={groups} shared={shared} />
         </div>
       );
     }
@@ -217,7 +218,7 @@ export function ItemView({ payload, index }: { payload: Payload; index: VaultInd
             <Row label="Passeport">{i.passportNumber ? <SecretValue value={i.passportNumber} /> : <Muted>—</Muted>}</Row>
             <Row label="Permis">{i.licenseNumber ? <SecretValue value={i.licenseNumber} /> : <Muted>—</Muted>}</Row>
           </Section>
-          <SecretCommon base={i} groups={groups} />
+          <SecretCommon base={i} groups={groups} shared={shared} />
         </div>
       );
     }
@@ -267,7 +268,7 @@ export function ItemView({ payload, index }: { payload: Payload; index: VaultInd
               </>
             )}
           </section>
-          <SecretCommon base={a} groups={groups} />
+          <SecretCommon base={a} groups={groups} shared={shared} />
         </div>
       );
     }
@@ -283,7 +284,7 @@ export function ItemView({ payload, index }: { payload: Payload; index: VaultInd
             {k.scopes && <Row label="Portée">{k.scopes}</Row>}
             <Row label="Expiration">{k.expiresAt ? <span className={expired ? "text-[var(--c-danger)]" : ""}>{k.expiresAt}{expired ? " — expirée" : ""}</span> : <Muted>aucune</Muted>}</Row>
           </Section>
-          <SecretCommon base={k} groups={groups} />
+          <SecretCommon base={k} groups={groups} shared={shared} />
         </div>
       );
     }
@@ -323,7 +324,7 @@ export function ItemView({ payload, index }: { payload: Payload; index: VaultInd
 
 /** Dossier, tags, notes et champs personnalisés : le pied de fiche de
  * tous les secrets. */
-function SecretCommon({ base, groups, withoutNotes }: { base: SecretBase; groups: Map<string, import("../lib/types").Group>; withoutNotes?: boolean }) {
+function SecretCommon({ base, groups, withoutNotes, shared }: { base: SecretBase; groups: Map<string, import("../lib/types").Group>; withoutNotes?: boolean; shared?: boolean }) {
   return (
     <>
       {!withoutNotes && base.notes && (
@@ -336,10 +337,12 @@ function SecretCommon({ base, groups, withoutNotes }: { base: SecretBase; groups
           {base.fields.map((f, i) => <Row key={i} label={f.name || "(sans nom)"}><FieldValue field={f} /></Row>)}
         </Section>
       )}
-      <Section title="Organisation">
-        <Row label="Dossier">{base.groupId ? groupPath(groups, base.groupId) || <Muted>dossier inconnu</Muted> : <Muted>racine</Muted>}</Row>
-        <Row label="Tags"><Tags tags={base.tags} /></Row>
-      </Section>
+      {!shared && (
+        <Section title="Organisation">
+          <Row label="Dossier">{base.groupId ? groupPath(groups, base.groupId) || <Muted>dossier inconnu</Muted> : <Muted>racine</Muted>}</Row>
+          <Row label="Tags"><Tags tags={base.tags} /></Row>
+        </Section>
+      )}
     </>
   );
 }

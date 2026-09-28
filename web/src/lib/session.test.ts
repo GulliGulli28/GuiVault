@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { toBase64 } from "./bytes";
 import * as c from "./crypto";
 import { kdfWeakerThan, pinKdf, pinnedKdf } from "./kdfPins";
+import { pinFingerprint } from "./pins";
 import { acceptRollback, invitationKeyFrom, loadItems, login, openOffline, refresh, wipe, type SessionState } from "./session";
 import { observeRevisions } from "./vaultRevisions";
 
@@ -206,6 +207,58 @@ describe("provenance de la clé d'un vault", () => {
     // Liée à son vault : reposée ailleurs, elle ne s'ouvre pas — le vault est écarté.
     expect(from["v-moved"]).toBeUndefined();
   }, 60_000);
+});
+
+describe("accès d'urgence", () => {
+  it("n'ouvre que les vaults enveloppés par le donneur épinglé, en lecture seule", async () => {
+    const bob = c.generateKeyPair();
+    const alice = c.generateKeyPair();
+    const mallory = c.generateKeyPair();
+    const user = { id: "u-bob", email: "bob@example.com", public_key: toBase64(bob.publicKey), created_at: "2026-01-01T00:00:00Z" };
+    const party = (id: string, email: string, pk: Uint8Array) => ({ id, email, public_key: toBase64(pk), fingerprint: c.fingerprint(pk) });
+    const grant = {
+      id: "g-1",
+      grantor: party("u-alice", "alice@example.com", alice.publicKey),
+      grantee: party("u-bob", "bob@example.com", bob.publicKey),
+      wait_days: 7,
+      status: "granted",
+      requested_at: "2026-01-01T00:00:00Z",
+      access_at: "2026-01-08T00:00:00Z",
+      vaults: [{ vault_id: "v-fam", has_key: true }, { vault_id: "v-forged", has_key: true }],
+      created_at: "2026-01-01T00:00:00Z",
+    };
+    const k = new Uint8Array(32).fill(7);
+    const ev = (id: string, wrapped: Uint8Array) => ({ id, kind: "shared", name_enc: toBase64(c.sealVaultName(k, id, "Famille")), wrapped_vault_key: toBase64(wrapped), revision: 3, created_at: "2026-01-01T00:00:00Z", updated_at: "2026-01-01T00:00:00Z" });
+    const item = { id: "i-1", vault_id: "v-fam", item_type: "note", revision: 3, deleted: false, created_at: "2026-01-01T00:00:00Z", updated_at: "2026-01-01T00:00:00Z", ciphertext: toBase64(c.sealItem(k, "v-fam", "i-1", "note", new TextEncoder().encode(JSON.stringify({ kind: "note", note: { id: "i-1", name: "Codes", groupId: null, tags: [], notes: "1234" } })))) };
+    const calls = fakeServer({
+      "/sync": { user, vaults: [], invitations: [], server_time: "2026-01-01T00:00:00Z" },
+      "/emergency": { granted_by_me: [], granted_to_me: [grant] },
+      // Une liste : `[statut, corps]` pour le faux serveur.
+      "/emergency/g-1/vaults": [200, [
+        ev("v-fam", c.wrapEmergencyKey(alice, bob.publicKey, "v-fam", k)),
+        // Le serveur glisse un vault à lui sous le nom d'Alice.
+        ev("v-forged", c.wrapEmergencyKey(mallory, bob.publicKey, "v-forged", k)),
+      ]],
+      "/emergency/g-1/vaults/v-fam/items": { items: [item], revision: 3 },
+    });
+    const state: SessionState = { user, account: { userKey: new Uint8Array(32), keypair: bob }, fingerprint: c.fingerprint(bob.publicKey), vaults: [], invitations: [], emergency: null, emergencyVaults: [], rollbacks: [] };
+
+    // Empreinte d'Alice pas vérifiée sur cet appareil : rien n'est demandé.
+    await refresh(state);
+    expect(state.emergency?.granted_to_me).toHaveLength(1);
+    expect(state.emergencyVaults).toEqual([]);
+    expect(calls.some((u) => u.endsWith("/emergency/g-1/vaults"))).toBe(false);
+
+    pinFingerprint("alice@example.com", c.fingerprint(alice.publicKey));
+    const warnings = await refresh(state);
+    expect(state.emergencyVaults.map((v) => [v.id, v.name, v.role, v.emergency?.grantor])).toEqual([["v-fam", "Famille", "reader", "alice@example.com"]]);
+    expect(warnings.join(" ")).toMatch(/ne vient pas de cette personne/);
+    // Pas un vault dont on est membre : ailleurs dans la session.
+    expect(state.vaults).toEqual([]);
+    const { items } = await loadItems(state.emergencyVaults[0]);
+    expect(items[0]).toMatchObject({ ok: true, payload: { kind: "note", note: { notes: "1234" } } });
+    expect(calls.at(-1)).toMatch(/\/emergency\/g-1\/vaults\/v-fam\/items$/);
+  });
 });
 
 describe("enveloppe jointe à une invitation", () => {

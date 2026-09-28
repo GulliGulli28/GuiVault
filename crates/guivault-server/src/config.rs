@@ -120,6 +120,9 @@ pub struct Config {
     pub item_history: usize,
     /// Jours qu'un item supprimé passe dans la corbeille.
     pub trash_days: u32,
+    /// Durée de vie maximale d'un lien de partage, en jours ; `0` : liens
+    /// désactivés (les routes publiques `/sends/{id}/access` aussi).
+    pub send_max_days: u32,
     /// Rafales autorisées sur les routes d'authentification, par IP.
     pub auth_rate_burst: u32,
     pub auth_rate_per_second: u64,
@@ -185,6 +188,7 @@ impl Config {
             max_item_bytes: env_parse("GUIVAULT_MAX_ITEM_BYTES", 1024 * 1024)?,
             item_history: env_parse("GUIVAULT_ITEM_HISTORY", 20)?,
             trash_days: env_parse("GUIVAULT_TRASH_DAYS", 30)?,
+            send_max_days: env_parse("GUIVAULT_SEND_MAX_DAYS", 30)?,
             auth_rate_burst: env_parse("GUIVAULT_AUTH_RATE_BURST", 10)?,
             auth_rate_per_second: env_parse("GUIVAULT_AUTH_RATE_PER_SECOND", 2)?,
             log_json: env_parse("GUIVAULT_LOG_JSON", false)?,
@@ -237,6 +241,7 @@ mod tests {
             max_item_bytes: 0,
             item_history: 0,
             trash_days: 0,
+            send_max_days: 0,
             auth_rate_burst: 0,
             auth_rate_per_second: 0,
             log_json: false,

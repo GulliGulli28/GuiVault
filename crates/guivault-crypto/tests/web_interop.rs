@@ -76,3 +76,44 @@ fn opens_browser_item_and_vault_name() {
         v["name"].as_str().unwrap()
     );
 }
+
+#[test]
+fn opens_browser_emergency_envelope() {
+    let v = &vectors()["vault_envelope"];
+    let private = PrivateKey::try_from(h(&v["recipient_private"]).as_slice()).unwrap();
+    let account = UnlockedAccount {
+        user_key: SymmetricKey::random(),
+        keypair: KeyPair {
+            public: private.public_key(),
+            private,
+        },
+    };
+    let vault_id = v["vault_id"].as_str().unwrap();
+    let opened = unwrap_emergency_key(&account, vault_id, &h(&v["emergency_blob"])).unwrap();
+    assert_eq!(opened.key.as_bytes().as_slice(), h(&v["vault_key"]));
+    assert_eq!(opened.sender.unwrap().as_bytes().as_slice(), h(&v["sender_public"]));
+    assert!(unwrap_vault_key(&account, vault_id, &h(&v["emergency_blob"])).is_err());
+}
+
+#[test]
+fn opens_browser_send_link() {
+    let v = &vectors()["send"];
+    let id = v["id"].as_str().unwrap();
+    let plain = v["plaintext"].as_str().unwrap().as_bytes();
+    let keys = send_keys(&h(&v["secret"]), None).unwrap();
+    assert_eq!(token_hash(keys.access.as_bytes()).as_slice(), h(&v["access_hash"]));
+    assert_eq!(open_send(&keys, id, &h(&v["blob"])).unwrap(), plain);
+    let params: KdfParams = serde_json::from_value(v["password_kdf"].clone()).unwrap();
+    let pw = send_password_key(v["password"].as_str().unwrap(), &h(&v["password_salt"]), params).unwrap();
+    let locked = send_keys(&h(&v["secret"]), Some(&pw)).unwrap();
+    assert_eq!(
+        token_hash(locked.access.as_bytes()).as_slice(),
+        h(&v["locked_access_hash"])
+    );
+    assert_eq!(open_send(&locked, id, &h(&v["locked_blob"])).unwrap(), plain);
+    let owner_key = SymmetricKey::from_slice(&h(&v["owner_key"])).unwrap();
+    assert_eq!(
+        open_send_owner(&owner_key, id, &h(&v["owner_blob"])).unwrap(),
+        v["owner_plaintext"].as_str().unwrap().as_bytes()
+    );
+}

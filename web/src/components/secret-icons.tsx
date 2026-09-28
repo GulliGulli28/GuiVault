@@ -121,3 +121,24 @@ export function IconHistory({ size = 16, className }: P) {
     </svg>
   );
 }
+
+/** Un lien de partage : deux maillons. */
+export function IconLink({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <path d="M6.75 9.25a2.75 2.75 0 0 0 3.9 0l2.1-2.1a2.75 2.75 0 0 0-3.9-3.9l-.95.95" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M9.25 6.75a2.75 2.75 0 0 0-3.9 0l-2.1 2.1a2.75 2.75 0 0 0 3.9 3.9l.95-.95" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** L'accès d'urgence : une bouée. */
+export function IconLifebuoy({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <circle cx="8" cy="8" r="6.25" stroke="currentColor" strokeWidth="1.25" />
+      <circle cx="8" cy="8" r="2.75" stroke="currentColor" strokeWidth="1.25" />
+      <path d="M3.6 3.6l2.45 2.45M12.4 3.6L9.95 6.05M3.6 12.4l2.45-2.45M12.4 12.4L9.95 9.95" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" />
+    </svg>
+  );
+}

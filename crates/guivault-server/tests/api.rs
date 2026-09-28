@@ -61,6 +61,7 @@ impl TestServer {
             max_item_bytes: 64 * 1024,
             item_history: 20,
             trash_days: 30,
+            send_max_days: 30,
             auth_rate_burst: 1000,
             auth_rate_per_second: 1000,
             log_json: false,
@@ -82,6 +83,13 @@ impl TestServer {
             admin_url,
             shutdown: Some(stop_tx),
         })
+    }
+
+    /// La base de ce serveur, pour simuler le temps qui passe.
+    async fn db(&self) -> sqlx::PgPool {
+        let mut u = url::Url::parse(&self.admin_url).unwrap();
+        u.set_path(&self.db_name);
+        sqlx::PgPool::connect(u.as_str()).await.unwrap()
     }
 
     async fn stop(mut self) {
@@ -796,6 +804,7 @@ async fn shared_vault_invite_existing_user_roles_and_rotation() {
         }],
         items: rotated,
         versions: None,
+        emergency: None,
         base_revision: current.revision,
     };
     // Un item manquant → refus.
@@ -1740,6 +1749,7 @@ async fn item_history_trash_restore_and_rotation() {
             }],
             items: vec![],
             versions,
+            emergency: None,
             base_revision: base,
         };
     let new_key = gc::SymmetricKey::random();
@@ -1816,4 +1826,549 @@ async fn item_history_trash_restore_and_rotation() {
             .is_empty()
     );
     server.stop().await;
+}
+
+// ─── Liens de partage ───────────────────────────────────────────────────────
+
+fn fast_kdf() -> KdfParams {
+    KdfParams {
+        m_cost: 19_456,
+        t_cost: 2,
+        p_cost: 1,
+    }
+}
+
+/// Ce que fait le client pour créer un lien : secret, clés, contenu scellé,
+/// fiche de l'auteur sous sa user key.
+fn new_send(
+    user: &User,
+    text: &str,
+    password: Option<&str>,
+    max_views: Option<u32>,
+    expires_in_secs: u64,
+) -> (CreateSendRequest, Vec<u8>) {
+    let id = Uuid::new_v4();
+    let secret = gc::random_bytes(gc::SEND_SECRET_LEN);
+    let (pw_key, password) = match password {
+        Some(pw) => {
+            let salt = gc::random_salt().to_vec();
+            let key = gc::send_password_key(pw, &salt, fast_kdf()).unwrap();
+            (Some(key), Some(SendPassword { kdf: fast_kdf(), salt }))
+        }
+        None => (None, None),
+    };
+    let keys = gc::send_keys(&secret, pw_key.as_ref()).unwrap();
+    let owner = serde_json::json!({ "name": text, "secret": secret }).to_string();
+    let req = CreateSendRequest {
+        id,
+        ciphertext: gc::seal_send(&keys, &id.to_string(), text.as_bytes()).unwrap(),
+        access_hash: gc::token_hash(keys.access.as_bytes()).to_vec(),
+        owner_blob: gc::seal_send_owner(&user.account.user_key, &id.to_string(), owner.as_bytes()).unwrap(),
+        password,
+        max_views,
+        expires_in_secs,
+    };
+    (req, secret)
+}
+
+#[tokio::test]
+async fn send_links_need_their_key_count_views_and_expire() {
+    let Some(server) = TestServer::start(RegistrationMode::Open).await else {
+        return;
+    };
+    let alice = User::register(&server, "alice@t.io", "pw").await;
+    let bob = User::register(&server, "bob@t.io", "pw").await;
+    let anon = Client::new();
+    let h: HealthResponse = anon
+        .get(format!("{}/health", server.base))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(h.send_max_days, 30);
+    let create = |req: &CreateSendRequest| alice.req(reqwest::Method::POST, "/sends").json(req).send();
+    let info = |id: Uuid| anon.get(format!("{}/sends/{id}/access", server.base)).send();
+    let access = |id: Uuid, key: Vec<u8>| {
+        anon.post(format!("{}/sends/{id}/access", server.base))
+            .json(&SendAccessRequest { access_key: key })
+            .send()
+    };
+
+    // Deux vues au plus, sans mot de passe.
+    let (req, secret) = new_send(&alice, "code du portail : 4321", None, Some(2), 3600);
+    let id = req.id;
+    let body = status!(create(&req).await.unwrap(), StatusCode::CREATED);
+    let summary: SendSummary = serde_json::from_str(&body).unwrap();
+    assert!(summary.available && !summary.has_password);
+    assert_eq!((summary.views, summary.max_views), (0, Some(2)));
+    status!(create(&req).await.unwrap(), StatusCode::CONFLICT);
+
+    let body = status!(info(id).await.unwrap(), StatusCode::OK);
+    let i: SendInfo = serde_json::from_str(&body).unwrap();
+    assert!(i.password.is_none());
+    assert_eq!(i.views_left, Some(2));
+
+    // Sans la clé (le serveur n'a que l'identifiant) : refusé, rien de consommé.
+    let body = status!(access(id, gc::random_bytes(32)).await.unwrap(), StatusCode::FORBIDDEN);
+    assert!(body.contains("invalid_send_key"));
+    status!(access(id, vec![1; 12]).await.unwrap(), StatusCode::BAD_REQUEST);
+
+    // Avec : le contenu, qui s'ouvre avec le secret du lien.
+    let keys = gc::send_keys(&secret, None).unwrap();
+    for left in [1, 0] {
+        let body = status!(
+            access(id, keys.access.as_bytes().to_vec()).await.unwrap(),
+            StatusCode::OK
+        );
+        let content: SendContent = serde_json::from_str(&body).unwrap();
+        assert_eq!(content.views_left, Some(left));
+        assert_eq!(
+            gc::open_send(&keys, &id.to_string(), &content.ciphertext).unwrap(),
+            b"code du portail : 4321"
+        );
+    }
+    // Épuisé : introuvable, et le chiffré n'est plus gardé.
+    let body = status!(
+        access(id, keys.access.as_bytes().to_vec()).await.unwrap(),
+        StatusCode::NOT_FOUND
+    );
+    assert!(body.contains("send_unavailable"));
+    status!(info(id).await.unwrap(), StatusCode::NOT_FOUND);
+    let db = server.db().await;
+    let (kept,): (bool,) = sqlx::query_as("SELECT ciphertext IS NOT NULL FROM sends WHERE id = $1")
+        .bind(id)
+        .fetch_one(&db)
+        .await
+        .unwrap();
+    assert!(!kept);
+
+    // L'auteur voit ses liens et en relit la fiche.
+    let mine: Vec<SendSummary> = alice.get("/sends").await;
+    assert_eq!(mine.len(), 1);
+    assert!(!mine[0].available);
+    assert_eq!(mine[0].views, 2);
+    let owner = gc::open_send_owner(&alice.account.user_key, &id.to_string(), &mine[0].owner_blob).unwrap();
+    assert!(String::from_utf8(owner).unwrap().contains("portail"));
+    assert!(bob.get::<Vec<SendSummary>>("/sends").await.is_empty());
+
+    // Avec mot de passe : il faut les deux ; le lien seul ne donne pas la clé.
+    let (req, secret) = new_send(&alice, "PIN 0000", Some("fromage"), None, 86_400);
+    let id = req.id;
+    status!(create(&req).await.unwrap(), StatusCode::CREATED);
+    let i: SendInfo = serde_json::from_str(&status!(info(id).await.unwrap(), StatusCode::OK)).unwrap();
+    let pw = i.password.expect("mot de passe annoncé");
+    assert_eq!(i.views_left, None);
+    let without = gc::send_keys(&secret, None).unwrap();
+    status!(
+        access(id, without.access.as_bytes().to_vec()).await.unwrap(),
+        StatusCode::FORBIDDEN
+    );
+    let wrong = gc::send_keys(&secret, Some(&gc::send_password_key("brie", &pw.salt, pw.kdf).unwrap())).unwrap();
+    status!(
+        access(id, wrong.access.as_bytes().to_vec()).await.unwrap(),
+        StatusCode::FORBIDDEN
+    );
+    let right = gc::send_keys(
+        &secret,
+        Some(&gc::send_password_key("fromage", &pw.salt, pw.kdf).unwrap()),
+    )
+    .unwrap();
+    let body = status!(
+        access(id, right.access.as_bytes().to_vec()).await.unwrap(),
+        StatusCode::OK
+    );
+    let content: SendContent = serde_json::from_str(&body).unwrap();
+    assert_eq!(
+        gc::open_send(&right, &id.to_string(), &content.ciphertext).unwrap(),
+        b"PIN 0000"
+    );
+
+    // Bornes : durée de vie, vues, tailles.
+    let (mut bad, _) = new_send(&alice, "x", None, None, 60);
+    status!(create(&bad).await.unwrap(), StatusCode::BAD_REQUEST);
+    bad.expires_in_secs = 31 * 86_400;
+    status!(create(&bad).await.unwrap(), StatusCode::BAD_REQUEST);
+    bad.expires_in_secs = 3600;
+    bad.max_views = Some(0);
+    status!(create(&bad).await.unwrap(), StatusCode::BAD_REQUEST);
+    bad.max_views = None;
+    bad.access_hash.pop();
+    status!(create(&bad).await.unwrap(), StatusCode::BAD_REQUEST);
+
+    // Supprimer : l'auteur seul ; ensuite, plus rien.
+    status!(
+        bob.req(reqwest::Method::DELETE, &format!("/sends/{id}"))
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::NOT_FOUND
+    );
+    status!(
+        alice
+            .req(reqwest::Method::DELETE, &format!("/sends/{id}"))
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::NO_CONTENT
+    );
+    status!(info(id).await.unwrap(), StatusCode::NOT_FOUND);
+
+    // Expiré : introuvable tout de suite, effacé au passage suivant.
+    let (req, _) = new_send(&alice, "bientôt périmé", None, None, 3600);
+    status!(create(&req).await.unwrap(), StatusCode::CREATED);
+    sqlx::query("UPDATE sends SET expires_at = now() - interval '1 second' WHERE id = $1")
+        .bind(req.id)
+        .execute(&db)
+        .await
+        .unwrap();
+    status!(info(req.id).await.unwrap(), StatusCode::NOT_FOUND);
+    assert!(guivault_server::routes::sends::prune(&db).await.unwrap() >= 1);
+    assert!(
+        alice
+            .get::<Vec<SendSummary>>("/sends")
+            .await
+            .iter()
+            .all(|s| s.id != req.id)
+    );
+
+    // Chaque création et ouverture laisse une trace ; celles de l'auteur
+    // sont dans son journal.
+    let audit: Vec<serde_json::Value> = alice.get("/users/me/audit").await;
+    assert!(audit.iter().any(|e| e["action"] == "send.create"));
+    assert!(audit.iter().any(|e| e["action"] == "send.delete"));
+    server.stop().await;
+
+    // Désactivés sur ce serveur : ni création, ni ouverture.
+    let Some(server) = TestServer::start_with(RegistrationMode::Open, |c| c.send_max_days = 0).await else {
+        return;
+    };
+    let carol = User::register(&server, "carol@t.io", "pw").await;
+    let (req, _) = new_send(&carol, "x", None, None, 3600);
+    status!(
+        carol
+            .req(reqwest::Method::POST, "/sends")
+            .json(&req)
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::FORBIDDEN
+    );
+    status!(
+        Client::new()
+            .get(format!("{}/sends/{}/access", server.base, req.id))
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::NOT_FOUND
+    );
+    server.stop().await;
+}
+
+// ─── Accès d'urgence ────────────────────────────────────────────────────────
+
+#[tokio::test]
+async fn emergency_access_waits_then_opens_owned_vaults_read_only() {
+    let Some(server) = TestServer::start(RegistrationMode::Open).await else {
+        return;
+    };
+    let alice = User::register(&server, "alice@t.io", "pw").await;
+    let bob = User::register(&server, "bob@t.io", "pw").await;
+    let carol = User::register(&server, "carol@t.io", "pw").await;
+    let db = server.db().await;
+
+    // Alice : son vault personnel et un vault « Famille » avec un item.
+    let personal = alice.sync().await.vaults.remove(0);
+    let personal_key = alice.vault_key(&personal);
+    let (famille, famille_key) = alice.create_vault("Famille").await;
+    let item_id = Uuid::new_v4();
+    status!(
+        alice
+            .put_item(famille.id, &famille_key, item_id, "login", "banque", None)
+            .await,
+        StatusCode::CREATED
+    );
+
+    // Elle désigne Bob (clé publique vérifiée) pour ces deux vaults, 7 jours.
+    let lookup: UserLookupResponse = alice.get("/users/lookup?email=bob@t.io").await;
+    let bob_pk = gc::PublicKey::try_from(lookup.public_key.as_slice()).unwrap();
+    let envelope = |vault_id: Uuid, key: &gc::SymmetricKey| EmergencyVaultKey {
+        vault_id,
+        wrapped_vault_key: gc::wrap_emergency_key(&alice.account.keypair, &bob_pk, &vault_id.to_string(), key).unwrap(),
+    };
+    let create = |req: &CreateEmergencyGrantRequest| alice.req(reqwest::Method::POST, "/emergency").json(req).send();
+    let mut req = CreateEmergencyGrantRequest {
+        grantee_id: bob.profile.id,
+        wait_days: 0,
+        vaults: vec![envelope(personal.id, &personal_key), envelope(famille.id, &famille_key)],
+    };
+    status!(create(&req).await.unwrap(), StatusCode::BAD_REQUEST);
+    req.wait_days = 7;
+    // On ne confie que ce qu'on possède.
+    let bob_personal = bob.sync().await.vaults.remove(0);
+    let mut foreign = req.clone();
+    foreign
+        .vaults
+        .push(envelope(bob_personal.id, &gc::SymmetricKey::random()));
+    status!(create(&foreign).await.unwrap(), StatusCode::FORBIDDEN);
+    let mut to_self = req.clone();
+    to_self.grantee_id = alice.profile.id;
+    status!(create(&to_self).await.unwrap(), StatusCode::BAD_REQUEST);
+    let body = status!(create(&req).await.unwrap(), StatusCode::CREATED);
+    let grant: EmergencyGrant = serde_json::from_str(&body).unwrap();
+    assert_eq!(grant.status, EmergencyStatus::Invited);
+    assert_eq!(grant.vaults.len(), 2);
+    status!(create(&req).await.unwrap(), StatusCode::CONFLICT);
+    let gid = grant.id;
+
+    let post = |u: &User, what: &str| u.req(reqwest::Method::POST, &format!("/emergency/{gid}/{what}")).send();
+    let bob_vaults = || {
+        bob.req(reqwest::Method::GET, &format!("/emergency/{gid}/vaults"))
+            .send()
+    };
+
+    // Bob le voit, avec l'empreinte d'Alice à vérifier.
+    let ov: EmergencyOverview = bob.get("/emergency").await;
+    assert!(ov.granted_by_me.is_empty());
+    let mine = &ov.granted_to_me[0];
+    assert_eq!(mine.grantor.email, "alice@t.io");
+    assert_eq!(mine.grantor.fingerprint, gc::fingerprint(&alice.account.keypair.public));
+    // Carol, étrangère à l'affaire, ne voit rien et ne peut rien.
+    assert!(
+        carol
+            .get::<EmergencyOverview>("/emergency")
+            .await
+            .granted_to_me
+            .is_empty()
+    );
+    status!(post(&carol, "accept").await.unwrap(), StatusCode::NOT_FOUND);
+
+    // Demander avant d'accepter : non. Accepter, demander : il faut attendre.
+    status!(post(&bob, "request").await.unwrap(), StatusCode::CONFLICT);
+    status!(post(&alice, "accept").await.unwrap(), StatusCode::FORBIDDEN);
+    let g: EmergencyGrant =
+        serde_json::from_str(&status!(post(&bob, "accept").await.unwrap(), StatusCode::OK)).unwrap();
+    assert_eq!(g.status, EmergencyStatus::Accepted);
+    let g: EmergencyGrant =
+        serde_json::from_str(&status!(post(&bob, "request").await.unwrap(), StatusCode::OK)).unwrap();
+    assert_eq!(g.status, EmergencyStatus::Requested);
+    let wait = g.access_at.unwrap() - g.requested_at.unwrap();
+    assert_eq!(wait.num_days(), 7);
+    status!(post(&bob, "request").await.unwrap(), StatusCode::CONFLICT);
+    let body = status!(bob_vaults().await.unwrap(), StatusCode::FORBIDDEN);
+    assert!(body.contains("emergency_not_granted"));
+
+    // Alice refuse ; Bob redemande ; elle accorde sans attendre.
+    status!(post(&bob, "approve").await.unwrap(), StatusCode::FORBIDDEN);
+    let g: EmergencyGrant =
+        serde_json::from_str(&status!(post(&alice, "reject").await.unwrap(), StatusCode::OK)).unwrap();
+    assert_eq!(g.status, EmergencyStatus::Accepted);
+    // Bob peut aussi retirer sa propre demande.
+    status!(post(&bob, "request").await.unwrap(), StatusCode::OK);
+    let g: EmergencyGrant =
+        serde_json::from_str(&status!(post(&bob, "reject").await.unwrap(), StatusCode::OK)).unwrap();
+    assert_eq!(g.status, EmergencyStatus::Accepted);
+    status!(post(&bob, "reject").await.unwrap(), StatusCode::CONFLICT);
+    status!(post(&bob, "request").await.unwrap(), StatusCode::OK);
+    let g: EmergencyGrant =
+        serde_json::from_str(&status!(post(&alice, "approve").await.unwrap(), StatusCode::OK)).unwrap();
+    assert_eq!(g.status, EmergencyStatus::Granted);
+
+    // Bob ouvre les vaults : enveloppes d'urgence signées d'Alice, en lecture.
+    let read_all = || async {
+        let vaults: Vec<EmergencyVault> =
+            serde_json::from_str(&status!(bob_vaults().await.unwrap(), StatusCode::OK)).unwrap();
+        vaults
+    };
+    let vaults = read_all().await;
+    assert_eq!(vaults.len(), 2);
+    let v = vaults.iter().find(|v| v.id == famille.id).unwrap();
+    let opened = gc::unwrap_emergency_key(&bob.account, &v.id.to_string(), &v.wrapped_vault_key).unwrap();
+    assert_eq!(opened.sender.as_ref(), Some(&alice.account.keypair.public));
+    assert_eq!(
+        gc::open_vault_name(&opened.key, &v.id.to_string(), &v.name_enc).unwrap(),
+        "Famille"
+    );
+    // Pas une enveloppe de membre : le serveur ne peut pas l'installer comme telle.
+    assert!(gc::unwrap_vault_key(&bob.account, &v.id.to_string(), &v.wrapped_vault_key).is_err());
+    let page: ItemsPage = bob.get(&format!("/emergency/{gid}/vaults/{}/items", famille.id)).await;
+    assert_eq!(bob.open_item(&opened.key, &page.items[0]), "banque");
+    // Lecture seule : Bob n'est pas membre.
+    status!(
+        bob.put_item(famille.id, &opened.key, Uuid::new_v4(), "login", "x", None)
+            .await,
+        StatusCode::NOT_FOUND
+    );
+    status!(
+        carol
+            .req(reqwest::Method::GET, &format!("/emergency/{gid}/vaults"))
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::NOT_FOUND
+    );
+    // Alice le voit dans le journal du vault — une fois, même relu.
+    read_all().await;
+    let audit: Vec<serde_json::Value> = alice.get(&format!("/vaults/{}/audit", famille.id)).await;
+    let accesses: Vec<_> = audit.iter().filter(|e| e["action"] == "emergency.access").collect();
+    assert_eq!(accesses.len(), 1);
+    assert_eq!(accesses[0]["actor_email"], "bob@t.io");
+
+    // Elle reprend la main ; Bob redemande, et au bout du délai l'accès
+    // s'ouvre sans elle.
+    status!(post(&alice, "reject").await.unwrap(), StatusCode::OK);
+    status!(bob_vaults().await.unwrap(), StatusCode::FORBIDDEN);
+    status!(post(&bob, "request").await.unwrap(), StatusCode::OK);
+    status!(bob_vaults().await.unwrap(), StatusCode::FORBIDDEN);
+    sqlx::query("UPDATE emergency_grants SET requested_at = now() - interval '8 days' WHERE id = $1")
+        .bind(gid)
+        .execute(&db)
+        .await
+        .unwrap();
+    assert_eq!(
+        bob.get::<EmergencyOverview>("/emergency").await.granted_to_me[0].status,
+        EmergencyStatus::Granted
+    );
+    assert_eq!(read_all().await.len(), 2);
+
+    // Rotation de la clé de « Famille » par Alice.
+    let rotate = |new_key: &gc::SymmetricKey, emergency: Option<Vec<RotatedEmergencyKey>>| {
+        rotate_as_owner(&alice, famille.id, "Famille", new_key.clone(), emergency)
+    };
+    // Sans les enveloppes d'urgence : celle de Bob est à renouveler, et le
+    // vault ne lui est plus remis (elle ouvrirait l'ancienne clé).
+    let k2 = gc::SymmetricKey::random();
+    status!(rotate(&k2, None).await, StatusCode::OK);
+    let g = &alice.get::<EmergencyOverview>("/emergency").await.granted_by_me[0];
+    assert!(!g.vaults.iter().find(|v| v.vault_id == famille.id).unwrap().has_key);
+    assert!(read_all().await.iter().all(|v| v.id != famille.id));
+    // Alice ré-enveloppe (remplacement de l'ensemble).
+    let patch = |req: &UpdateEmergencyGrantRequest| {
+        alice
+            .req(reqwest::Method::PATCH, &format!("/emergency/{gid}"))
+            .json(req)
+            .send()
+    };
+    status!(
+        patch(&UpdateEmergencyGrantRequest {
+            wait_days: Some(3),
+            vaults: Some(vec![envelope(personal.id, &personal_key), envelope(famille.id, &k2)]),
+        })
+        .await
+        .unwrap(),
+        StatusCode::OK
+    );
+    assert_eq!(read_all().await.len(), 2);
+    // Avec les enveloppes : il les faut toutes, et elles suivent la clé.
+    let k3 = gc::SymmetricKey::random();
+    let body = status!(rotate(&k3, Some(vec![])).await, StatusCode::BAD_REQUEST);
+    assert!(body.contains("incomplete_rotation"));
+    let fresh = RotatedEmergencyKey {
+        grant_id: gid,
+        wrapped_vault_key: envelope(famille.id, &k3).wrapped_vault_key,
+    };
+    status!(rotate(&k3, Some(vec![fresh])).await, StatusCode::OK);
+    let v = read_all().await.into_iter().find(|v| v.id == famille.id).unwrap();
+    let opened = gc::unwrap_emergency_key(&bob.account, &v.id.to_string(), &v.wrapped_vault_key).unwrap();
+    assert_eq!(opened.key.as_bytes(), k3.as_bytes());
+
+    // Bob renonce : plus rien, d'un côté comme de l'autre.
+    status!(
+        bob.req(reqwest::Method::DELETE, &format!("/emergency/{gid}"))
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::NO_CONTENT
+    );
+    assert!(
+        alice
+            .get::<EmergencyOverview>("/emergency")
+            .await
+            .granted_by_me
+            .is_empty()
+    );
+    status!(bob_vaults().await.unwrap(), StatusCode::NOT_FOUND);
+    let audit: Vec<serde_json::Value> = alice.get("/users/me/audit").await;
+    for action in [
+        "emergency.create",
+        "emergency.approve",
+        "emergency.reject",
+        "emergency.update",
+    ] {
+        assert!(audit.iter().any(|e| e["action"] == action), "{action} manquant");
+    }
+    let audit: Vec<serde_json::Value> = bob.get("/users/me/audit").await;
+    for action in [
+        "emergency.accept",
+        "emergency.request",
+        "emergency.cancel",
+        "emergency.delete",
+    ] {
+        assert!(audit.iter().any(|e| e["action"] == action), "{action} manquant");
+    }
+    server.stop().await;
+}
+
+/// Rotation de la clé d'un vault dont `owner` est le seul membre : items
+/// re-chiffrés, historique renvoyé tel quel, enveloppes d'urgence fournies
+/// ou non.
+async fn rotate_as_owner(
+    owner: &User,
+    vault_id: Uuid,
+    name: &str,
+    new_key: gc::SymmetricKey,
+    emergency: Option<Vec<RotatedEmergencyKey>>,
+) -> reqwest::Response {
+    let cur: Vault = owner.get(&format!("/vaults/{vault_id}")).await;
+    let page: ItemsPage = owner.get(&format!("/vaults/{vault_id}/items")).await;
+    let versions: Vec<ItemVersion> = owner.get(&format!("/vaults/{vault_id}/versions")).await;
+    let vid = vault_id.to_string();
+    let old_key = owner.vault_key(&cur);
+    let req = RotateVaultKeyRequest {
+        name_enc: gc::seal_vault_name(&new_key, &vid, name).unwrap(),
+        members: vec![RotatedMemberKey {
+            user_id: owner.profile.id,
+            wrapped_vault_key: gc::wrap_vault_key(
+                &owner.account.keypair,
+                &owner.account.keypair.public,
+                &vid,
+                &new_key,
+            )
+            .unwrap(),
+        }],
+        items: page
+            .items
+            .iter()
+            .map(|it| RotatedItem {
+                id: it.id,
+                ciphertext: gc::seal_item(
+                    &new_key,
+                    &vid,
+                    &it.id.to_string(),
+                    &it.item_type,
+                    owner.open_item(&old_key, it).as_bytes(),
+                )
+                .unwrap(),
+            })
+            .collect(),
+        versions: Some(
+            versions
+                .iter()
+                .map(|v| RotatedVersion {
+                    item_id: v.item_id,
+                    revision: v.revision,
+                    ciphertext: v.ciphertext.clone(),
+                })
+                .collect(),
+        ),
+        emergency,
+        base_revision: cur.revision,
+    };
+    owner
+        .req(reqwest::Method::POST, &format!("/vaults/{vault_id}/rotate-key"))
+        .json(&req)
+        .send()
+        .await
+        .unwrap()
 }

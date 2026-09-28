@@ -372,6 +372,7 @@ pub async fn transfer_ownership(
         tx.rollback().await?;
         return Err(AppError::not_found("membre"));
     }
+    crate::routes::emergency::on_transfer(&mut tx, vault_id, user.id).await?;
     Audit::new("vault.transfer")
         .actor(user.id)
         .vault(vault_id)
@@ -409,7 +410,10 @@ pub async fn rotate_key(
     for v in req.versions.iter().flatten() {
         validate::item("x", &v.ciphertext, state.config.max_item_bytes)?;
     }
-    db::vault_with_role(&state.db, user.id, vault_id, Role::Admin).await?;
+    let caller = db::vault_with_role(&state.db, user.id, vault_id, Role::Admin).await?;
+    for k in req.emergency.iter().flatten() {
+        validate::emergency_key(&k.wrapped_vault_key)?;
+    }
 
     let mut tx = state.db.begin().await?;
     let (revision,): (i64,) = sqlx::query_as("SELECT revision FROM vaults WHERE id = $1 FOR UPDATE")
@@ -530,6 +534,16 @@ pub async fn rotate_key(
         }
     }
 
+    // Les contacts d'urgence : ré-enveloppés par le propriétaire, ou à
+    // renouveler (leurs enveloppes ouvriraient l'ancienne clé).
+    let emergency = crate::routes::emergency::on_rotation(
+        &mut tx,
+        vault_id,
+        caller.role() == Role::Owner,
+        req.emergency.as_deref(),
+    )
+    .await?;
+
     // Les invitations en attente portaient l'ancienne clé : elles n'ouvrent
     // plus rien, l'inviteur les recrée.
     sqlx::query("UPDATE invitations SET status = 'revoked', resolved_at = now() WHERE vault_id = $1 AND status IN ('pending','awaiting_key')")
@@ -557,5 +571,10 @@ pub async fn rotate_key(
             },
         )
         .await?;
+    for (grant_id, grantor) in emergency {
+        state
+            .events
+            .publish(vec![grantor], ServerEvent::EmergencyChanged { grant_id });
+    }
     Ok(Json(row.into_proto()))
 }

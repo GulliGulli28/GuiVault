@@ -12,6 +12,9 @@ export interface HealthResponse {
   protocol_version: number;
   server_version: string;
   registration: RegistrationMode;
+  /** Durée de vie maximale d'un lien de partage, en jours ; 0 ou absent :
+   * liens désactivés (ou serveur d'avant les liens). */
+  send_max_days?: number;
 }
 
 export interface KdfParams {
@@ -166,7 +169,82 @@ export type ServerEvent =
   | { type: "vault_changed"; vault_id: string; revision: number }
   | { type: "invitation_received"; invitation_id: string; vault_id: string }
   | { type: "membership_changed"; vault_id: string }
-  | { type: "settings_changed"; revision: number };
+  | { type: "settings_changed"; revision: number }
+  | { type: "emergency_changed"; grant_id: string };
+
+// ─── Accès d'urgence ────────────────────────────────────────────────────────
+
+/** `invited` : pas encore accepté ; `accepted` : aucune demande ;
+ * `requested` : accès à `access_at` sauf refus ; `granted` : ouvert. */
+export type EmergencyStatus = "invited" | "accepted" | "requested" | "granted";
+
+export interface EmergencyParty {
+  id: string;
+  email: string;
+  public_key: string;
+  fingerprint: string;
+}
+
+export interface EmergencyGrant {
+  id: string;
+  grantor: EmergencyParty;
+  grantee: EmergencyParty;
+  wait_days: number;
+  status: EmergencyStatus;
+  requested_at: string | null;
+  access_at: string | null;
+  /** `has_key` faux : la clé du vault a tourné sans ré-enveloppe pour ce
+   * contact (à renouveler). */
+  vaults: { vault_id: string; has_key: boolean }[];
+  created_at: string;
+}
+
+export interface EmergencyOverview {
+  granted_by_me: EmergencyGrant[];
+  granted_to_me: EmergencyGrant[];
+}
+
+/** Un vault remis au contact : son enveloppe d'urgence (`wrapEmergencyKey`). */
+export interface EmergencyVault {
+  id: string;
+  kind: VaultKind;
+  name_enc: string;
+  wrapped_vault_key: string;
+  revision: number;
+  created_at: string;
+  updated_at: string;
+}
+
+// ─── Liens de partage ───────────────────────────────────────────────────────
+
+export interface SendPassword {
+  kdf: KdfParams;
+  salt: string;
+}
+
+export interface SendSummary {
+  id: string;
+  owner_blob: string;
+  has_password: boolean;
+  max_views: number | null;
+  views: number;
+  created_at: string;
+  expires_at: string;
+  last_viewed_at: string | null;
+  available: boolean;
+}
+
+export interface SendInfo {
+  password?: SendPassword;
+  expires_at: string;
+  views_left: number | null;
+}
+
+export interface SendContent {
+  ciphertext: string;
+  expires_at: string;
+  views_left: number | null;
+}
 
 /** Les réglages synchronisés, scellés sous la user key (`sealUserSettings`). */
 export interface UserSettings {

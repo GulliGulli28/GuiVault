@@ -270,11 +270,14 @@ export async function rekeyAccount(account: UnlockedAccount, newPassword: string
 // ─── Vaults et items ────────────────────────────────────────────────────────
 
 const VAULT_KEY_CONTEXT = utf8.encode("guivault/v2/vault-key");
+/** Même enveloppe, remise à un contact d'urgence (`wrapEmergencyKey`). */
+const EMERGENCY_KEY_CONTEXT = utf8.encode("guivault/v2/emergency-key");
 
 /** X25519 entre sa clé privée et la clé publique de l'autre (le même secret
  * des deux côtés), puis HKDF avec les deux clés publiques — expéditeur puis
- * destinataire. `vault_envelope_key` côté Rust. */
-function vaultEnvelopeKey(ownPrivate: Uint8Array, otherPublic: Uint8Array, senderPk: Uint8Array, recipientPk: Uint8Array): Uint8Array {
+ * destinataire. `context` sépare les usages (membre, urgence).
+ * `vault_envelope_key` côté Rust. */
+function vaultEnvelopeKey(context: Uint8Array, ownPrivate: Uint8Array, otherPublic: Uint8Array, senderPk: Uint8Array, recipientPk: Uint8Array): Uint8Array {
   let shared: Uint8Array;
   try {
     shared = x25519.getSharedSecret(ownPrivate, otherPublic);
@@ -283,13 +286,36 @@ function vaultEnvelopeKey(ownPrivate: Uint8Array, otherPublic: Uint8Array, sende
   }
   // Une clé publique d'ordre faible donne un secret nul, connu de tous.
   if (shared.every((b) => b === 0)) throw new CryptoError("decrypt", "clé publique d'expéditeur invalide");
-  const key = hkdf(sha256, shared, undefined, concat(VAULT_KEY_CONTEXT, senderPk, recipientPk), KEY_LEN);
+  const key = hkdf(sha256, shared, undefined, concat(context, senderPk, recipientPk), KEY_LEN);
   shared.fill(0);
   return key;
 }
 
-function vaultEnvelopeAad(vaultId: string): Uint8Array {
-  return concat(VAULT_KEY_CONTEXT, new Uint8Array([0]), utf8.encode(vaultId));
+function vaultEnvelopeAad(context: Uint8Array, vaultId: string): Uint8Array {
+  return concat(context, new Uint8Array([0]), utf8.encode(vaultId));
+}
+
+function wrapFormat2(context: Uint8Array, sender: KeyPair, recipientPk: Uint8Array, vaultId: string, vaultKey: Uint8Array): Uint8Array {
+  const key = vaultEnvelopeKey(context, sender.privateKey, recipientPk, sender.publicKey, recipientPk);
+  try {
+    return concat(new Uint8Array([FORMAT_V2]), sender.publicKey, seal(key, vaultKey, vaultEnvelopeAad(context, vaultId)));
+  } finally {
+    key.fill(0);
+  }
+}
+
+function unwrapFormat2(context: Uint8Array, account: UnlockedAccount, vaultId: string, wrapped: Uint8Array): UnwrappedVaultKey {
+  if (wrapped[0] !== FORMAT_V2 || wrapped.length <= 33) throw new CryptoError("format", "enveloppe de vault key illisible (format ou version inconnus)");
+  const sender = wrapped.slice(1, 33);
+  const k = vaultEnvelopeKey(context, account.keypair.privateKey, sender, sender, account.keypair.publicKey);
+  let key: Uint8Array;
+  try {
+    key = open(k, wrapped.subarray(33), vaultEnvelopeAad(context, vaultId));
+  } finally {
+    k.fill(0);
+  }
+  if (key.length !== KEY_LEN) throw new CryptoError("format", "vault key de taille inattendue");
+  return { key, sender };
 }
 
 /** Enveloppe une vault key pour un membre, format 2 :
@@ -299,12 +325,7 @@ function vaultEnvelopeAad(vaultId: string): Uint8Array {
  * lit encore mais ne s'écrit plus : n'importe qui connaissant la clé
  * publique du destinataire — le serveur compris — pouvait en fabriquer une. */
 export function wrapVaultKey(sender: KeyPair, recipientPk: Uint8Array, vaultId: string, vaultKey: Uint8Array): Uint8Array {
-  const key = vaultEnvelopeKey(sender.privateKey, recipientPk, sender.publicKey, recipientPk);
-  try {
-    return concat(new Uint8Array([FORMAT_V2]), sender.publicKey, seal(key, vaultKey, vaultEnvelopeAad(vaultId)));
-  } finally {
-    key.fill(0);
-  }
+  return wrapFormat2(VAULT_KEY_CONTEXT, sender, recipientPk, vaultId, vaultKey);
 }
 
 /** Une vault key ouverte, et la clé publique de qui l'a enveloppée — `null`
@@ -315,23 +336,22 @@ export interface UnwrappedVaultKey {
 }
 
 export function unwrapVaultKey(account: UnlockedAccount, vaultId: string, wrapped: Uint8Array): UnwrappedVaultKey {
-  let key: Uint8Array;
-  let sender: Uint8Array | null = null;
-  if (wrapped[0] === FORMAT_V1) {
-    key = unseal(account.keypair, wrapped);
-  } else if (wrapped[0] === FORMAT_V2 && wrapped.length > 33) {
-    sender = wrapped.slice(1, 33);
-    const k = vaultEnvelopeKey(account.keypair.privateKey, sender, sender, account.keypair.publicKey);
-    try {
-      key = open(k, wrapped.subarray(33), vaultEnvelopeAad(vaultId));
-    } finally {
-      k.fill(0);
-    }
-  } else {
-    throw new CryptoError("format", "enveloppe de vault key illisible (format ou version inconnus)");
-  }
+  if (wrapped[0] !== FORMAT_V1) return unwrapFormat2(VAULT_KEY_CONTEXT, account, vaultId, wrapped);
+  const key = unseal(account.keypair, wrapped);
   if (key.length !== KEY_LEN) throw new CryptoError("format", "vault key de taille inattendue");
-  return { key, sender };
+  return { key, sender: null };
+}
+
+/** La vault key remise à un contact d'urgence : même format 2, sous le
+ * contexte `"guivault/v2/emergency-key"` — le serveur ne peut pas la faire
+ * passer pour une enveloppe de membre (ce qui ouvrirait le vault sans
+ * attendre). `wrap_emergency_key` côté Rust. */
+export function wrapEmergencyKey(sender: KeyPair, recipientPk: Uint8Array, vaultId: string, vaultKey: Uint8Array): Uint8Array {
+  return wrapFormat2(EMERGENCY_KEY_CONTEXT, sender, recipientPk, vaultId, vaultKey);
+}
+
+export function unwrapEmergencyKey(account: UnlockedAccount, vaultId: string, wrapped: Uint8Array): UnwrappedVaultKey {
+  return unwrapFormat2(EMERGENCY_KEY_CONTEXT, account, vaultId, wrapped);
 }
 
 /** `"guivault/v1/item\0" ‖ vault_id ‖ "\0" ‖ item_id ‖ "\0" ‖ item_type` : le
@@ -367,6 +387,71 @@ export function sealUserSettings(userKey: Uint8Array, json: string): Uint8Array 
 
 export function openUserSettings(userKey: Uint8Array, blob: Uint8Array): string {
   return utf8.decode(open(userKey, blob, AAD_USER_SETTINGS));
+}
+
+// ─── Partage éphémère (liens) ───────────────────────────────────────────────
+
+/** Octets de secret d'un lien : dans le fragment de l'URL (`#…`), que le
+ * navigateur n'envoie jamais au serveur. */
+export const SEND_SECRET_LEN = 16;
+
+/** `enc` chiffre le contenu ; `access` se présente au serveur pour obtenir
+ * le chiffré — il n'en garde que le SHA-256 (`sendAccessHash`). */
+export interface SendKeys {
+  enc: Uint8Array;
+  access: Uint8Array;
+}
+
+/** Le mot de passe facultatif d'un lien : Argon2id (mêmes bornes que le mot
+ * de passe maître : les paramètres viennent du serveur) sur le sel du lien,
+ * puis HKDF — `send_password_key` côté Rust. */
+export async function sendPasswordKey(password: string, salt: Uint8Array, params: KdfParams): Promise<Uint8Array> {
+  requireSaneKdf(params);
+  let master: Uint8Array;
+  try {
+    master = await argon2idAsync(utf8.encode(password), salt, { m: params.m_cost, t: params.t_cost, p: params.p_cost, dkLen: KEY_LEN });
+  } catch (e) {
+    throw new CryptoError("kdf", `dérivation de clé impossible : ${e instanceof Error ? e.message : e}`);
+  }
+  const key = hkdf(sha256, master, undefined, utf8.encode("guivault/v1/send/password"), KEY_LEN);
+  master.fill(0);
+  return key;
+}
+
+/** Le mot de passe entre dans les deux clés : le lien seul n'ouvre rien. */
+export function sendKeys(secret: Uint8Array, passwordKey?: Uint8Array): SendKeys {
+  if (secret.length < SEND_SECRET_LEN) throw new CryptoError("format", "secret de lien trop court");
+  const ikm = passwordKey ? concat(secret, passwordKey) : secret.slice();
+  const out = {
+    enc: hkdf(sha256, ikm, undefined, utf8.encode("guivault/v1/send/enc"), KEY_LEN),
+    access: hkdf(sha256, ikm, undefined, utf8.encode("guivault/v1/send/access"), KEY_LEN),
+  };
+  ikm.fill(0);
+  return out;
+}
+
+/** Ce que le serveur garde de la clé d'accès (`token_hash`). */
+export function sendAccessHash(keys: SendKeys): Uint8Array {
+  return sha256(keys.access);
+}
+
+const sendAad = (context: string, sendId: string) => utf8.encode(`${context}\0${sendId}`);
+
+export function sealSend(keys: SendKeys, sendId: string, plaintext: Uint8Array): Uint8Array {
+  return seal(keys.enc, plaintext, sendAad("guivault/v1/send", sendId));
+}
+
+export function openSend(keys: SendKeys, sendId: string, blob: Uint8Array): Uint8Array {
+  return open(keys.enc, blob, sendAad("guivault/v1/send", sendId));
+}
+
+/** Ce que l'auteur garde pour lui (nom, secret du lien) : sous sa user key. */
+export function sealSendOwner(userKey: Uint8Array, sendId: string, json: string): Uint8Array {
+  return seal(userKey, utf8.encode(json), sendAad("guivault/v1/send-owner", sendId));
+}
+
+export function openSendOwner(userKey: Uint8Array, sendId: string, blob: Uint8Array): string {
+  return utf8.decode(open(userKey, blob, sendAad("guivault/v1/send-owner", sendId)));
 }
 
 // ─── Exports chiffrés ───────────────────────────────────────────────────────

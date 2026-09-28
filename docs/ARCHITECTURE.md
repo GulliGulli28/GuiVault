@@ -100,7 +100,10 @@ Conséquences pratiques :
 users ──┬── sessions (jetons hachés, rotation, révocation)
         ├── vault_members ── vaults ──┬── items (blobs, révision, tombale)
         │                             ├── item_versions (historique, corbeille)
-        │                             └── invitations
+        │                             ├── invitations
+        │                             └── emergency_vault_keys ─┐
+        ├── emergency_grants (donneur → contact, délai, demande) ┘
+        ├── sends (liens de partage : chiffré, empreinte d'accès, vues)
         └── audit_log
 ```
 
@@ -123,6 +126,17 @@ users ──┬── sessions (jetons hachés, rotation, révocation)
   l'écriture), `deleted_at` (pierre tombale, `ciphertext` vidé).
 - `invitations` : `wrapped_vault_key` nullable (invité pas encore inscrit),
   statut `pending → accepted` ou `pending → awaiting_key → accepted`.
+- `sends` : un lien de partage — `ciphertext` (vidé à la dernière vue),
+  `access_hash` (SHA-256 de la clé d'accès), `owner_blob` (nom et secret du
+  lien sous la user key de l'auteur), paramètres Argon2id du mot de passe
+  facultatif, `max_views`/`views`, `expires_at` (effacement horaire).
+- `emergency_grants` / `emergency_vault_keys` : l'accès d'urgence. Une
+  désignation par couple (donneur, contact), `wait_days` (1 à 90),
+  `accepted_at`, `requested_at`, `approved_at` ; l'état (`invited`,
+  `accepted`, `requested`, `granted`) en découle. Une enveloppe par vault
+  confié (`wrap_emergency_key`, format 2 sous le contexte
+  `guivault/v2/emergency-key`), `NULL` quand une rotation l'a rendue caduque
+  sans que le propriétaire la refasse (à renouveler).
 
 ## Synchronisation
 
@@ -189,6 +203,30 @@ Un admin ne confère pas un rôle supérieur au sien et ne touche pas au
 propriétaire. Le propriétaire ne quitte pas un vault : il transfère ou
 supprime.
 
+## Liens de partage
+
+Un texte ou un élément (sans son rangement) confié à quelqu'un sans compte.
+Le client tire un secret de 16 octets, en dérive (avec le mot de passe
+facultatif, Argon2id) la clé du contenu et une clé d'accès, envoie le
+chiffré et le SHA-256 de la clé d'accès, et donne
+`https://<serveur>/#/send/<id>/<secret>`. Le destinataire ouvre la page (le
+fragment ne quitte pas le navigateur), `GET /sends/{id}/access` dit s'il
+faut un mot de passe, et « Ouvrir » présente la clé d'accès contre le
+chiffré — une vue de consommée. Détail des formats dans `API.md`.
+
+## Accès d'urgence
+
+Le donneur désigne un contact (inscrit, empreinte vérifiée) et lui
+enveloppe la clé de vaults dont il est propriétaire. Le contact accepte
+(après avoir vérifié l'empreinte du donneur), puis peut demander l'accès ;
+le serveur lui remet enveloppes et items au bout du délai sans refus, ou dès
+l'accord du donneur. Côté web, ces vaults s'ajoutent à la session à part
+(`emergencyVaults`), en lecture seule, sans corbeille ni historique ni
+réglages ; l'export reste possible. Une rotation faite par le propriétaire
+ré-enveloppe pour ses contacts ; faite par un autre (admin, Guiterm), elle
+marque les enveloppes à renouveler, ce que la page « Accès d'urgence » du
+propriétaire refait d'elle-même.
+
 ## Ce que le serveur sait
 
 Métadonnées visibles côté serveur, assumées : adresses e-mail, qui est
@@ -227,7 +265,8 @@ resynchronise. Rien n'est persisté — un client déconnecté rate des
 - **Administration du serveur** (comptes, quotas) : il n'y a pas de rôle
   d'administrateur, seulement les rôles par vault.
 - **Emails** d'invitation : l'invitation est visible dans le client de
-  l'invité ; rien n'est envoyé par courrier.
+  l'invité ; rien n'est envoyé par courrier — ni l'alerte d'une demande
+  d'accès d'urgence, que le donneur découvre à sa connexion.
 - **Vérification d'e-mail** à l'inscription.
 - **Vault personnel** : pas de suppression de compte (ni du vault) pour
   l'instant.

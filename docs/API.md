@@ -15,13 +15,17 @@ Erreurs : `{ "code": "…", "message": "…" }` (+ champs selon le code, ex.
 `already_invited`, `not_pending`, `invitee_has_no_key`,
 `invitee_not_registered`, `totp_already_enabled`, `totp_not_setup`,
 `totp_not_enabled`, `invalid_code`, `challenge_expired`, `incomplete_rotation`, `unknown_member`,
-`unknown_item`, `invalid_*`, `internal`.
+`unknown_item`, `unknown_grant`, `not_owner`, `send_unavailable`, `invalid_send_key`,
+`send_id_taken`, `send_too_large`, `too_many_sends`, `already_designated`,
+`already_accepted`, `not_accepted`, `already_requested`, `not_requested`,
+`already_granted`, `emergency_not_granted`, `self_grant`, `no_vaults`,
+`duplicate_vault`, `invalid_*`, `internal`.
 
 ## Santé
 
 | | |
 |---|---|
-| `GET /health` | `{ status, protocol_version, server_version, registration }` |
+| `GET /health` | `{ status, protocol_version, server_version, registration, send_max_days }` — `send_max_days` : durée de vie maximale d'un lien de partage, `0` (ou absent, serveur plus ancien) si les liens sont désactivés |
 
 ## Authentification (rate-limitées par IP)
 
@@ -32,6 +36,8 @@ Erreurs : `{ "code": "…", "message": "…" }` (+ champs selon le code, ex.
 | `POST /auth/login` | `{ email, auth_key, device_name? }` → `200` `LoginResponse` (`access_token`, `refresh_token`, `user`, `protected_user_key`, `protected_private_key`) — ou `202` `TotpChallenge { totp_token }` si le compte a un second facteur |
 | `POST /auth/totp/verify` | `{ totp_token, code }` → `LoginResponse` (code à 6 chiffres ou code de récupération ; 5 essais, 5 min) |
 | `POST /auth/refresh` | `{ refresh_token }` → `TokenPair` (rotation) |
+| `GET /sends/{id}/access` | sans compte : `SendInfo { password?: { kdf, salt }, expires_at, views_left }`, ou `404 send_unavailable` (inconnu, expiré, épuisé, supprimé — ou liens désactivés). Ne consomme rien |
+| `POST /sends/{id}/access` | sans compte : `{ access_key }` → `SendContent { ciphertext, expires_at, views_left }` et une vue consommée (la dernière efface le chiffré), ou `403 invalid_send_key` (lien incomplet, mauvais mot de passe) |
 
 ## Session (authentifié)
 
@@ -45,7 +51,7 @@ Erreurs : `{ "code": "…", "message": "…" }` (+ champs selon le code, ex.
 | `POST /auth/totp/setup` | → `{ secret, otpauth_url }` (en attente jusqu'à `enable`) |
 | `POST /auth/totp/enable` | `{ code }` → `{ recovery_codes }` (8, montrés une seule fois ; autres sessions révoquées) |
 | `POST /auth/totp/disable` | `{ code }` (TOTP ou récupération) → `204` |
-| `GET /events` | flux SSE de `ServerEvent` (`vault_changed`, `invitation_received`, `membership_changed`, `settings_changed`) — dit *que* quelque chose a changé, le client resynchronise |
+| `GET /events` | flux SSE de `ServerEvent` (`vault_changed`, `invitation_received`, `membership_changed`, `settings_changed`, `emergency_changed`) — dit *que* quelque chose a changé, le client resynchronise |
 | `GET /users/me` | `UserProfile` |
 | `GET /users/me/settings` | `UserSettings` (`{ blob, revision, updated_at }`) ou `null` si aucun appareil n'en a envoyé |
 | `PUT /users/me/settings` | `{ blob, base_revision }` → `UserSettings`, ou `409` `{ code: "revision_mismatch", current }` si `base_revision` n'est pas la dernière (`null` = « je n'en ai lu aucune »). `blob` = `seal_user_settings(user_key, json)`, 64 Kio max. Prévient les autres sessions (`settings_changed`) |
@@ -63,7 +69,7 @@ Erreurs : `{ "code": "…", "message": "…" }` (+ champs selon le code, ex.
 | `PATCH /vaults/{id}` | admin | `{ name_enc }` |
 | `DELETE /vaults/{id}` | owner | supprime tout (pas le personnel) |
 | `POST /vaults/{id}/leave` | membre non-owner | |
-| `POST /vaults/{id}/rotate-key` | admin | `RotateVaultKeyRequest` → `Vault` ; `versions` : l'historique et la corbeille re-chiffrés, **tous** (`GET /vaults/{id}/versions`), sinon `400 incomplete_rotation` — absent, ils sont effacés |
+| `POST /vaults/{id}/rotate-key` | admin | `RotateVaultKeyRequest` → `Vault` ; `versions` : l'historique et la corbeille re-chiffrés, **tous** (`GET /vaults/{id}/versions`), sinon `400 incomplete_rotation` — absent, ils sont effacés ; `emergency` (propriétaire seulement, sinon `400 not_owner`) : `[{ grant_id, wrapped_vault_key }]` pour **tous** les contacts d'urgence qui couvrent le vault — absent, leurs enveloppes sont marquées à renouveler (`has_key: false`) |
 | `GET /vaults/{id}/audit?limit=&before=` | admin | journal |
 
 ## Membres
@@ -74,7 +80,7 @@ Erreurs : `{ "code": "…", "message": "…" }` (+ champs selon le code, ex.
 | `POST /vaults/{id}/members` | admin | `{ user_id, role, wrapped_vault_key }` (ajout direct d'un utilisateur existant) |
 | `PATCH /vaults/{id}/members/{user_id}` | admin | `{ role }` |
 | `DELETE /vaults/{id}/members/{user_id}` | admin | (puis rotation conseillée) |
-| `POST /vaults/{id}/members/{user_id}/transfer` | owner | transfère la propriété |
+| `POST /vaults/{id}/members/{user_id}/transfer` | owner | transfère la propriété (l'ancien propriétaire ne confie plus ce vault à ses contacts d'urgence) |
 
 ## Invitations
 
@@ -107,6 +113,43 @@ quelle** par `PUT` — même clé, même AAD —, avec la révision courante de
 l'item en `base_revision`, ou sans pour un item de la corbeille (recréé).
 L'élément remplacé passe à son tour dans l'historique.
 
+## Liens de partage
+
+Un contenu chiffré côté client sous une clé tirée d'un secret qui ne voyage
+que dans le fragment de l'URL : `https://<serveur>/#/send/<id>/<secret>`
+(16 octets, base64url). Voir « Chiffrement d'un lien » plus bas ; les deux
+routes d'ouverture, sans compte, sont plus haut (rate-limitées par IP).
+
+| | |
+|---|---|
+| `POST /sends` | `CreateSendRequest { id, ciphertext, access_hash, owner_blob, password?, max_views?, expires_in_secs }` → `201` `SendSummary`. Une heure à `GUIVAULT_SEND_MAX_DAYS` jours (`400 invalid_expiry`), 1 à 1000 vues (`invalid_max_views`), taille d'un item au plus (`413 send_too_large`), 100 liens ouvrables par compte (`409 too_many_sends`) ; `403` si les liens sont désactivés |
+| `GET /sends` | mes liens, du plus récent au plus ancien : `[SendSummary { id, owner_blob, has_password, max_views, views, created_at, expires_at, last_viewed_at, available }]` — expirés compris jusqu'à leur effacement (horaire) |
+| `DELETE /sends/{id}` | supprime (`404` si ce n'est pas le mien) |
+
+## Accès d'urgence
+
+Le donneur désigne un contact inscrit et lui enveloppe la clé de vaults dont
+il est **propriétaire** (`wrap_emergency_key`, ci-dessous). Le contact
+accepte, puis peut demander l'accès : il l'obtient au bout de `wait_days`
+jours sans refus, ou dès que le donneur accorde. `EmergencyGrant { id,
+grantor, grantee, wait_days, status, requested_at, access_at, vaults:
+[{ vault_id, has_key }], created_at }`, `status` ∈ `invited`, `accepted`,
+`requested`, `granted`. Chaque changement prévient les deux parties
+(`emergency_changed`).
+
+| | Qui | |
+|---|---|---|
+| `GET /emergency` | tous | `{ granted_by_me, granted_to_me }` |
+| `POST /emergency` | donneur | `{ grantee_id, wait_days, vaults: [{ vault_id, wrapped_vault_key }] }` → `201` ; 1 à 90 jours (`invalid_wait`), au moins un vault (`no_vaults`), tous possédés (`403`), un seul par contact (`409 already_designated`) |
+| `PATCH /emergency/{id}` | donneur | `{ wait_days?, vaults? }` — `vaults` remplace l'ensemble (c'est aussi ainsi qu'on renouvelle une enveloppe marquée `has_key: false`) |
+| `DELETE /emergency/{id}` | l'un ou l'autre | retirer le contact, ou renoncer |
+| `POST /emergency/{id}/accept` | contact | `invited` → `accepted` |
+| `POST /emergency/{id}/request` | contact | `accepted` → `requested` (`access_at` = maintenant + délai) |
+| `POST /emergency/{id}/approve` | donneur | accorde sans attendre |
+| `POST /emergency/{id}/reject` | l'un ou l'autre | le donneur refuse une demande ou reprend la main sur un accès accordé ; le contact retire sa demande — retour à `accepted` |
+| `GET /emergency/{id}/vaults` | contact, `granted` | `[EmergencyVault { id, kind, name_enc, wrapped_vault_key, revision, … }]` : les vaults confiés dont le donneur est encore propriétaire et dont l'enveloppe est à jour ; sinon `403 emergency_not_granted`. La première lecture de chaque vault après la demande laisse `emergency.access` dans son journal |
+| `GET /emergency/{id}/vaults/{vault_id}/items` | contact, `granted` | `{ items, revision }` (vivants), lecture seule |
+
 ### Chiffrement d'un item (côté client)
 
 ```
@@ -132,3 +175,29 @@ format 1 (lu)    : 0x01 ‖ boîte scellée libsodium (pk éphémère ‖ XSalsa
 Le serveur n'accepte que ces deux tailles (`invalid_blob` sinon) et ne peut
 rien vérifier d'autre : c'est le destinataire qui authentifie l'expéditeur
 (`sender_pk`, dont il compare l'empreinte à celles qu'il a vérifiées).
+
+Pour l'accès d'urgence, même format 2 sous un autre contexte :
+`"guivault/v2/emergency-key"` à la place de `"guivault/v2/vault-key"`, dans
+le HKDF comme dans l'AAD. Une enveloppe d'urgence ne s'ouvre pas comme
+enveloppe de membre (ni l'inverse) : le serveur ne peut pas l'installer en
+appartenance pour ouvrir le vault sans attendre. Le contact vérifie que
+`sender_pk` est bien celle du donneur, dont il a épinglé l'empreinte en
+acceptant.
+
+### Chiffrement d'un lien de partage (côté client)
+
+```
+secret      = 16 octets aléatoires, dans le fragment de l'URL (base64url)
+pw_key      = HKDF-SHA256(Argon2id(mot de passe, salt, kdf), info = "guivault/v1/send/password")   (facultatif)
+ikm         = secret ‖ pw_key?
+enc_key     = HKDF-SHA256(ikm, info = "guivault/v1/send/enc")
+access_key  = HKDF-SHA256(ikm, info = "guivault/v1/send/access")      → présentée à POST /sends/{id}/access
+access_hash = SHA-256(access_key)                                      → seul gardé par le serveur
+ciphertext  = 0x01 ‖ nonce(24) ‖ XChaCha20-Poly1305(enc_key, nonce, json, aad = "guivault/v1/send\0" ‖ id)
+owner_blob  = même enveloppe sous la user key, aad = "guivault/v1/send-owner\0" ‖ id   ({ name, secret, kind })
+```
+
+Le contenu (`json`) est `{ "v": 1, "kind": "text", "name", "text" }` ou
+`{ "v": 1, "kind": "item", "payload": <Payload d'un secret> }` (sans dossier,
+tags ni favori). Les paramètres `kdf` viennent du serveur : le client refuse
+ceux hors de `KdfParams::is_sane`.

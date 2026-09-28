@@ -45,6 +45,22 @@ fn main() {
     };
     let wrapped = wrap_vault_key(&sender, &account.keypair.public, vault_id, &vault_key).unwrap();
     let wrapped_v1 = seal_for(&account.keypair.public, vault_key.as_bytes()).unwrap();
+    // La même clé remise à un contact d'urgence (autre contexte).
+    let emergency = wrap_emergency_key(&sender, &account.keypair.public, vault_id, &vault_key).unwrap();
+
+    // Un lien de partage, sans puis avec mot de passe.
+    let send_secret: [u8; SEND_SECRET_LEN] = *b"link-secret-16by";
+    let send_id = "99999999-8888-7777-6666-555555555555";
+    let send_plain = r#"{"v":1,"kind":"text","text":"bonjour"}"#;
+    let open_keys = send_keys(&send_secret, None).unwrap();
+    let send_blob = seal_send(&open_keys, send_id, send_plain.as_bytes()).unwrap();
+    let send_salt: [u8; 16] = *b"send-salt-16byte";
+    let send_password = "mot de passe — ü";
+    let password_key = send_password_key(send_password, &send_salt, kdf).unwrap();
+    let locked_keys = send_keys(&send_secret, Some(&password_key)).unwrap();
+    let locked_blob = seal_send(&locked_keys, send_id, send_plain.as_bytes()).unwrap();
+    let owner_key = SymmetricKey::from_bytes([3u8; 32]);
+    let owner_blob = seal_send_owner(&owner_key, send_id, br#"{"name":"Wi-Fi"}"#).unwrap();
 
     let v = json!({
         "kdf": {
@@ -76,6 +92,23 @@ fn main() {
             "wrapped_vault_key_v1": hex(&wrapped_v1),
             "wrap_vault_id": vault_id,
             "wrap_sender_public": hex(sender.public.as_bytes()),
+            "emergency_key": hex(&emergency),
+        },
+        "send": {
+            "secret": hex(&send_secret),
+            "id": send_id,
+            "plaintext": send_plain,
+            "access_key": hex(open_keys.access.as_bytes()),
+            "access_hash": hex(&token_hash(open_keys.access.as_bytes())),
+            "blob": hex(&send_blob),
+            "password": send_password,
+            "password_salt": hex(&send_salt),
+            "password_kdf": kdf,
+            "locked_access_key": hex(locked_keys.access.as_bytes()),
+            "locked_blob": hex(&locked_blob),
+            "owner_key": hex(owner_key.as_bytes()),
+            "owner_plaintext": r#"{"name":"Wi-Fi"}"#,
+            "owner_blob": hex(&owner_blob),
         },
         "item": {
             "vault_key": hex(vault_key.as_bytes()),

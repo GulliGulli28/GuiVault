@@ -94,6 +94,56 @@ pub fn wrapped_vault_key(bytes: &[u8]) -> Result<(), AppError> {
     Ok(())
 }
 
+/// Une clé de vault enveloppée pour un contact d'urgence : format 2
+/// seulement (`wrap_emergency_key`, authentifié — le contact vérifie que
+/// l'expéditeur est son donneur).
+pub fn emergency_key(bytes: &[u8]) -> Result<(), AppError> {
+    if bytes.first() != Some(&0x02) || bytes.len() != AUTHENTICATED_KEY_LEN {
+        return Err(AppError::bad_request(
+            "invalid_blob",
+            "clé de vault enveloppée pour l'urgence : format ou taille invalide",
+        ));
+    }
+    Ok(())
+}
+
+/// Contenu chiffré d'un lien de partage : la même limite qu'un item.
+pub fn send_content(bytes: &[u8], max: usize) -> Result<(), AppError> {
+    if bytes.len() <= MIN_SYM_BLOB {
+        return Err(AppError::bad_request("invalid_blob", "contenu chiffré : trop court"));
+    }
+    if bytes.len() > max {
+        return Err(AppError::new(
+            axum::http::StatusCode::PAYLOAD_TOO_LARGE,
+            "send_too_large",
+            format!("contenu de {} octets, maximum {max}", bytes.len()),
+        ));
+    }
+    Ok(())
+}
+
+/// Ce que l'auteur d'un lien garde pour lui (nom, secret) : court.
+pub fn send_owner_blob(bytes: &[u8]) -> Result<(), AppError> {
+    if bytes.len() <= MIN_SYM_BLOB || bytes.len() > 4096 {
+        return Err(AppError::bad_request(
+            "invalid_blob",
+            "fiche chiffrée du lien : taille invalide",
+        ));
+    }
+    Ok(())
+}
+
+/// SHA-256 d'une clé d'accès, ou la clé elle-même : 32 octets.
+pub fn send_key(name: &str, bytes: &[u8]) -> Result<(), AppError> {
+    if bytes.len() != 32 {
+        return Err(AppError::bad_request(
+            "invalid_blob",
+            format!("{name} : taille invalide"),
+        ));
+    }
+    Ok(())
+}
+
 /// Nom de vault chiffré : court.
 pub fn name_enc(bytes: &[u8]) -> Result<(), AppError> {
     if bytes.len() <= MIN_SYM_BLOB || bytes.len() > 4096 {

@@ -7,13 +7,14 @@ import { uuid } from "../lib/bytes";
 import { isSecret, primarySecret, primaryUser } from "../lib/items";
 import { pinnedEmailFor } from "../lib/pins";
 import { navigate } from "../lib/route";
-import { loadItems, moveItem, payloadEntity, payloadName, putPayload, RevisionConflict, type DecodedItem, type VaultView } from "../lib/session";
+import { findVault, loadItems, moveItem, payloadEntity, payloadName, putPayload, RevisionConflict, type DecodedItem, type VaultView } from "../lib/session";
 import { canWrite, KIND_LABELS, KIND_LABELS_PLURAL, ROLE_HINTS, ROLE_LABELS, type CustomIcon, type GuiVaultEntity, type ItemKind, type Payload } from "../lib/types";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { EntityIcon, ItemTree, KIND_ICONS, type FolderNaming } from "./ItemTree";
 import { ItemView } from "./ItemView";
 import { ItemForm } from "./forms/ItemForm";
-import { IconHistory, IconStar, IconTools } from "./secret-icons";
+import { IconHistory, IconLink, IconStar, IconTools } from "./secret-icons";
+import { ShareLinkDialog } from "./SendsPage";
 import { ItemHistory } from "./ItemHistory";
 import { ShortcutsHelp } from "./ShortcutsHelp";
 import { IconChevronDown, IconCopy, IconEdit, IconFolder, IconPlus, IconRefresh, IconSearch, IconSettings, IconTrash } from "./ui-icons";
@@ -34,7 +35,7 @@ const FILTERS: Filter[] = ["all", "favorites", "login", "note", "card", "identit
 
 /** Un vault : son contenu à gauche, la fiche ou le formulaire à droite. */
 export function VaultPage({ ctx, vaultId, itemId }: { ctx: PageContext; vaultId: string; itemId?: string }) {
-  const vault = ctx.session.vaults.find((v) => v.id === vaultId);
+  const vault = findVault(ctx.session, vaultId);
   if (!vault) return <p className="p-6 text-[12.5px] text-[var(--c-text-muted)]">Ce vault n'existe pas (ou plus).</p>;
   return <VaultBody key={vault.id} ctx={ctx} vault={vault} itemId={itemId} />;
 }
@@ -85,6 +86,11 @@ function VaultBody({ ctx, vault, itemId }: { ctx: PageContext; vault: VaultView;
   // Stable, comme `closeHelp` : `useModalSurface` rend le focus à l'ouvreur
   // quand `onClose` change.
   const closeHistory = useCallback(() => setHistory(false), []);
+  const [sharing, setSharing] = useState(false);
+  const closeSharing = useCallback(() => setSharing(false), []);
+  /** Remis par un accès d'urgence : lecture seule, sans corbeille, historique
+   * ni réglages (ce compte n'en est pas membre). */
+  const emergency = vault.emergency;
   const [moveTo, setMoveTo] = useState<VaultView | null>(null);
   const [newMenu, setNewMenu] = useState(false);
   const [stale, setStale] = useState(false);
@@ -307,7 +313,7 @@ function VaultBody({ ctx, vault, itemId }: { ctx: PageContext; vault: VaultView;
     switch (e.key) {
       case "c": copy(primarySecret(current.payload)); break;
       case "u": copy(primaryUser(current.payload)); break;
-      case "h": e.preventDefault(); setHistory(true); break;
+      case "h": if (!emergency) { e.preventDefault(); setHistory(true); } break;
       case "e": if (writable) { e.preventDefault(); setMode({ kind: "edit" }); } break;
       case "f": if (writable && isSecretItem) { e.preventDefault(); void toggleFavorite(); } break;
       case "Delete": if (writable) { e.preventDefault(); setConfirmDelete(true); } break;
@@ -323,7 +329,11 @@ function VaultBody({ ctx, vault, itemId }: { ctx: PageContext; vault: VaultView;
     <div className="flex h-full min-h-0 flex-col">
       <header className="flex shrink-0 flex-wrap items-center gap-2 border-b border-[var(--c-border)] px-4 py-2.5 pl-4 max-md:pl-11">
         <h1 className="min-w-0 truncate text-[14px] font-semibold text-[var(--c-text)]">{vault.name}</h1>
-        <span className="tag" title={ROLE_HINTS[vault.role]}>{vault.kind === "personal" ? "personnel" : ROLE_LABELS[vault.role]}</span>
+        {emergency ? (
+          <span className="tag tag-accent" title={`Confié par ${emergency.grantor} par l'accès d'urgence : lecture seule`}>accès d'urgence · {emergency.grantor}</span>
+        ) : (
+          <span className="tag" title={ROLE_HINTS[vault.role]}>{vault.kind === "personal" ? "personnel" : ROLE_LABELS[vault.role]}</span>
+        )}
         {vault.keyFrom.kind === "member" && !pinnedEmailFor(vault.keyFrom.fingerprint) && (
           <button
             type="button"
@@ -359,9 +369,9 @@ function VaultBody({ ctx, vault, itemId }: { ctx: PageContext; vault: VaultView;
               )}
             </div>
           )}
-          <button onClick={() => navigate({ page: "vault-trash", id: vault.id })} className="btn btn-secondary btn-sm btn-icon" title="Corbeille : les éléments supprimés, à restaurer" aria-label="Corbeille"><IconTrash size={13} /></button>
-          <button onClick={() => navigate({ page: "vault-tools", id: vault.id })} className="btn btn-secondary btn-sm btn-icon" title="Importer / exporter" aria-label="Importer / exporter"><IconTools size={13} /></button>
-          <button onClick={() => navigate({ page: "vault-settings", id: vault.id })} className="btn btn-secondary btn-sm btn-icon" title="Réglages du vault : membres, invitations, clé" aria-label="Réglages du vault"><IconSettings size={13} /></button>
+          {!emergency && <button onClick={() => navigate({ page: "vault-trash", id: vault.id })} className="btn btn-secondary btn-sm btn-icon" title="Corbeille : les éléments supprimés, à restaurer" aria-label="Corbeille"><IconTrash size={13} /></button>}
+          <button onClick={() => navigate({ page: "vault-tools", id: vault.id })} className="btn btn-secondary btn-sm btn-icon" title={emergency ? "Exporter" : "Importer / exporter"} aria-label={emergency ? "Exporter" : "Importer / exporter"}><IconTools size={13} /></button>
+          {!emergency && <button onClick={() => navigate({ page: "vault-settings", id: vault.id })} className="btn btn-secondary btn-sm btn-icon" title="Réglages du vault : membres, invitations, clé" aria-label="Réglages du vault"><IconSettings size={13} /></button>}
         </div>
       </header>
 
@@ -441,7 +451,10 @@ function VaultBody({ ctx, vault, itemId }: { ctx: PageContext; vault: VaultView;
                 {current.ok && (() => { const entity = entities.find((e) => e.id === current.id); return <span className="flex h-6 w-6 items-center justify-center rounded-md bg-[var(--c-bg3)] text-[var(--c-text-secondary)] [&>.host-icon]:h-[72%] [&>.host-icon]:w-[72%] [&>.host-icon>*]:h-full [&>.host-icon>*]:w-full">{entity ? <EntityIcon entity={entity} customIcons={index.icons} /> : null}</span>; })()}
                 <h2 className="min-w-0 truncate text-[13px] font-semibold text-[var(--c-text)]">{current.ok ? payloadName(current.payload) : "Élément illisible"}</h2>
                 <span className="text-[11px] text-[var(--c-text-faint)]" title={`Révision ${current.revision}`}>{current.ok ? KIND_LABELS[current.payload.kind] : current.itemType} · {formatWhen(current.updatedAt)}</span>
-                <button onClick={() => setHistory(true)} className={`btn btn-ghost btn-sm btn-icon ${writable ? "" : "ml-auto"}`} title="Historique : ses versions précédentes" aria-label="Historique"><IconHistory size={13} /></button>
+                {!emergency && isSecretItem && (
+                  <button onClick={() => setSharing(true)} className={`btn btn-ghost btn-sm btn-icon ${writable ? "" : "ml-auto"}`} title="Partager par lien : une copie chiffrée, qui expire" aria-label="Partager par lien"><IconLink size={13} /></button>
+                )}
+                {!emergency && <button onClick={() => setHistory(true)} className={`btn btn-ghost btn-sm btn-icon ${writable || isSecretItem ? "" : "ml-auto"}`} title="Historique : ses versions précédentes" aria-label="Historique"><IconHistory size={13} /></button>}
                 {writable && (
                   <div className="ml-auto flex items-center gap-1">
                     {isSecretItem && current.ok && (() => {
@@ -505,6 +518,7 @@ function VaultBody({ ctx, vault, itemId }: { ctx: PageContext; vault: VaultView;
         />
       )}
       {help && <ShortcutsHelp onClose={closeHelp} />}
+      {sharing && current?.ok && isSecret(current.payload) && <ShareLinkDialog session={ctx.session} item={current.payload} onClose={closeSharing} />}
       {history && current && (
         <ItemHistory
           vault={vault}

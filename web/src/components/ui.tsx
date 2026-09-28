@@ -106,14 +106,15 @@ export function SecretValue({ value, mono = true }: { value: string; mono?: bool
 }
 
 /** Champ de mot de passe avec l'œil pour le montrer. */
-export function PasswordInput({ value, onChange, placeholder, autoFocus, autoComplete, className = "", name }: {
-  value: string; onChange: (v: string) => void; placeholder?: string; autoFocus?: boolean; autoComplete?: string; className?: string; name?: string;
+export function PasswordInput({ value, onChange, placeholder, autoFocus, autoComplete, className = "", name, id }: {
+  value: string; onChange: (v: string) => void; placeholder?: string; autoFocus?: boolean; autoComplete?: string; className?: string; name?: string; id?: string;
 }) {
   const [shown, setShown] = useState(false);
   return (
     <div className={`relative ${className}`}>
       <input
         type={shown ? "text" : "password"}
+        id={id}
         name={name}
         value={value}
         onChange={(e) => onChange(e.target.value)}

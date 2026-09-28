@@ -16,11 +16,13 @@ use tower_http::trace::TraceLayer;
 
 pub mod audit;
 pub mod auth;
+pub mod emergency;
 pub mod events;
 pub mod health;
 pub mod history;
 pub mod invitations;
 pub mod items;
+pub mod sends;
 pub mod sync;
 pub mod totp;
 pub mod users;
@@ -29,8 +31,9 @@ pub mod vaults;
 pub fn router(state: AppState) -> Router {
     let cfg = &state.config;
 
-    // Rate-limit par IP sur ce qui se devine (mots de passe, e-mails) ;
-    // le reste est derrière un jeton et n'a pas besoin de ce frein.
+    // Rate-limit par IP sur ce qui se devine (mots de passe, e-mails, clés
+    // et mots de passe des liens de partage) ; le reste est derrière un
+    // jeton et n'a pas besoin de ce frein.
     let governor = GovernorConfigBuilder::default()
         // `per_second(n)` de tower_governor = une requête toutes les n
         // secondes ; on veut n requêtes par seconde, d'où la période en ms.
@@ -48,6 +51,7 @@ pub fn router(state: AppState) -> Router {
         .route("/auth/login", post(auth::login))
         .route("/auth/refresh", post(auth::refresh))
         .route("/auth/totp/verify", post(totp::verify))
+        .route("/sends/{id}/access", get(sends::info).post(sends::access))
         .layer(GovernorLayer::new(Arc::new(governor)));
 
     let api = Router::new()
@@ -100,6 +104,19 @@ pub fn router(state: AppState) -> Router {
             "/vaults/{id}/items/{item_id}",
             put(items::put).get(items::get).delete(items::delete),
         )
+        .route("/sends", get(sends::list).post(sends::create))
+        .route("/sends/{id}", delete(sends::delete))
+        .route("/emergency", get(emergency::overview).post(emergency::create))
+        .route(
+            "/emergency/{id}",
+            axum::routing::patch(emergency::update).delete(emergency::delete),
+        )
+        .route("/emergency/{id}/accept", post(emergency::accept))
+        .route("/emergency/{id}/request", post(emergency::request))
+        .route("/emergency/{id}/approve", post(emergency::approve))
+        .route("/emergency/{id}/reject", post(emergency::reject))
+        .route("/emergency/{id}/vaults", get(emergency::vaults))
+        .route("/emergency/{id}/vaults/{vault_id}/items", get(emergency::items))
         .route("/invitations", get(invitations::list_mine))
         .route("/invitations/{id}", delete(invitations::revoke))
         .route("/invitations/{id}/accept", post(invitations::accept))

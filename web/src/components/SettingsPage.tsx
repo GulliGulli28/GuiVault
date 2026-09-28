@@ -10,7 +10,8 @@ import type { AuditEntry, Session } from "../lib/types";
 import { AppearanceSettings, SettingsSyncToggle } from "./AppearanceSettings";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { AuditList } from "./VaultSettings";
-import { IconIdentity } from "./secret-icons";
+import { IconIdentity, IconLifebuoy } from "./secret-icons";
+import { EmergencySettings } from "./EmergencySettings";
 import { IconMonitor, IconPalette, IconShield, IconTrash } from "./ui-icons";
 import { CopyButton, Eyebrow, Fingerprint, formatWhen, Modal, PasswordInput } from "./ui";
 
@@ -20,6 +21,7 @@ const CATEGORIES: { key: SettingsSection; label: string; Icon: ComponentType<{ s
   { key: "apparence", label: "Apparence", Icon: IconPalette },
   { key: "compte", label: "Compte", Icon: IconIdentity },
   { key: "securite", label: "Sécurité", Icon: IconShield },
+  { key: "urgence", label: "Accès d'urgence", Icon: IconLifebuoy },
   { key: "sessions", label: "Sessions", Icon: IconMonitor },
 ];
 
@@ -130,6 +132,8 @@ export function SettingsPage({ ctx, section }: { ctx: PageContext; section: Sett
               </div>
             </section>
           )}
+
+          {current.key === "urgence" && <EmergencySettings ctx={ctx} />}
 
           {current.key === "sessions" && (
             <>

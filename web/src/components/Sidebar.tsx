@@ -4,7 +4,7 @@ import { navigate, routeHash, type Route } from "../lib/route";
 import { createVault } from "../lib/session";
 import { errorMessage } from "../lib/api";
 import { ROLE_HINTS, ROLE_LABELS } from "../lib/types";
-import { IconDice, IconIdentity, IconShieldClock } from "./secret-icons";
+import { IconDice, IconIdentity, IconLifebuoy, IconLink, IconShieldClock } from "./secret-icons";
 import { IconBell, IconPlus, IconVault, IconSearch } from "./ui-icons";
 import { Logo } from "./Logo";
 import { Modal } from "./ui";
@@ -62,6 +62,29 @@ export function Sidebar({ ctx, route, onLogout, onSearch, width }: { ctx: PageCo
           </a>
         ))}
 
+        {/* Les vaults qu'un accès d'urgence nous remet : à part, avec qui les
+            a confiés, en lecture seule. */}
+        {session.emergencyVaults.length > 0 && (
+          <>
+            <div className="px-2 pb-1 pt-3"><span className="eyebrow">Accès d'urgence</span></div>
+            {session.emergencyVaults.map((v) => (
+              <a
+                key={v.id}
+                href={routeHash({ page: "vault", id: v.id })}
+                onClick={(e) => { e.preventDefault(); go({ page: "vault", id: v.id }); }}
+                data-active={activeVault === v.id ? "true" : undefined}
+                className="list-row mx-1 mb-0.5 py-1.5"
+              >
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[var(--c-bg3)] text-[var(--c-text-secondary)]"><IconLifebuoy size={12} /></span>
+                <span className="flex min-w-0 flex-1 flex-col leading-tight">
+                  <span className="truncate text-[12.5px] font-medium text-[var(--c-text)]">{v.name}</span>
+                  <span className="truncate text-[10.5px] text-[var(--c-text-muted)]" title={`Confié par ${v.emergency?.grantor}, en lecture seule`}>de {v.emergency?.grantor}</span>
+                </span>
+              </a>
+            ))}
+          </>
+        )}
+
         <a
           href={routeHash({ page: "invitations" })}
           onClick={(e) => { e.preventDefault(); go({ page: "invitations" }); }}
@@ -89,6 +112,15 @@ export function Sidebar({ ctx, route, onLogout, onSearch, width }: { ctx: PageCo
         >
           <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[var(--c-bg3)] text-[var(--c-text-secondary)]"><IconShieldClock size={12} /></span>
           <span className="min-w-0 flex-1 truncate text-[12.5px] text-[var(--c-text)]">Authentificateur</span>
+        </a>
+        <a
+          href={routeHash({ page: "sends" })}
+          onClick={(e) => { e.preventDefault(); go({ page: "sends" }); }}
+          data-active={route.page === "sends" ? "true" : undefined}
+          className="list-row mx-1 mt-0.5 py-1.5"
+        >
+          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[var(--c-bg3)] text-[var(--c-text-secondary)]"><IconLink size={12} /></span>
+          <span className="min-w-0 flex-1 truncate text-[12.5px] text-[var(--c-text)]">Liens de partage</span>
         </a>
       </div>
 

@@ -89,6 +89,14 @@ HMAC pour les sels fictifs de prelogin.
     seulement s'il est encore dans le presse-papiers ; le popup de
     l'extension confie l'effacement au service worker (`setClearScheduler`,
     document hors écran dans Chrome).
+  - `lib/sends.ts` — les liens de partage (secret dans le fragment
+    `#/send/<id>/<secret>`, jamais vu par le serveur) ; `SendView` est la
+    page publique qui les ouvre (hors session, avant l'écran de connexion),
+    `SendsPage` la liste de l'auteur et le dialogue « Partager par lien ».
+  - Accès d'urgence : dans `lib/session.ts` (`emergencyVaults`, à part des
+    vaults dont on est membre, lecture seule ; `findVault` pour les deux),
+    `components/EmergencySettings.tsx` (Paramètres › Accès d'urgence, et le
+    bandeau du donneur).
   - `lib/items.ts` (secrets vides, ligne secondaire, recherche, `~/.aws/config`),
     `lib/generator.ts` (+ `wordlist.ts`, liste EFF), `lib/sshkey.ts` (clés
     OpenSSH, testées contre `ssh-keygen`), `lib/totp.ts`, `lib/qr.ts`,

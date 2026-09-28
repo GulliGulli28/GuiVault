@@ -18,6 +18,9 @@ import { TotpPage } from "./components/TotpPage";
 import { TrashPage } from "./components/TrashPage";
 import { clearSearchCache, SearchPalette } from "./components/SearchPalette";
 import { RollbackBanner } from "./components/RollbackBanner";
+import { EmergencyBanner } from "./components/EmergencySettings";
+import { SendView } from "./components/SendView";
+import { SendsPage } from "./components/SendsPage";
 import { Toasts, useToasts } from "./components/ui";
 import { PaneHandle, usePersistedPane } from "./hooks/usePersistedPane";
 
@@ -190,6 +193,15 @@ export default function App() {
 
   const ctx = useMemo<PageContext | null>(() => (session ? { session, reload, notify, error, vaultTicks } : null), [session, reload, notify, error, vaultTicks]);
 
+  // Un lien de partage s'ouvre sans compte, et hors de l'application.
+  if (route.page === "send") {
+    return (
+      <div className="h-full overflow-y-auto bg-[var(--c-bg)] text-[var(--c-text)]">
+        <SendView id={route.id} secret={route.secret} />
+      </div>
+    );
+  }
+
   if (!ctx) {
     return (
       <div className="h-full overflow-y-auto bg-[var(--c-bg)] text-[var(--c-text)]">
@@ -230,6 +242,9 @@ export default function App() {
     case "totp":
       page = <TotpPage ctx={ctx} />;
       break;
+    case "sends":
+      page = <SendsPage ctx={ctx} />;
+      break;
     default:
       page = <p className="p-6 text-[12.5px] text-[var(--c-text-muted)]">Aucun vault.</p>;
   }
@@ -250,6 +265,7 @@ export default function App() {
           </div>
         )}
         <RollbackBanner rollbacks={ctx.session.rollbacks} onAccept={(id) => { acceptRollback(ctx.session, id); setSession({ ...ctx.session }); }} />
+        {route.page !== "settings" && <EmergencyBanner grants={ctx.session.emergency?.granted_by_me ?? []} onOpen={() => navigate({ page: "settings", section: "urgence" })} />}
         {page}
       </main>
       {search && <SearchPalette ctx={ctx} onClose={closeSearch} />}

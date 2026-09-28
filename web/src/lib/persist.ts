@@ -53,6 +53,10 @@ export function deserializeSession(s: StoredSession): SessionState {
     fingerprint: fingerprint(publicKey),
     vaults: s.vaults.map((v) => ({ ...v, key: fromBase64(v.key), keyFrom: v.keyFrom ?? { kind: "anonymous" } })),
     invitations: [],
+    // Les accès d'urgence reviennent au prochain `/sync` : leurs clés ne
+    // sont pas mises à plat.
+    emergency: null,
+    emergencyVaults: [],
     // Recalculés au prochain `/sync` (ils ne changent la référence qu'une
     // fois acceptés, `vaultRevisions.ts`).
     rollbacks: [],

@@ -50,8 +50,9 @@ pub async fn serve(
     shutdown: impl std::future::Future<Output = ()> + Send + 'static,
 ) -> anyhow::Result<()> {
     let db = connect(&config).await?;
-    // La corbeille garde un item supprimé `trash_days` jours, pas plus :
-    // vérifié toutes les heures, que quelqu'un l'ouvre ou non.
+    // La corbeille garde un item supprimé `trash_days` jours, pas plus, et
+    // un lien de partage expiré ne reste pas : vérifié toutes les heures,
+    // que quelqu'un les ouvre ou non.
     let (pool, days) = (db.clone(), config.trash_days);
     tokio::spawn(async move {
         let mut tick = tokio::time::interval(std::time::Duration::from_secs(3600));
@@ -61,6 +62,11 @@ pub async fn serve(
                 Ok(0) => {}
                 Ok(n) => tracing::info!(versions = n, "corbeille : versions expirées effacées"),
                 Err(e) => tracing::warn!(error = %e, "corbeille : effacement des versions expirées impossible"),
+            }
+            match routes::sends::prune(&pool).await {
+                Ok(0) => {}
+                Ok(n) => tracing::info!(liens = n, "liens de partage expirés effacés"),
+                Err(e) => tracing::warn!(error = %e, "liens de partage : effacement des expirés impossible"),
             }
         }
     });

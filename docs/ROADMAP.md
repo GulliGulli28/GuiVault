@@ -9,32 +9,30 @@ l'auto-hébergement sans fonctions « premium »).
 Chaque piste respecte la règle n°1 (`CLAUDE.md`) : le serveur ne garde que
 des blobs qu'il ne sait pas lire. Cocher au fur et à mesure.
 
-## État (24 septembre 2026)
+## État (28 septembre 2026)
 
 **Fait** : tout le §0 sauf le manifeste authentifié (plancher et
 paramètres Argon2id épinglés, retour en arrière détecté, enveloppes
-authentifiées, empreinte de l'inviteur), et dans les §1, §3 et §4 : presse-papiers
+authentifiées, empreinte de l'inviteur) ; dans les §1, §3 et §4 : presse-papiers
 effacé, historique et corbeille, copie hors ligne, recherche globale
-(Ctrl+K), raccourcis, tri, CLI `gv`. Chaque point est coché ci-dessous avec
-où il vit dans le code.
+(Ctrl+K), raccourcis, tri, CLI `gv` ; dans le §2 : **accès d'urgence** et
+**liens de partage** (web). Chaque point est coché ci-dessous avec où il
+vit dans le code.
 
 **Ensuite, dans cet ordre** — du plus demandé ou du plus exposé au plus
 confortable :
 
-1. **Accès d'urgence et partage éphémère** (§2) : les deux fonctions
-   « premium » de Bitwarden qui manquent encore, zero-knowledge sans
-   compromis (le serveur garde des blobs qu'il ne lit pas, et libère ou
-   expire).
-2. **Remplissage plus fiable** (§1, première ligne) : la plainte n°1 contre
+1. **Remplissage plus fiable** (§1, première ligne) : la plainte n°1 contre
    Bitwarden — shadow DOM, iframes de connexion, avec un corpus de pages
    rejoué par Playwright en CI.
-3. **Rapport de santé** (§2) : faibles, réutilisés, fuites (HIBP par
+2. **Rapport de santé** (§2) : faibles, réutilisés, fuites (HIBP par
    k-anonymat), clés d'API et cartes qui expirent.
-4. **Agent SSH dans Guiterm** (§3) : le différenciateur dev/ops.
-5. **Manifeste de vault authentifié** (§0) : à concevoir ensemble avant de
+3. **Agent SSH dans Guiterm** (§3) : le différenciateur dev/ops.
+4. **Manifeste de vault authentifié** (§0) : à concevoir ensemble avant de
    l'écrire (chaque écriture devient deux, sous le verrou optimiste ; tous
    les clients à la fois).
-6. **Exploitation** (§5 : administration, sauvegardes vérifiées, SMTP,
+5. **Exploitation** (§5 : administration, sauvegardes vérifiées, **SMTP** —
+   qui compléterait l'accès d'urgence d'une alerte par e-mail —,
    suppression de compte) et **mobile** (§4).
 
 ## 0. Sécurité face à un serveur malveillant
@@ -105,19 +103,36 @@ paramètres ou formats anciens.
 | ~~Presse-papier jamais effacé (très demandé)~~ **fait** | `lib/clipboard.ts` : effacé au bout du délai (30 s par défaut, section synchronisée `clipboard`) s'il contient encore ce qui a été copié ; extension : service worker + document hors écran ; web : à l'échéance si la page peut vérifier, sinon au clic suivant | — |
 | Tri, doublons, duplication | **Tri fait** (nom en dossiers, modifiés / créés récemment à plat, retenu par appareil) | Rapport de doublons avec fusion ; « Dupliquer » via `useSeed` ; tri par dernier usage (à tracer côté client) |
 | Re-demande du mot de passe maître pour un élément | — | Drapeau `reprompt` sur l'élément (affichage et copie du secret) |
-| Fonctions « premium » payantes (accès d'urgence, pièces jointes, Send, TOTP) ; +100 % sur Premium en janvier 2026 | Absentes | Gratuites parce qu'auto-hébergées — voir §2 |
+| Fonctions « premium » payantes (accès d'urgence, pièces jointes, Send, TOTP) ; +100 % sur Premium en janvier 2026 | **Accès d'urgence, Send et TOTP faits**, gratuits parce qu'auto-hébergés | Pièces jointes chiffrées — voir §2 |
 | Interface « datée », pas d'accompagnement | Pas de premier lancement guidé | Assistant d'import à la première connexion, puis une liste « activer la 2FA, installer l'extension, vérifier une empreinte » |
 
 ## 2. Fonctions nouvelles (zero-knowledge)
 
-- [ ] **Accès d'urgence** : la vault key scellée vers la clé publique d'un
-  proche (empreinte vérifiée) ; le serveur ne libère ce blob qu'après un
-  délai d'attente sans refus du propriétaire. Le serveur ne garde qu'un blob
-  illisible pour lui — l'inverse de la récupération de compte critiquée
-  chez Bitwarden.
-- [ ] **Partage éphémère (Send)** : chiffré + expiration + nombre de vues
-  max ; la clé dans le fragment de l'URL (`#…`), jamais vu par le serveur.
-  Sert aussi à partager un seul élément sans créer de vault.
+- [x] **Accès d'urgence** : la clé de vaults dont on est propriétaire,
+  enveloppée vers un proche inscrit (empreinte vérifiée des deux côtés) sous
+  un contexte propre (`wrap_emergency_key`, format 2 : le serveur ne peut
+  ni l'ouvrir, ni l'installer comme appartenance) ; le serveur ne la remet
+  qu'après une demande du contact suivie du délai (1 à 90 jours) sans
+  refus, ou dès l'accord du donneur, qui peut refuser, reprendre la main,
+  changer délai et vaults, ou retirer le contact. Lecture seule (export
+  compris). Serveur : `routes/emergency.rs`, migration `0006` ; web :
+  Paramètres › Accès d'urgence (`EmergencySettings.tsx`), bandeau du
+  donneur, vaults remis dans la barre latérale. Une rotation par le
+  propriétaire ré-enveloppe ; par un autre client, les enveloppes sont à
+  renouveler et la page du propriétaire les refait. Reste : alerte par
+  e-mail (§5 SMTP), Guiterm (rotation qui ré-enveloppe, écran contact),
+  l'extension.
+- [x] **Partage éphémère (Send)** : texte ou élément (sans son rangement),
+  chiffré sous une clé tirée d'un secret qui ne voyage que dans le fragment
+  (`#/send/<id>/<secret>`) et d'un mot de passe facultatif (Argon2id) ; le
+  serveur ne remet le chiffré qu'à qui présente la clé d'accès, compte les
+  ouvertures, efface à la dernière et à l'expiration
+  (`GUIVAULT_SEND_MAX_DAYS`, 30 j ; `0` désactive). Crypto :
+  `send_keys` / `sendKeys` (vecteurs d'interop) ; serveur :
+  `routes/sends.rs`, migration `0005` ; web : `lib/sends.ts`, page « Liens
+  de partage », « Partager par lien » sur un élément, page publique
+  `SendView.tsx`. Reste : fichiers (avec les pièces jointes), `gv send`,
+  l'extension.
 - [ ] **Pièces jointes chiffrées**, découpées en morceaux, stockées à part
   (la limite actuelle de 1 Mio par item les empêche).
 - [ ] **Rapport de santé** : faibles, réutilisés, anciens ; sites qui

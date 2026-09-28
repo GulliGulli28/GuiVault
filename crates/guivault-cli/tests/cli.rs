@@ -54,6 +54,7 @@ impl Server {
             max_item_bytes: 64 * 1024,
             item_history: 20,
             trash_days: 30,
+            send_max_days: 30,
             auth_rate_burst: 1000,
             auth_rate_per_second: 1000,
             log_json: false,
