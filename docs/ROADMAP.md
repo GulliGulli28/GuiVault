@@ -27,9 +27,8 @@ confortable :
    l'écrire (chaque écriture devient deux, sous le verrou optimiste ; tous
    les clients à la fois) — proposition et questions dans
    [`MANIFESTE.md`](MANIFESTE.md).
-2. **Mobile** (§4) : l'exploitation (§5) est faite — administration,
-   sauvegardes vérifiées, SMTP facultatif, plages d'IP, suppression de
-   compte.
+2. **Conflits (409)** (§4) : proposer une fusion champ par champ au lieu
+   de recharger. L'exploitation (§5) et le mobile sont faits.
 
 ## 0. Sécurité face à un serveur malveillant
 
@@ -181,9 +180,16 @@ paramètres ou formats anciens.
   `c` copier le secret, `u` l'utilisateur, `e` modifier, `h` historique,
   `f` favori, Suppr, `?` l'aide (`ShortcutsHelp.tsx`) — ignorés pendant
   la saisie.
-- [ ] **Mobile** : ~16 règles responsive dans tout `components/` —
-  quasi inutilisable sur téléphone, et pas d'app. Une vue à un panneau + la
-  PWA couvrent déjà consultation, copie et TOTP.
+- [x] **Mobile** — relevé à 390 px, écran par écran : aucune page ne
+  déborde (panneau unique, tiroir). Corrigé : `src/touch.css` (pointeur
+  tactile : champs en 16 px, sans quoi Safari iOS zoome au focus ; boutons
+  de 36–40 px, lignes de 44 px ; pas d'indications clavier), tiroir refermé
+  à chaque changement de page et à Échap, inerte quand il est hors écran
+  (ni focus ni lecteur d'écran), en-têtes qui laissent la place au bouton
+  Menu, deux notifications au plus sur petit écran, menu « Nouveau » à
+  Échap. **PWA installable** (`manifest.webmanifest`, icônes 192/512 et
+  masquable ; Chrome la juge installable). Pas d'app native : la PWA et la
+  copie hors ligne couvrent consultation, copie, TOTP et liens reçus.
 - [ ] **Conflits (409)** : on recharge et on lève une erreur ; proposer une
   fusion champ par champ (ma version / celle du serveur).
 

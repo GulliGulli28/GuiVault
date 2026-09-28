@@ -20,7 +20,7 @@ async function precache() {
   if (!res.ok) return;
   const html = await res.clone().text();
   await cache.put("/", res);
-  const assets = [...html.matchAll(/(?:src|href)="(\/(?:assets\/[^"]+|favicon\.png|apple-touch-icon\.png))"/g)].map((m) => m[1]);
+  const assets = [...html.matchAll(/(?:src|href)="(\/(?:assets\/[^"]+|favicon\.png|apple-touch-icon\.png|manifest\.webmanifest))"/g)].map((m) => m[1]);
   await Promise.all(assets.map((a) => cache.add(a).catch(() => {})));
 }
 

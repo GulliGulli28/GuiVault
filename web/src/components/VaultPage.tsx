@@ -20,6 +20,7 @@ import { ShortcutsHelp } from "./ShortcutsHelp";
 import { IconChevronDown, IconCopy, IconEdit, IconFolder, IconPlus, IconRefresh, IconSearch, IconSettings, IconTrash } from "./ui-icons";
 import { copyText, formatWhen, Loading, useDelayed } from "./ui";
 import { PaneHandle, usePersistedPane } from "../hooks/usePersistedPane";
+import { TOUCH, useMediaQuery } from "../hooks/useMediaQuery";
 
 /** `groupId` : le dossier où créer (bouton « + » d'un dossier) ; absent, le
  * dossier de l'élément sélectionné. */
@@ -93,6 +94,20 @@ function VaultBody({ ctx, vault, itemId }: { ctx: PageContext; vault: VaultView;
   const emergency = vault.emergency;
   const [moveTo, setMoveTo] = useState<VaultView | null>(null);
   const [newMenu, setNewMenu] = useState(false);
+  const newButton = useRef<HTMLButtonElement>(null);
+  const touch = useMediaQuery(TOUCH);
+  // Le menu « Nouveau » se referme à Échap, et rend le focus à son bouton.
+  useEffect(() => {
+    if (!newMenu) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.stopPropagation();
+      setNewMenu(false);
+      newButton.current?.focus();
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [newMenu]);
   const [stale, setStale] = useState(false);
   const [naming, setNaming] = useState<FolderNaming | null>(null);
   /** Le menu « + » d'un dossier, posé à l'endroit du bouton. */
@@ -327,7 +342,7 @@ function VaultBody({ ctx, vault, itemId }: { ctx: PageContext; vault: VaultView;
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <header className="flex shrink-0 flex-wrap items-center gap-2 border-b border-[var(--c-border)] px-4 py-2.5 pl-4 max-md:pl-11">
+      <header className="flex shrink-0 flex-wrap items-center gap-2 border-b border-[var(--c-border)] px-4 py-2.5 pl-4 max-md:pl-14">
         <h1 className="min-w-0 truncate text-[14px] font-semibold text-[var(--c-text)]">{vault.name}</h1>
         {emergency ? (
           <span className="tag tag-accent" title={`Confié par ${emergency.grantor} par l'accès d'urgence : lecture seule`}>accès d'urgence · {emergency.grantor}</span>
@@ -350,16 +365,16 @@ function VaultBody({ ctx, vault, itemId }: { ctx: PageContext; vault: VaultView;
           <button onClick={() => void load()} className="btn btn-ghost btn-sm btn-icon" title="Recharger" aria-label="Recharger"><IconRefresh size={13} /></button>
           {writable && (
             <div className="relative">
-              <button onClick={() => setNewMenu((m) => !m)} className="btn btn-primary btn-sm"><IconPlus size={12} /> Nouveau <IconChevronDown size={10} /></button>
+              <button ref={newButton} onClick={() => setNewMenu((m) => !m)} className="btn btn-primary btn-sm" aria-haspopup="menu" aria-expanded={newMenu}><IconPlus size={12} /> Nouveau <IconChevronDown size={10} /></button>
               {newMenu && (
                 <>
                   <div className="fixed inset-0 z-10" onClick={() => setNewMenu(false)} />
-                  <div className="popover absolute right-0 z-20 mt-1 w-44 py-1">
+                  <div className="popover absolute right-0 z-20 mt-1 w-44 py-1" role="menu" aria-label="Nouvel élément">
                     {NEW_KINDS.map((k, i) => {
                       if (k === "sep") return <div key={i} className="menu-sep" />;
                       const Icon = KIND_ICONS[k];
                       return (
-                        <button key={k} onClick={() => { setNewMenu(false); if (k === "group") { setQuery(""); setFilter("all"); setNaming({ mode: "create", parentId: selectedGroupId }); } else setMode({ kind: "new", itemKind: k }); }} className="menu-item">
+                        <button key={k} role="menuitem" onClick={() => { setNewMenu(false); if (k === "group") { setQuery(""); setFilter("all"); setNaming({ mode: "create", parentId: selectedGroupId }); } else setMode({ kind: "new", itemKind: k }); }} className="menu-item">
                           <Icon size={13} /> {capitalize(KIND_LABELS[k])}
                         </button>
                       );
@@ -384,7 +399,7 @@ function VaultBody({ ctx, vault, itemId }: { ctx: PageContext; vault: VaultView;
             <div className="flex items-center gap-1.5">
               <div className="relative min-w-0 flex-1">
                 <IconSearch size={12} className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[var(--c-text-muted)]" />
-                <input ref={filterRef} value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => { if (e.key === "Escape") { e.currentTarget.blur(); if (query) setQuery(""); } }} placeholder="Filtrer…  ( / )" aria-label="Filtrer" className="input pl-7" />
+                <input ref={filterRef} value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => { if (e.key === "Escape") { e.currentTarget.blur(); if (query) setQuery(""); } }} placeholder={touch ? "Filtrer…" : "Filtrer…  ( / )"} aria-label="Filtrer" className="input pl-7" />
               </div>
               <select value={sort} onChange={(e) => setSort(e.target.value as SortMode)} className="input w-auto shrink-0 px-1.5" title="Trier" aria-label="Trier">
                 {(Object.keys(SORT_LABELS) as SortMode[]).map((s) => <option key={s} value={s}>{SORT_LABELS[s]}</option>)}
@@ -440,7 +455,7 @@ function VaultBody({ ctx, vault, itemId }: { ctx: PageContext; vault: VaultView;
             <ItemForm kind={current.payload.kind} initial={current.payload} index={index} onSave={(p) => save(p, current.revision)} onCancel={() => setMode({ kind: "view" })} onAddIcon={addIcon} />
           )}
           {mode.kind === "view" && !current && (
-            <div className="flex flex-1 items-center justify-center p-6 text-center text-[12.5px] text-[var(--c-text-muted)]">
+            <div className="flex flex-1 items-center justify-center p-6 text-center text-[12.5px] text-[var(--c-text-muted)] max-md:hidden">
               {items && items.length > 0 ? "Choisissez un élément dans la liste." : ""}
             </div>
           )}

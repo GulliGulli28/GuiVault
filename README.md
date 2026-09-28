@@ -38,7 +38,8 @@ serveur puisse jamais lire un secret.
   tri par date, **historique** de chaque élément et **corbeille** (30 j),
   presse-papiers effacé après copie, **copie hors ligne** chiffrée pour
   lire son coffre (et remplir dans l'extension) quand le serveur ne répond
-  pas.
+  pas. Utilisable au téléphone, **installable** sur l'écran d'accueil
+  (PWA).
   Formats décrits dans [`docs/ITEMS.md`](docs/ITEMS.md).
 - **Rapport de santé** : mots de passe faibles, réutilisés (identifiants,
   hôtes, connexions, passphrases), inchangés depuis un an, **fuités** (Have

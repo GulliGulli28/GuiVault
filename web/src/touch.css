@@ -1,0 +1,48 @@
+/* Écrans tactiles et étroits : ce qui s'ajoute à la charte (`index.css`,
+ * identique à celle de Guiterm, pensée pour la souris). Rien ici ne change
+ * l'affichage à la souris sur un grand écran. Importée après `index.css` :
+ * à spécificité égale, elle l'emporte sur les primitives et les utilitaires.
+ * Tailles en px : la racine est à 13 px, un `rem` n'y fait pas un doigt. */
+
+@media (pointer: coarse) {
+  /* Safari iOS agrandit la page au focus de tout champ sous 16 px. */
+  .input,
+  .input-mono {
+    font-size: 16px;
+  }
+  .input:not(textarea) {
+    min-height: 40px;
+  }
+  /* Des cibles faites pour un doigt ; les icônes gardent leur taille. */
+  .btn {
+    min-height: 40px;
+  }
+  .btn-sm {
+    min-height: 36px;
+  }
+  .btn-icon {
+    min-width: 40px;
+  }
+  .btn-icon.btn-sm {
+    min-width: 36px;
+  }
+  .list-row,
+  .menu-item {
+    min-height: 44px;
+  }
+  /* Pas de clavier : pas de raccourcis à montrer. */
+  .kbd {
+    display: none;
+  }
+}
+
+@media (max-width: 767px) {
+  /* Deux notifications à la fois au plus, au-dessus de la barre d'accueil
+     d'iOS : elles ne doivent pas couvrir l'écran. */
+  .toast-stack > :not(:nth-last-child(-n + 2)) {
+    display: none;
+  }
+  .toast-stack {
+    bottom: calc(0.75rem + env(safe-area-inset-bottom));
+  }
+}

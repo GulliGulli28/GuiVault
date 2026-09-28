@@ -53,7 +53,7 @@ export function SettingsPage({ ctx, section }: { ctx: PageContext; section: Sett
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <header className="flex shrink-0 items-center gap-2 border-b border-[var(--c-border)] px-4 py-2.5 max-md:pl-11">
+      <header className="flex shrink-0 items-center gap-2 border-b border-[var(--c-border)] px-4 py-2.5 max-md:pl-14">
         <h1 className="text-[14px] font-semibold text-[var(--c-text)]">Paramètres</h1>
         <span className="text-[11px] text-[var(--c-text-faint)]">{session.user.email}</span>
       </header>

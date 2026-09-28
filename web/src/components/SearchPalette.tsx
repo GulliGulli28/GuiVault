@@ -180,7 +180,8 @@ export function SearchPalette({ ctx, onClose }: { ctx: PageContext; onClose: () 
             </button>
           ))}
         </div>
-        <footer className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-[var(--c-border)] px-4 py-2 text-[11px] text-[var(--c-text-muted)]">
+        {/* Des raccourcis clavier : rien à dire à un doigt. */}
+        <footer className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-[var(--c-border)] px-4 py-2 text-[11px] text-[var(--c-text-muted)] [@media(pointer:coarse)]:hidden">
           <Hint keys={["↑", "↓"]}>parcourir</Hint>
           <Hint keys={["Entrée"]}>ouvrir</Hint>
           {current?.kind === "item" && primarySecret(current.payload) && <Hint keys={["Ctrl", "C"]}>copier {primarySecret(current.payload)!.label.toLowerCase()}</Hint>}

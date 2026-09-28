@@ -51,7 +51,8 @@ HMAC pour les sels fictifs de prelogin.
   (sert `web/dist` embarqué par `include_dir!`, CSP stricte ; `build.rs`
   crée le dossier vide s'il manque pour que ça compile sans Node).
 - `web/` — l'interface web, Vite + React 19 + TypeScript + Tailwind 3,
-  **même charte que Guiterm** : `src/index.css` (jetons et primitives
+  **même charte que Guiterm** (le tactile à part : `src/touch.css`, pour
+  ne pas diverger ; `hooks/useMediaQuery.ts`) : `src/index.css` (jetons et primitives
   `.btn`, `.input`, `.card`, `.list-row`…), `components/ui-icons.tsx`,
   `components/icons.tsx` (banque d'icônes d'hôte), `EntityRow.tsx`,
   `ConfirmDialog.tsx`, `hooks/useModalSurface.ts`, `hooks/useResizablePane.ts`

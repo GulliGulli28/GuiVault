@@ -28,7 +28,7 @@ export function SendsPage({ ctx }: { ctx: PageContext }) {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <header className="flex shrink-0 items-center gap-2 border-b border-[var(--c-border)] px-4 py-2.5 max-md:pl-11">
+      <header className="flex shrink-0 items-center gap-2 border-b border-[var(--c-border)] px-4 py-2.5 max-md:pl-14">
         <h1 className="text-[14px] font-semibold text-[var(--c-text)]">Liens de partage</h1>
         <button onClick={() => setCreating(true)} className="btn btn-primary btn-sm ml-auto"><IconPlus size={12} /> Nouveau texte</button>
       </header>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { PageContext } from "../App";
 import { navigate, routeHash, type Route } from "../lib/route";
 import { createVault } from "../lib/session";
@@ -8,6 +8,7 @@ import { IconDice, IconIdentity, IconLifebuoy, IconLink, IconPulse, IconShieldCl
 import { IconBell, IconDatabase, IconPlus, IconVault, IconSearch } from "./ui-icons";
 import { Logo } from "./Logo";
 import { Modal } from "./ui";
+import { NARROW, TOUCH, useMediaQuery } from "../hooks/useMediaQuery";
 
 /** La barre latérale : les vaults, les invitations reçues, le compte. Même
  * vocabulaire que la barre de Guiterm — surface `--c-bg`, lignes `list-row`,
@@ -15,7 +16,28 @@ import { Modal } from "./ui";
 export function Sidebar({ ctx, route, onLogout, onSearch, width }: { ctx: PageContext; route: Route; onLogout: () => void; onSearch: () => void; width: number }) {
   const { session } = ctx;
   const [creating, setCreating] = useState(false);
-  const [open, setOpen] = useState(false);
+  // Étroit : le tiroir est ouvert pour une page ; en changer (lien, palette,
+  // retour arrière) le referme sans rien d'autre à faire.
+  const here = routeHash(route);
+  const [openAt, setOpenAt] = useState<string | null>(null);
+  const open = openAt === here;
+  const setOpen = (o: boolean) => setOpenAt(o ? here : null);
+  const narrow = useMediaQuery(NARROW);
+  const touch = useMediaQuery(TOUCH);
+  const menuButton = useRef<HTMLButtonElement>(null);
+  const drawer = useRef<HTMLElement>(null);
+  // Ouvert : le focus y entre, Échap le referme et le rend au bouton.
+  useEffect(() => {
+    if (!open || !narrow) return;
+    drawer.current?.querySelector<HTMLElement>("a, button")?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      setOpenAt(null);
+      menuButton.current?.focus();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, narrow]);
   const activeVault = route.page === "vault" || route.page === "vault-settings" || route.page === "vault-tools" || route.page === "vault-trash" ? route.id : null;
 
   const go = (r: Route) => {
@@ -35,10 +57,10 @@ export function Sidebar({ ctx, route, onLogout, onSearch, width }: { ctx: PageCo
         <Logo size={26} />
         <span className="text-[13px] font-semibold">GuiVault</span>
       </a>
-      <button onClick={onSearch} className="mx-2 mb-1.5 flex items-center gap-2 rounded-md border border-[var(--c-border)] px-2 py-1 text-left text-[12px] text-[var(--c-text-muted)] hover:border-[var(--c-border-strong)] hover:text-[var(--c-text-secondary)]" title="Rechercher dans tous les vaults">
+      <button onClick={() => { setOpen(false); onSearch(); }} className="mx-2 mb-1.5 flex items-center gap-2 rounded-md border border-[var(--c-border)] px-2 py-1 text-left text-[12px] text-[var(--c-text-muted)] hover:border-[var(--c-border-strong)] hover:text-[var(--c-text-secondary)]" title="Rechercher dans tous les vaults">
         <IconSearch size={12} />
         <span className="flex-1">Rechercher…</span>
-        <span className="kbd">Ctrl K</span>
+        {!touch && <span className="kbd">Ctrl K</span>}
       </button>
 
       <div className="sidebar-scroll -mx-1 min-h-0 flex-1 overflow-y-auto px-1">
@@ -167,7 +189,7 @@ export function Sidebar({ ctx, route, onLogout, onSearch, width }: { ctx: PageCo
       {/* Étroit : un bouton en haut ouvre la barre en tiroir. Le titre de la
           page est juste à côté, le bouton ne le répète pas. */}
       <div className="fixed left-2 top-2 z-30 md:hidden">
-        <button onClick={() => setOpen(true)} className="btn btn-secondary btn-sm btn-icon" aria-label="Menu" title="Menu">
+        <button ref={menuButton} onClick={() => setOpen(true)} className="btn btn-secondary btn-sm btn-icon" aria-label="Menu" title="Menu" aria-expanded={open}>
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2.5 4h11M2.5 8h11M2.5 12h11" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" /></svg>
         </button>
       </div>
@@ -175,6 +197,10 @@ export function Sidebar({ ctx, route, onLogout, onSearch, width }: { ctx: PageCo
       {/* Large : la largeur réglée à la poignée (la bordure est la poignée) ;
           étroit : un tiroir de largeur fixe. */}
       <aside
+        ref={drawer}
+        // Fermé en étroit, il est hors de l'écran : ni focus ni lecteur d'écran.
+        inert={narrow && !open}
+        aria-label="Navigation"
         style={{ "--sidebar-w": `${width}px` } as React.CSSProperties}
         className={`fixed inset-y-0 left-0 z-40 w-64 border-r border-[var(--c-border)] bg-[var(--c-bg)] transition-transform md:static md:z-auto md:w-[var(--sidebar-w)] md:translate-x-0 md:border-r-0 ${open ? "translate-x-0" : "-translate-x-full"}`}
       >

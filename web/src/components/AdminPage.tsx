@@ -68,7 +68,7 @@ export function AdminPage({ ctx }: { ctx: PageContext }) {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <header className="flex shrink-0 items-center gap-2 border-b border-[var(--c-border)] px-4 py-2.5 max-md:pl-11">
+      <header className="flex shrink-0 items-center gap-2 border-b border-[var(--c-border)] px-4 py-2.5 max-md:pl-14">
         <h1 className="text-[14px] font-semibold text-[var(--c-text)]">Administration du serveur</h1>
       </header>
       <div className="sidebar-scroll min-h-0 flex-1 space-y-5 overflow-y-auto p-4">

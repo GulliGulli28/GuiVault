@@ -238,7 +238,7 @@ export function useToasts() {
 
 export function Toasts({ toasts, onDismiss }: { toasts: Toast[]; onDismiss: (id: number) => void }) {
   return (
-    <div className="pointer-events-none fixed bottom-3 right-3 z-[60] flex w-[min(24rem,calc(100%-1.5rem))] flex-col gap-2">
+    <div className="toast-stack pointer-events-none fixed bottom-3 right-3 z-[60] flex w-[min(24rem,calc(100%-1.5rem))] flex-col gap-2">
       {toasts.map((t) => (
         <div key={t.id} role={t.kind === "error" ? "alert" : "status"} className={`pointer-events-auto popover flex items-start gap-2 px-3 py-2 text-[12.5px] ${t.kind === "error" ? "border border-[color-mix(in_srgb,var(--c-danger)_40%,transparent)] text-[var(--c-text)]" : "text-[var(--c-text)]"}`}>
           <span className="min-w-0 flex-1 break-words leading-relaxed">{t.message}</span>

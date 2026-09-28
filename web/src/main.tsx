@@ -2,6 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
 import "./index.css";
+import "./touch.css";
 // La mono de Guiterm (JetBrains Mono), sous-ensemble latin ; la police
 // d'interface est celle du système, comme son réglage par défaut.
 import "@fontsource/jetbrains-mono/latin-400.css";
