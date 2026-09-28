@@ -15,6 +15,15 @@ export interface HealthResponse {
   /** Durée de vie maximale d'un lien de partage, en jours ; 0 ou absent :
    * liens désactivés (ou serveur d'avant les liens). */
   send_max_days?: number;
+  /** Le serveur relaie les recherches du rapport de santé (fuites, 2FA). */
+  health_lookups?: boolean;
+}
+
+/** Un site qui accepte un code TOTP (2fa.directory, relayé par le serveur). */
+export interface TwoFactorSite {
+  name: string;
+  domains: string[];
+  documentation?: string;
 }
 
 export interface KdfParams {

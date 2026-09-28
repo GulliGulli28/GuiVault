@@ -22,6 +22,7 @@ pub mod health;
 pub mod history;
 pub mod invitations;
 pub mod items;
+pub mod lookups;
 pub mod sends;
 pub mod sync;
 pub mod totp;
@@ -104,6 +105,8 @@ pub fn router(state: AppState) -> Router {
             "/vaults/{id}/items/{item_id}",
             put(items::put).get(items::get).delete(items::delete),
         )
+        .route("/lookups/pwned-passwords/{prefix}", get(lookups::pwned_range))
+        .route("/lookups/2fa-directory", get(lookups::twofa_directory))
         .route("/sends", get(sends::list).post(sends::create))
         .route("/sends/{id}", delete(sends::delete))
         .route("/emergency", get(emergency::overview).post(emergency::create))

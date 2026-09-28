@@ -71,6 +71,23 @@ pub struct HealthResponse {
     /// désactivés sur ce serveur (ou serveur d'avant les liens).
     #[serde(default)]
     pub send_max_days: u32,
+    /// Le serveur relaie les recherches du rapport de santé (fuites, sites
+    /// qui proposent la 2FA) ; faux : désactivées (ou serveur plus ancien).
+    #[serde(default)]
+    pub health_lookups: bool,
+}
+
+/// Un site qui accepte un code TOTP (liste publique 2fa.directory, relayée
+/// par `GET /lookups/2fa-directory`) : le rapport de santé signale un
+/// identifiant de ce site qui n'a pas de secret TOTP.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct TwoFactorSite {
+    pub name: String,
+    /// Domaine principal, puis les autres.
+    pub domains: Vec<String>,
+    /// La page qui explique comment l'activer.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub documentation: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

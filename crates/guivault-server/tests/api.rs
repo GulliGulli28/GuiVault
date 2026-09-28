@@ -62,6 +62,9 @@ impl TestServer {
             item_history: 20,
             trash_days: 30,
             send_max_days: 30,
+            health_lookups: false,
+            hibp_url: String::new(),
+            twofa_directory_url: String::new(),
             auth_rate_burst: 1000,
             auth_rate_per_second: 1000,
             log_json: false,
@@ -2371,4 +2374,124 @@ async fn rotate_as_owner(
         .send()
         .await
         .unwrap()
+}
+
+// ─── Rapport de santé : relais ──────────────────────────────────────────────
+
+/// Un faux Have I Been Pwned et un faux 2fa.directory, sur un port local :
+/// les tests ne sortent pas sur Internet. Rend l'adresse et le compte des
+/// requêtes reçues (préfixe, et en-tête de remplissage).
+async fn fake_lookups() -> (String, std::sync::Arc<std::sync::Mutex<Vec<String>>>) {
+    use axum::routing::get;
+    let seen = std::sync::Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
+    let log = seen.clone();
+    let app = axum::Router::new()
+        .route(
+            "/range/{prefix}",
+            get(move |axum::extract::Path(prefix): axum::extract::Path<String>, headers: axum::http::HeaderMap| {
+                let log = log.clone();
+                async move {
+                    let padded = headers.get("add-padding").map(|v| v == "true").unwrap_or(false);
+                    log.lock().unwrap().push(format!("{prefix} padding={padded}"));
+                    // SHA-1("password") = 5BAA6 1E4C9B93F3F0682250B6CF8331B7EE68FD8
+                    "1D2DA4053E34E76F6576ED1DA63134B5E2A:2\r\n1E4C9B93F3F0682250B6CF8331B7EE68FD8:9659365\r\n0000000000000000000000000000000000A:0"
+                }
+            }),
+        )
+        .route(
+            "/totp.json",
+            get(|| async {
+                axum::Json(serde_json::json!([
+                    ["Exemple", { "domain": "exemple.com", "tfa": ["totp"], "documentation": "https://exemple.com/2fa" }]
+                ]))
+            }),
+        );
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+    (format!("http://{addr}"), seen)
+}
+
+#[tokio::test]
+async fn health_lookups_are_relayed_without_the_password() {
+    let (fake, seen) = fake_lookups().await;
+    let Some(server) = TestServer::start_with(RegistrationMode::Open, |c| {
+        c.health_lookups = true;
+        c.hibp_url = fake.clone();
+        c.twofa_directory_url = format!("{fake}/totp.json");
+    })
+    .await
+    else {
+        return;
+    };
+    let alice = User::register(&server, "alice@t.io", "pw").await;
+    let h: HealthResponse = Client::new()
+        .get(format!("{}/health", server.base))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert!(h.health_lookups);
+
+    // k-anonymat : 5 caractères seulement, en majuscules, avec remplissage.
+    let body = status!(
+        alice
+            .req(reqwest::Method::GET, "/lookups/pwned-passwords/5baa6")
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::OK
+    );
+    assert!(body.contains("1E4C9B93F3F0682250B6CF8331B7EE68FD8:9659365"));
+    assert_eq!(seen.lock().unwrap().as_slice(), ["5BAA6 padding=true"]);
+    for bad in ["5BAA", "5BAA61", "ZZZZZ"] {
+        status!(
+            alice
+                .req(reqwest::Method::GET, &format!("/lookups/pwned-passwords/{bad}"))
+                .send()
+                .await
+                .unwrap(),
+            StatusCode::BAD_REQUEST
+        );
+    }
+    // Réservé aux comptes : ce n'est pas un relais ouvert.
+    status!(
+        Client::new()
+            .get(format!("{}/lookups/pwned-passwords/5BAA6", server.base))
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::UNAUTHORIZED
+    );
+
+    let sites: Vec<TwoFactorSite> = alice.get("/lookups/2fa-directory").await;
+    assert_eq!(sites[0].domains, ["exemple.com"]);
+    assert_eq!(sites[0].documentation.as_deref(), Some("https://exemple.com/2fa"));
+    server.stop().await;
+
+    // Désactivé : aucune requête sortante.
+    let Some(server) = TestServer::start(RegistrationMode::Open).await else {
+        return;
+    };
+    let bob = User::register(&server, "bob@t.io", "pw").await;
+    let before = seen.lock().unwrap().len();
+    let body = status!(
+        bob.req(reqwest::Method::GET, "/lookups/pwned-passwords/5BAA6")
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::NOT_FOUND
+    );
+    assert!(body.contains("lookups_disabled"));
+    status!(
+        bob.req(reqwest::Method::GET, "/lookups/2fa-directory")
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(seen.lock().unwrap().len(), before);
+    server.stop().await;
 }

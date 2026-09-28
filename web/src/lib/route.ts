@@ -1,6 +1,6 @@
 /** Un routeur minuscule sur le fragment : `#/vault/<id>`,
  * `#/vault/<id>/item/<id>`, `#/vault/<id>/settings`, `#/vault/<id>/tools`, `#/vault/<id>/trash`, `#/settings/<section>`,
- * `#/invitations`, `#/generator`, `#/totp`, `#/sends`, et `#/send/<id>/<secret>`
+ * `#/invitations`, `#/generator`, `#/totp`, `#/sends`, `#/health`, et `#/send/<id>/<secret>`
  * — un lien de partage, ouvert sans compte (le secret reste dans le
  * fragment, le serveur ne le voit jamais). `#/account` d'avant mène au
  * compte dans les paramètres. */
@@ -18,6 +18,7 @@ export type Route =
   | { page: "generator" }
   | { page: "totp" }
   | { page: "sends" }
+  | { page: "health" }
   /** Un lien de partage reçu : public, hors session. */
   | { page: "send"; id: string; secret: string };
 
@@ -39,6 +40,7 @@ export function parseRoute(hash: string): Route {
   if (parts[0] === "generator") return { page: "generator" };
   if (parts[0] === "totp") return { page: "totp" };
   if (parts[0] === "sends") return { page: "sends" };
+  if (parts[0] === "health") return { page: "health" };
   if (parts[0] === "send" && parts[1]) return { page: "send", id: parts[1], secret: parts[2] ?? "" };
   return { page: "home" };
 }
@@ -55,6 +57,7 @@ export function routeHash(r: Route): string {
     case "generator": return "#/generator";
     case "totp": return "#/totp";
     case "sends": return "#/sends";
+    case "health": return "#/health";
     case "send": return `#/send/${r.id}/${r.secret}`;
   }
 }

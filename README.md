@@ -39,6 +39,11 @@ serveur puisse jamais lire un secret.
   lire son coffre (et remplir dans l'extension) quand le serveur ne répond
   pas.
   Formats décrits dans [`docs/ITEMS.md`](docs/ITEMS.md).
+- **Rapport de santé** : mots de passe faibles, réutilisés (identifiants,
+  hôtes, connexions, passphrases), inchangés depuis un an, **fuités** (Have
+  I Been Pwned par k-anonymat, sur demande), sites qui acceptent la 2FA sans
+  code enregistré, clés d'API et cartes qui expirent — calculé dans le
+  navigateur.
 - **Liens de partage** éphémères (« Send ») : un texte ou un élément transmis
   à quelqu'un sans compte, chiffré dans le navigateur, la clé dans le lien
   (jamais vue par le serveur), avec expiration, nombre d'ouvertures et mot
@@ -153,6 +158,8 @@ dans [`docs/SECURITY.md`](docs/SECURITY.md).
 | `GUIVAULT_ITEM_HISTORY` | `20` | Versions précédentes gardées par item (historique, chiffrées) ; `0` : ni historique ni corbeille |
 | `GUIVAULT_TRASH_DAYS` | `30` | Jours qu'un élément supprimé reste dans la corbeille |
 | `GUIVAULT_SEND_MAX_DAYS` | `30` | Durée de vie maximale d'un lien de partage (jours) ; `0` : liens désactivés, routes publiques comprises |
+| `GUIVAULT_HEALTH_LOOKUPS` | `true` | Relayer les recherches du rapport de santé (fuites par k-anonymat, liste des sites à 2FA) ; `false` : aucune requête sortante |
+| `GUIVAULT_HIBP_URL` / `GUIVAULT_2FA_DIRECTORY_URL` | services publics | Où les relayer (miroir interne, tests) |
 | `GUIVAULT_AUTH_RATE_PER_SECOND` / `_BURST` | `2` / `10` | Rate-limit par IP des routes d'auth |
 | `GUIVAULT_LOG_JSON` | `false` | Journaux en JSON |
 | `RUST_LOG` | `info,sqlx=warn` | Filtre de journalisation |

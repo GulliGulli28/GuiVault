@@ -123,6 +123,14 @@ pub struct Config {
     /// Durée de vie maximale d'un lien de partage, en jours ; `0` : liens
     /// désactivés (les routes publiques `/sends/{id}/access` aussi).
     pub send_max_days: u32,
+    /// Les recherches du rapport de santé relayées vers des services publics
+    /// (fuites de mots de passe, sites qui proposent la 2FA) ; `false` :
+    /// aucune requête sortante.
+    pub health_lookups: bool,
+    /// Base de l'API « range » de Have I Been Pwned.
+    pub hibp_url: String,
+    /// La liste des sites qui acceptent un code TOTP (2fa.directory).
+    pub twofa_directory_url: String,
     /// Rafales autorisées sur les routes d'authentification, par IP.
     pub auth_rate_burst: u32,
     pub auth_rate_per_second: u64,
@@ -189,6 +197,10 @@ impl Config {
             item_history: env_parse("GUIVAULT_ITEM_HISTORY", 20)?,
             trash_days: env_parse("GUIVAULT_TRASH_DAYS", 30)?,
             send_max_days: env_parse("GUIVAULT_SEND_MAX_DAYS", 30)?,
+            health_lookups: env_parse("GUIVAULT_HEALTH_LOOKUPS", true)?,
+            hibp_url: env("GUIVAULT_HIBP_URL").unwrap_or_else(|| "https://api.pwnedpasswords.com".into()),
+            twofa_directory_url: env("GUIVAULT_2FA_DIRECTORY_URL")
+                .unwrap_or_else(|| "https://api.2fa.directory/v3/totp.json".into()),
             auth_rate_burst: env_parse("GUIVAULT_AUTH_RATE_BURST", 10)?,
             auth_rate_per_second: env_parse("GUIVAULT_AUTH_RATE_PER_SECOND", 2)?,
             log_json: env_parse("GUIVAULT_LOG_JSON", false)?,
@@ -242,6 +254,9 @@ mod tests {
             item_history: 0,
             trash_days: 0,
             send_max_days: 0,
+            health_lookups: false,
+            hibp_url: String::new(),
+            twofa_directory_url: String::new(),
             auth_rate_burst: 0,
             auth_rate_per_second: 0,
             log_json: false,

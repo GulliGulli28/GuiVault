@@ -39,6 +39,7 @@ pub fn app(config: Config, db: sqlx::PgPool) -> axum::Router {
         db,
         config: Arc::new(config),
         events: events::Broadcaster::new(),
+        lookups: Arc::new(routes::lookups::Lookups::new()),
     })
 }
 

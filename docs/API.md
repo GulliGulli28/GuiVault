@@ -19,13 +19,13 @@ Erreurs : `{ "code": "…", "message": "…" }` (+ champs selon le code, ex.
 `send_id_taken`, `send_too_large`, `too_many_sends`, `already_designated`,
 `already_accepted`, `not_accepted`, `already_requested`, `not_requested`,
 `already_granted`, `emergency_not_granted`, `self_grant`, `no_vaults`,
-`duplicate_vault`, `invalid_*`, `internal`.
+`duplicate_vault`, `lookups_disabled`, `lookup_failed`, `invalid_*`, `internal`.
 
 ## Santé
 
 | | |
 |---|---|
-| `GET /health` | `{ status, protocol_version, server_version, registration, send_max_days }` — `send_max_days` : durée de vie maximale d'un lien de partage, `0` (ou absent, serveur plus ancien) si les liens sont désactivés |
+| `GET /health` | `{ status, protocol_version, server_version, registration, send_max_days, health_lookups }` — `send_max_days` : durée de vie maximale d'un lien de partage, `0` (ou absent, serveur plus ancien) si les liens sont désactivés ; `health_lookups` : le serveur relaie les recherches du rapport de santé |
 
 ## Authentification (rate-limitées par IP)
 
@@ -112,6 +112,19 @@ Restaurer une version (historique ou corbeille) : la renvoyer **telle
 quelle** par `PUT` — même clé, même AAD —, avec la révision courante de
 l'item en `base_revision`, ou sans pour un item de la corbeille (recréé).
 L'élément remplacé passe à son tour dans l'historique.
+
+## Rapport de santé (relais)
+
+Le rapport se calcule dans le client ; deux recherches seulement passent par
+le serveur, qui les relaie (CSP de l'interface fermée aux tiers, adresse
+des utilisateurs cachée aux services). `404 lookups_disabled` avec
+`GUIVAULT_HEALTH_LOOKUPS=false`, `502 lookup_failed` si le service ne répond
+pas.
+
+| | |
+|---|---|
+| `GET /lookups/pwned-passwords/{prefix}` | authentifié ; `prefix` = les 5 premiers caractères hexadécimaux du SHA-1 d'un mot de passe (`400 invalid_prefix` sinon) → `text/plain`, la réponse « range » de Have I Been Pwned telle quelle (`SUFFIXE:NOMBRE` par ligne, avec remplissage : `Add-Padding`) — le client y cherche son suffixe |
+| `GET /lookups/2fa-directory` | authentifié → `[TwoFactorSite { name, domains, documentation? }]` : les sites qui acceptent un code TOTP (2fa.directory, gardée 24 h) |
 
 ## Liens de partage
 

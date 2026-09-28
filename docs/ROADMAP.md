@@ -16,20 +16,18 @@ paramètres Argon2id épinglés, retour en arrière détecté, enveloppes
 authentifiées, empreinte de l'inviteur) ; dans les §1, §3 et §4 : presse-papiers
 effacé, historique et corbeille, copie hors ligne, recherche globale
 (Ctrl+K), raccourcis, tri, CLI `gv`, **remplissage fiable** de l'extension
-(shadow DOM, cadres, corpus rejoué en CI) ; dans le §2 : **accès d'urgence**
-et **liens de partage** (web). Chaque point est coché ci-dessous avec où il
+(shadow DOM, cadres, corpus rejoué en CI) ; dans le §2 : **accès d'urgence**,
+**liens de partage** et **rapport de santé** (web). Chaque point est coché ci-dessous avec où il
 vit dans le code.
 
 **Ensuite, dans cet ordre** — du plus demandé ou du plus exposé au plus
 confortable :
 
-1. **Rapport de santé** (§2) : faibles, réutilisés, fuites (HIBP par
-   k-anonymat), clés d'API et cartes qui expirent.
-2. **Agent SSH dans Guiterm** (§3) : le différenciateur dev/ops.
-3. **Manifeste de vault authentifié** (§0) : à concevoir ensemble avant de
+1. **Agent SSH dans Guiterm** (§3) : le différenciateur dev/ops.
+2. **Manifeste de vault authentifié** (§0) : à concevoir ensemble avant de
    l'écrire (chaque écriture devient deux, sous le verrou optimiste ; tous
    les clients à la fois).
-4. **Exploitation** (§5 : administration, sauvegardes vérifiées, **SMTP**
+3. **Exploitation** (§5 : administration, sauvegardes vérifiées, **SMTP**
    facultatif — qui compléterait l'accès d'urgence d'une alerte par
    e-mail, sans que rien n'en dépende —, suppression de compte) et
    **mobile** (§4).
@@ -134,10 +132,14 @@ paramètres ou formats anciens.
   l'extension.
 - [ ] **Pièces jointes chiffrées**, découpées en morceaux, stockées à part
   (la limite actuelle de 1 Mio par item les empêche).
-- [ ] **Rapport de santé** : faibles, réutilisés, anciens ; sites qui
-  proposent la 2FA sans TOTP enregistré (liste 2fa.directory) ; fuites HIBP
-  par k-anonymat, relayées par le serveur pour garder la CSP stricte ;
-  **clés d'API et cartes qui expirent** (`expiresAt` existe déjà).
+- [x] **Rapport de santé** (web, « Santé du coffre ») : faibles,
+  réutilisés (identifiants, hôtes, connexions SQL, passphrases de clés),
+  inchangés depuis un an ; sites qui acceptent la 2FA sans TOTP ni passkey
+  enregistrés (2fa.directory) ; fuites HIBP par k-anonymat, sur demande ;
+  clés d'API et cartes qui expirent dans le mois. Calcul :
+  `web/src/lib/health.ts` ; relais : `routes/lookups.rs`
+  (`GUIVAULT_HEALTH_LOOKUPS`, désactivable). Reste : dans l'extension et
+  Guiterm ; « ignorer » un élément signalé ; doublons avec fusion (§1).
 - [ ] **Déverrouillage par passkey** (extension WebAuthn PRF) et code PIN
   dans l'extension ; **2FA WebAuthn** (seul TOTP aujourd'hui).
 - [ ] Alias d'e-mail dans le générateur (SimpleLogin / addy.io), comme

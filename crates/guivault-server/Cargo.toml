@@ -47,6 +47,9 @@ ipnet = "2"
 # L'interface web (`web/dist`, build Vite) embarquée dans le binaire — une
 # seule image, rien d'autre à déployer. Voir `src/web.rs` et `build.rs`.
 include_dir = "0.7"
+# Relais du rapport de santé (Have I Been Pwned, 2fa.directory) : rustls,
+# comme le reste.
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
 mime_guess = "2"
 
 [dev-dependencies]

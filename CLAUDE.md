@@ -97,6 +97,9 @@ HMAC pour les sels fictifs de prelogin.
     vaults dont on est membre, lecture seule ; `findVault` pour les deux),
     `components/EmergencySettings.tsx` (Paramètres › Accès d'urgence, et le
     bandeau du donneur).
+  - `lib/health.ts` — le rapport de santé (`HealthPage`, « Santé du
+    coffre ») : tout est calculé ici ; les fuites (k-anonymat) et la liste
+    des sites à 2FA passent par les relais du serveur (`routes/lookups.rs`).
   - `lib/items.ts` (secrets vides, ligne secondaire, recherche, `~/.aws/config`),
     `lib/generator.ts` (+ `wordlist.ts`, liste EFF), `lib/sshkey.ts` (clés
     OpenSSH, testées contre `ssh-keygen`), `lib/totp.ts`, `lib/qr.ts`,

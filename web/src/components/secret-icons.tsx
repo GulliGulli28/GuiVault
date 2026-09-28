@@ -142,3 +142,12 @@ export function IconLifebuoy({ size = 16, className }: P) {
     </svg>
   );
 }
+
+/** Le rapport de santé : un pouls. */
+export function IconPulse({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <path d="M1.5 8.5h3l1.5-4 3 8 1.75-5.5 1.25 1.5h2.5" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}

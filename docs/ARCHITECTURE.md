@@ -214,6 +214,16 @@ fragment ne quitte pas le navigateur), `GET /sends/{id}/access` dit s'il
 faut un mot de passe, et « Ouvrir » présente la clé d'accès contre le
 chiffré — une vue de consommée. Détail des formats dans `API.md`.
 
+## Rapport de santé
+
+Calculé par le client sur les items déchiffrés (`web/src/lib/health.ts`) :
+faibles (`estimateStrength`), réutilisés, anciens (dernier changement du
+mot de passe, sinon création de l'item), qui expirent. Deux questions
+passent par des relais du serveur (`routes/lookups.rs`) : les fuites (Have
+I Been Pwned, k-anonymat, un préfixe de 5 caractères par requête, jamais le
+même deux fois) et la liste des sites qui acceptent un code TOTP
+(2fa.directory, gardée 24 h en mémoire).
+
 ## Accès d'urgence
 
 Le donneur désigne un contact (inscrit, empreinte vérifiée) et lui

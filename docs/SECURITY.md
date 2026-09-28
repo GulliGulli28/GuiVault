@@ -29,6 +29,7 @@ chiffrées.
 | Lien de partage intercepté ou transféré | Le lien porte la clé (fragment `#…`, jamais envoyé au serveur ni dans un `Referer` : `Referrer-Policy: no-referrer`). Expiration obligatoire (`GUIVAULT_SEND_MAX_DAYS`), nombre d'ouvertures borné, et un **mot de passe** facultatif qui entre dans la dérivation des clés : sans lui, le lien seul n'ouvre rien. La page n'ouvre le contenu qu'au clic (« Ouvrir ») — l'aperçu d'une messagerie ne consomme pas de vue — puis retire le secret de la barre d'adresse. |
 | Serveur (ou voleur de la base) qui veut lire un lien de partage | Il n'a que le chiffré et `SHA-256(access_key)` ; la clé de contenu et la clé d'accès sont tirées d'un secret de 128 bits qu'il ne voit jamais. Avec un mot de passe, même le lien complet ne suffit pas : il faudrait aussi casser un Argon2id 64 MiB. Il ne remet le chiffré qu'à qui présente `access_key` (qui n'a que l'identifiant ne peut ni lire, ni consommer une vue), efface le chiffré à la dernière vue et la ligne à l'expiration. Mot de passe deviné en ligne : frein par IP des routes d'authentification. |
 | **Accès d'urgence** détourné par le serveur | Le serveur garde des enveloppes (`wrap_emergency_key`) qu'il ne sait pas ouvrir : au pire, il les remet **au contact choisi** avant la fin du délai — jamais à lui-même ni à un tiers. Le donneur enveloppe vers une clé dont il a vérifié l'empreinte (comme pour un partage), et le contact n'ouvre qu'une enveloppe dont l'expéditeur est l'empreinte qu'il a épinglée en acceptant : un vault fabriqué par le serveur « au nom » du donneur est écarté. Le contexte propre à l'urgence (HKDF et AAD) empêche d'installer l'enveloppe comme appartenance au vault. Rien de comparable à la récupération de compte critiquée chez Bitwarden, où le serveur garde de quoi rouvrir le coffre. |
+| Recherche de fuites (rapport de santé) qui livrerait les mots de passe | k-anonymat : le client n'envoie que les 5 premiers caractères hexadécimaux du SHA-1 d'un mot de passe (un préfixe partagé par des centaines de mots de passe connus), reçoit tous les suffixes de ce préfixe — **avec remplissage**, pour que la taille de la réponse ne dise pas combien il y en a — et cherche le sien lui-même. Ni le serveur ni Have I Been Pwned ne voient le mot de passe ou son empreinte ; le relais cache en plus l'adresse de l'utilisateur au service. Seulement sur demande (« Rechercher les fuites »), désactivable pour tout le serveur (`GUIVAULT_HEALTH_LOOKUPS=false`). |
 | Blobs de taille arbitraire | Tailles bornées par champ ; taille max d'item configurable ; limite globale du corps. |
 | Mutex empoisonné, panique, surcharge | Runtime tokio, timeouts de 30 s, arrêt gracieux SIGTERM. |
 
@@ -49,7 +50,10 @@ re-chiffre les versions sous la nouvelle clé.
 
 Des **liens de partage**, il voit qui en crée, quand, leur taille, s'ils ont
 un mot de passe, leurs expirations et chaque ouverture (date, IP) — pas leur
-contenu ni leur nom (dans la fiche de l'auteur, sous sa user key). De
+contenu ni leur nom (dans la fiche de l'auteur, sous sa user key). Du **rapport de santé**, rien, sauf s'il relaie la recherche de fuites :
+alors des préfixes de 5 caractères de SHA-1 (et leur nombre, à peu près
+celui des mots de passe distincts du coffre), et qui demande la liste des
+sites à 2FA. De
 l'**accès d'urgence**, il voit qui a désigné qui, pour quels vaults, le
 délai, et chaque étape (acceptation, demande, accord, refus) — ce qu'il faut
 pour appliquer le délai.

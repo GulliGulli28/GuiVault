@@ -1,6 +1,7 @@
 /** Le client HTTP de l'API, sans cryptographie — l'équivalent de
  * `core/src/guivault/client.rs` dans Guiterm. Une méthode par route ; les
  * blobs restent en base64, c'est `session.ts` qui chiffre et déchiffre. */
+import type { TwoFactorSite } from "./types";
 import type { AuditEntry, EmergencyGrant, EmergencyOverview, EmergencyVault, HealthResponse, Invitation, Item, ItemVersion, ItemsPage, KdfParams, LoginResponse, PreloginResponse, Role, SendContent, SendInfo, SendPassword, SendSummary, ServerEvent, Session, SyncResponse, TokenPair, TotpChallenge, TrashedItem, UserLookupResponse, UserProfile, UserSettings, Vault, VaultMember } from "./types";
 
 /** Une enveloppe de clé de vault pour un contact d'urgence. */
@@ -143,6 +144,18 @@ async function authed<T>(method: string, path: string, body?: unknown): Promise<
   }
 }
 
+/** Une réponse en texte (pas du JSON), authentifiée. */
+async function authedText(path: string): Promise<string> {
+  const get = () => fetch(BASE + path, { headers: tokens ? { authorization: `Bearer ${tokens.access}` } : {} });
+  let res = await get();
+  if (res.status === 401 && tokens) {
+    await refreshTokens();
+    res = await get();
+  }
+  if (!res.ok) await parse(res);
+  return res.text();
+}
+
 const q = (s: string) => encodeURIComponent(s);
 
 export const api = {
@@ -229,6 +242,11 @@ export const api = {
   /** Sans compte : ce que le destinataire d'un lien appelle. */
   sendInfo: (id: string) => raw<SendInfo>("GET", `/sends/${id}/access`, undefined, false),
   openSend: (id: string, access_key: string) => raw<SendContent>("POST", `/sends/${id}/access`, { access_key }, false),
+
+  // ── Rapport de santé (relais du serveur) ──
+  /** Les suffixes HIBP sous un préfixe de 5 caractères du SHA-1. */
+  pwnedRange: (prefix: string) => authedText(`/lookups/pwned-passwords/${prefix}`),
+  twoFactorDirectory: () => authed<TwoFactorSite[]>("GET", "/lookups/2fa-directory"),
 
   // ── Accès d'urgence ──
   emergency: () => authed<EmergencyOverview>("GET", "/emergency"),
