@@ -48,6 +48,54 @@ export interface UserProfile {
   email: string;
   public_key: string;
   created_at: string;
+  /** Administrateur du serveur (`/admin/*`) ; absent : non. */
+  is_admin?: boolean;
+}
+
+/** `GET /admin/overview` — des comptes, jamais un contenu. */
+export interface AdminOverview {
+  server_version: string;
+  registration: "open" | "invite_only" | "closed";
+  users: number;
+  disabled_users: number;
+  admins: number;
+  vaults: number;
+  shared_vaults: number;
+  items: number;
+  storage_bytes: number;
+  sends: number;
+  active_sessions: number;
+  pending_registrations: number;
+  /** `0` : aucun quota par défaut. */
+  default_quota_bytes: number;
+  allowed_ips: string[];
+  admin_allowed_ips: string[];
+}
+
+export interface AdminUserInfo {
+  id: string;
+  email: string;
+  created_at: string;
+  disabled_at: string | null;
+  is_admin: boolean;
+  totp_enabled: boolean;
+  last_seen_at: string | null;
+  active_sessions: number;
+  vaults_owned: number;
+  vaults_joined: number;
+  items: number;
+  storage_bytes: number;
+  /** Propre au compte : `null` = celui du serveur, `0` = aucun. */
+  quota_bytes: number | null;
+  /** Celui qui s'applique ; `0` : aucun. */
+  effective_quota_bytes: number;
+}
+
+export interface RegistrationInvite {
+  email: string;
+  invited_by: string | null;
+  created_at: string;
+  expires_at: string;
 }
 
 export interface LoginResponse extends TokenPair {

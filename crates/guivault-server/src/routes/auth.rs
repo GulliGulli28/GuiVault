@@ -42,7 +42,10 @@ pub async fn prelogin(
         kdf_salt: Vec<u8>,
     }
     let row = sqlx::query_as::<_, Row>(
-        "SELECT kdf_m_cost, kdf_t_cost, kdf_p_cost, kdf_salt FROM users WHERE email = $1 AND disabled_at IS NULL",
+        // Un compte désactivé garde ses vrais paramètres : son propriétaire
+        // apprendra pourquoi il ne peut pas entrer, après avoir prouvé son
+        // mot de passe (`login`). Pour les autres, rien ne change.
+        "SELECT kdf_m_cost, kdf_t_cost, kdf_p_cost, kdf_salt FROM users WHERE email = $1",
     )
     .bind(&email)
     .fetch_optional(&state.db)
@@ -73,6 +76,14 @@ fn fake_salt(secret: &[u8], email: &str) -> Vec<u8> {
 
 // ─── Inscription ────────────────────────────────────────────────────────────
 
+/// Un administrateur a ouvert l'inscription à cette adresse (`/admin/registrations`).
+async fn registration_invited(db: &sqlx::PgPool, email: &str) -> sqlx::Result<bool> {
+    sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM registration_invites WHERE email = $1 AND expires_at > now())")
+        .bind(email)
+        .fetch_one(db)
+        .await
+}
+
 pub async fn register(
     State(state): State<AppState>,
     ClientIp(ip): ClientIp,
@@ -88,7 +99,7 @@ pub async fn register(
     validate::name_enc(&req.personal_vault.name_enc)?;
     validate::wrapped_vault_key(&req.personal_vault.wrapped_vault_key)?;
 
-    let allowlisted = state.config.is_email_allowlisted(&email);
+    let allowlisted = state.config.is_email_allowlisted(&email) || registration_invited(&state.db, &email).await?;
     match state.config.registration {
         RegistrationMode::Open => {}
         _ if allowlisted => {}
@@ -162,6 +173,11 @@ pub async fn register(
     .bind(&req.personal_vault.wrapped_vault_key)
     .execute(&mut *tx)
     .await?;
+    // L'inscription ouverte par un administrateur sert une fois.
+    sqlx::query("DELETE FROM registration_invites WHERE email = $1")
+        .bind(&email)
+        .execute(&mut *tx)
+        .await?;
 
     let (_, tokens) = sessions::create(
         &mut *tx,
@@ -191,6 +207,7 @@ pub async fn register(
                 email,
                 public_key: req.public_key,
                 created_at: Utc::now(),
+                is_admin: false,
             },
             protected_user_key: req.protected_user_key,
             protected_private_key: req.protected_private_key,
@@ -209,6 +226,8 @@ struct LoginRow {
     public_key: Vec<u8>,
     protected_private_key: Vec<u8>,
     created_at: DateTime<Utc>,
+    is_admin: bool,
+    disabled: bool,
 }
 
 /// Hash de référence vérifié quand l'e-mail est inconnu, pour que la réponse
@@ -229,8 +248,9 @@ pub async fn login(
     validate::auth_key(&req.auth_key)?;
 
     let row = sqlx::query_as::<_, LoginRow>(
-        "SELECT id, email::text AS email, auth_hash, protected_user_key, public_key, protected_private_key, created_at
-         FROM users WHERE email = $1 AND disabled_at IS NULL",
+        "SELECT id, email::text AS email, auth_hash, protected_user_key, public_key, protected_private_key, created_at,
+                is_admin, disabled_at IS NOT NULL AS disabled
+         FROM users WHERE email = $1",
     )
     .bind(&email)
     .fetch_optional(&state.db)
@@ -257,6 +277,20 @@ pub async fn login(
             "identifiants incorrects",
         ));
     };
+
+    if row.disabled {
+        // Le mot de passe est bon : dire pourquoi n'apprend rien qu'il ne sache.
+        Audit::new("user.login_disabled")
+            .actor(row.id)
+            .ip(ip)
+            .write(&state.db)
+            .await?;
+        return Err(AppError::new(
+            StatusCode::FORBIDDEN,
+            "account_disabled",
+            "ce compte a été désactivé par un administrateur du serveur",
+        ));
+    }
 
     if super::totp::is_enabled(&state.db, row.id).await? {
         let challenge =
@@ -286,6 +320,7 @@ pub async fn login(
             email: row.email,
             public_key: row.public_key,
             created_at: row.created_at,
+            is_admin: row.is_admin,
         },
         protected_user_key: row.protected_user_key,
         protected_private_key: row.protected_private_key,

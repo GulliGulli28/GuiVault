@@ -5,7 +5,7 @@ import { createVault } from "../lib/session";
 import { errorMessage } from "../lib/api";
 import { ROLE_HINTS, ROLE_LABELS } from "../lib/types";
 import { IconDice, IconIdentity, IconLifebuoy, IconLink, IconPulse, IconShieldClock } from "./secret-icons";
-import { IconBell, IconPlus, IconVault, IconSearch } from "./ui-icons";
+import { IconBell, IconDatabase, IconPlus, IconVault, IconSearch } from "./ui-icons";
 import { Logo } from "./Logo";
 import { Modal } from "./ui";
 
@@ -131,6 +131,17 @@ export function Sidebar({ ctx, route, onLogout, onSearch, width }: { ctx: PageCo
           <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[var(--c-bg3)] text-[var(--c-text-secondary)]"><IconPulse size={12} /></span>
           <span className="min-w-0 flex-1 truncate text-[12.5px] text-[var(--c-text)]">Santé du coffre</span>
         </a>
+        {session.user.is_admin && (
+          <a
+            href={routeHash({ page: "admin" })}
+            onClick={(e) => { e.preventDefault(); go({ page: "admin" }); }}
+            data-active={route.page === "admin" ? "true" : undefined}
+            className="list-row mx-1 mt-0.5 py-1.5"
+          >
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[var(--c-bg3)] text-[var(--c-text-secondary)]"><IconDatabase size={12} /></span>
+            <span className="min-w-0 flex-1 truncate text-[12.5px] text-[var(--c-text)]">Administration</span>
+          </a>
+        )}
       </div>
 
       <div className="border-t border-[var(--c-border)] p-2">

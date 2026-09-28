@@ -20,7 +20,11 @@ Erreurs : `{ "code": "…", "message": "…" }` (+ champs selon le code, ex.
 `already_accepted`, `not_accepted`, `already_requested`, `not_requested`,
 `already_granted`, `emergency_not_granted`, `self_grant`, `no_vaults`,
 `duplicate_vault`, `lookups_disabled`, `lookup_failed`, `totp_required`, `owns_shared_vaults`,
+`account_disabled`, `quota_exceeded`, `ip_not_allowed`, `self_action`, `target_is_admin`,
 `invalid_*`, `internal`.
+
+Partout : `403 ip_not_allowed` si l'adresse du client n'est pas dans
+`GUIVAULT_ALLOWED_IPS` (sauf `GET /health`).
 
 ## Santé
 
@@ -33,8 +37,8 @@ Erreurs : `{ "code": "…", "message": "…" }` (+ champs selon le code, ex.
 | | |
 |---|---|
 | `POST /auth/prelogin` | `{ email }` → `{ kdf, kdf_salt }` (déterministe même pour un inconnu) |
-| `POST /auth/register` | matériel de compte + `personal_vault` → `201` `LoginResponse` |
-| `POST /auth/login` | `{ email, auth_key, device_name? }` → `200` `LoginResponse` (`access_token`, `refresh_token`, `user`, `protected_user_key`, `protected_private_key`) — ou `202` `TotpChallenge { totp_token }` si le compte a un second facteur |
+| `POST /auth/register` | matériel de compte + `personal_vault` → `201` `LoginResponse`. Hors `open` : adresse de `GUIVAULT_ALLOWED_EMAILS`, inscription ouverte par un administrateur (consommée), ou — en `invite_only` — invitation de vault en attente ; sinon `403 invitation_required` (ou `forbidden` en `closed`) |
+| `POST /auth/login` | `{ email, auth_key, device_name? }` → `200` `LoginResponse` (`access_token`, `refresh_token`, `user`, `protected_user_key`, `protected_private_key`) — ou `202` `TotpChallenge { totp_token }` si le compte a un second facteur ; `403 account_disabled` si un administrateur l'a désactivé (dit seulement avec le bon mot de passe) |
 | `POST /auth/totp/verify` | `{ totp_token, code }` → `LoginResponse` (code à 6 chiffres ou code de récupération ; 5 essais, 5 min) |
 | `POST /auth/refresh` | `{ refresh_token }` → `TokenPair` (rotation) |
 | `GET /sends/{id}/access` | sans compte : `SendInfo { password?: { kdf, salt }, expires_at, views_left }`, ou `404 send_unavailable` (inconnu, expiré, épuisé, supprimé — ou liens désactivés). Ne consomme rien |
@@ -53,7 +57,7 @@ Erreurs : `{ "code": "…", "message": "…" }` (+ champs selon le code, ex.
 | `POST /auth/totp/enable` | `{ code }` → `{ recovery_codes }` (8, montrés une seule fois ; autres sessions révoquées) |
 | `POST /auth/totp/disable` | `{ code }` (TOTP ou récupération) → `204` |
 | `GET /events` | flux SSE de `ServerEvent` (`vault_changed`, `invitation_received`, `membership_changed`, `settings_changed`, `emergency_changed`) — dit *que* quelque chose a changé, le client resynchronise |
-| `GET /users/me` | `UserProfile` |
+| `GET /users/me` | `UserProfile` (`is_admin` : administrateur du serveur, absent sinon) |
 | `DELETE /users/me` | `{ auth_key, totp_code? }` → `204`. Supprime le compte, ses vaults (personnel et partagés dont il est le seul membre), sessions, réglages, second facteur, liens de partage, accès d'urgence (dans les deux sens) et les invitations qu'il a envoyées ; révoque celles adressées à son e-mail. Le journal d'audit garde ses lignes, sans IP. `401 invalid_credentials` (mot de passe), `400 totp_required` / `401 invalid_code` si le second facteur est actif, `409 owns_shared_vaults` `{ vaults: [id] }` tant qu'il possède un vault partagé avec d'autres membres (transférer la propriété ou le supprimer d'abord) |
 | `GET /users/me/settings` | `UserSettings` (`{ blob, revision, updated_at }`) ou `null` si aucun appareil n'en a envoyé |
 | `PUT /users/me/settings` | `{ blob, base_revision }` → `UserSettings`, ou `409` `{ code: "revision_mismatch", current }` si `base_revision` n'est pas la dernière (`null` = « je n'en ai lu aucune »). `blob` = `seal_user_settings(user_key, json)`, 64 Kio max. Prévient les autres sessions (`settings_changed`) |
@@ -114,6 +118,31 @@ Restaurer une version (historique ou corbeille) : la renvoyer **telle
 quelle** par `PUT` — même clé, même AAD —, avec la révision courante de
 l'item en `base_revision`, ou sans pour un item de la corbeille (recréé).
 L'élément remplacé passe à son tour dans l'historique.
+
+## Administration du serveur
+
+Réservé aux comptes `is_admin` (`403 forbidden` sinon), rôle donné depuis le
+shell du serveur (`guivault admin grant|revoke|list`), jamais par l'API ;
+`403 ip_not_allowed` hors de `GUIVAULT_ADMIN_ALLOWED_IPS`. Des métadonnées,
+jamais un contenu. Chaque action écrit une ligne d'audit `admin.*`.
+
+| | |
+|---|---|
+| `GET /admin/overview` | `AdminOverview` : comptes (désactivés, admins), vaults (partagés), items et octets vivants, liens, sessions actives, inscriptions ouvertes, mode d'inscription, quota par défaut, plages d'IP |
+| `GET /admin/users` | `[AdminUserInfo]` : e-mail, dates, `disabled_at`, `is_admin`, `totp_enabled`, `last_seen_at`, sessions actives, vaults possédés / rejoints, items et octets dans les vaults possédés, `quota_bytes` (propre, `null` = celui du serveur, `0` = aucun), `effective_quota_bytes` |
+| `POST /admin/users/{id}/disable` | → `AdminUserInfo`. Plus de connexion (`account_disabled`), sessions révoquées ; rien d'effacé. `400 self_action` sur soi, `409 target_is_admin` sur un administrateur |
+| `POST /admin/users/{id}/enable` | → `AdminUserInfo` |
+| `PUT /admin/users/{id}/quota` | `{ quota_bytes: n \| 0 \| null }` → `AdminUserInfo` (soi compris) |
+| `DELETE /admin/users/{id}` | → `204`. Comme `DELETE /users/me`, sans mot de passe ; ses vaults partagés avec d'autres passent au membre le mieux placé (compte actif, rôle le plus haut, le plus ancien — `vault.transfer`) au lieu de bloquer. Mêmes refus que `disable` |
+| `GET /admin/registrations` | `[RegistrationInvite { email, invited_by, created_at, expires_at }]` (non expirées) |
+| `POST /admin/registrations` | `{ email, days? }` (1–90, 14 par défaut) → `201`. Autorise cette adresse à s'inscrire une fois, quel que soit le mode ; renouvelle si elle l'était. `409 email_taken` si le compte existe |
+| `DELETE /admin/registrations/{email}` | → `204` |
+
+**Quota** : `PUT …/items/{id}` qui ferait dépasser au propriétaire du vault
+son quota (chiffrés vivants de tous ses vaults, ni historique ni tombales)
+répond `507 quota_exceeded` `{ used, quota }` — quel que soit le membre qui
+écrit. Une écriture qui ne grossit pas passe toujours ; la rotation de clé
+n'est jamais bloquée.
 
 ## Rapport de santé (relais)
 

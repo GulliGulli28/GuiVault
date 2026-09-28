@@ -4,6 +4,7 @@
 //! `lib.rs` expose ce qu'il faut pour démarrer le serveur depuis `main.rs` et
 //! depuis les tests d'intégration (`tests/`), qui lancent une vraie instance
 //! sur un port libre contre une base Postgres jetable.
+pub mod admin;
 pub mod audit;
 pub mod auth;
 pub mod config;
@@ -25,10 +26,15 @@ use std::sync::Arc;
 pub static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("./migrations");
 
 pub async fn connect(config: &Config) -> anyhow::Result<sqlx::PgPool> {
+    connect_url(&config.database_url).await
+}
+
+/// Connexion et migrations : le schéma est toujours à jour de ce binaire.
+pub async fn connect_url(url: &str) -> anyhow::Result<sqlx::PgPool> {
     let pool = PgPoolOptions::new()
         .max_connections(16)
         .acquire_timeout(std::time::Duration::from_secs(10))
-        .connect(&config.database_url)
+        .connect(url)
         .await?;
     MIGRATOR.run(&pool).await?;
     Ok(pool)

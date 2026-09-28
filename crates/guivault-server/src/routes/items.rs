@@ -115,6 +115,20 @@ pub async fn put(
         ));
     }
 
+    let old_len = current
+        .as_ref()
+        .filter(|c| c.deleted_at.is_none())
+        .map_or(0, |c| c.ciphertext.len());
+    db::check_quota(
+        &mut tx,
+        state.config.quota_bytes,
+        vault_id,
+        item_id,
+        old_len,
+        req.ciphertext.len(),
+    )
+    .await?;
+
     // La version remplacée va dans l'historique.
     if let Some(c) = current.as_ref().filter(|c| c.deleted_at.is_none()) {
         db::keep_version(&mut tx, c, user.id, state.config.item_history).await?;

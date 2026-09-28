@@ -2,7 +2,7 @@
  * `core/src/guivault/client.rs` dans Guiterm. Une méthode par route ; les
  * blobs restent en base64, c'est `session.ts` qui chiffre et déchiffre. */
 import type { TwoFactorSite } from "./types";
-import type { AuditEntry, EmergencyGrant, EmergencyOverview, EmergencyVault, HealthResponse, Invitation, Item, ItemVersion, ItemsPage, KdfParams, LoginResponse, PreloginResponse, Role, SendContent, SendInfo, SendPassword, SendSummary, ServerEvent, Session, SyncResponse, TokenPair, TotpChallenge, TrashedItem, UserLookupResponse, UserProfile, UserSettings, Vault, VaultMember } from "./types";
+import type { AdminOverview, AdminUserInfo, AuditEntry, EmergencyGrant, EmergencyOverview, EmergencyVault, HealthResponse, Invitation, Item, ItemVersion, ItemsPage, KdfParams, LoginResponse, PreloginResponse, Role, SendContent, SendInfo, SendPassword, SendSummary, RegistrationInvite, ServerEvent, Session, SyncResponse, TokenPair, TotpChallenge, TrashedItem, UserLookupResponse, UserProfile, UserSettings, Vault, VaultMember } from "./types";
 
 /** Une enveloppe de clé de vault pour un contact d'urgence. */
 export interface EmergencyVaultKey {
@@ -188,6 +188,15 @@ export const api = {
   /** Supprime le compte (mot de passe maître prouvé, code du second facteur
    * s'il est actif) ; `409 owns_shared_vaults` avec `vaults` sinon. */
   deleteAccount: (auth_key: string, totp_code?: string) => authed<void>("DELETE", "/users/me", { auth_key, totp_code }),
+  adminOverview: () => authed<AdminOverview>("GET", "/admin/overview"),
+  adminUsers: () => authed<AdminUserInfo[]>("GET", "/admin/users"),
+  adminDisable: (id: string) => authed<AdminUserInfo>("POST", `/admin/users/${id}/disable`),
+  adminEnable: (id: string) => authed<AdminUserInfo>("POST", `/admin/users/${id}/enable`),
+  adminSetQuota: (id: string, quota_bytes: number | null) => authed<AdminUserInfo>("PUT", `/admin/users/${id}/quota`, { quota_bytes }),
+  adminDeleteUser: (id: string) => authed<void>("DELETE", `/admin/users/${id}`),
+  adminRegistrations: () => authed<RegistrationInvite[]>("GET", "/admin/registrations"),
+  adminOpenRegistration: (email: string, days?: number) => authed<RegistrationInvite>("POST", "/admin/registrations", { email, days }),
+  adminCloseRegistration: (email: string) => authed<void>("DELETE", `/admin/registrations/${q(email)}`),
   myAudit: (limit = 100) => authed<AuditEntry[]>("GET", `/users/me/audit?limit=${limit}`),
   settings: () => authed<UserSettings | null>("GET", "/users/me/settings"),
   putSettings: (blob: string, base_revision: number | null) => authed<UserSettings>("PUT", "/users/me/settings", { blob, base_revision }),

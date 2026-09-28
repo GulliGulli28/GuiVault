@@ -27,7 +27,7 @@ confortable :
    l'écrire (chaque écriture devient deux, sous le verrou optimiste ; tous
    les clients à la fois) — proposition et questions dans
    [`MANIFESTE.md`](MANIFESTE.md).
-2. **Exploitation** (§5 : administration, sauvegardes vérifiées, **SMTP**
+2. **Exploitation** (§5 : sauvegardes vérifiées, **SMTP**
    facultatif — qui compléterait l'accès d'urgence d'une alerte par
    e-mail, sans que rien n'en dépende) et
    **mobile** (§4).
@@ -190,13 +190,22 @@ paramètres ou formats anciens.
 
 ## 5. Exploitation (auto-hébergement)
 
-- [ ] **Administration du serveur** : pas de rôle admin aujourd'hui ;
-  comptes, invitations, désactivation, quotas.
+- [x] **Administration du serveur** — rôle donné depuis le shell
+  (`guivault admin grant`, `src/admin.rs`), jamais par l'API ;
+  `routes/admin.rs` : état du serveur, comptes (activité, vaults, octets),
+  désactivation (sessions coupées, `account_disabled` à la connexion),
+  quotas (`GUIVAULT_QUOTA_MB` et par compte, vérifiés dans
+  `db::check_quota`), suppression avec transfert des vaults partagés,
+  inscriptions ouvertes à une adresse. Un administrateur ne touche pas un
+  autre administrateur. Web : `AdminPage.tsx`.
 - [ ] **Sauvegardes intégrées et vérifiées** (le « backup corrompu depuis
   des mois » est un classique de l'auto-hébergement).
 - [ ] **SMTP optionnel** : invitations, alertes de nouvelle connexion
   (demande ouverte chez Bitwarden).
-- [ ] **Restriction par plages d'IP** (réglage serveur).
+- [x] **Restriction par plages d'IP** — `GUIVAULT_ALLOWED_IPS` (tout le
+  serveur sauf `/api/v1/health`, couche `restrict_ips` dans
+  `routes/mod.rs`) et `GUIVAULT_ADMIN_ALLOWED_IPS` (l'administration),
+  sur l'adresse du client selon `GUIVAULT_TRUST_PROXY`.
 - [x] **Suppression de compte** (RGPD) — `DELETE /users/me`
   (`routes/users.rs::delete_me`) : mot de passe et second facteur
   redemandés, refusée tant que le compte possède un vault partagé avec

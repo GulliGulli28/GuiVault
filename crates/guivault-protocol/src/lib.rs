@@ -262,6 +262,9 @@ pub struct UserProfile {
     #[serde(with = "b64")]
     pub public_key: Vec<u8>,
     pub created_at: DateTime<Utc>,
+    /// Administrateur du serveur (routes `/admin/*`). Absent : non.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub is_admin: bool,
 }
 
 /// Changement de mot de passe maître : le client prouve l'ancien, envoie le
@@ -724,6 +727,83 @@ pub struct SendContent {
     pub ciphertext: Vec<u8>,
     pub expires_at: DateTime<Utc>,
     pub views_left: Option<u32>,
+}
+
+// ─── Administration du serveur ──────────────────────────────────────────────
+
+/// `GET /admin/overview` : l'état du serveur, sans rien de chiffré.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AdminOverview {
+    pub server_version: String,
+    pub registration: RegistrationMode,
+    pub users: i64,
+    pub disabled_users: i64,
+    pub admins: i64,
+    pub vaults: i64,
+    pub shared_vaults: i64,
+    pub items: i64,
+    /// Octets de chiffrés vivants, tous vaults confondus.
+    pub storage_bytes: i64,
+    pub sends: i64,
+    pub active_sessions: i64,
+    pub pending_registrations: i64,
+    /// Quota par défaut d'un compte, en octets ; `0` : aucun.
+    pub default_quota_bytes: u64,
+    /// `GUIVAULT_ALLOWED_IPS` et `GUIVAULT_ADMIN_ALLOWED_IPS` ; vides : toutes.
+    #[serde(default)]
+    pub allowed_ips: Vec<String>,
+    #[serde(default)]
+    pub admin_allowed_ips: Vec<String>,
+}
+
+/// Un compte vu par l'administrateur : des métadonnées, jamais un contenu.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AdminUserInfo {
+    pub id: Uuid,
+    pub email: String,
+    pub created_at: DateTime<Utc>,
+    pub disabled_at: Option<DateTime<Utc>>,
+    pub is_admin: bool,
+    pub totp_enabled: bool,
+    /// Dernière requête d'une de ses sessions.
+    pub last_seen_at: Option<DateTime<Utc>>,
+    pub active_sessions: i64,
+    pub vaults_owned: i64,
+    /// Vaults partagés où il est membre sans en être propriétaire.
+    pub vaults_joined: i64,
+    /// Items vivants et leurs octets, dans les vaults qu'il possède.
+    pub items: i64,
+    pub storage_bytes: i64,
+    /// Quota propre au compte : `None` = celui du serveur, `Some(0)` = aucun.
+    pub quota_bytes: Option<i64>,
+    /// Le quota qui s'applique, en octets ; `0` : aucun.
+    pub effective_quota_bytes: u64,
+}
+
+/// `PUT /admin/users/{id}/quota`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SetQuotaRequest {
+    /// `None` : revenir au quota du serveur ; `Some(0)` : aucun quota.
+    pub quota_bytes: Option<u64>,
+}
+
+/// Une inscription ouverte par un administrateur à une adresse.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RegistrationInvite {
+    pub email: String,
+    /// L'administrateur qui l'a ouverte (s'il existe encore).
+    pub invited_by: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub expires_at: DateTime<Utc>,
+}
+
+/// `POST /admin/registrations`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateRegistrationInvite {
+    pub email: String,
+    /// Durée de validité, 1 à 90 jours (14 par défaut).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub days: Option<u32>,
 }
 
 // ─── Items ──────────────────────────────────────────────────────────────────

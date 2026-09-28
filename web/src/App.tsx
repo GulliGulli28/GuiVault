@@ -21,6 +21,7 @@ import { RollbackBanner } from "./components/RollbackBanner";
 import { EmergencyBanner } from "./components/EmergencySettings";
 import { SendView } from "./components/SendView";
 import { SendsPage } from "./components/SendsPage";
+import { AdminPage } from "./components/AdminPage";
 import { HealthPage } from "./components/HealthPage";
 import { Toasts, useToasts } from "./components/ui";
 import { PaneHandle, usePersistedPane } from "./hooks/usePersistedPane";
@@ -248,6 +249,9 @@ export default function App() {
       break;
     case "health":
       page = <HealthPage ctx={ctx} />;
+      break;
+    case "admin":
+      page = <AdminPage ctx={ctx} />;
       break;
     default:
       page = <p className="p-6 text-[12.5px] text-[var(--c-text-muted)]">Aucun vault.</p>;

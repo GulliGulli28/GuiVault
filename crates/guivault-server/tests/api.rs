@@ -65,6 +65,9 @@ impl TestServer {
             health_lookups: false,
             hibp_url: String::new(),
             twofa_directory_url: String::new(),
+            allowed_ips: Default::default(),
+            admin_allowed_ips: Default::default(),
+            quota_bytes: 0,
             auth_rate_burst: 1000,
             auth_rate_per_second: 1000,
             log_json: false,
@@ -2633,5 +2636,393 @@ async fn account_deletion_needs_the_password_and_no_orphaned_shared_vault() {
             .iter()
             .any(|e| e["action"] == "vault.create" && e["actor_email"].is_null())
     );
+    server.stop().await;
+}
+
+/// Une demande d'inscription complète, pour les cas où elle doit échouer.
+fn register_request(email: &str) -> RegisterRequest {
+    let (m, a) = gc::create_account("pw-x").unwrap();
+    let k = gc::SymmetricKey::random();
+    let pid = Uuid::new_v4();
+    RegisterRequest {
+        email: email.into(),
+        kdf: m.kdf,
+        kdf_salt: m.kdf_salt,
+        auth_key: m.auth_key,
+        protected_user_key: m.protected_user_key,
+        public_key: m.public_key,
+        protected_private_key: m.protected_private_key,
+        personal_vault: CreateVaultRequest {
+            id: pid,
+            name_enc: gc::seal_vault_name(&k, &pid.to_string(), "P").unwrap(),
+            wrapped_vault_key: gc::wrap_vault_key(&a.keypair, &a.keypair.public, &pid.to_string(), &k).unwrap(),
+        },
+        device_name: None,
+    }
+}
+
+/// Ajoute `member` au vault partagé de `owner`, avec la vraie enveloppe.
+async fn add_member(owner: &User, vault: &Vault, key: &gc::SymmetricKey, member: &User, role: Role) {
+    let lookup: UserLookupResponse = owner.get(&format!("/users/lookup?email={}", member.email)).await;
+    let pk = gc::PublicKey::try_from(lookup.public_key.as_slice()).unwrap();
+    status!(
+        owner
+            .req(reqwest::Method::POST, &format!("/vaults/{}/members", vault.id))
+            .json(&AddMemberRequest {
+                user_id: member.profile.id,
+                role,
+                wrapped_vault_key: gc::wrap_vault_key(&owner.account.keypair, &pk, &vault.id.to_string(), key).unwrap(),
+            })
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::CREATED
+    );
+}
+
+#[tokio::test]
+async fn server_admin_accounts_quotas_and_registrations() {
+    let Some(server) = TestServer::start(RegistrationMode::InviteOnly).await else {
+        return;
+    };
+    let db = server.db().await;
+    let alice = User::register(&server, "alice@t.io", "pw-alice").await;
+    assert!(!alice.profile.is_admin);
+    // Pas encore administratrice : rien.
+    let body = status!(
+        alice.req(reqwest::Method::GET, "/admin/overview").send().await.unwrap(),
+        StatusCode::FORBIDDEN
+    );
+    assert!(body.contains("\"forbidden\""), "{body}");
+
+    // Le rôle se donne depuis le shell du serveur, pas par l'API.
+    assert!(
+        !guivault_server::admin::set_admin(&db, "personne@t.io", true)
+            .await
+            .unwrap()
+    );
+    assert!(
+        guivault_server::admin::set_admin(&db, "Alice@t.io", true)
+            .await
+            .unwrap()
+    );
+    assert_eq!(guivault_server::admin::list(&db).await.unwrap(), vec!["alice@t.io"]);
+    let me: UserProfile = alice.get("/users/me").await;
+    assert!(me.is_admin);
+
+    // Inscriptions : Bob n'a ni invitation de vault ni place dans la liste
+    // blanche ; l'administratrice lui ouvre la porte, qui sert une fois.
+    let body = status!(
+        Client::new()
+            .post(format!("{}/auth/register", server.base))
+            .json(&register_request("bob@t.io"))
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::FORBIDDEN
+    );
+    assert!(body.contains("invitation_required"), "{body}");
+    for email in ["bob@t.io", "carol@t.io"] {
+        status!(
+            alice
+                .req(reqwest::Method::POST, "/admin/registrations")
+                .json(&CreateRegistrationInvite {
+                    email: email.into(),
+                    days: Some(3),
+                })
+                .send()
+                .await
+                .unwrap(),
+            StatusCode::CREATED
+        );
+    }
+    let body = status!(
+        alice
+            .req(reqwest::Method::POST, "/admin/registrations")
+            .json(&CreateRegistrationInvite {
+                email: "alice@t.io".into(),
+                days: None,
+            })
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::CONFLICT
+    );
+    assert!(body.contains("email_taken"));
+    let bob = User::register(&server, "bob@t.io", "pw-bob").await;
+    let carol = User::register(&server, "carol@t.io", "pw-carol").await;
+    let open: Vec<RegistrationInvite> = alice.get("/admin/registrations").await;
+    assert!(open.is_empty(), "consommées à l'inscription : {open:?}");
+
+    // Un peu de contenu : un vault partagé de Bob où Carol écrit.
+    let (team, team_key) = bob.create_vault("Équipe").await;
+    add_member(&bob, &team, &team_key, &carol, Role::Writer).await;
+    status!(
+        bob.put_item(team.id, &team_key, Uuid::new_v4(), "note", "consignes", None)
+            .await,
+        StatusCode::CREATED
+    );
+
+    let users: Vec<AdminUserInfo> = alice.get("/admin/users").await;
+    assert_eq!(users.len(), 3);
+    let b = users.iter().find(|u| u.email == "bob@t.io").unwrap();
+    assert_eq!((b.vaults_owned, b.vaults_joined, b.items), (2, 0, 1));
+    assert!(b.storage_bytes > 0 && b.active_sessions == 1 && b.last_seen_at.is_some());
+    assert_eq!(b.effective_quota_bytes, 0, "aucun quota par défaut");
+    let c = users.iter().find(|u| u.email == "carol@t.io").unwrap();
+    assert_eq!((c.vaults_owned, c.vaults_joined, c.items), (1, 1, 0));
+    let overview: AdminOverview = alice.get("/admin/overview").await;
+    assert_eq!((overview.users, overview.admins, overview.shared_vaults), (3, 1, 1));
+
+    // Quota : le vault d'équipe compte pour Bob, son propriétaire — même
+    // quand c'est Carol qui écrit.
+    let body = status!(
+        alice
+            .req(reqwest::Method::PUT, &format!("/admin/users/{}/quota", bob.profile.id))
+            .json(&SetQuotaRequest {
+                quota_bytes: Some(b.storage_bytes as u64 + 200),
+            })
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::OK
+    );
+    let b: AdminUserInfo = serde_json::from_str(&body).unwrap();
+    assert_eq!(b.effective_quota_bytes, b.storage_bytes as u64 + 200);
+    status!(
+        carol
+            .put_item(team.id, &team_key, Uuid::new_v4(), "note", "court", None)
+            .await,
+        StatusCode::CREATED
+    );
+    let big = "x".repeat(400);
+    let body = status!(
+        carol
+            .put_item(team.id, &team_key, Uuid::new_v4(), "note", &big, None)
+            .await,
+        StatusCode::INSUFFICIENT_STORAGE
+    );
+    assert!(body.contains("quota_exceeded") && body.contains("\"quota\""), "{body}");
+    // Le vault personnel de Carol n'est pas concerné.
+    let carol_personal = carol
+        .sync()
+        .await
+        .vaults
+        .into_iter()
+        .find(|v| v.kind == VaultKind::Personal)
+        .unwrap();
+    let carol_key = carol.vault_key(&carol_personal);
+    status!(
+        carol
+            .put_item(carol_personal.id, &carol_key, Uuid::new_v4(), "note", &big, None)
+            .await,
+        StatusCode::CREATED
+    );
+    status!(
+        alice
+            .req(reqwest::Method::PUT, &format!("/admin/users/{}/quota", bob.profile.id))
+            .json(&SetQuotaRequest { quota_bytes: None })
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::OK
+    );
+    status!(
+        carol
+            .put_item(team.id, &team_key, Uuid::new_v4(), "note", &big, None)
+            .await,
+        StatusCode::CREATED
+    );
+
+    // Désactiver : sessions coupées, connexion refusée en le disant (le mot
+    // de passe une fois prouvé), puis réactiver.
+    let body = status!(
+        alice
+            .req(
+                reqwest::Method::POST,
+                &format!("/admin/users/{}/disable", alice.profile.id)
+            )
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::BAD_REQUEST
+    );
+    assert!(body.contains("self_action"));
+    let body = status!(
+        alice
+            .req(
+                reqwest::Method::POST,
+                &format!("/admin/users/{}/disable", bob.profile.id)
+            )
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::OK
+    );
+    let b: AdminUserInfo = serde_json::from_str(&body).unwrap();
+    assert!(b.disabled_at.is_some() && b.active_sessions == 0);
+    status!(
+        bob.req(reqwest::Method::GET, "/sync").send().await.unwrap(),
+        StatusCode::UNAUTHORIZED
+    );
+    let (st, body) = User::login(&server, "bob@t.io", "pw-bob").await.err().unwrap();
+    assert_eq!(st, StatusCode::FORBIDDEN);
+    assert!(body.contains("account_disabled"), "{body}");
+    let (st, body) = User::login(&server, "bob@t.io", "mauvais").await.err().unwrap();
+    assert_eq!(
+        st,
+        StatusCode::UNAUTHORIZED,
+        "sans le mot de passe, rien de plus : {body}"
+    );
+    status!(
+        alice
+            .req(
+                reqwest::Method::POST,
+                &format!("/admin/users/{}/enable", bob.profile.id)
+            )
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::OK
+    );
+    let bob = User::login(&server, "bob@t.io", "pw-bob").await.unwrap();
+
+    // Un autre administrateur est intouchable depuis l'API.
+    guivault_server::admin::set_admin(&db, "carol@t.io", true)
+        .await
+        .unwrap();
+    let body = status!(
+        alice
+            .req(
+                reqwest::Method::POST,
+                &format!("/admin/users/{}/disable", carol.profile.id)
+            )
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::CONFLICT
+    );
+    assert!(body.contains("target_is_admin"));
+    guivault_server::admin::set_admin(&db, "carol@t.io", false)
+        .await
+        .unwrap();
+
+    // Supprimer Bob : son vault personnel part, le vault d'équipe passe à
+    // Carol (seule autre membre), avec ses items.
+    status!(
+        alice
+            .req(reqwest::Method::DELETE, &format!("/admin/users/{}", bob.profile.id))
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::NO_CONTENT
+    );
+    let team_now = carol
+        .sync()
+        .await
+        .vaults
+        .into_iter()
+        .find(|v| v.id == team.id)
+        .expect("le vault reste");
+    assert_eq!(team_now.role, Role::Owner);
+    let page: ItemsPage = carol.get(&format!("/vaults/{}/items", team.id)).await;
+    assert_eq!(page.items.len(), 3);
+    assert!(User::login(&server, "bob@t.io", "pw-bob").await.is_err());
+    let actions: Vec<String> =
+        sqlx::query_scalar("SELECT action FROM audit_log WHERE action LIKE 'admin.%' ORDER BY id")
+            .fetch_all(&db)
+            .await
+            .unwrap();
+    assert_eq!(
+        actions,
+        vec![
+            "admin.grant",
+            "admin.registration_open",
+            "admin.registration_open",
+            "admin.user_quota",
+            "admin.user_quota",
+            "admin.user_disable",
+            "admin.user_enable",
+            "admin.grant",
+            "admin.revoke",
+            "admin.user_delete",
+        ]
+    );
+    server.stop().await;
+}
+
+#[tokio::test]
+async fn ip_allow_lists_for_the_server_and_its_administration() {
+    // Tout le serveur fermé à 127.0.0.1 : ni l'API, ni l'interface — la
+    // sonde de santé seule répond.
+    let Some(server) = TestServer::start_with(RegistrationMode::Open, |c| {
+        c.allowed_ips = guivault_server::config::IpAllowList::parse("X", "10.0.0.0/8").unwrap();
+    })
+    .await
+    else {
+        return;
+    };
+    let http = Client::new();
+    let root = server.base.trim_end_matches("/api/v1").to_string();
+    status!(
+        http.get(format!("{}/health", server.base)).send().await.unwrap(),
+        StatusCode::OK
+    );
+    let body = status!(
+        http.post(format!("{}/auth/prelogin", server.base))
+            .json(&PreloginRequest { email: "a@t.io".into() })
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::FORBIDDEN
+    );
+    assert!(body.contains("ip_not_allowed"), "{body}");
+    status!(
+        http.get(format!("{root}/")).send().await.unwrap(),
+        StatusCode::FORBIDDEN
+    );
+    server.stop().await;
+
+    // Derrière un proxy de confiance, c'est l'adresse du client qui compte.
+    let Some(server) = TestServer::start_with(RegistrationMode::Open, |c| {
+        c.allowed_ips = guivault_server::config::IpAllowList::parse("X", "10.0.0.0/8").unwrap();
+        c.trust_proxy = guivault_server::config::TrustProxy::parse("127.0.0.1").unwrap();
+    })
+    .await
+    else {
+        return;
+    };
+    for (xff, expected) in [("10.1.2.3", StatusCode::OK), ("192.0.2.9", StatusCode::FORBIDDEN)] {
+        status!(
+            http.post(format!("{}/auth/prelogin", server.base))
+                .header("x-forwarded-for", xff)
+                .json(&PreloginRequest { email: "a@t.io".into() })
+                .send()
+                .await
+                .unwrap(),
+            expected
+        );
+    }
+    server.stop().await;
+
+    // L'administration seule restreinte : le reste répond, `/admin` non —
+    // même pour un administrateur.
+    let Some(server) = TestServer::start_with(RegistrationMode::Open, |c| {
+        c.admin_allowed_ips = guivault_server::config::IpAllowList::parse("X", "10.0.0.0/8").unwrap();
+    })
+    .await
+    else {
+        return;
+    };
+    let alice = User::register(&server, "alice@t.io", "pw-alice").await;
+    guivault_server::admin::set_admin(&server.db().await, "alice@t.io", true)
+        .await
+        .unwrap();
+    alice.sync().await;
+    let body = status!(
+        alice.req(reqwest::Method::GET, "/admin/users").send().await.unwrap(),
+        StatusCode::FORBIDDEN
+    );
+    assert!(body.contains("ip_not_allowed"), "{body}");
     server.stop().await;
 }

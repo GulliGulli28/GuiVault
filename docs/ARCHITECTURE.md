@@ -272,8 +272,6 @@ resynchronise. Rien n'est persisté — un client déconnecté rate des
 ## Ce qui n'est pas encore là
 
 - **WebAuthn / clés de sécurité** en second facteur.
-- **Administration du serveur** (comptes, quotas) : il n'y a pas de rôle
-  d'administrateur, seulement les rôles par vault.
 - **Emails** d'invitation : l'invitation est visible dans le client de
   l'invité ; rien n'est envoyé par courrier — ni l'alerte d'une demande
   d'accès d'urgence, que le donneur découvre à sa connexion.

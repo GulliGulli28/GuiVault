@@ -12,6 +12,7 @@ pub struct UserRow {
     pub email: String,
     pub public_key: Vec<u8>,
     pub created_at: DateTime<Utc>,
+    pub is_admin: bool,
 }
 
 impl From<UserRow> for UserProfile {
@@ -21,13 +22,14 @@ impl From<UserRow> for UserProfile {
             email: r.email,
             public_key: r.public_key,
             created_at: r.created_at,
+            is_admin: r.is_admin,
         }
     }
 }
 
 pub async fn user_by_id<'e>(db: impl PgExecutor<'e>, id: Uuid) -> sqlx::Result<Option<UserRow>> {
     sqlx::query_as(
-        "SELECT id, email::text AS email, public_key, created_at FROM users WHERE id = $1 AND disabled_at IS NULL",
+        "SELECT id, email::text AS email, public_key, created_at, is_admin FROM users WHERE id = $1 AND disabled_at IS NULL",
     )
     .bind(id)
     .fetch_optional(db)
@@ -36,11 +38,54 @@ pub async fn user_by_id<'e>(db: impl PgExecutor<'e>, id: Uuid) -> sqlx::Result<O
 
 pub async fn user_by_email<'e>(db: impl PgExecutor<'e>, email: &str) -> sqlx::Result<Option<UserRow>> {
     sqlx::query_as(
-        "SELECT id, email::text AS email, public_key, created_at FROM users WHERE email = $1 AND disabled_at IS NULL",
+        "SELECT id, email::text AS email, public_key, created_at, is_admin FROM users WHERE email = $1 AND disabled_at IS NULL",
     )
     .bind(email)
     .fetch_optional(db)
     .await
+}
+
+/// Le propriétaire du vault a-t-il la place d'écrire ce chiffré ? Son usage :
+/// les chiffrés vivants de tous les vaults qu'il possède (ni l'historique,
+/// borné par `GUIVAULT_ITEM_HISTORY`, ni les tombales). Une écriture qui ne
+/// grossit pas passe toujours — un quota abaissé sous l'usage n'empêche pas
+/// de corriger ou d'alléger. À appeler sous le verrou du vault.
+pub async fn check_quota(
+    tx: &mut PgConnection,
+    default_quota: u64,
+    vault_id: Uuid,
+    item_id: Uuid,
+    old_len: usize,
+    new_len: usize,
+) -> Result<(), AppError> {
+    if new_len <= old_len {
+        return Ok(());
+    }
+    let row: Option<(Option<i64>, i64)> = sqlx::query_as(
+        "SELECT u.quota_bytes,
+                coalesce((SELECT sum(octet_length(i.ciphertext))
+                          FROM items i JOIN vault_members o ON o.vault_id = i.vault_id AND o.role = 'owner'
+                          WHERE o.user_id = m.user_id AND i.deleted_at IS NULL
+                            AND NOT (i.vault_id = $1 AND i.id = $2)), 0)::bigint
+         FROM vault_members m JOIN users u ON u.id = m.user_id
+         WHERE m.vault_id = $1 AND m.role = 'owner'",
+    )
+    .bind(vault_id)
+    .bind(item_id)
+    .fetch_optional(&mut *tx)
+    .await?;
+    let Some((own, used)) = row else { return Ok(()) };
+    let quota = crate::routes::admin::effective_quota(own, default_quota);
+    let after = used.max(0) as u64 + new_len as u64;
+    if quota > 0 && after > quota {
+        return Err(AppError::new(
+            axum::http::StatusCode::INSUFFICIENT_STORAGE,
+            "quota_exceeded",
+            "quota de stockage atteint pour le propriétaire de ce vault",
+        )
+        .with_extra(serde_json::json!({ "used": used, "quota": quota })));
+    }
+    Ok(())
 }
 
 /// Une ligne de `vaults` jointe à l'appartenance de l'utilisateur courant.

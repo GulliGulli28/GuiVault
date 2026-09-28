@@ -14,6 +14,7 @@ use tower_http::set_header::SetResponseHeaderLayer;
 use tower_http::timeout::TimeoutLayer;
 use tower_http::trace::TraceLayer;
 
+pub mod admin;
 pub mod audit;
 pub mod auth;
 pub mod emergency;
@@ -124,7 +125,18 @@ pub fn router(state: AppState) -> Router {
         .route("/invitations/{id}", delete(invitations::revoke))
         .route("/invitations/{id}/accept", post(invitations::accept))
         .route("/invitations/{id}/decline", post(invitations::decline))
-        .route("/invitations/{id}/complete", post(invitations::complete));
+        .route("/invitations/{id}/complete", post(invitations::complete))
+        .route("/admin/overview", get(admin::overview))
+        .route("/admin/users", get(admin::users))
+        .route("/admin/users/{id}", delete(admin::delete_user))
+        .route("/admin/users/{id}/disable", post(admin::disable))
+        .route("/admin/users/{id}/enable", post(admin::enable))
+        .route("/admin/users/{id}/quota", put(admin::set_quota))
+        .route(
+            "/admin/registrations",
+            get(admin::registrations).post(admin::create_registration),
+        )
+        .route("/admin/registrations/{email}", delete(admin::delete_registration));
 
     // Corps : la rotation de clé renvoie tous les items d'un vault d'un coup,
     // d'où une limite bien au-dessus de celle d'un item seul.
@@ -162,5 +174,23 @@ pub fn router(state: AppState) -> Router {
         ))
         .layer(TraceLayer::new_for_http())
         .merge(crate::web::router())
+        .layer(axum::middleware::from_fn_with_state(state.clone(), restrict_ips))
         .with_state(state)
+}
+
+/// `GUIVAULT_ALLOWED_IPS` : hors des plages, rien — ni l'API, ni l'interface,
+/// ni les liens de partage. Seule la sonde de santé reste joignable (le
+/// HEALTHCHECK Docker, un répartiteur de charge).
+async fn restrict_ips(
+    axum::extract::State(state): axum::extract::State<AppState>,
+    crate::auth::ClientIp(ip): crate::auth::ClientIp,
+    req: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> axum::response::Response {
+    use axum::response::IntoResponse;
+    if state.config.allowed_ips.allows(ip) || req.uri().path() == "/api/v1/health" {
+        return next.run(req).await;
+    }
+    tracing::debug!(ip = ?ip, path = %req.uri().path(), "adresse refusée");
+    admin::ip_not_allowed().into_response()
 }

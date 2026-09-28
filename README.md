@@ -129,7 +129,27 @@ Le serveur ne peut pas créer de compte (il n'a jamais le mot de passe
 maître). En mode `invite_only` (défaut), mettez votre adresse dans
 `GUIVAULT_ALLOWED_EMAILS`, inscrivez-vous depuis Guiterm ou depuis
 l'interface web (`https://vault.example.com/`), puis invitez les autres
-depuis un vault partagé : une invitation autorise l'inscription.
+depuis un vault partagé : une invitation autorise l'inscription — ou,
+administrateur (voir ci-dessous), ouvrez-la à une adresse.
+
+### Administration
+
+Un compte devient administrateur du serveur depuis le shell du serveur —
+jamais par l'API, pour qu'une session volée ne puisse pas s'en donner
+d'autres :
+
+```bash
+docker compose exec guivault guivault admin grant vous@example.com
+docker compose exec guivault guivault admin list     # ou revoke <email>
+```
+
+L'entrée « Administration » apparaît alors dans l'interface web : état du
+serveur, comptes (dernière activité, vaults, taille stockée, quota),
+désactivation (sessions coupées, rien d'effacé), suppression (ses vaults
+partagés avec d'autres passent au membre le mieux placé), et inscriptions
+ouvertes à une adresse — utile en `invite_only` sans vault à partager, ou
+en `closed`. Un administrateur voit des métadonnées, jamais un contenu, et
+ne peut ni désactiver ni supprimer un autre administrateur.
 
 ### Interface web
 
@@ -161,6 +181,9 @@ dans [`docs/SECURITY.md`](docs/SECURITY.md).
 | `GUIVAULT_SEND_MAX_DAYS` | `30` | Durée de vie maximale d'un lien de partage (jours) ; `0` : liens désactivés, routes publiques comprises |
 | `GUIVAULT_HEALTH_LOOKUPS` | `true` | Relayer les recherches du rapport de santé (fuites par k-anonymat, liste des sites à 2FA) ; `false` : aucune requête sortante |
 | `GUIVAULT_HIBP_URL` / `GUIVAULT_2FA_DIRECTORY_URL` | services publics | Où les relayer (miroir interne, tests) |
+| `GUIVAULT_QUOTA_MB` | `0` | Quota de stockage par compte (Mio de chiffrés dans les vaults qu'il possède) ; `0` : aucun. Modifiable compte par compte dans l'administration |
+| `GUIVAULT_ALLOWED_IPS` | — | Plages (IP/CIDR, séparées par des virgules) seules servies : API, interface, liens de partage ; `/api/v1/health` reste joignable. Vide : toutes |
+| `GUIVAULT_ADMIN_ALLOWED_IPS` | — | Plages d'où l'administration (`/admin`) répond ; vide : toutes |
 | `GUIVAULT_AUTH_RATE_PER_SECOND` / `_BURST` | `2` / `10` | Rate-limit par IP des routes d'auth |
 | `GUIVAULT_LOG_JSON` | `false` | Journaux en JSON |
 | `RUST_LOG` | `info,sqlx=warn` | Filtre de journalisation |

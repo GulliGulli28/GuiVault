@@ -26,8 +26,11 @@ fn healthcheck() -> anyhow::Result<()> {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    if std::env::args().nth(1).as_deref() == Some("healthcheck") {
-        return healthcheck();
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    match args.first().map(String::as_str) {
+        Some("healthcheck") => return healthcheck(),
+        Some("admin") => return guivault_server::admin::run(&args[1..]).await,
+        _ => {}
     }
     let config = Config::from_env()?;
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info,sqlx=warn"));

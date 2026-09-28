@@ -37,20 +37,9 @@ impl TrustProxy {
             "true" | "1" | "yes" => return Ok(Self::Any),
             _ => {}
         }
-        let nets = raw
-            .split(',')
-            .map(str::trim)
-            .filter(|s| !s.is_empty())
-            .map(|s| {
-                s.parse::<IpNet>()
-                    .or_else(|_| s.parse::<IpAddr>().map(IpNet::from))
-                    .map_err(|_| {
-                        anyhow::anyhow!(
-                            "GUIVAULT_TRUST_PROXY : « {s} » n'est ni une adresse IP, ni un réseau CIDR, ni true/false"
-                        )
-                    })
-            })
-            .collect::<anyhow::Result<Vec<_>>>()?;
+        let nets = parse_nets(raw).map_err(|s| {
+            anyhow::anyhow!("GUIVAULT_TRUST_PROXY : « {s} » n'est ni une adresse IP, ni un réseau CIDR, ni true/false")
+        })?;
         if nets.is_empty() {
             return Ok(Self::No);
         }
@@ -65,19 +54,61 @@ impl TrustProxy {
             // Une adresse IPv4 arrivée sur une écoute IPv6 se présente en
             // `::ffff:a.b.c.d` : on la compare aussi sous sa forme v4, sinon
             // un réseau v4 de confiance ne reconnaîtrait jamais son proxy.
-            Self::From(nets) => {
-                let v4 = match peer {
-                    IpAddr::V6(a) => a.to_ipv4_mapped().map(IpAddr::V4),
-                    IpAddr::V4(_) => None,
-                };
-                nets.iter()
-                    .any(|n| n.contains(&peer) || v4.is_some_and(|a| n.contains(&a)))
-            }
+            Self::From(nets) => nets_contain(nets, peer),
         }
     }
 
     pub fn enabled(&self) -> bool {
         !matches!(self, Self::No)
+    }
+}
+
+/// Adresses ou réseaux séparés par des virgules ; une adresse seule vaut pour
+/// elle-même (`/32`, `/128`). L'erreur est le morceau illisible.
+fn parse_nets(raw: &str) -> Result<Vec<IpNet>, String> {
+    raw.split(',')
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(|s| {
+            s.parse::<IpNet>()
+                .or_else(|_| s.parse::<IpAddr>().map(IpNet::from))
+                .map_err(|_| s.to_string())
+        })
+        .collect()
+}
+
+/// Une adresse IPv4 arrivée sur une écoute IPv6 se présente en
+/// `::ffff:a.b.c.d` : on la compare aussi sous sa forme v4, sinon un réseau
+/// v4 ne la reconnaîtrait jamais.
+fn nets_contain(nets: &[IpNet], ip: IpAddr) -> bool {
+    let v4 = match ip {
+        IpAddr::V6(a) => a.to_ipv4_mapped().map(IpAddr::V4),
+        IpAddr::V4(_) => None,
+    };
+    nets.iter()
+        .any(|n| n.contains(&ip) || v4.is_some_and(|a| n.contains(&a)))
+}
+
+/// Les plages d'adresses d'où l'on accepte des requêtes (`GUIVAULT_ALLOWED_IPS`,
+/// `GUIVAULT_ADMIN_ALLOWED_IPS`). Vide : toutes. L'adresse comparée est
+/// celle du client selon `TrustProxy` — derrière un proxy, le régler aussi.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct IpAllowList(pub Vec<IpNet>);
+
+impl IpAllowList {
+    pub fn parse(var: &str, raw: &str) -> anyhow::Result<Self> {
+        parse_nets(raw)
+            .map(Self)
+            .map_err(|s| anyhow::anyhow!("{var} : « {s} » n'est ni une adresse IP, ni un réseau CIDR"))
+    }
+
+    /// Sans adresse connue, une liste non vide refuse.
+    pub fn allows(&self, ip: Option<IpAddr>) -> bool {
+        self.0.is_empty() || ip.is_some_and(|ip| nets_contain(&self.0, ip))
+    }
+
+    pub fn to_strings(&self) -> Vec<String> {
+        self.0.iter().map(|n| n.to_string()).collect()
     }
 }
 
@@ -131,6 +162,16 @@ pub struct Config {
     pub hibp_url: String,
     /// La liste des sites qui acceptent un code TOTP (2fa.directory).
     pub twofa_directory_url: String,
+    /// Les seules adresses servies (API et interface) ; vide : toutes.
+    /// `/api/v1/health` reste joignable de partout (sondes, HEALTHCHECK).
+    pub allowed_ips: IpAllowList,
+    /// Les seules adresses d'où l'administration (`/admin/*`) répond, en plus
+    /// de `allowed_ips` ; vide : toutes.
+    pub admin_allowed_ips: IpAllowList,
+    /// Quota de stockage par défaut d'un compte, en octets de chiffrés
+    /// vivants dans les vaults qu'il possède ; `0` : aucun. Un administrateur
+    /// peut le changer compte par compte.
+    pub quota_bytes: u64,
     /// Rafales autorisées sur les routes d'authentification, par IP.
     pub auth_rate_burst: u32,
     pub auth_rate_per_second: u64,
@@ -201,6 +242,12 @@ impl Config {
             hibp_url: env("GUIVAULT_HIBP_URL").unwrap_or_else(|| "https://api.pwnedpasswords.com".into()),
             twofa_directory_url: env("GUIVAULT_2FA_DIRECTORY_URL")
                 .unwrap_or_else(|| "https://api.2fa.directory/v3/totp.json".into()),
+            allowed_ips: IpAllowList::parse("GUIVAULT_ALLOWED_IPS", &env("GUIVAULT_ALLOWED_IPS").unwrap_or_default())?,
+            admin_allowed_ips: IpAllowList::parse(
+                "GUIVAULT_ADMIN_ALLOWED_IPS",
+                &env("GUIVAULT_ADMIN_ALLOWED_IPS").unwrap_or_default(),
+            )?,
+            quota_bytes: env_parse::<u64>("GUIVAULT_QUOTA_MB", 0)?.saturating_mul(1024 * 1024),
             auth_rate_burst: env_parse("GUIVAULT_AUTH_RATE_BURST", 10)?,
             auth_rate_per_second: env_parse("GUIVAULT_AUTH_RATE_PER_SECOND", 2)?,
             log_json: env_parse("GUIVAULT_LOG_JSON", false)?,
@@ -257,6 +304,9 @@ mod tests {
             health_lookups: false,
             hibp_url: String::new(),
             twofa_directory_url: String::new(),
+            allowed_ips: IpAllowList::default(),
+            admin_allowed_ips: IpAllowList::default(),
+            quota_bytes: 0,
             auth_rate_burst: 0,
             auth_rate_per_second: 0,
             log_json: false,
@@ -267,5 +317,22 @@ mod tests {
         assert!(!c.is_email_allowlisted("anyone@sub.team.example"));
         c.allowed_emails.clear();
         assert!(!c.is_email_allowlisted("admin@corp.io"));
+    }
+
+    #[test]
+    fn ip_allow_list() {
+        let ip = |s: &str| Some(s.parse::<IpAddr>().unwrap());
+        let open = IpAllowList::parse("X", "").unwrap();
+        assert!(open.allows(ip("8.8.8.8")) && open.allows(None), "vide : tout passe");
+        let lan = IpAllowList::parse("X", "192.168.1.0/24, 10.0.0.7, fd00::/8").unwrap();
+        assert!(lan.allows(ip("192.168.1.42")));
+        assert!(lan.allows(ip("10.0.0.7")));
+        assert!(!lan.allows(ip("10.0.0.8")));
+        assert!(lan.allows(ip("fd12::1")));
+        assert!(lan.allows(ip("::ffff:192.168.1.9")), "IPv4 vue sur une écoute IPv6");
+        assert!(!lan.allows(ip("8.8.8.8")));
+        assert!(!lan.allows(None), "adresse inconnue : refusée");
+        let err = IpAllowList::parse("GUIVAULT_ALLOWED_IPS", "10.0.0.0/8, bureau").unwrap_err();
+        assert!(err.to_string().contains("« bureau »"), "{err}");
     }
 }

@@ -38,6 +38,8 @@ HMAC pour les sels fictifs de prelogin.
 - `crates/guivault-server` — `routes/` (une route par domaine), `db.rs`
   (lignes et requêtes partagées), `auth.rs` (extracteur `AuthUser`,
   jetons), `sessions.rs`, `validate.rs` (tailles des blobs), `audit.rs`,
+  `admin.rs` (`guivault admin grant|revoke|list` : le rôle d'administrateur
+  ne se donne que depuis le shell ; les routes sont dans `routes/admin.rs`),
   `migrations/` (sqlx, embarquées, appliquées au démarrage), `web.rs`
   (sert `web/dist` embarqué par `include_dir!`, CSP stricte ; `build.rs`
   crée le dossier vide s'il manque pour que ça compile sans Node).
@@ -118,7 +120,8 @@ HMAC pour les sels fictifs de prelogin.
     ouvrir `popup.html?tab=<id>`.
   - `components/` — une page par route (`VaultPage`, `VaultSettings`,
     `ToolsPage` import/export, `TrashPage` corbeille, `SettingsPage`
-    apparence/compte/sécurité/sessions, `InvitationsPage`, `GeneratorPanel`),
+    apparence/compte/sécurité/sessions, `InvitationsPage`, `GeneratorPanel`,
+    `AdminPage` administration du serveur, si `user.is_admin`),
     `SearchPalette` (Ctrl+K, tous les vaults), `ItemHistory` (versions d'un
     élément), `ShortcutsHelp` (« ? ») — les raccourcis à une touche passent
     par `lib/keyboard.ts` (`plainShortcut` : ni en saisie, ni sous une

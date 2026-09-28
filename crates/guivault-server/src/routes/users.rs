@@ -162,35 +162,101 @@ pub async fn delete_me(
         }
     }
 
+    delete_account(&state, user.id, &user.email, None, SharedVaults::Refuse).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// Que faire des vaults partagés que le compte possède avec d'autres membres.
+pub(crate) enum SharedVaults {
+    /// Refuser (`409 owns_shared_vaults`) : le titulaire transfère lui-même.
+    Refuse,
+    /// Les donner à un autre membre — le mieux placé : compte actif, rôle le
+    /// plus haut, le plus ancien. C'est ce que fait l'administrateur, qui ne
+    /// peut pas demander au titulaire. Aucune clé à changer : l'héritier a
+    /// déjà celle du vault.
+    Transfer,
+}
+
+/// Supprime un compte (voir `delete_me`). `by_admin` : l'administrateur qui
+/// le fait, et son IP, pour l'audit. Rend le nombre de vaults effacés.
+pub(crate) async fn delete_account(
+    state: &AppState,
+    user_id: Uuid,
+    email: &str,
+    by_admin: Option<(Uuid, Option<std::net::IpAddr>)>,
+    shared_vaults: SharedVaults,
+) -> ApiResult<u64> {
     let mut tx = state.db.begin().await?;
     let blocking: Vec<(Uuid,)> = sqlx::query_as(
         "SELECT m.vault_id FROM vault_members m JOIN vaults v ON v.id = m.vault_id
          WHERE m.user_id = $1 AND m.role = 'owner' AND v.kind = 'shared'
            AND EXISTS (SELECT 1 FROM vault_members o WHERE o.vault_id = m.vault_id AND o.user_id <> $1)",
     )
-    .bind(user.id)
+    .bind(user_id)
     .fetch_all(&mut *tx)
     .await?;
-    if !blocking.is_empty() {
-        let ids: Vec<Uuid> = blocking.into_iter().map(|(v,)| v).collect();
-        return Err(AppError::conflict(
-            "owns_shared_vaults",
-            "vous possédez des vaults partagés avec d'autres membres : transférez-en la propriété ou supprimez-les d'abord",
-        )
-        .with_extra(serde_json::json!({ "vaults": ids })));
+    let blocking: Vec<Uuid> = blocking.into_iter().map(|(v,)| v).collect();
+    let mut transferred = Vec::new();
+    match shared_vaults {
+        SharedVaults::Refuse if !blocking.is_empty() => {
+            return Err(AppError::conflict(
+                "owns_shared_vaults",
+                "vous possédez des vaults partagés avec d'autres membres : transférez-en la propriété ou supprimez-les d'abord",
+            )
+            .with_extra(serde_json::json!({ "vaults": blocking })));
+        }
+        SharedVaults::Refuse => {}
+        SharedVaults::Transfer => {
+            for vault_id in blocking {
+                let heir: Uuid = sqlx::query_scalar(
+                    "SELECT m.user_id FROM vault_members m JOIN users u ON u.id = m.user_id
+                     WHERE m.vault_id = $1 AND m.user_id <> $2
+                     ORDER BY u.disabled_at IS NOT NULL,
+                              CASE m.role WHEN 'admin' THEN 0 WHEN 'writer' THEN 1 ELSE 2 END,
+                              m.added_at
+                     LIMIT 1",
+                )
+                .bind(vault_id)
+                .bind(user_id)
+                .fetch_one(&mut *tx)
+                .await?;
+                // L'ancien propriétaire d'abord (index « un seul owner »).
+                sqlx::query("UPDATE vault_members SET role = 'admin' WHERE vault_id = $1 AND user_id = $2")
+                    .bind(vault_id)
+                    .bind(user_id)
+                    .execute(&mut *tx)
+                    .await?;
+                sqlx::query("UPDATE vault_members SET role = 'owner' WHERE vault_id = $1 AND user_id = $2")
+                    .bind(vault_id)
+                    .bind(heir)
+                    .execute(&mut *tx)
+                    .await?;
+                crate::routes::emergency::on_transfer(&mut tx, vault_id, user_id).await?;
+                let (admin, ip) = by_admin.unwrap_or((user_id, None));
+                Audit::new("vault.transfer")
+                    .actor(admin)
+                    .vault(vault_id)
+                    .target(heir)
+                    .ip(ip)
+                    .meta(serde_json::json!({ "from": user_id, "account_deleted": true }))
+                    .write(&mut *tx)
+                    .await?;
+                transferred.push(vault_id);
+            }
+        }
     }
     // Les membres des vaults partagés qu'il quitte : prévenus après coup.
     let shared: Vec<(Uuid,)> = sqlx::query_as(
         "SELECT m.vault_id FROM vault_members m JOIN vaults v ON v.id = m.vault_id
          WHERE m.user_id = $1 AND m.role <> 'owner' AND v.kind = 'shared'",
     )
-    .bind(user.id)
+    .bind(user_id)
     .fetch_all(&mut *tx)
     .await?;
     let owned = sqlx::query(
         "DELETE FROM vaults WHERE id IN (SELECT vault_id FROM vault_members WHERE user_id = $1 AND role = 'owner')",
     )
-    .bind(user.id)
+    .bind(user_id)
     .execute(&mut *tx)
     .await?
     .rows_affected();
@@ -200,21 +266,27 @@ pub async fn delete_me(
         "UPDATE invitations SET status = 'revoked', resolved_at = now()
          WHERE invitee_email = $1 AND status IN ('pending', 'awaiting_key')",
     )
-    .bind(&user.email)
+    .bind(email)
     .execute(&mut *tx)
     .await?;
     sqlx::query("UPDATE audit_log SET ip = NULL WHERE actor_id = $1")
-        .bind(user.id)
+        .bind(user_id)
         .execute(&mut *tx)
         .await?;
-    // Sans IP : c'est la dernière trace du compte.
-    Audit::new("user.delete")
-        .actor(user.id)
-        .meta(serde_json::json!({ "vaults_deleted": owned }))
-        .write(&mut *tx)
-        .await?;
+    // Sans IP (ni e-mail) : c'est la dernière trace du compte.
+    let meta = serde_json::json!({ "vaults_deleted": owned, "vaults_transferred": transferred });
+    match by_admin {
+        None => Audit::new("user.delete").actor(user_id).meta(meta),
+        Some((admin, ip)) => Audit::new("admin.user_delete")
+            .actor(admin)
+            .target(user_id)
+            .ip(ip)
+            .meta(meta),
+    }
+    .write(&mut *tx)
+    .await?;
     sqlx::query("DELETE FROM users WHERE id = $1")
-        .bind(user.id)
+        .bind(user_id)
         .execute(&mut *tx)
         .await?;
     tx.commit().await?;
@@ -224,6 +296,6 @@ pub async fn delete_me(
             .vault(&state.db, vault_id, ServerEvent::MembershipChanged { vault_id })
             .await?;
     }
-    tracing::info!(user = %user.id, vaults = owned, "compte supprimé");
-    Ok(StatusCode::NO_CONTENT)
+    tracing::info!(user = %user_id, vaults = owned, transferred = transferred.len(), "compte supprimé");
+    Ok(owned)
 }
