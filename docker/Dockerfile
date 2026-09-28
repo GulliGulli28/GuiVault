@@ -32,7 +32,8 @@ FROM debian:bookworm-slim
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates \
     && rm -rf /var/lib/apt/lists/* \
-    && useradd --system --uid 10001 --user-group --no-create-home guivault
+    && useradd --system --uid 10001 --user-group --no-create-home guivault \
+    && mkdir /backups && chown guivault:guivault /backups && chmod 700 /backups
 COPY --from=builder /src/target/release/guivault /usr/local/bin/guivault
 USER guivault
 ENV GUIVAULT_BIND=0.0.0.0:8080

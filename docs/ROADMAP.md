@@ -27,7 +27,7 @@ confortable :
    l'écrire (chaque écriture devient deux, sous le verrou optimiste ; tous
    les clients à la fois) — proposition et questions dans
    [`MANIFESTE.md`](MANIFESTE.md).
-2. **Exploitation** (§5 : sauvegardes vérifiées, **SMTP**
+2. **Exploitation** (§5 : **SMTP**
    facultatif — qui compléterait l'accès d'urgence d'une alerte par
    e-mail, sans que rien n'en dépende) et
    **mobile** (§4).
@@ -198,8 +198,14 @@ paramètres ou formats anciens.
   `db::check_quota`), suppression avec transfert des vaults partagés,
   inscriptions ouvertes à une adresse. Un administrateur ne touche pas un
   autre administrateur. Web : `AdminPage.tsx`.
-- [ ] **Sauvegardes intégrées et vérifiées** (le « backup corrompu depuis
-  des mois » est un classique de l'auto-hébergement).
+- [x] **Sauvegardes intégrées et vérifiées** — `src/backup.rs` : un
+  instantané cohérent en lignes JSON de PostgreSQL (aucun type réinterprété),
+  SHA-256 par table ; vérifiée par relecture complète, et par
+  **restauration dans une base d'essai** re-sauvegardée à l'identique
+  (créée si absente) ; restaurable depuis un schéma plus ancien (montée
+  ensuite) ; automatique (`GUIVAULT_BACKUP_*`, activée par le compose),
+  `guivault backup create|verify|restore`, suivie dans l'administration
+  (`backup_runs`, alerte si échouée ou trop vieille).
 - [ ] **SMTP optionnel** : invitations, alertes de nouvelle connexion
   (demande ouverte chez Bitwarden).
 - [x] **Restriction par plages d'IP** — `GUIVAULT_ALLOWED_IPS` (tout le

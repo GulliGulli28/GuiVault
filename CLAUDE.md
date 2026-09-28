@@ -40,6 +40,9 @@ HMAC pour les sels fictifs de prelogin.
   jetons), `sessions.rs`, `validate.rs` (tailles des blobs), `audit.rs`,
   `admin.rs` (`guivault admin grant|revoke|list` : le rôle d'administrateur
   ne se donne que depuis le shell ; les routes sont dans `routes/admin.rs`),
+  `backup.rs` (sauvegardes vérifiées, `guivault backup` ; **une migration
+  qui crée une table l'ajoute à `backup::TABLES`**, dans l'ordre des clés
+  étrangères — sinon les sauvegardes échouent, c'est voulu),
   `migrations/` (sqlx, embarquées, appliquées au démarrage), `web.rs`
   (sert `web/dist` embarqué par `include_dir!`, CSP stricte ; `build.rs`
   crée le dossier vide s'il manque pour que ça compile sans Node).

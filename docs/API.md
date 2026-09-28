@@ -21,7 +21,7 @@ Erreurs : `{ "code": "…", "message": "…" }` (+ champs selon le code, ex.
 `already_granted`, `emergency_not_granted`, `self_grant`, `no_vaults`,
 `duplicate_vault`, `lookups_disabled`, `lookup_failed`, `totp_required`, `owns_shared_vaults`,
 `account_disabled`, `quota_exceeded`, `ip_not_allowed`, `self_action`, `target_is_admin`,
-`invalid_*`, `internal`.
+`backups_disabled`, `backup_running`, `invalid_*`, `internal`.
 
 Partout : `403 ip_not_allowed` si l'adresse du client n'est pas dans
 `GUIVAULT_ALLOWED_IPS` (sauf `GET /health`).
@@ -137,6 +137,8 @@ jamais un contenu. Chaque action écrit une ligne d'audit `admin.*`.
 | `GET /admin/registrations` | `[RegistrationInvite { email, invited_by, created_at, expires_at }]` (non expirées) |
 | `POST /admin/registrations` | `{ email, days? }` (1–90, 14 par défaut) → `201`. Autorise cette adresse à s'inscrire une fois, quel que soit le mode ; renouvelle si elle l'était. `409 email_taken` si le compte existe |
 | `DELETE /admin/registrations/{email}` | → `204` |
+| `GET /admin/backups` | `BackupsStatus { enabled, dir, interval_hours, keep, restore_check, running, runs: [BackupRun] }` — les 20 derniers passages (`triggered_by` `schedule`/`admin`/`shell`, fichier, octets, lignes, SHA-256, `verified` `file`/`restore`, `error`) |
+| `POST /admin/backups` | → `202` : une sauvegarde démarre en arrière-plan (suivre `GET`). `400 backups_disabled` sans `GUIVAULT_BACKUP_DIR`, `409 backup_running` |
 
 **Quota** : `PUT …/items/{id}` qui ferait dépasser au propriétaire du vault
 son quota (chiffrés vivants de tous ses vaults, ni historique ni tombales)

@@ -125,6 +125,23 @@ impl std::fmt::Display for TrustProxy {
     }
 }
 
+/// Sauvegardes automatiques (`GUIVAULT_BACKUP_*`), voir `crate::backup`.
+#[derive(Debug, Clone)]
+pub struct BackupConfig {
+    /// Où les écrire (`GUIVAULT_BACKUP_DIR`) ; absent : pas de sauvegarde
+    /// automatique.
+    pub dir: std::path::PathBuf,
+    /// Une sauvegarde dès que la dernière réussie a plus que ça.
+    pub interval: Duration,
+    /// Combien en garder ; les plus anciennes sont effacées après une
+    /// sauvegarde réussie.
+    pub keep: usize,
+    /// Une base d'essai où chaque sauvegarde est restaurée puis comparée
+    /// (`GUIVAULT_BACKUP_VERIFY_DATABASE_URL`) ; elle est **effacée** à chaque
+    /// fois — le serveur refuse une base qui contient autre chose.
+    pub verify_database_url: Option<String>,
+}
+
 #[derive(Debug, Clone)]
 pub struct Config {
     pub database_url: String,
@@ -172,6 +189,9 @@ pub struct Config {
     /// vivants dans les vaults qu'il possède ; `0` : aucun. Un administrateur
     /// peut le changer compte par compte.
     pub quota_bytes: u64,
+    /// Sauvegardes automatiques ; `None` : seulement à la main
+    /// (`guivault backup create`).
+    pub backup: Option<BackupConfig>,
     /// Rafales autorisées sur les routes d'authentification, par IP.
     pub auth_rate_burst: u32,
     pub auth_rate_per_second: u64,
@@ -248,6 +268,21 @@ impl Config {
                 &env("GUIVAULT_ADMIN_ALLOWED_IPS").unwrap_or_default(),
             )?,
             quota_bytes: env_parse::<u64>("GUIVAULT_QUOTA_MB", 0)?.saturating_mul(1024 * 1024),
+            backup: match env("GUIVAULT_BACKUP_DIR") {
+                None => None,
+                Some(dir) => {
+                    let hours: u64 = env_parse("GUIVAULT_BACKUP_INTERVAL_HOURS", 24)?;
+                    let keep: usize = env_parse("GUIVAULT_BACKUP_KEEP", 7)?;
+                    anyhow::ensure!(hours >= 1, "GUIVAULT_BACKUP_INTERVAL_HOURS : au moins 1");
+                    anyhow::ensure!(keep >= 1, "GUIVAULT_BACKUP_KEEP : au moins 1");
+                    Some(BackupConfig {
+                        dir: dir.into(),
+                        interval: Duration::from_secs(hours * 3600),
+                        keep,
+                        verify_database_url: env("GUIVAULT_BACKUP_VERIFY_DATABASE_URL"),
+                    })
+                }
+            },
             auth_rate_burst: env_parse("GUIVAULT_AUTH_RATE_BURST", 10)?,
             auth_rate_per_second: env_parse("GUIVAULT_AUTH_RATE_PER_SECOND", 2)?,
             log_json: env_parse("GUIVAULT_LOG_JSON", false)?,
@@ -307,6 +342,7 @@ mod tests {
             allowed_ips: IpAllowList::default(),
             admin_allowed_ips: IpAllowList::default(),
             quota_bytes: 0,
+            backup: None,
             auth_rate_burst: 0,
             auth_rate_per_second: 0,
             log_json: false,

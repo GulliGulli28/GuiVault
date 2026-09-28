@@ -269,6 +269,21 @@ réglages synchronisés, au seul utilisateur concerné), jamais quoi : le client
 resynchronise. Rien n'est persisté — un client déconnecté rate des
 événements et compare les révisions à la reconnexion, comme avant.
 
+## Administration et sauvegardes
+
+Le rôle d'administrateur du serveur (`users.is_admin`) se donne depuis le
+shell (`guivault admin grant`) ; `routes/admin.rs` lui montre des
+métadonnées (comptes, tailles, activité), jamais un chiffré, et lui permet
+de désactiver, supprimer, fixer un quota ou ouvrir l'inscription à une
+adresse. Les sauvegardes (`src/backup.rs`) sont un instantané
+`REPEATABLE READ` de toutes les tables, écrit ligne par ligne tel que
+PostgreSQL le rend (`row_to_json`) et relu tel quel
+(`json_populate_recordset`), avec un SHA-256 par table ; la restauration
+recrée le schéma de la sauvegarde (migrations jusqu'à sa version), charge
+les lignes dans l'ordre des clés étrangères, remet les compteurs, puis
+applique les migrations suivantes. `backup::TABLES` doit connaître chaque
+table : une migration qui en crée une l'y ajoute.
+
 ## Ce qui n'est pas encore là
 
 - **WebAuthn / clés de sécurité** en second facteur.

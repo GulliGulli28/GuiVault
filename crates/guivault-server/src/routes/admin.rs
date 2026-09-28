@@ -19,7 +19,10 @@ use axum::extract::{FromRequestParts, Path, State};
 use axum::http::StatusCode;
 use axum::http::request::Parts;
 use chrono::{DateTime, Utc};
-use guivault_protocol::{AdminOverview, AdminUserInfo, CreateRegistrationInvite, RegistrationInvite, SetQuotaRequest};
+use guivault_protocol::{
+    AdminOverview, AdminUserInfo, BackupRun, BackupsStatus, CreateRegistrationInvite, RegistrationInvite,
+    SetQuotaRequest,
+};
 use std::net::IpAddr;
 use uuid::Uuid;
 
@@ -414,4 +417,74 @@ pub async fn delete_registration(
         .await?;
     tx.commit().await?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+// ─── Sauvegardes ────────────────────────────────────────────────────────────
+
+pub async fn backups(State(state): State<AppState>, _admin: Admin) -> ApiResult<Json<BackupsStatus>> {
+    #[derive(sqlx::FromRow)]
+    struct Row {
+        id: i64,
+        triggered_by: String,
+        started_at: DateTime<Utc>,
+        finished_at: Option<DateTime<Utc>>,
+        file: Option<String>,
+        bytes: Option<i64>,
+        row_count: Option<i64>,
+        sha256: Option<String>,
+        verified: Option<String>,
+        error: Option<String>,
+    }
+    let rows: Vec<Row> = sqlx::query_as("SELECT * FROM backup_runs ORDER BY started_at DESC, id DESC LIMIT 20")
+        .fetch_all(&state.db)
+        .await?;
+    let cfg = state.config.backup.as_ref();
+    Ok(Json(BackupsStatus {
+        enabled: cfg.is_some(),
+        dir: cfg.map(|c| c.dir.display().to_string()),
+        interval_hours: cfg.map_or(0, |c| c.interval.as_secs() / 3600),
+        keep: cfg.map_or(0, |c| c.keep.min(u32::MAX as usize) as u32),
+        restore_check: cfg.is_some_and(|c| c.verify_database_url.is_some()),
+        running: crate::backup::running(&state.db).await?,
+        runs: rows
+            .into_iter()
+            .map(|r| BackupRun {
+                id: r.id,
+                triggered_by: r.triggered_by,
+                started_at: r.started_at,
+                finished_at: r.finished_at,
+                file: r.file,
+                bytes: r.bytes,
+                row_count: r.row_count,
+                sha256: r.sha256,
+                verified: r.verified,
+                error: r.error,
+            })
+            .collect(),
+    }))
+}
+
+/// Lance une sauvegarde tout de suite (en arrière-plan) : `202`, puis suivre
+/// `GET /admin/backups`.
+pub async fn backup_now(State(state): State<AppState>, admin: Admin) -> ApiResult<StatusCode> {
+    let Some(cfg) = state.config.backup.clone() else {
+        return Err(AppError::bad_request(
+            "backups_disabled",
+            "pas de sauvegardes sur ce serveur (GUIVAULT_BACKUP_DIR)",
+        ));
+    };
+    if crate::backup::running(&state.db).await? {
+        return Err(AppError::conflict("backup_running", "une sauvegarde est déjà en cours"));
+    }
+    Audit::new("admin.backup")
+        .actor(admin.user.id)
+        .ip(admin.ip)
+        .write(&state.db)
+        .await?;
+    let (db, url) = (state.db.clone(), state.config.database_url.clone());
+    tokio::spawn(async move {
+        // Échec journalisé et noté dans `backup_runs` par `run`.
+        let _ = crate::backup::run(&db, &cfg, &url, crate::backup::Trigger::Admin).await;
+    });
+    Ok(StatusCode::ACCEPTED)
 }

@@ -806,6 +806,40 @@ pub struct CreateRegistrationInvite {
     pub days: Option<u32>,
 }
 
+/// `GET /admin/backups` : la configuration des sauvegardes et les derniers
+/// passages.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BackupsStatus {
+    /// Sauvegardes automatiques configurées (`GUIVAULT_BACKUP_DIR`).
+    pub enabled: bool,
+    pub dir: Option<String>,
+    pub interval_hours: u64,
+    pub keep: u32,
+    /// Chaque sauvegarde est aussi restaurée dans une base d'essai.
+    pub restore_check: bool,
+    pub running: bool,
+    /// Les 20 derniers passages, du plus récent au plus ancien.
+    pub runs: Vec<BackupRun>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BackupRun {
+    pub id: i64,
+    /// `schedule`, `admin` ou `shell`.
+    pub triggered_by: String,
+    pub started_at: DateTime<Utc>,
+    pub finished_at: Option<DateTime<Utc>>,
+    /// Nom du fichier dans le dossier des sauvegardes.
+    pub file: Option<String>,
+    pub bytes: Option<i64>,
+    pub row_count: Option<i64>,
+    pub sha256: Option<String>,
+    /// `file` (relue et contrôlée) ou `restore` (restaurée à l'identique dans
+    /// une base d'essai) ; absent : échouée ou en cours.
+    pub verified: Option<String>,
+    pub error: Option<String>,
+}
+
 // ─── Items ──────────────────────────────────────────────────────────────────
 
 /// Une version précédente d'un item : ce qu'il était avant d'être modifié

@@ -184,16 +184,45 @@ dans [`docs/SECURITY.md`](docs/SECURITY.md).
 | `GUIVAULT_QUOTA_MB` | `0` | Quota de stockage par compte (Mio de chiffrés dans les vaults qu'il possède) ; `0` : aucun. Modifiable compte par compte dans l'administration |
 | `GUIVAULT_ALLOWED_IPS` | — | Plages (IP/CIDR, séparées par des virgules) seules servies : API, interface, liens de partage ; `/api/v1/health` reste joignable. Vide : toutes |
 | `GUIVAULT_ADMIN_ALLOWED_IPS` | — | Plages d'où l'administration (`/admin`) répond ; vide : toutes |
+| `GUIVAULT_BACKUP_DIR` | — (`/backups` avec le compose) | Dossier des sauvegardes automatiques ; vide : aucune |
+| `GUIVAULT_BACKUP_INTERVAL_HOURS` / `_KEEP` | `24` / `7` | Fréquence ; nombre gardé |
+| `GUIVAULT_BACKUP_VERIFY_DATABASE_URL` | — (réglée par le compose) | Base d'essai où chaque sauvegarde est restaurée et comparée — **effacée à chaque fois** : vide ou réservée à ça (créée si absente sur le même Postgres) |
 | `GUIVAULT_AUTH_RATE_PER_SECOND` / `_BURST` | `2` / `10` | Rate-limit par IP des routes d'auth |
 | `GUIVAULT_LOG_JSON` | `false` | Journaux en JSON |
 | `RUST_LOG` | `info,sqlx=warn` | Filtre de journalisation |
 
-### Sauvegarde
+### Sauvegardes
 
-Tout est dans PostgreSQL (`pg_dump`). Le dump ne contient aucun secret en
-clair : sans le mot de passe maître de chaque utilisateur, il est inutile.
-À l'inverse, **un mot de passe maître perdu est irrécupérable** — il n'y a
-pas de « réinitialisation » possible côté serveur, par construction.
+Le serveur se sauvegarde lui-même : `GUIVAULT_BACKUP_DIR` (activé par le
+`docker-compose.yml` fourni, volume `backups`) reçoit toutes les
+`GUIVAULT_BACKUP_INTERVAL_HOURS` un fichier `guivault-AAAAMMJJ-….jsonl.gz`,
+les `GUIVAULT_BACKUP_KEEP` derniers gardés. Chaque sauvegarde est
+**vérifiée** : relue en entier (gzip, chaque ligne, nombres et SHA-256 par
+table), et — avec `GUIVAULT_BACKUP_VERIFY_DATABASE_URL`, réglée par le
+compose — **restaurée dans une base d'essai** puis re-sauvegardée : mêmes
+lignes, mêmes empreintes, ou la sauvegarde est marquée échouée. L'état est
+dans Administration › Sauvegardes (en rouge si la dernière a échoué ou si
+la dernière réussie est trop vieille), avec « Sauvegarder maintenant ».
+
+```bash
+docker compose exec guivault guivault backup create /backups          # à la main
+docker compose exec guivault guivault backup verify /backups/guivault-….jsonl.gz
+# Restaurer : dans une base vide (ou où le serveur a seulement démarré),
+# serveur arrêté ; le schéma de la sauvegarde est recréé puis mis à jour.
+docker compose stop guivault
+docker compose run --rm guivault backup restore /backups/guivault-….jsonl.gz
+```
+
+**Copiez le dossier ailleurs** (autre disque, autre machine) : une
+sauvegarde à côté de la base ne protège pas de la perte du disque. Le
+fichier ne contient aucun secret en clair — sans le mot de passe maître de
+chacun il est inutile —, mais tout ce qu'a la base (adresses, hachés,
+chiffrés) : à protéger comme elle. `GUIVAULT_SECRET` n'y est pas : gardez-le
+à part ; sans lui, les seconds facteurs TOTP restaurés sont à réenrôler.
+`pg_dump` reste possible, à côté.
+
+**Un mot de passe maître perdu est irrécupérable** — il n'y a pas de
+« réinitialisation » possible côté serveur, par construction.
 
 ## Développement
 

@@ -91,6 +91,32 @@ export interface AdminUserInfo {
   effective_quota_bytes: number;
 }
 
+/** `GET /admin/backups`. */
+export interface BackupsStatus {
+  enabled: boolean;
+  dir: string | null;
+  interval_hours: number;
+  keep: number;
+  /** Chaque sauvegarde est aussi restaurée dans une base d'essai. */
+  restore_check: boolean;
+  running: boolean;
+  runs: BackupRun[];
+}
+
+export interface BackupRun {
+  id: number;
+  triggered_by: "schedule" | "admin" | "shell";
+  started_at: string;
+  finished_at: string | null;
+  file: string | null;
+  bytes: number | null;
+  row_count: number | null;
+  sha256: string | null;
+  /** `file` : relue et contrôlée ; `restore` : restaurée à l'identique. */
+  verified: "file" | "restore" | null;
+  error: string | null;
+}
+
 export interface RegistrationInvite {
   email: string;
   invited_by: string | null;

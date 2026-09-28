@@ -68,6 +68,7 @@ impl TestServer {
             allowed_ips: Default::default(),
             admin_allowed_ips: Default::default(),
             quota_bytes: 0,
+            backup: None,
             auth_rate_burst: 1000,
             auth_rate_per_second: 1000,
             log_json: false,
@@ -96,6 +97,33 @@ impl TestServer {
         let mut u = url::Url::parse(&self.admin_url).unwrap();
         u.set_path(&self.db_name);
         sqlx::PgPool::connect(u.as_str()).await.unwrap()
+    }
+
+    fn db_url(&self) -> String {
+        let mut u = url::Url::parse(&self.admin_url).unwrap();
+        u.set_path(&self.db_name);
+        u.to_string()
+    }
+
+    /// Une base vide de plus sur le même Postgres (restaurations) : son URL
+    /// et son nom, pour `drop_database`.
+    async fn fresh_database(&self) -> (String, String) {
+        let admin = sqlx::PgPool::connect(&self.admin_url).await.unwrap();
+        let name = format!("guivault_t_{}", Uuid::new_v4().simple());
+        sqlx::query(&format!("CREATE DATABASE {name}"))
+            .execute(&admin)
+            .await
+            .unwrap();
+        let mut u = url::Url::parse(&self.admin_url).unwrap();
+        u.set_path(&name);
+        (u.to_string(), name)
+    }
+
+    async fn drop_database(&self, name: &str) {
+        let admin = sqlx::PgPool::connect(&self.admin_url).await.unwrap();
+        let _ = sqlx::query(&format!("DROP DATABASE IF EXISTS {name} WITH (FORCE)"))
+            .execute(&admin)
+            .await;
     }
 
     async fn stop(mut self) {
@@ -3024,5 +3052,326 @@ async fn ip_allow_lists_for_the_server_and_its_administration() {
         StatusCode::FORBIDDEN
     );
     assert!(body.contains("ip_not_allowed"), "{body}");
+    server.stop().await;
+}
+
+/// Décompresse une sauvegarde, applique `edit` à ses lignes, recompresse.
+fn tamper(src: &std::path::Path, dst: &std::path::Path, edit: impl FnOnce(&mut Vec<String>)) {
+    use std::io::{Read, Write};
+    let mut text = String::new();
+    flate2::read::GzDecoder::new(std::fs::File::open(src).unwrap())
+        .read_to_string(&mut text)
+        .unwrap();
+    let mut lines: Vec<String> = text.lines().map(str::to_string).collect();
+    edit(&mut lines);
+    let mut gz = flate2::write::GzEncoder::new(std::fs::File::create(dst).unwrap(), flate2::Compression::fast());
+    for l in &lines {
+        writeln!(gz, "{l}").unwrap();
+    }
+    gz.finish().unwrap();
+}
+
+#[tokio::test]
+async fn backups_are_verified_by_restoring_them() {
+    use guivault_server::backup::{self, Trigger, Verified};
+    use guivault_server::config::BackupConfig;
+    let Some(server) = TestServer::start(RegistrationMode::Open).await else {
+        return;
+    };
+    // Un peu de tout : deux comptes, un vault partagé, des items dont un
+    // modifié (historique), un lien de partage.
+    let alice = User::register(&server, "alice@t.io", "pw-alice").await;
+    let bob = User::register(&server, "bob@t.io", "pw-bob").await;
+    let (team, team_key) = alice.create_vault("Équipe").await;
+    add_member(&alice, &team, &team_key, &bob, Role::Writer).await;
+    let note = Uuid::new_v4();
+    let body = status!(
+        alice.put_item(team.id, &team_key, note, "note", "v1", None).await,
+        StatusCode::CREATED
+    );
+    let item: Item = serde_json::from_str(&body).unwrap();
+    status!(
+        alice
+            .put_item(team.id, &team_key, note, "note", "consignes v2", Some(item.revision))
+            .await,
+        StatusCode::OK
+    );
+    let (send, _) = new_send(&alice, "à transmettre", None, None, 3600);
+    status!(
+        alice
+            .req(reqwest::Method::POST, "/sends")
+            .json(&send)
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::CREATED
+    );
+    let db = server.db().await;
+    let dir = std::env::temp_dir().join(format!("guivault-backups-{}", Uuid::new_v4()));
+    let (scratch_url, scratch) = server.fresh_database().await;
+    let cfg = BackupConfig {
+        dir: dir.clone(),
+        interval: Duration::from_secs(3600),
+        keep: 2,
+        verify_database_url: Some(scratch_url.clone()),
+    };
+
+    // Écrite, relue, restaurée dans la base d'essai et re-sauvegardée à
+    // l'identique.
+    let out = backup::run(&db, &cfg, &server.db_url(), Trigger::Shell).await.unwrap();
+    assert_eq!(out.verified, Verified::Restore);
+    assert_eq!(out.summary.tables["users"].rows, 2);
+    assert_eq!(out.summary.tables["item_versions"].rows, 1);
+    assert_eq!(out.summary.tables["sends"].rows, 1);
+    let (verified, error, rows): (Option<String>, Option<String>, Option<i64>) =
+        sqlx::query_as("SELECT verified, error, row_count FROM backup_runs WHERE id = $1")
+            .bind(out.id)
+            .fetch_one(&db)
+            .await
+            .unwrap();
+    assert_eq!((verified.as_deref(), error), (Some("restore"), None));
+    assert_eq!(rows, Some(out.summary.rows() as i64));
+    // La base d'essai de nouveau vérifiable (marquée) : un second passage passe.
+    backup::restore_check(&scratch_url, &out.path, &out.summary)
+        .await
+        .unwrap();
+    // Un serveur tournant sur la base, pas celle d'essai.
+    let err = backup::run(
+        &db,
+        &BackupConfig {
+            verify_database_url: Some(server.db_url()),
+            ..cfg.clone()
+        },
+        &server.db_url(),
+        Trigger::Shell,
+    )
+    .await
+    .unwrap_err();
+    assert!(format!("{err:#}").contains("base du serveur"), "{err:#}");
+
+    // Restaurée pour de vrai, puis servie : Alice se connecte avec son mot
+    // de passe et relit son vault.
+    let (restored_url, restored) = server.fresh_database().await;
+    let pool = sqlx::PgPool::connect(&restored_url).await.unwrap();
+    backup::restore(&pool, &out.path, true).await.unwrap();
+    let err = backup::restore(&pool, &out.path, true).await.unwrap_err();
+    assert!(format!("{err:#}").contains("contient déjà des données"), "{err:#}");
+    pool.close().await;
+    let url = restored_url.clone();
+    let again = TestServer::start_with(RegistrationMode::Open, move |c| c.database_url = url)
+        .await
+        .unwrap();
+    let alice2 = User::login(&again, "alice@t.io", "pw-alice").await.unwrap();
+    let v = alice2
+        .sync()
+        .await
+        .vaults
+        .into_iter()
+        .find(|v| v.id == team.id)
+        .unwrap();
+    let key = alice2.vault_key(&v);
+    let page: ItemsPage = alice2.get(&format!("/vaults/{}/items", team.id)).await;
+    assert_eq!(alice2.open_item(&key, &page.items[0]), "consignes v2");
+    let versions: Vec<ItemVersion> = alice2.get(&format!("/vaults/{}/items/{note}/versions", team.id)).await;
+    let v1 = gc::open_item(
+        &key,
+        &team.id.to_string(),
+        &note.to_string(),
+        "note",
+        &versions[0].ciphertext,
+    )
+    .unwrap();
+    assert_eq!(v1, b"v1");
+    // Le journal reprend après sa plus grande ligne.
+    status!(
+        alice2
+            .put_item(team.id, &key, Uuid::new_v4(), "note", "après", None)
+            .await,
+        StatusCode::CREATED
+    );
+    again.stop().await;
+
+    // Tronquée, altérée, sans fin, ou pas une sauvegarde : refusée.
+    let bad = dir.join("mauvaise.jsonl.gz");
+    let bytes = std::fs::read(&out.path).unwrap();
+    std::fs::write(&bad, &bytes[..bytes.len() / 2]).unwrap();
+    assert!(backup::verify_file(&bad).is_err(), "tronquée");
+    tamper(&out.path, &bad, |lines| {
+        let l = lines.iter_mut().find(|l| l.starts_with("items\t")).unwrap();
+        *l = l.replacen("\"note\"", "\"nota\"", 1);
+    });
+    let err = backup::verify_file(&bad).unwrap_err().to_string();
+    assert!(err.contains("« items »") && err.contains("altéré"), "{err}");
+    tamper(&out.path, &bad, |lines| {
+        lines.pop();
+    });
+    let err = backup::verify_file(&bad).unwrap_err().to_string();
+    assert!(err.contains("tronquée"), "{err}");
+    tamper(&out.path, &bad, |lines| {
+        let i = lines.iter().position(|l| l.starts_with("sends\t")).unwrap();
+        let l = lines.remove(i);
+        lines.insert(1, l);
+    });
+    let err = backup::verify_file(&bad).unwrap_err().to_string();
+    assert!(err.contains("hors d'ordre"), "{err}");
+    std::fs::write(&bad, b"pas du tout une sauvegarde").unwrap();
+    assert!(backup::verify_file(&bad).is_err());
+    std::fs::remove_file(&bad).unwrap();
+
+    // Une base d'essai qui contient autre chose n'est pas effacée.
+    let (other_url, other) = server.fresh_database().await;
+    let other_pool = sqlx::PgPool::connect(&other_url).await.unwrap();
+    sqlx::raw_sql("CREATE TABLE compta (x int); INSERT INTO compta VALUES (42)")
+        .execute(&other_pool)
+        .await
+        .unwrap();
+    let err = backup::restore_check(&other_url, &out.path, &out.summary)
+        .await
+        .unwrap_err();
+    assert!(format!("{err:#}").contains("refus de l'effacer"), "{err:#}");
+    let (kept,): (i32,) = sqlx::query_as("SELECT x FROM compta")
+        .fetch_one(&other_pool)
+        .await
+        .unwrap();
+    assert_eq!(kept, 42);
+    // Une table inconnue des sauvegardes les fait échouer plutôt que de
+    // l'oublier.
+    backup::migrate_to(&other_pool, 6).await.unwrap();
+    let err = backup::dump(&other_pool, &mut std::io::sink()).await.unwrap_err();
+    assert!(err.to_string().contains("« compta »"), "{err}");
+    sqlx::query("DROP TABLE compta").execute(&other_pool).await.unwrap();
+
+    // Une sauvegarde d'un schéma plus ancien (6) se restaure, puis monte.
+    sqlx::query(
+        "INSERT INTO users (id, email, kdf_m_cost, kdf_t_cost, kdf_p_cost, kdf_salt, auth_hash,
+                            protected_user_key, public_key, protected_private_key)
+         VALUES ($1, 'ancien@t.io', 65536, 3, 1, '\\x00', 'x', '\\x01', '\\x02', '\\x03')",
+    )
+    .bind(Uuid::new_v4())
+    .execute(&other_pool)
+    .await
+    .unwrap();
+    let old = dir.join("ancienne.jsonl.gz");
+    let summary = backup::create_file(&other_pool, &old).await.unwrap();
+    assert_eq!(summary.header.schema, 6);
+    assert!(!summary.header.tables.contains(&"registration_invites".to_string()));
+    other_pool.close().await;
+    let (up_url, up) = server.fresh_database().await;
+    let up_pool = sqlx::PgPool::connect(&up_url).await.unwrap();
+    backup::restore(&up_pool, &old, true).await.unwrap();
+    let (email, is_admin): (String, bool) = sqlx::query_as("SELECT email::text, is_admin FROM users")
+        .fetch_one(&up_pool)
+        .await
+        .unwrap();
+    assert_eq!((email.as_str(), is_admin), ("ancien@t.io", false));
+    let latest: i64 = sqlx::query_scalar("SELECT max(version) FROM _sqlx_migrations")
+        .fetch_one(&up_pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        latest,
+        guivault_server::MIGRATOR.iter().map(|m| m.version).max().unwrap()
+    );
+    up_pool.close().await;
+    std::fs::remove_file(&old).unwrap();
+
+    // Une seule à la fois ; et on n'en garde que `keep`.
+    let quick = BackupConfig {
+        verify_database_url: None,
+        ..cfg.clone()
+    };
+    let mut holder = db.acquire().await.unwrap();
+    sqlx::query("SELECT pg_advisory_lock($1)")
+        .bind(backup::LOCK_KEY)
+        .execute(&mut *holder)
+        .await
+        .unwrap();
+    assert!(backup::running(&db).await.unwrap());
+    let err = backup::run(&db, &quick, &server.db_url(), Trigger::Shell)
+        .await
+        .unwrap_err();
+    assert!(err.downcast_ref::<backup::Busy>().is_some(), "{err:#}");
+    sqlx::query("SELECT pg_advisory_unlock($1)")
+        .bind(backup::LOCK_KEY)
+        .execute(&mut *holder)
+        .await
+        .unwrap();
+    drop(holder);
+    for _ in 0..2 {
+        backup::run(&db, &quick, &server.db_url(), Trigger::Schedule)
+            .await
+            .unwrap();
+    }
+    let files = std::fs::read_dir(&dir).unwrap().count();
+    assert_eq!(files, 2, "rétention : 2 gardées sur 3");
+
+    // Une base d'essai qui n'existe pas encore est créée à côté.
+    let missing = format!("guivault_t_{}", Uuid::new_v4().simple());
+    let mut missing_url = url::Url::parse(&server.db_url()).unwrap();
+    missing_url.set_path(&missing);
+    let out = backup::run(
+        &db,
+        &BackupConfig {
+            verify_database_url: Some(missing_url.to_string()),
+            keep: 10,
+            ..cfg.clone()
+        },
+        &server.db_url(),
+        Trigger::Schedule,
+    )
+    .await
+    .unwrap();
+    assert_eq!(out.verified, Verified::Restore);
+    server.drop_database(&missing).await;
+
+    for name in [&scratch, &restored, &other, &up] {
+        server.drop_database(name).await;
+    }
+    let _ = std::fs::remove_dir_all(&dir);
+    server.stop().await;
+}
+
+#[tokio::test]
+async fn admin_starts_a_backup_and_follows_it() {
+    use guivault_server::config::BackupConfig;
+    let dir = std::env::temp_dir().join(format!("guivault-backups-{}", Uuid::new_v4()));
+    let d = dir.clone();
+    let Some(server) = TestServer::start_with(RegistrationMode::Open, move |c| {
+        c.backup = Some(BackupConfig {
+            dir: d,
+            interval: Duration::from_secs(24 * 3600),
+            keep: 3,
+            verify_database_url: None,
+        })
+    })
+    .await
+    else {
+        return;
+    };
+    let alice = User::register(&server, "alice@t.io", "pw-alice").await;
+    guivault_server::admin::set_admin(&server.db().await, "alice@t.io", true)
+        .await
+        .unwrap();
+    let st: BackupsStatus = alice.get("/admin/backups").await;
+    assert!(st.enabled && !st.restore_check && st.runs.is_empty());
+    assert_eq!((st.interval_hours, st.keep), (24, 3));
+    status!(
+        alice.req(reqwest::Method::POST, "/admin/backups").send().await.unwrap(),
+        StatusCode::ACCEPTED
+    );
+    let mut done = None;
+    for _ in 0..100 {
+        let st: BackupsStatus = alice.get("/admin/backups").await;
+        if let Some(r) = st.runs.first().filter(|r| r.finished_at.is_some()) {
+            done = Some(r.clone());
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    let run = done.expect("sauvegarde terminée");
+    assert_eq!(run.triggered_by, "admin");
+    assert_eq!((run.verified.as_deref(), run.error.as_deref()), (Some("file"), None));
+    assert!(dir.join(run.file.unwrap()).exists());
+    let _ = std::fs::remove_dir_all(&dir);
     server.stop().await;
 }

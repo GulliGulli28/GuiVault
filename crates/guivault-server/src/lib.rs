@@ -7,6 +7,7 @@
 pub mod admin;
 pub mod audit;
 pub mod auth;
+pub mod backup;
 pub mod config;
 pub mod db;
 pub mod error;
@@ -77,6 +78,11 @@ pub async fn serve(
             }
         }
     });
+    if let Some(cfg) = config.backup.clone() {
+        tracing::info!(dir = %cfg.dir.display(), heures = cfg.interval.as_secs() / 3600, garder = cfg.keep,
+            restauration = cfg.verify_database_url.is_some(), "sauvegardes automatiques");
+        tokio::spawn(backup::schedule(db.clone(), cfg, config.database_url.clone()));
+    }
     let listener = tokio::net::TcpListener::bind(config.bind).await?;
     ready(listener.local_addr()?);
     let router = app(config, db);

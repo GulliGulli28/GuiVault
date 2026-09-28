@@ -2,7 +2,7 @@
  * `core/src/guivault/client.rs` dans Guiterm. Une méthode par route ; les
  * blobs restent en base64, c'est `session.ts` qui chiffre et déchiffre. */
 import type { TwoFactorSite } from "./types";
-import type { AdminOverview, AdminUserInfo, AuditEntry, EmergencyGrant, EmergencyOverview, EmergencyVault, HealthResponse, Invitation, Item, ItemVersion, ItemsPage, KdfParams, LoginResponse, PreloginResponse, Role, SendContent, SendInfo, SendPassword, SendSummary, RegistrationInvite, ServerEvent, Session, SyncResponse, TokenPair, TotpChallenge, TrashedItem, UserLookupResponse, UserProfile, UserSettings, Vault, VaultMember } from "./types";
+import type { AdminOverview, AdminUserInfo, AuditEntry, BackupsStatus, EmergencyGrant, EmergencyOverview, EmergencyVault, HealthResponse, Invitation, Item, ItemVersion, ItemsPage, KdfParams, LoginResponse, PreloginResponse, Role, SendContent, SendInfo, SendPassword, SendSummary, RegistrationInvite, ServerEvent, Session, SyncResponse, TokenPair, TotpChallenge, TrashedItem, UserLookupResponse, UserProfile, UserSettings, Vault, VaultMember } from "./types";
 
 /** Une enveloppe de clé de vault pour un contact d'urgence. */
 export interface EmergencyVaultKey {
@@ -197,6 +197,8 @@ export const api = {
   adminRegistrations: () => authed<RegistrationInvite[]>("GET", "/admin/registrations"),
   adminOpenRegistration: (email: string, days?: number) => authed<RegistrationInvite>("POST", "/admin/registrations", { email, days }),
   adminCloseRegistration: (email: string) => authed<void>("DELETE", `/admin/registrations/${q(email)}`),
+  adminBackups: () => authed<BackupsStatus>("GET", "/admin/backups"),
+  adminBackupNow: () => authed<void>("POST", "/admin/backups"),
   myAudit: (limit = 100) => authed<AuditEntry[]>("GET", `/users/me/audit?limit=${limit}`),
   settings: () => authed<UserSettings | null>("GET", "/users/me/settings"),
   putSettings: (blob: string, base_revision: number | null) => authed<UserSettings>("PUT", "/users/me/settings", { blob, base_revision }),

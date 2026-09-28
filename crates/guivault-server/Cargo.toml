@@ -51,8 +51,11 @@ include_dir = "0.7"
 # comme le reste.
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
 mime_guess = "2"
+# Sauvegardes intégrées (`src/backup.rs`) : gzip en Rust pur (miniz_oxide).
+flate2 = "1"
 
 [dev-dependencies]
+flate2 = "1"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream"] }
 url = "2"
 futures-util = "0.3"

@@ -30,6 +30,7 @@ async fn main() -> anyhow::Result<()> {
     match args.first().map(String::as_str) {
         Some("healthcheck") => return healthcheck(),
         Some("admin") => return guivault_server::admin::run(&args[1..]).await,
+        Some("backup") => return guivault_server::backup::cli(&args[1..]).await,
         _ => {}
     }
     let config = Config::from_env()?;

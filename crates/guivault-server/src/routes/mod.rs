@@ -136,7 +136,8 @@ pub fn router(state: AppState) -> Router {
             "/admin/registrations",
             get(admin::registrations).post(admin::create_registration),
         )
-        .route("/admin/registrations/{email}", delete(admin::delete_registration));
+        .route("/admin/registrations/{email}", delete(admin::delete_registration))
+        .route("/admin/backups", get(admin::backups).post(admin::backup_now));
 
     // Corps : la rotation de clé renvoie tous les items d'un vault d'un coup,
     // d'où une limite bien au-dessus de celle d'un item seul.

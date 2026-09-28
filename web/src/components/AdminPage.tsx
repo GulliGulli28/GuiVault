@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import type { PageContext } from "../App";
 import { api, errorMessage } from "../lib/api";
-import type { AdminOverview, AdminUserInfo, RegistrationInvite } from "../lib/types";
+import type { AdminOverview, AdminUserInfo, BackupRun, BackupsStatus, RegistrationInvite } from "../lib/types";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { IconTrash } from "./ui-icons";
 import { Eyebrow, Field, formatWhen, Loading, Modal, useDelayed } from "./ui";
@@ -81,6 +81,7 @@ export function AdminPage({ ctx }: { ctx: PageContext }) {
         ) : users === null || overview === null ? (slow ? <Loading /> : null) : (
           <>
             <ServerSummary overview={overview} />
+            <BackupsSection ctx={ctx} />
             <RegistrationsSection
               registrations={registrations ?? []}
               registration={overview.registration}
@@ -208,6 +209,95 @@ function ServerSummary({ overview: o }: { overview: AdminOverview }) {
         <p>Adresses admises : <span className="text-[var(--c-text)]">{ips(o.allowed_ips)}</span> ; pour l'administration : <span className="text-[var(--c-text)]">{ips(o.admin_allowed_ips)}</span></p>
         <p className="text-[var(--c-text-muted)]">GuiVault {o.server_version}</p>
       </div>
+    </section>
+  );
+}
+
+const TRIGGERS: Record<BackupRun["triggered_by"], string> = { schedule: "automatique", admin: "depuis l'administration", shell: "depuis le serveur" };
+
+/** Les sauvegardes : réglage, dernier état (en rouge si la dernière a
+ * échoué ou si la dernière réussie est trop vieille), les derniers passages,
+ * et « Sauvegarder maintenant ». */
+function BackupsSection({ ctx }: { ctx: PageContext }) {
+  const [status, setStatus] = useState<BackupsStatus | null>(null);
+  /** Demandée : le plus grand passage connu au moment du clic, jusqu'à ce
+   * qu'un plus récent apparaisse. */
+  const [requestedAfter, setRequestedAfter] = useState<number | null>(null);
+  const { error } = ctx;
+  const load = useCallback(() => api.adminBackups().then(setStatus).catch((e) => error(errorMessage(e))), [error]);
+  useEffect(() => { void load(); }, [load]);
+  const newest = status?.runs[0]?.id ?? 0;
+  const waiting = requestedAfter !== null && newest <= requestedAfter;
+  // Tant qu'une sauvegarde tourne (ou va démarrer), on suit.
+  const running = Boolean(status?.running || status?.runs.some((r) => !r.finished_at) || waiting);
+  useEffect(() => {
+    if (!running) return;
+    const t = window.setInterval(() => { void load(); }, 1500);
+    return () => window.clearInterval(t);
+  }, [running, load]);
+
+  if (!status) return null;
+  const last = status.runs[0];
+  const lastOk = status.runs.find((r) => r.finished_at && !r.error);
+  const stale = status.enabled && (!lastOk || Date.now() - new Date(lastOk.started_at).getTime() > 2 * status.interval_hours * 3600_000);
+  const start = async () => {
+    setRequestedAfter(newest);
+    try {
+      await api.adminBackupNow();
+      await load();
+    } catch (e) {
+      setRequestedAfter(null);
+      error(errorMessage(e));
+    }
+  };
+  return (
+    <section className="max-w-3xl space-y-1.5">
+      <div className="flex items-center gap-2">
+        <Eyebrow>Sauvegardes</Eyebrow>
+        {status.enabled && (
+          <button onClick={() => void start()} disabled={running} className="btn btn-secondary btn-sm ml-auto">
+            {running ? "Sauvegarde en cours…" : "Sauvegarder maintenant"}
+          </button>
+        )}
+      </div>
+      {!status.enabled ? (
+        <p className="help-text">
+          Pas de sauvegarde automatique : définissez <code className="font-mono">GUIVAULT_BACKUP_DIR</code> (voir le README). À la main : <code className="font-mono">guivault backup create</code>.
+        </p>
+      ) : (
+        <p className="help-text">
+          Toutes les {status.interval_hours} h dans <code className="font-mono">{status.dir}</code>, les {status.keep} dernières gardées.{" "}
+          {status.restore_check
+            ? "Chacune est relue, puis restaurée dans une base d'essai et comparée ligne à ligne."
+            : "Chacune est relue et contrôlée ; pour la restaurer aussi à chaque fois dans une base d'essai, définissez GUIVAULT_BACKUP_VERIFY_DATABASE_URL."}
+          {" "}Copiez ce dossier ailleurs : une sauvegarde sur le même disque ne protège pas de sa perte.
+        </p>
+      )}
+      {last?.error && last.finished_at && (
+        <p className="callout callout-danger">La dernière sauvegarde a échoué ({formatWhen(last.started_at)}) : {last.error}</p>
+      )}
+      {!last?.error && stale && (
+        <p className="callout callout-warn">{lastOk ? `Aucune sauvegarde réussie depuis le ${formatWhen(lastOk.started_at)}.` : "Aucune sauvegarde réussie pour l'instant."}</p>
+      )}
+      {status.runs.slice(0, 8).map((r) => (
+        <div key={r.id} className="card flex min-w-0 items-center gap-2 p-2.5" data-testid="backup-run">
+          <div className="min-w-0 flex-1">
+            <p className="flex min-w-0 flex-wrap items-center gap-1.5 text-[12.5px] text-[var(--c-text)]">
+              <span className="truncate font-mono text-[12px]">{r.file ?? "—"}</span>
+              {!r.finished_at && <span className="tag shrink-0">en cours</span>}
+              {r.verified === "restore" && <span className="tag shrink-0" title="Restaurée dans une base d'essai, puis re-sauvegardée à l'identique">restaurée</span>}
+              {r.verified === "file" && <span className="tag shrink-0" title="Relue en entier : gzip, lignes, nombres et empreintes">relue</span>}
+              {r.error && <span className="tag shrink-0 text-[var(--c-danger)]">échouée</span>}
+            </p>
+            <p className="text-[11px] text-[var(--c-text-muted)]">
+              {formatWhen(r.started_at)} · {TRIGGERS[r.triggered_by] ?? r.triggered_by}
+              {r.bytes !== null ? ` · ${formatBytes(r.bytes)}` : ""}
+              {r.row_count !== null ? ` · ${r.row_count} lignes` : ""}
+              {r.error ? ` · ${r.error}` : ""}
+            </p>
+          </div>
+        </div>
+      ))}
     </section>
   );
 }
