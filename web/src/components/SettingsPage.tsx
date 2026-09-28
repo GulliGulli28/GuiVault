@@ -1,11 +1,15 @@
 import { useCallback, useEffect, useState, type ComponentType, type FormEvent } from "react";
 import type { PageContext } from "../App";
-import { api, errorMessage } from "../lib/api";
+import { api, ApiError, errorMessage } from "../lib/api";
 import { navigate, routeHash, type SettingsSection } from "../lib/route";
 import { LOCK_CHOICES, loadLockMinutes, saveLockMinutes } from "../lib/persist";
 import { CLEAR_CHOICES, loadClearSeconds, saveClearSeconds } from "../lib/clipboard";
 import { OfflineSetting } from "./OfflineSetting";
-import { changePassword } from "../lib/session";
+import { changePassword, deleteAccount, wipe } from "../lib/session";
+import { clearWebSession } from "../lib/persist";
+import { disableOffline } from "../lib/offline";
+import { forgetKdf } from "../lib/kdfPins";
+import { forgetRevisions } from "../lib/vaultRevisions";
 import type { AuditEntry, Session } from "../lib/types";
 import { AppearanceSettings, SettingsSyncToggle } from "./AppearanceSettings";
 import { ConfirmDialog } from "./ConfirmDialog";
@@ -33,7 +37,7 @@ export function SettingsPage({ ctx, section }: { ctx: PageContext; section: Sett
   const [sessions, setSessions] = useState<Session[]>([]);
   const [totp, setTotp] = useState<boolean | null>(null);
   const [audit, setAudit] = useState<AuditEntry[] | null>(null);
-  const [dialog, setDialog] = useState<null | "password" | "totp-setup" | "totp-disable">(null);
+  const [dialog, setDialog] = useState<null | "password" | "totp-setup" | "totp-disable" | "delete-account">(null);
   const [revoke, setRevoke] = useState<Session | null>(null);
   const [lockMinutes, setLockMinutes] = useState(loadLockMinutes);
 
@@ -96,6 +100,15 @@ export function SettingsPage({ ctx, section }: { ctx: PageContext; section: Sett
                   <p className="help-text">Communiquez-la hors bande (de vive voix, messagerie interne) à qui veut partager un vault avec vous : c'est ce qui lui permet de vérifier que la clé publique que le serveur lui montre est bien la vôtre.</p>
                 </div>
               </section>
+              {!session.offline && (
+                <section className="max-w-2xl space-y-1.5">
+                  <Eyebrow>Supprimer le compte</Eyebrow>
+                  <div className="card flex flex-wrap items-center gap-2 p-3">
+                    <p className="help-text min-w-0 flex-1">Efface le compte et tout ce qui n'appartient qu'à lui : vault personnel, vaults partagés dont vous êtes seul membre, liens de partage, accès d'urgence. Irréversible.</p>
+                    <button onClick={() => setDialog("delete-account")} className="btn btn-danger btn-sm">Supprimer…</button>
+                  </div>
+                </section>
+              )}
             </>
           )}
 
@@ -163,6 +176,7 @@ export function SettingsPage({ ctx, section }: { ctx: PageContext; section: Sett
       </div>
 
       {dialog === "password" && <PasswordDialog ctx={ctx} onClose={() => setDialog(null)} />}
+      {dialog === "delete-account" && <DeleteAccountDialog ctx={ctx} totp={totp === true} onClose={() => setDialog(null)} />}
       {dialog === "totp-setup" && <TotpSetupDialog ctx={ctx} onClose={() => { setDialog(null); reload(); }} />}
       {dialog === "totp-disable" && <TotpDisableDialog ctx={ctx} onClose={() => { setDialog(null); reload(); }} />}
       {revoke && (
@@ -176,6 +190,83 @@ export function SettingsPage({ ctx, section }: { ctx: PageContext; section: Sett
         />
       )}
     </div>
+  );
+}
+
+/** Supprimer le compte : le mot de passe maître (et le code du second
+ * facteur), l'adresse retapée. Refusé tant qu'un vault partagé avec d'autres
+ * perdrait son propriétaire — ces vaults sont nommés, avec un lien vers leurs
+ * réglages. Fait : plus rien de ce compte sur cet appareil non plus. */
+function DeleteAccountDialog({ ctx, totp, onClose }: { ctx: PageContext; totp: boolean; onClose: () => void }) {
+  const { session } = ctx;
+  const [password, setPassword] = useState("");
+  const [code, setCode] = useState("");
+  const [typed, setTyped] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [blocking, setBlocking] = useState<{ id: string; name: string }[] | null>(null);
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    setBlocking(null);
+    const { email } = session.user;
+    const userId = session.user.id;
+    try {
+      await deleteAccount(session, password, totp ? code : undefined);
+    } catch (err) {
+      if (err instanceof ApiError && err.code === "owns_shared_vaults") {
+        const ids = (err.extra.vaults as string[] | undefined) ?? [];
+        setBlocking(ids.map((id) => ({ id, name: session.vaults.find((v) => v.id === id)?.name ?? id.slice(0, 8) })));
+      } else {
+        setError(errorMessage(err));
+      }
+      setBusy(false);
+      return;
+    }
+    // Plus rien du compte sur cet appareil : copie hors ligne, paramètres
+    // épinglés, révisions vues, session.
+    await disableOffline(email).catch(() => {});
+    forgetKdf(email);
+    forgetRevisions(userId);
+    clearWebSession();
+    wipe(session);
+    window.location.hash = "#/";
+    window.location.reload();
+  };
+  return (
+    <Modal title="Supprimer le compte" onClose={onClose}>
+      <form onSubmit={submit} className="space-y-3">
+        <p className="callout callout-danger">
+          Irréversible. Votre vault personnel et les vaults partagés dont vous êtes le seul membre sont effacés, avec leur historique ; vos liens de partage cessent de s'ouvrir ; vos contacts d'urgence et ceux qui vous avaient désigné perdent ces accès. Les éléments que vous avez mis dans les vaults des autres y restent.
+        </p>
+        {blocking && (
+          <div className="callout callout-warn space-y-1 text-[12.5px]">
+            <p>Ces vaults partagés perdraient leur propriétaire : transférez-en la propriété à un autre membre, ou supprimez-les, d'abord.</p>
+            <ul className="list-disc pl-5">
+              {blocking.map((v) => (
+                <li key={v.id}>
+                  <a href={routeHash({ page: "vault-settings", id: v.id })} onClick={onClose} className="underline">{v.name}</a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        <label className="block"><span className="field-label">Mot de passe maître</span><PasswordInput value={password} onChange={setPassword} autoFocus autoComplete="current-password" /></label>
+        {totp && (
+          <label className="block"><span className="field-label">Code du second facteur</span><input value={code} onChange={(e) => setCode(e.target.value)} inputMode="numeric" autoComplete="one-time-code" className="input input-mono" /></label>
+        )}
+        <div>
+          <label htmlFor="delete-confirm" className="field-label">Tapez votre adresse pour confirmer</label>
+          <input id="delete-confirm" value={typed} onChange={(e) => setTyped(e.target.value)} placeholder={session.user.email} className="input" />
+        </div>
+        {error && <p className="callout callout-danger">{error}</p>}
+        <div className="flex justify-end gap-2">
+          <button type="button" onClick={onClose} className="btn btn-ghost">Annuler</button>
+          <button type="submit" disabled={busy || !password || (totp && !code.trim()) || typed.trim().toLowerCase() !== session.user.email.toLowerCase()} className="btn btn-danger">{busy ? "Suppression…" : "Supprimer définitivement"}</button>
+        </div>
+      </form>
+    </Modal>
   );
 }
 

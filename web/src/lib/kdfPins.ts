@@ -51,6 +51,17 @@ export function requireKdfNotDowngraded(email: string, params: KdfParams) {
   }
 }
 
+/** Le compte n'existe plus (supprimé) : rien à retenir pour lui. */
+export function forgetKdf(email: string) {
+  const pins = load();
+  delete pins[pinKey(email)];
+  try {
+    localStorage.setItem(KEY, JSON.stringify(pins));
+  } catch {
+    // stockage indisponible : rien n'avait été retenu non plus
+  }
+}
+
 /** Après un déverrouillage réussi (ou un changement de mot de passe). */
 export function pinKdf(email: string, params: KdfParams) {
   const pins = load();

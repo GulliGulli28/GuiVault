@@ -278,5 +278,5 @@ resynchronise. Rien n'est persisté — un client déconnecté rate des
   l'invité ; rien n'est envoyé par courrier — ni l'alerte d'une demande
   d'accès d'urgence, que le donneur découvre à sa connexion.
 - **Vérification d'e-mail** à l'inscription.
-- **Vault personnel** : pas de suppression de compte (ni du vault) pour
-  l'instant.
+- **Vault personnel** : il ne se supprime qu'avec le compte
+  (`DELETE /users/me`).

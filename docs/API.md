@@ -19,7 +19,8 @@ Erreurs : `{ "code": "…", "message": "…" }` (+ champs selon le code, ex.
 `send_id_taken`, `send_too_large`, `too_many_sends`, `already_designated`,
 `already_accepted`, `not_accepted`, `already_requested`, `not_requested`,
 `already_granted`, `emergency_not_granted`, `self_grant`, `no_vaults`,
-`duplicate_vault`, `lookups_disabled`, `lookup_failed`, `invalid_*`, `internal`.
+`duplicate_vault`, `lookups_disabled`, `lookup_failed`, `totp_required`, `owns_shared_vaults`,
+`invalid_*`, `internal`.
 
 ## Santé
 
@@ -53,6 +54,7 @@ Erreurs : `{ "code": "…", "message": "…" }` (+ champs selon le code, ex.
 | `POST /auth/totp/disable` | `{ code }` (TOTP ou récupération) → `204` |
 | `GET /events` | flux SSE de `ServerEvent` (`vault_changed`, `invitation_received`, `membership_changed`, `settings_changed`, `emergency_changed`) — dit *que* quelque chose a changé, le client resynchronise |
 | `GET /users/me` | `UserProfile` |
+| `DELETE /users/me` | `{ auth_key, totp_code? }` → `204`. Supprime le compte, ses vaults (personnel et partagés dont il est le seul membre), sessions, réglages, second facteur, liens de partage, accès d'urgence (dans les deux sens) et les invitations qu'il a envoyées ; révoque celles adressées à son e-mail. Le journal d'audit garde ses lignes, sans IP. `401 invalid_credentials` (mot de passe), `400 totp_required` / `401 invalid_code` si le second facteur est actif, `409 owns_shared_vaults` `{ vaults: [id] }` tant qu'il possède un vault partagé avec d'autres membres (transférer la propriété ou le supprimer d'abord) |
 | `GET /users/me/settings` | `UserSettings` (`{ blob, revision, updated_at }`) ou `null` si aucun appareil n'en a envoyé |
 | `PUT /users/me/settings` | `{ blob, base_revision }` → `UserSettings`, ou `409` `{ code: "revision_mismatch", current }` si `base_revision` n'est pas la dernière (`null` = « je n'en ai lu aucune »). `blob` = `seal_user_settings(user_key, json)`, 64 Kio max. Prévient les autres sessions (`settings_changed`) |
 | `GET /users/me/audit?limit=&before=` | mes actions |

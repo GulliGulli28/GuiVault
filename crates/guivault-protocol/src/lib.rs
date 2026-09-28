@@ -279,6 +279,18 @@ pub struct ChangePasswordRequest {
     pub protected_user_key: Vec<u8>,
 }
 
+/// Suppression du compte : le mot de passe maître (sa clé d'auth) le prouve,
+/// et le code du second facteur s'il est actif. Refusée (`409
+/// owns_shared_vaults`, ids dans `vaults`) tant que le compte possède un
+/// vault partagé qui a d'autres membres.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DeleteAccountRequest {
+    #[serde(with = "b64")]
+    pub auth_key: Vec<u8>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub totp_code: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Session {
     pub id: Uuid,

@@ -16,7 +16,8 @@ serveur puisse jamais lire un secret.
   pierres tombales pour les suppressions.
 - **Sessions** : jetons opaques hachés, rotation des jetons de
   rafraîchissement avec détection de rejeu, révocation à distance, second
-  facteur TOTP optionnel avec codes de récupération.
+  facteur TOTP optionnel avec codes de récupération, suppression du
+  compte (mot de passe et second facteur redemandés).
 - **Temps réel** : un flux SSE prévient les clients qu'un vault a changé.
 - **Audit** : journal en ajout seul par vault et par utilisateur.
 - **Interface web** servie par le serveur lui-même (`/`), avec le même

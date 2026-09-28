@@ -185,6 +185,9 @@ export const api = {
 
   // ── Compte ──
   me: () => authed<UserProfile>("GET", "/users/me"),
+  /** Supprime le compte (mot de passe maître prouvé, code du second facteur
+   * s'il est actif) ; `409 owns_shared_vaults` avec `vaults` sinon. */
+  deleteAccount: (auth_key: string, totp_code?: string) => authed<void>("DELETE", "/users/me", { auth_key, totp_code }),
   myAudit: (limit = 100) => authed<AuditEntry[]>("GET", `/users/me/audit?limit=${limit}`),
   settings: () => authed<UserSettings | null>("GET", "/users/me/settings"),
   putSettings: (blob: string, base_revision: number | null) => authed<UserSettings>("PUT", "/users/me/settings", { blob, base_revision }),

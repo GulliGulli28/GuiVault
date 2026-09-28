@@ -16,20 +16,20 @@ paramètres Argon2id épinglés, retour en arrière détecté, enveloppes
 authentifiées, empreinte de l'inviteur) ; dans les §1, §3 et §4 : presse-papiers
 effacé, historique et corbeille, copie hors ligne, recherche globale
 (Ctrl+K), raccourcis, tri, CLI `gv`, **remplissage fiable** de l'extension
-(shadow DOM, cadres, corpus rejoué en CI) ; dans le §2 : **accès d'urgence**,
+(shadow DOM, cadres, corpus rejoué en CI), **agent SSH dans Guiterm** ; dans le §2 : **accès d'urgence**,
 **liens de partage** et **rapport de santé** (web). Chaque point est coché ci-dessous avec où il
 vit dans le code.
 
 **Ensuite, dans cet ordre** — du plus demandé ou du plus exposé au plus
 confortable :
 
-1. **Agent SSH dans Guiterm** (§3) : le différenciateur dev/ops.
-2. **Manifeste de vault authentifié** (§0) : à concevoir ensemble avant de
+1. **Manifeste de vault authentifié** (§0) : à concevoir ensemble avant de
    l'écrire (chaque écriture devient deux, sous le verrou optimiste ; tous
-   les clients à la fois).
-3. **Exploitation** (§5 : administration, sauvegardes vérifiées, **SMTP**
+   les clients à la fois) — proposition et questions dans
+   [`MANIFESTE.md`](MANIFESTE.md).
+2. **Exploitation** (§5 : administration, sauvegardes vérifiées, **SMTP**
    facultatif — qui compléterait l'accès d'urgence d'une alerte par
-   e-mail, sans que rien n'en dépende —, suppression de compte) et
+   e-mail, sans que rien n'en dépende) et
    **mobile** (§4).
 
 ## 0. Sécurité face à un serveur malveillant
@@ -147,10 +147,17 @@ paramètres ou formats anciens.
 
 ## 3. Se différencier : dev/ops avec Guiterm
 
-- [ ] **Agent SSH dans Guiterm** adossé au coffre. Celui de Bitwarden
-  essaie les clés une par une, sans lien hôte → clé, et casse régulièrement
-  la signature Git. Ici chaque hôte connaît sa clé : la bonne présentée,
-  confirmation à chaque usage, signature des commits.
+- [x] **Agent SSH dans Guiterm** adossé au trousseau (et donc au coffre) :
+  Paramètres › Agent SSH, éteint par défaut, clés cochées une à une. Le
+  client OpenSSH ≥ 8.9 annonce son serveur (`session-bind@openssh.com`,
+  signature vérifiée) : l'hôte est reconnu à sa clé d'hôte et seule la clé
+  qu'il utilise est présentée. Confirmation à chaque usage (ou 10 min par
+  clé), qui dit ce qui est signé (connexion à quel hôte, commit Git
+  `SSHSIG`) et quel programme le demande ; agent transféré : toujours.
+  Signature des commits (`gpg.format ssh`). Socket Unix, tube nommé sous
+  Windows. Guiterm : `core/src/ssh_agent/`, testé contre les vrais `ssh`,
+  `ssh-add`, `ssh-keygen`. Reste : l'extension et le web n'en ont pas
+  l'usage ; Windows ne nomme pas le programme demandeur.
 - [x] **CLI `gv`** (`crates/guivault-cli`, `docs/CLI.md`) : `login`,
   `unlock` (session dans `GUIVAULT_SESSION`, modèle de la CLI Bitwarden),
   `get` par référence `gv://vault/élément/champ`, `run -- cmd` (variables
@@ -190,7 +197,13 @@ paramètres ou formats anciens.
 - [ ] **SMTP optionnel** : invitations, alertes de nouvelle connexion
   (demande ouverte chez Bitwarden).
 - [ ] **Restriction par plages d'IP** (réglage serveur).
-- [ ] **Suppression de compte** (RGPD) — absente.
+- [x] **Suppression de compte** (RGPD) — `DELETE /users/me`
+  (`routes/users.rs::delete_me`) : mot de passe et second facteur
+  redemandés, refusée tant que le compte possède un vault partagé avec
+  d'autres membres (la liste est rendue, pour transférer ou supprimer) ;
+  le journal d'audit perd les IP du compte. Web : Paramètres › Compte, qui
+  oublie aussi ce que l'appareil retenait (copie hors ligne, paramètres
+  Argon2id, révisions).
 
 ## Sources
 

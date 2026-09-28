@@ -67,6 +67,13 @@ export function observeRevisions(userId: string, vaults: { id: string; name: str
   return rollbacks;
 }
 
+/** Le compte n'existe plus (supprimé) : ses révisions non plus. */
+export function forgetRevisions(userId: string) {
+  const store = load();
+  delete store[scope(userId)];
+  save(store);
+}
+
 /** L'utilisateur a pris acte : la révision annoncée devient la référence. */
 export function acceptRollback(userId: string, vaultId: string, revision: number) {
   const store = load();

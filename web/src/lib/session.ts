@@ -178,6 +178,22 @@ export function wipe(state: SessionState) {
   offlineItems = null;
 }
 
+/** Supprime le compte : la clé d'auth prouve le mot de passe maître (même
+ * dérivation, mêmes gardes que la connexion). Le nettoyage local (copie hors
+ * ligne, paramètres épinglés) est à la charge de l'appelant. */
+export async function deleteAccount(state: SessionState, password: string, totpCode?: string) {
+  const pre = await api.prelogin(state.user.email);
+  requireKdfNotDowngraded(state.user.email, pre.kdf);
+  const master = await c.deriveMasterKey(password, unb64(pre.kdf_salt), pre.kdf);
+  master.stretchedKey.fill(0);
+  try {
+    await api.deleteAccount(b64(master.authKey), totpCode?.replace(/\s+/g, "") || undefined);
+  } finally {
+    master.authKey.fill(0);
+  }
+  setTokens(null);
+}
+
 export async function changePassword(state: SessionState, current: string, next: string) {
   // La clé d'auth courante prouve qu'on connaît l'ancien mot de passe ; le
   // serveur la vérifie avant de remplacer quoi que ce soit.

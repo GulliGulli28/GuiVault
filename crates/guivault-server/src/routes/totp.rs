@@ -98,7 +98,7 @@ pub async fn is_enabled<'e>(db: impl PgExecutor<'e>, user_id: Uuid) -> sqlx::Res
 
 /// Vérifie un code TOTP, ou consomme un code de récupération. Un code de
 /// récupération fait 10 caractères, un TOTP 6 chiffres : pas d'ambiguïté.
-async fn check_code(state: &AppState, user_id: Uuid, email: &str, code: &str) -> ApiResult<bool> {
+pub(crate) async fn check_code(state: &AppState, user_id: Uuid, email: &str, code: &str) -> ApiResult<bool> {
     let normalized = normalize_code(code);
     if normalized.len() == 6 && normalized.chars().all(|c| c.is_ascii_digit()) {
         let Some(row) = totp_row(&state.db, user_id).await? else {

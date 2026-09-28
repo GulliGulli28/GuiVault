@@ -2495,3 +2495,143 @@ async fn health_lookups_are_relayed_without_the_password() {
     assert_eq!(seen.lock().unwrap().len(), before);
     server.stop().await;
 }
+
+// ─── Suppression de compte ──────────────────────────────────────────────────
+
+#[tokio::test]
+async fn account_deletion_needs_the_password_and_no_orphaned_shared_vault() {
+    let Some(server) = TestServer::start(RegistrationMode::Open).await else {
+        return;
+    };
+    let alice = User::register(&server, "alice@t.io", "pw-alice").await;
+    let bob = User::register(&server, "bob@t.io", "pw-bob").await;
+    let db = server.db().await;
+    let delete = |u: &User, password: &str| {
+        let pre_email = u.email.clone();
+        let http = u.http.clone();
+        let base = u.base.clone();
+        let token = u.tokens.access_token.clone();
+        let password = password.to_string();
+        async move {
+            let pre: PreloginResponse = http
+                .post(format!("{base}/auth/prelogin"))
+                .json(&PreloginRequest { email: pre_email })
+                .send()
+                .await
+                .unwrap()
+                .json()
+                .await
+                .unwrap();
+            let lm = gc::prepare_login(&password, &pre.kdf_salt, pre.kdf).unwrap();
+            http.delete(format!("{base}/users/me"))
+                .bearer_auth(token)
+                .json(&DeleteAccountRequest {
+                    auth_key: lm.auth_key.as_bytes().to_vec(),
+                    totp_code: None,
+                })
+                .send()
+                .await
+                .unwrap()
+        }
+    };
+
+    // Un vault partagé d'Alice, où Bob est membre ; un item ; un lien.
+    let (shared, key) = alice.create_vault("Équipe").await;
+    let lookup: UserLookupResponse = alice.get("/users/lookup?email=bob@t.io").await;
+    let bob_pk = gc::PublicKey::try_from(lookup.public_key.as_slice()).unwrap();
+    status!(
+        alice
+            .req(reqwest::Method::POST, &format!("/vaults/{}/members", shared.id))
+            .json(&AddMemberRequest {
+                user_id: bob.profile.id,
+                role: Role::Writer,
+                wrapped_vault_key: gc::wrap_vault_key(&alice.account.keypair, &bob_pk, &shared.id.to_string(), &key)
+                    .unwrap(),
+            })
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::CREATED
+    );
+    status!(
+        alice
+            .put_item(shared.id, &key, Uuid::new_v4(), "note", "partagée", None)
+            .await,
+        StatusCode::CREATED
+    );
+    let (send, _) = new_send(&alice, "lien d'Alice", None, None, 3600);
+    status!(
+        alice
+            .req(reqwest::Method::POST, "/sends")
+            .json(&send)
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::CREATED
+    );
+
+    // Mauvais mot de passe : refusé.
+    status!(delete(&alice, "pas-le-bon").await, StatusCode::UNAUTHORIZED);
+    // Bob perdrait son propriétaire : refusé, et le vault est nommé.
+    let body = status!(delete(&alice, "pw-alice").await, StatusCode::CONFLICT);
+    assert!(body.contains("owns_shared_vaults") && body.contains(&shared.id.to_string()));
+
+    // Propriété transférée à Bob : la suppression passe.
+    status!(
+        alice
+            .req(
+                reqwest::Method::POST,
+                &format!("/vaults/{}/members/{}/transfer", shared.id, bob.profile.id)
+            )
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::NO_CONTENT
+    );
+    status!(delete(&alice, "pw-alice").await, StatusCode::NO_CONTENT);
+
+    // Alice n'existe plus : ni connexion, ni session.
+    assert_eq!(
+        User::login(&server, "alice@t.io", "pw-alice").await.err().map(|e| e.0),
+        Some(StatusCode::UNAUTHORIZED)
+    );
+    status!(
+        alice.req(reqwest::Method::GET, "/sync").send().await.unwrap(),
+        StatusCode::UNAUTHORIZED
+    );
+    // Son vault personnel et son lien ont disparu ; le vault d'équipe reste à
+    // Bob, avec l'item.
+    let (vaults,): (i64,) = sqlx::query_as("SELECT count(*) FROM vaults")
+        .fetch_one(&db)
+        .await
+        .unwrap();
+    assert_eq!(vaults, 2, "les vaults personnel et d'équipe de Bob");
+    let (sends,): (i64,) = sqlx::query_as("SELECT count(*) FROM sends")
+        .fetch_one(&db)
+        .await
+        .unwrap();
+    assert_eq!(sends, 0);
+    let sync = bob.sync().await;
+    let team = sync
+        .vaults
+        .iter()
+        .find(|v| v.id == shared.id)
+        .expect("le vault d'équipe reste à Bob");
+    assert_eq!(team.role, Role::Owner);
+    let page: ItemsPage = bob.get(&format!("/vaults/{}/items", shared.id)).await;
+    assert_eq!(page.items.len(), 1);
+    // Le journal du vault garde l'histoire, sans l'adresse IP d'Alice.
+    let (with_ip,): (i64,) = sqlx::query_as("SELECT count(*) FROM audit_log WHERE actor_id = $1 AND ip IS NOT NULL")
+        .bind(alice.profile.id)
+        .fetch_one(&db)
+        .await
+        .unwrap();
+    assert_eq!(with_ip, 0);
+    let audit: Vec<serde_json::Value> = bob.get(&format!("/vaults/{}/audit", shared.id)).await;
+    assert!(
+        audit
+            .iter()
+            .any(|e| e["action"] == "vault.create" && e["actor_email"].is_null())
+    );
+    server.stop().await;
+}
