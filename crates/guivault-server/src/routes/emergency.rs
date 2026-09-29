@@ -15,7 +15,7 @@
 //! de quoi rouvrir le coffre (voir `docs/SECURITY.md`).
 use crate::audit::Audit;
 use crate::auth::{AuthUser, ClientIp};
-use crate::db::{self, ItemRow};
+use crate::db;
 use crate::error::{ApiResult, AppError};
 use crate::state::AppState;
 use crate::validate;
@@ -614,22 +614,15 @@ pub async fn items(
     Path((id, vault_id)): Path<(Uuid, Uuid)>,
 ) -> ApiResult<Json<ItemsPage>> {
     granted(&state.db, id, &user).await?;
-    let vault = sqlx::query_as::<_, EmergencyVaultRow>(&format!("{EMERGENCY_VAULT_SELECT} AND v.id = $2"))
+    // Seulement un vault confié par cette désignation.
+    sqlx::query_as::<_, EmergencyVaultRow>(&format!("{EMERGENCY_VAULT_SELECT} AND v.id = $2"))
         .bind(id)
         .bind(vault_id)
         .fetch_optional(&state.db)
         .await?
         .ok_or_else(|| AppError::not_found("vault"))?;
-    let rows = sqlx::query_as::<_, ItemRow>(
-        "SELECT * FROM items WHERE vault_id = $1 AND deleted_at IS NULL ORDER BY revision",
-    )
-    .bind(vault_id)
-    .fetch_all(&state.db)
-    .await?;
-    Ok(Json(ItemsPage {
-        items: rows.into_iter().map(Into::into).collect(),
-        revision: vault.revision,
-    }))
+    // Avec le manifeste : le contact vérifie ce qu'on lui remet comme un membre.
+    Ok(Json(db::items_page(&state.db, vault_id, None).await?))
 }
 
 // ─── Rotation et transfert (appelés par `vaults`) ───────────────────────────

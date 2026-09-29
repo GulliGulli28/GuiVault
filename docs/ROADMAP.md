@@ -23,10 +23,10 @@ vit dans le code.
 **Ensuite, dans cet ordre** — du plus demandé ou du plus exposé au plus
 confortable :
 
-1. **Manifeste de vault authentifié** (§0) : à concevoir ensemble avant de
-   l'écrire (chaque écriture devient deux, sous le verrou optimiste ; tous
-   les clients à la fois) — proposition et questions dans
-   [`MANIFESTE.md`](MANIFESTE.md).
+1. **Manifeste de vault authentifié** (§0) : **en cours** — serveur et web
+   faits ; restent l'interface d'alerte web, les vecteurs d'interop, `gv`,
+   Guiterm, puis l'activation. La liste exacte, dans l'ordre :
+   [`MANIFESTE.md`](MANIFESTE.md), « Ce qui reste ».
 2. **Conflits (409)** (§4) : proposer une fusion champ par champ au lieu
    de recharger. L'exploitation (§5) et le mobile sont faits.
 
@@ -68,12 +68,14 @@ paramètres ou formats anciens.
   ce qui s'écrivait ensuite sous des révisions déjà « vues » — jusqu'à
   « Reprendre la synchronisation » (panneau GuiVault), où ce poste fait foi :
   versions renvoyées, items perdus recréés, suppressions rejouées.
-- [ ] **Manifeste de vault authentifié.** La révision n'est pas dans l'AAD :
-  un serveur qui sert d'anciens chiffrés sous des révisions qui montent
-  n'est pas détecté. Piste : un item spécial par vault, chiffré sous la
-  vault key, qui porte un compteur et l'empreinte (id → hash du chiffré)
-  de chaque item, réécrit par chaque écrivain sous le verrou optimiste
-  existant ; un client refuse un item dont le hash ne correspond pas.
+- [ ] **Manifeste de vault authentifié** — **en cours**, décisions prises,
+  détail et reste à faire dans [`MANIFESTE.md`](MANIFESTE.md). Fait :
+  format et vérification (`guivault-crypto/src/manifest.rs`), serveur
+  (migration `0010`, écritures refusées sans manifeste, verrou optimiste,
+  lecture cohérente, rotation), client web (vérification, entretien à chaque
+  écriture, prise d'acte). Reste : interface d'alerte web, vecteurs
+  d'interop, `gv`, Guiterm, puis activation (`AUTO_ENABLE_MANIFEST`, coupé
+  d'ici là : aucun vault n'en reçoit).
 - [x] **Enveloppes authentifiées.** Les enveloppes de clés de vault étaient
   des boîtes scellées anonymes : le serveur pouvait en fabriquer une pour un
   vault de son choix. Format 2 (`wrap_vault_key`) : X25519 statique entre

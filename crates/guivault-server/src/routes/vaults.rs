@@ -414,6 +414,9 @@ pub async fn rotate_key(
     for k in req.emergency.iter().flatten() {
         validate::emergency_key(&k.wrapped_vault_key)?;
     }
+    if let Some(m) = &req.manifest {
+        validate::manifest(m, state.config.max_item_bytes)?;
+    }
 
     let mut tx = state.db.begin().await?;
     let (revision,): (i64,) = sqlx::query_as("SELECT revision FROM vaults WHERE id = $1 FOR UPDATE")
@@ -465,6 +468,15 @@ pub async fn rotate_key(
             "incomplete_rotation",
             "il manque un item re-chiffré",
         ));
+    }
+
+    // Le manifeste suit la clé : re-scellé, avec les empreintes des items
+    // re-chiffrés. La révision du vault (déjà vérifiée) couvre sa base.
+    let manifest = db::locked_manifest(&mut tx, vault_id).await?;
+    match (&req.manifest, &manifest.0) {
+        (None, Some(_)) => return Err(db::manifest_required()),
+        (Some(blob), _) => db::store_manifest(&mut tx, vault_id, blob, manifest.1 + 1).await?,
+        (None, None) => {}
     }
 
     let rev = db::bump_revision(&mut *tx, vault_id).await?;

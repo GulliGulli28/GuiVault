@@ -9,7 +9,9 @@ import { fingerprint as fingerprintOf, type UnlockedAccount } from "./crypto";
 import { pinKdf, requireKdfNotDowngraded } from "./kdfPins";
 import { fingerprintTrust, requirePinned } from "./pins";
 import { acceptRollback as acceptRollbackRevision, observeRevisions, type VaultRollback } from "./vaultRevisions";
-import type { EmergencyGrant, EmergencyOverview, Invitation, Item, LoginResponse, Payload, Role, UserProfile, Vault, VaultMember } from "./types";
+import { canWrite, type EmergencyGrant, type EmergencyOverview, type Invitation, type Item, type ItemsPage, type LoginResponse, type ManifestWrite, type Payload, type Role, type UserProfile, type Vault, type VaultManifest, type VaultMember } from "./types";
+import { itemDigest, manifestOf, nextManifest, openManifest, sealManifest, verifyManifest, type Manifest, type ManifestProblem } from "./manifest";
+import { acceptCounter, observeCounter, seenCounter } from "./manifestCounters";
 
 /** Qui a remis la clé de ce vault à ce compte : soi-même (vault créé ou
  * clé renouvelée ici), la détentrice d'une clé publique (enveloppe de format
@@ -488,13 +490,168 @@ export async function openOffline(
   return { session: state, warnings };
 }
 
-export async function loadItems(vault: VaultView): Promise<{ items: DecodedItem[]; revision: number }> {
+/** Les items d'un vault, vérifiés contre son manifeste (`manifest.ts`) :
+ * `problems` dit ce que le serveur sert de travers — un élément rejoué,
+ * retenu, ressuscité, un manifeste qui recule. Le vault reste lisible, mais
+ * on n'y écrit plus d'ici tant qu'on n'en a pas pris acte
+ * (`acceptIntegrity`). Un vault sans manifeste en reçoit un, si l'on peut
+ * y écrire. */
+export async function loadItems(vault: VaultView): Promise<{ items: DecodedItem[]; revision: number; problems: ManifestProblem[] }> {
   if (offlineItems) {
     const stored = offlineItems(vault.id) ?? { items: [], revision: vault.revision };
-    return { items: stored.items.filter((i) => !i.deleted).map((i) => decodeItem(vault, i)), revision: stored.revision };
+    return { items: stored.items.filter((i) => !i.deleted).map((i) => decodeItem(vault, i)), revision: stored.revision, problems: [] };
   }
   const page = vault.emergency ? await api.emergencyItems(vault.emergency.grantId, vault.id) : await api.items(vault.id);
-  return { items: page.items.filter((i) => !i.deleted).map((i) => decodeItem(vault, i)), revision: page.revision };
+  const live = page.items.filter((i) => !i.deleted);
+  const problems = checkManifest(vault, page, live);
+  if (AUTO_ENABLE_MANIFEST && !page.manifest && problems.length === 0 && canWrite(vault.role) && !vault.emergency) void enableManifest(vault, page, live);
+  return { items: live.map((i) => decodeItem(vault, i)), revision: page.revision, problems };
+}
+
+// ─── Manifeste ──────────────────────────────────────────────────────────────
+
+/** Donner un manifeste aux vaults qui n'en ont pas (à la lecture, à la
+ * rotation de clé). **Coupé** tant que Guiterm et `gv` ne savent pas
+ * l'entretenir : le serveur refuse ensuite toute écriture sans manifeste sur
+ * ce vault (`409 manifest_required`), le Guiterm d'aujourd'hui n'y écrirait
+ * plus. Ordre de déploiement : `docs/MANIFESTE.md`. La vérification et
+ * l'entretien, eux, sont actifs pour tout vault qui en a déjà un. */
+const AUTO_ENABLE_MANIFEST = false;
+
+/** Par vault : le dernier manifeste lu ou écrit d'ici, et sa révision — la
+ * base de la prochaine écriture. */
+const manifests = new Map<string, { revision: number; manifest: Manifest }>();
+/** Les vaults où la dernière vérification a trouvé un écart : on n'y écrit
+ * plus d'ici. */
+const integrity = new Map<string, ManifestProblem[]>();
+const enabling = new Set<string>();
+
+/** Ce que la dernière lecture de ce vault a trouvé de travers. */
+export function vaultIntegrity(vaultId: string): ManifestProblem[] {
+  return integrity.get(vaultId) ?? [];
+}
+
+export class IntegrityError extends Error {
+  constructor(name: string) {
+    super(`« ${name} » ne correspond pas à son manifeste : rien n'y est écrit d'ici tant que vous n'en avez pas pris acte (page du vault).`);
+  }
+}
+
+function checkManifest(vault: VaultView, page: ItemsPage, live: Item[]): ManifestProblem[] {
+  const served = page.manifest ? { revision: page.manifest.revision, ciphertext: unb64(page.manifest.ciphertext) } : null;
+  const { manifest, problems } = verifyManifest(
+    vault.key,
+    vault.id,
+    served,
+    live.map((i) => ({ id: i.id, ciphertext: unb64(i.ciphertext) })),
+    seenCounter(vault.id),
+  );
+  if (manifest && served && manifest.counter === served.revision) {
+    observeCounter(vault.id, manifest.counter);
+    manifests.set(vault.id, { revision: served.revision, manifest });
+  } else {
+    manifests.delete(vault.id);
+  }
+  if (problems.length) integrity.set(vault.id, problems);
+  else integrity.delete(vault.id);
+  return problems;
+}
+
+/** Le premier manifeste d'un vault, d'après ce que le serveur vient de
+ * servir — sur cette révision exacte : si le vault a bougé entre-temps, le
+ * serveur refuse, et la prochaine lecture recommencera. */
+async function enableManifest(vault: VaultView, page: ItemsPage, live: Item[]) {
+  if (enabling.has(vault.id)) return;
+  enabling.add(vault.id);
+  try {
+    const m = manifestOf(1, live.map((i) => ({ id: i.id, ciphertext: unb64(i.ciphertext) })));
+    const res = await api.putManifest(vault.id, { ciphertext: b64(sealManifest(vault.key, vault.id, m)), base_revision: 0, vault_revision: page.revision });
+    manifests.set(vault.id, { revision: res.revision, manifest: m });
+    observeCounter(vault.id, res.revision);
+  } catch {
+    // Un autre client l'a fait, ou le vault a bougé : la prochaine lecture
+    // vérifiera (ou recommencera).
+  } finally {
+    enabling.delete(vault.id);
+  }
+}
+
+/** Un manifeste reçu hors d'une lecture complète (conflit, écriture depuis
+ * un contexte qui n'a rien lu) : il doit s'ouvrir, dire sa révision, et ne
+ * pas reculer — sinon on n'écrit pas par-dessus. */
+function manifestState(vault: VaultView, m: VaultManifest | null): { revision: number; manifest: Manifest } | null {
+  if (!m) return null;
+  let manifest: Manifest;
+  try {
+    manifest = openManifest(vault.key, vault.id, unb64(m.ciphertext));
+  } catch {
+    integrity.set(vault.id, [{ kind: "unreadable" }]);
+    throw new IntegrityError(vault.name);
+  }
+  const seen = seenCounter(vault.id);
+  if (manifest.counter !== m.revision || (seen !== null && manifest.counter < seen)) {
+    integrity.set(vault.id, [manifest.counter !== m.revision ? { kind: "mismatch", counter: manifest.counter, revision: m.revision } : { kind: "rollback", counter: manifest.counter, seen: seen! }]);
+    throw new IntegrityError(vault.name);
+  }
+  observeCounter(vault.id, manifest.counter);
+  return { revision: m.revision, manifest };
+}
+
+/** Une écriture et le manifeste qui l'accompagne : `change` y reporte ce
+ * qu'elle fait, `send` l'envoie. Si quelqu'un a écrit entre-temps
+ * (`manifest_conflict`), on repart du manifeste courant — il vient d'un
+ * membre, le serveur ne sait pas le fabriquer. Sur un vault sans manifeste,
+ * on écrit comme avant ; s'il en a reçu un entre-temps, on le reprend. */
+async function withManifest<T>(vault: VaultView, change: (m: Manifest) => void, send: (manifest?: ManifestWrite) => Promise<T>): Promise<T> {
+  if (integrity.get(vault.id)?.length) throw new IntegrityError(vault.name);
+  let state = manifests.get(vault.id) ?? manifestState(vault, await api.manifest(vault.id));
+  for (let attempt = 0; ; attempt++) {
+    if (!state) {
+      try {
+        return await send(undefined);
+      } catch (e) {
+        if (attempt < 3 && e instanceof ApiError && e.code === "manifest_required") {
+          state = manifestState(vault, await api.manifest(vault.id));
+          continue;
+        }
+        throw e;
+      }
+    }
+    const next = nextManifest(state.manifest, state.revision);
+    change(next);
+    try {
+      const out = await send({ ciphertext: b64(sealManifest(vault.key, vault.id, next)), base_revision: state.revision });
+      manifests.set(vault.id, { revision: next.counter, manifest: next });
+      observeCounter(vault.id, next.counter);
+      return out;
+    } catch (e) {
+      if (attempt < 3 && e instanceof ApiError && e.code === "manifest_conflict") {
+        state = manifestState(vault, (e.extra.current as VaultManifest | null) ?? null);
+        continue;
+      }
+      throw e;
+    }
+  }
+}
+
+/** Prendre acte d'un écart : ce que sert le serveur devient la référence.
+ * Qui peut écrire réécrit le manifeste d'après les items servis (un
+ * serveur restauré depuis une sauvegarde, un écart connu) ; un lecteur ne
+ * fait qu'accepter le compteur — l'écart reviendra tant qu'un membre qui
+ * écrit ne l'a pas réglé. */
+export async function acceptIntegrity(vault: VaultView): Promise<void> {
+  const page = await api.items(vault.id);
+  const live = page.items.filter((i) => !i.deleted);
+  if (page.manifest && canWrite(vault.role) && !vault.emergency) {
+    const m = manifestOf(page.manifest.revision + 1, live.map((i) => ({ id: i.id, ciphertext: unb64(i.ciphertext) })));
+    const res = await api.putManifest(vault.id, { ciphertext: b64(sealManifest(vault.key, vault.id, m)), base_revision: page.manifest.revision, vault_revision: page.revision });
+    acceptCounter(vault.id, res.revision);
+    manifests.set(vault.id, { revision: res.revision, manifest: m });
+  } else {
+    acceptCounter(vault.id, page.manifest?.revision ?? null);
+    manifests.delete(vault.id);
+  }
+  integrity.delete(vault.id);
 }
 
 export class RevisionConflict extends Error {
@@ -508,12 +665,13 @@ export class RevisionConflict extends Error {
 export async function putPayload(vault: VaultView, payload: Payload, baseRevision?: number): Promise<Item> {
   const id = payloadId(payload);
   const plain = utf8.encode(JSON.stringify(payload));
+  const ciphertext = c.sealItem(vault.key, vault.id, id, payload.kind, plain);
   try {
-    return await api.putItem(vault.id, id, {
-      item_type: payload.kind,
-      ciphertext: b64(c.sealItem(vault.key, vault.id, id, payload.kind, plain)),
-      base_revision: baseRevision,
-    });
+    return await withManifest(
+      vault,
+      (m) => { m.items[id] = itemDigest(ciphertext); },
+      (manifest) => api.putItem(vault.id, id, { item_type: payload.kind, ciphertext: b64(ciphertext), base_revision: baseRevision, manifest }),
+    );
   } catch (e) {
     if (e instanceof ApiError && e.code === "revision_mismatch") throw new RevisionConflict(Number(e.extra.current));
     throw e;
@@ -526,7 +684,17 @@ export async function putPayload(vault: VaultView, payload: Payload, baseRevisio
 export async function moveItem(from: VaultView, to: VaultView, item: DecodedItem & { ok: true }) {
   await putPayload(to, item.payload);
   // Pas une suppression : l'item ne va pas dans la corbeille d'ici.
-  await api.deleteItem(from.id, item.id, { moved: true });
+  await deleteItem(from, item.id, { moved: true });
+}
+
+/** Supprime un item (pierre tombale, et sa dernière version à la corbeille
+ * sauf `moved`), le manifeste avec. */
+export async function deleteItem(vault: VaultView, id: string, opts: { moved?: boolean } = {}): Promise<void> {
+  await withManifest(
+    vault,
+    (m) => { delete m.items[id]; },
+    (manifest) => api.deleteItem(vault.id, id, { moved: opts.moved, manifest }),
+  );
 }
 
 // ─── Historique et corbeille ────────────────────────────────────────────────
@@ -541,8 +709,13 @@ export function decodeVersion(vault: VaultView, v: { item_id: string; item_type:
  * révision courante de l'item, `undefined` s'il est dans la corbeille (il
  * est alors recréé). */
 export async function restoreVersion(vault: VaultView, v: { item_id: string; item_type: string; ciphertext: string }, baseRevision: number | undefined): Promise<Item> {
+  const ciphertext = unb64(v.ciphertext);
   try {
-    return await api.putItem(vault.id, v.item_id, { item_type: v.item_type, ciphertext: v.ciphertext, base_revision: baseRevision });
+    return await withManifest(
+      vault,
+      (m) => { m.items[v.item_id] = itemDigest(ciphertext); },
+      (manifest) => api.putItem(vault.id, v.item_id, { item_type: v.item_type, ciphertext: v.ciphertext, base_revision: baseRevision, manifest }),
+    );
   } catch (e) {
     if (e instanceof ApiError && e.code === "revision_mismatch") throw new RevisionConflict(Number(e.extra.current));
     throw e;
@@ -588,10 +761,16 @@ export async function rotateVaultKey(state: SessionState, vault: VaultView, memb
   const page = await api.items(vault.id);
   const history = await api.vaultVersions(vault.id);
   const newKey = randomBytes(c.KEY_LEN);
-  const items = page.items.map((it) => {
+  const sealed = page.items.map((it) => {
     const plain = c.openItem(vault.key, vault.id, it.id, it.item_type, unb64(it.ciphertext));
-    return { id: it.id, ciphertext: b64(c.sealItem(newKey, vault.id, it.id, it.item_type, plain)) };
+    return { id: it.id, ciphertext: c.sealItem(newKey, vault.id, it.id, it.item_type, plain) };
   });
+  const items = sealed.map((it) => ({ id: it.id, ciphertext: b64(it.ciphertext) }));
+  // Le manifeste suit la clé : les empreintes des items re-chiffrés, sous la
+  // nouvelle clé (et il naît ici s'il n'y en avait pas, une fois
+  // `AUTO_ENABLE_MANIFEST` ouvert).
+  if (integrity.get(vault.id)?.length) throw new IntegrityError(vault.name);
+  const manifest = page.manifest || AUTO_ENABLE_MANIFEST ? manifestOf((page.manifest?.revision ?? 0) + 1, sealed) : null;
   // L'historique et la corbeille suivent la clé. Une version qui ne s'ouvre
   // plus (altérée) repart telle quelle : illisible avant, illisible après,
   // mais elle ne bloque pas la rotation.
@@ -615,8 +794,11 @@ export async function rotateVaultKey(state: SessionState, vault: VaultView, memb
     items,
     versions,
     emergency: vault.role === "owner" ? await rotatedEmergencyKeys(state, vault.id, newKey) : undefined,
+    manifest: manifest ? b64(sealManifest(newKey, vault.id, manifest)) : undefined,
     base_revision: fresh.revision,
   });
+  if (manifest) observeCounter(vault.id, manifest.counter);
+  manifests.delete(vault.id);
 }
 
 /** Les contacts d'urgence qui couvrent ce vault, ré-enveloppés sous la

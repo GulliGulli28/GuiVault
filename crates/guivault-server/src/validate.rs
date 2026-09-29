@@ -158,7 +158,8 @@ pub fn item(item_type: &str, ciphertext: &[u8], max: usize) -> Result<(), AppErr
         && item_type
             .chars()
             .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.');
-    if !type_ok {
+    // Réservé au manifeste du vault (même AAD qu'un item de ce type).
+    if !type_ok || item_type == guivault_crypto::MANIFEST_TYPE {
         return Err(AppError::bad_request("invalid_item_type", "type d'item invalide"));
     }
     if ciphertext.len() <= MIN_SYM_BLOB {
@@ -169,6 +170,23 @@ pub fn item(item_type: &str, ciphertext: &[u8], max: usize) -> Result<(), AppErr
             axum::http::StatusCode::PAYLOAD_TOO_LARGE,
             "item_too_large",
             format!("item de {} octets, maximum {max}", ciphertext.len()),
+        ));
+    }
+    Ok(())
+}
+
+/// Le manifeste d'un vault : un blob symétrique, jusqu'à huit fois la taille
+/// d'un item (≈ 85 octets par item : 1 Mio d'items en tient ~100 000).
+pub fn manifest(ciphertext: &[u8], max_item: usize) -> Result<(), AppError> {
+    if ciphertext.len() <= MIN_SYM_BLOB {
+        return Err(AppError::bad_request("invalid_blob", "manifeste : trop court"));
+    }
+    let max = max_item.saturating_mul(8);
+    if ciphertext.len() > max {
+        return Err(AppError::new(
+            axum::http::StatusCode::PAYLOAD_TOO_LARGE,
+            "manifest_too_large",
+            format!("manifeste de {} octets, maximum {max}", ciphertext.len()),
         ));
     }
     Ok(())

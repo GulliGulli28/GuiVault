@@ -10,6 +10,7 @@ import { clearWebSession } from "../lib/persist";
 import { disableOffline } from "../lib/offline";
 import { forgetKdf } from "../lib/kdfPins";
 import { forgetRevisions } from "../lib/vaultRevisions";
+import { forgetCounters } from "../lib/manifestCounters";
 import type { AuditEntry, Session } from "../lib/types";
 import { AppearanceSettings, SettingsSyncToggle } from "./AppearanceSettings";
 import { ConfirmDialog } from "./ConfirmDialog";
@@ -229,6 +230,7 @@ function DeleteAccountDialog({ ctx, totp, onClose }: { ctx: PageContext; totp: b
     await disableOffline(email).catch(() => {});
     forgetKdf(email);
     forgetRevisions(userId);
+    forgetCounters(session.vaults.map((v) => v.id));
     clearWebSession();
     wipe(session);
     window.location.hash = "#/";

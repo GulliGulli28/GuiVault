@@ -21,7 +21,8 @@ Erreurs : `{ "code": "…", "message": "…" }` (+ champs selon le code, ex.
 `already_granted`, `emergency_not_granted`, `self_grant`, `no_vaults`,
 `duplicate_vault`, `lookups_disabled`, `lookup_failed`, `totp_required`, `owns_shared_vaults`,
 `account_disabled`, `quota_exceeded`, `ip_not_allowed`, `self_action`, `target_is_admin`,
-`backups_disabled`, `backup_running`, `mail_disabled`, `mail_failed`, `invalid_*`, `internal`.
+`backups_disabled`, `backup_running`, `mail_disabled`, `mail_failed`, `manifest_required`,
+`manifest_conflict`, `manifest_too_large`, `invalid_*`, `internal`.
 
 Partout : `403 ip_not_allowed` si l'adresse du client n'est pas dans
 `GUIVAULT_ALLOWED_IPS` (sauf `GET /health`).
@@ -158,6 +159,23 @@ son quota (chiffrés vivants de tous ses vaults, ni historique ni tombales)
 répond `507 quota_exceeded` `{ used, quota }` — quel que soit le membre qui
 écrit. Une écriture qui ne grossit pas passe toujours ; la rotation de clé
 n'est jamais bloquée.
+
+## Manifeste de vault
+
+La liste authentifiée des items d'un vault (`docs/MANIFESTE.md`,
+`guivault_crypto::manifest`) : un blob chiffré sous la clé du vault que le
+serveur garde sans le lire, avec sa révision. Un vault sans manifeste se
+comporte comme avant ; dès qu'il en a un, **toute écriture doit
+l'accompagner**.
+
+| | |
+|---|---|
+| `GET /vaults/{id}/items` | `ItemsPage` gagne `manifest?: { ciphertext, revision }`, lu dans le même instantané que les items et la révision (idem `GET /emergency/{id}/vaults/{vault}/items`) |
+| `PUT /vaults/{id}/items/{item}` | `manifest?: { ciphertext, base_revision }` : le manifeste avec cet item, appliqué dans la même transaction. `409 manifest_required` s'il manque sur un vault qui en a un ; `409 manifest_conflict` `{ current }` si `base_revision` n'est plus la révision du manifeste ; `413 manifest_too_large` au-delà de 8 × `GUIVAULT_MAX_ITEM_BYTES`. Le type d'item `manifest` est réservé (`400 invalid_item_type`) |
+| `DELETE /vaults/{id}/items/{item}` | corps JSON facultatif `{ manifest? }` : le manifeste sans cet item ; mêmes refus |
+| `GET /vaults/{id}/manifest` | `{ ciphertext, revision }` ou `null` (membre) |
+| `PUT /vaults/{id}/manifest` | `{ ciphertext, base_revision, vault_revision }` → `{ ciphertext, revision }` : créer (base 0) ou réécrire d'après ce que sert le serveur. Écrivain et plus ; `409 revision_mismatch` si le vault a bougé depuis `vault_revision`, `409 manifest_conflict` si la base est dépassée. Monte la révision du vault (les autres clients relisent) |
+| `POST /vaults/{id}/rotate-key` | `manifest?` : re-scellé sous la nouvelle clé ; obligatoire si le vault en a un |
 
 ## Rapport de santé (relais)
 

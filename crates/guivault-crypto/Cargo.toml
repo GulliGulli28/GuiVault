@@ -18,6 +18,8 @@ subtle.workspace = true
 zeroize.workspace = true
 base64.workspace = true
 serde.workspace = true
+# Le contenu du manifeste d'un vault (`manifest.rs`).
+serde_json.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]

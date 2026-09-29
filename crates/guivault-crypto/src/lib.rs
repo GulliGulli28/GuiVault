@@ -57,6 +57,12 @@ use zeroize::{Zeroize, ZeroizeOnDrop};
 
 pub use crypto_box::{PublicKey, SecretKey as PrivateKey};
 
+pub mod manifest;
+pub use manifest::{
+    MANIFEST_ID, MANIFEST_TYPE, Manifest, ManifestProblem, Verified, item_digest, open_manifest, seal_manifest,
+    verify_manifest,
+};
+
 pub const KEY_LEN: usize = 32;
 pub const SALT_LEN: usize = 16;
 pub const NONCE_LEN: usize = 24;

@@ -454,6 +454,11 @@ pub struct RotateVaultKeyRequest {
     /// sont marquées à renouveler, et le propriétaire les refait plus tard.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub emergency: Option<Vec<RotatedEmergencyKey>>,
+    /// Le manifeste, re-scellé sous la nouvelle clé avec les empreintes des
+    /// items re-chiffrés (compteur : révision du manifeste + 1). Obligatoire
+    /// si le vault en a un (409 `manifest_required`).
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "b64::option")]
+    pub manifest: Option<Vec<u8>>,
     /// Révision attendue du vault : refusé (409) si quelqu'un a écrit entre-temps.
     pub base_revision: i64,
 }
@@ -909,6 +914,50 @@ pub struct PutItemRequest {
     /// une création. Si elle ne correspond pas : 409 avec l'item courant.
     #[serde(default)]
     pub base_revision: Option<i64>,
+    /// Le manifeste réécrit avec cet item (`guivault_crypto::manifest`).
+    /// Obligatoire si le vault en a un (409 `manifest_required`) ; sur un
+    /// vault qui n'en a pas, le crée (`base_revision` 0).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub manifest: Option<ManifestWrite>,
+}
+
+/// `DELETE /vaults/{id}/items/{item}` : le corps, facultatif.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct DeleteItemRequest {
+    /// Le manifeste sans cet item ; obligatoire si le vault en a un.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub manifest: Option<ManifestWrite>,
+}
+
+/// Le manifeste d'un vault tel que le serveur le garde : un blob qu'il ne
+/// lit pas, et sa révision (le compteur scellé dedans).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VaultManifest {
+    #[serde(with = "b64")]
+    pub ciphertext: Vec<u8>,
+    pub revision: i64,
+}
+
+/// Un manifeste qui accompagne une écriture : le nouveau blob, et la révision
+/// du manifeste sur laquelle il s'appuie (409 `manifest_conflict` avec le
+/// courant sinon).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ManifestWrite {
+    #[serde(with = "b64")]
+    pub ciphertext: Vec<u8>,
+    pub base_revision: i64,
+}
+
+/// `PUT /vaults/{id}/manifest` : créer le manifeste d'un vault qui n'en a
+/// pas, ou le réécrire d'après ce que sert le serveur (prise d'acte après un
+/// écart). `vault_revision` : la révision du vault qu'il décrit — refusé
+/// (409 `revision_mismatch`) si le vault a bougé depuis.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PutManifestRequest {
+    #[serde(with = "b64")]
+    pub ciphertext: Vec<u8>,
+    pub base_revision: i64,
+    pub vault_revision: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -917,6 +966,10 @@ pub struct ItemsPage {
     /// Révision du vault au moment de la réponse — à mémoriser pour le
     /// prochain `?since=`.
     pub revision: i64,
+    /// Le manifeste du vault au même instant (`None` : vault sans manifeste,
+    /// ou serveur plus ancien).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub manifest: Option<VaultManifest>,
 }
 
 /// Résumé de tout ce que voit l'utilisateur : ses vaults (avec révisions) et

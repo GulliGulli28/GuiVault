@@ -2,8 +2,8 @@
  * enregistrer ou supprimer un identifiant, et tenir le cache d'items à
  * jour pour que la liste, le badge et les boutons dans les pages suivent
  * sans re-télécharger. */
-import { api, setBaseUrl } from "../../src/lib/api";
-import { loadItems, payloadEntity, putPayload, RevisionConflict, type DecodedItem, type SessionState } from "../../src/lib/session";
+import { setBaseUrl } from "../../src/lib/api";
+import { deleteItem as deleteVaultItem, loadItems, payloadEntity, putPayload, RevisionConflict, type DecodedItem, type SessionState } from "../../src/lib/session";
 import type { Login, Payload } from "../../src/lib/types";
 import { loadItemsCache, loadSession, loadSettings, saveItemsCache } from "./store";
 
@@ -52,8 +52,10 @@ export function saveLogin(vaultId: string, login: Login, revision?: number): Pro
 }
 
 export async function deleteItem(vaultId: string, id: string): Promise<void> {
-  await session();
-  await api.deleteItem(vaultId, id);
+  const state = await session();
+  const vault = state.vaults.find((v) => v.id === vaultId);
+  if (!vault) throw new Error("Vault inconnu.");
+  await deleteVaultItem(vault, id);
   const cache = await loadItemsCache();
   if (cache[vaultId]) {
     cache[vaultId].items = cache[vaultId].items.filter((i) => i.id !== id);

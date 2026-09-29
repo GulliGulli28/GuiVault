@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PageContext } from "../App";
-import { api, errorMessage } from "../lib/api";
+import { errorMessage } from "../lib/api";
 import { filterEntities, indexItems, SORT_LABELS, toEntities, withParent, type SortMode } from "../lib/entities";
 import { plainShortcut } from "../lib/keyboard";
 import { uuid } from "../lib/bytes";
 import { isSecret, primarySecret, primaryUser } from "../lib/items";
 import { pinnedEmailFor } from "../lib/pins";
 import { navigate } from "../lib/route";
-import { findVault, loadItems, moveItem, payloadEntity, payloadName, putPayload, RevisionConflict, type DecodedItem, type VaultView } from "../lib/session";
+import { deleteItem, findVault, loadItems, moveItem, payloadEntity, payloadName, putPayload, RevisionConflict, type DecodedItem, type VaultView } from "../lib/session";
 import { canWrite, KIND_LABELS, KIND_LABELS_PLURAL, ROLE_HINTS, ROLE_LABELS, type CustomIcon, type GuiVaultEntity, type ItemKind, type Payload } from "../lib/types";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { EntityIcon, ItemTree, KIND_ICONS, type FolderNaming } from "./ItemTree";
@@ -187,7 +187,7 @@ function VaultBody({ ctx, vault, itemId }: { ctx: PageContext; vault: VaultView;
     if (!current) return;
     setConfirmDelete(false);
     try {
-      await api.deleteItem(vault.id, current.id);
+      await deleteItem(vault, current.id);
       ctx.notify("Élément supprimé.");
       setSelected(null);
       await load();

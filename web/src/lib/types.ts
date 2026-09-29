@@ -232,6 +232,21 @@ export interface TrashedItem {
 export interface ItemsPage {
   items: Item[];
   revision: number;
+  /** Le manifeste du vault au même instant (`manifest.ts`) ; absent : vault
+   * sans manifeste, ou serveur plus ancien. */
+  manifest?: VaultManifest;
+}
+
+/** Le manifeste tel que le serveur le garde : un blob qu'il ne lit pas. */
+export interface VaultManifest {
+  ciphertext: string;
+  revision: number;
+}
+
+/** Un manifeste qui accompagne une écriture, sur la révision lue. */
+export interface ManifestWrite {
+  ciphertext: string;
+  base_revision: number;
 }
 
 export interface SyncResponse {

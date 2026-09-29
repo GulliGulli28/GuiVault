@@ -1,9 +1,10 @@
-# Manifeste de vault authentifié — proposition à trancher
+# Manifeste de vault authentifié
 
-Statut : **proposition**, rien n'est écrit. La feuille de route (§0, point 1
-de « Ensuite ») demande de la concevoir ensemble avant de l'écrire : chaque
-écriture d'item devient deux, et tous les clients (web, extension, Guiterm,
-`gv`) doivent suivre en même temps.
+Statut : **adopté, en cours d'implémentation** (29 septembre 2026). Serveur
+et format faits et testés ; client web fait sauf l'interface d'alerte ;
+`gv` et Guiterm à faire. **L'activation est coupée** (voir « Déploiement ») :
+aucun vault ne reçoit de manifeste tant que tous les clients ne savent pas
+l'entretenir.
 
 ## Le problème
 
@@ -12,60 +13,132 @@ C'est voulu (une rotation re-chiffre sans toucher aux révisions), mais un
 serveur malveillant peut alors, sans jamais savoir déchiffrer :
 
 1. **rejouer** l'ancien chiffré d'un item sous une révision qui monte (un
-   ancien mot de passe « revient ») — les clients ne détectent qu'une
+   ancien mot de passe « revient ») — les clients ne détectaient qu'une
    révision de *vault* qui recule ;
-2. **supprimer par omission** : ne plus servir un item, sans tombale ;
+2. **retenir** un item (le faire disparaître, sans tombale) ;
 3. **ressusciter** un item supprimé (resservir sa dernière version).
 
 C'est la famille « métadonnées non authentifiées » du papier de l'ETH
 (`ROADMAP.md`, §0).
 
-## La proposition
+## Décisions (prises le 29 septembre 2026)
 
-Un item réservé par vault (type `manifest`, id fixe dérivé du vault),
-chiffré sous la clé du vault comme les autres :
+1. **Qui peut écrire un manifeste valide** : n'importe quel membre, lecteurs
+   compris (il a déjà la clé du vault). Pas de signature pour l'instant ; la
+   porte reste ouverte (paire Ed25519 par compte, qui servirait aussi aux
+   invitations et à l'accès d'urgence).
+2. **En cas d'écart** : alerte rouge et **blocage des écritures** d'ici sur
+   ce vault ; il reste lisible. Levée par une prise d'acte explicite.
+3. **Historique et corbeille** : hors du manifeste (ils ne servent qu'à
+   restaurer, et une restauration repasse par une écriture).
+4. **Le serveur refuse** toute écriture sans manifeste sur un vault qui en a
+   un (`409 manifest_required`).
+5. **Ordre** : web et extension, puis `gv`, puis Guiterm — Guiterm à jour
+   *avant* qu'un vault partagé avec lui ait un manifeste.
+
+## La conception, telle qu'implémentée
+
+**Contenu** (`crates/guivault-crypto/src/manifest.rs`, miroir
+`web/src/lib/manifest.ts`) :
 
 ```json
-{ "v": 1, "counter": 42, "items": { "<id>": "<SHA-256 du chiffré, base64>" }, "deleted": ["<id>", …] }
+{ "v": 1, "counter": 42, "items": { "<id>": "<SHA-256 du chiffré, base64url sans remplissage>" } }
 ```
 
-- **Écrire un item** = écrire aussi le manifeste (compteur + 1, empreinte de
-  l'item mise à jour), **dans la même requête** : `PUT …/items/{id}` accepte
-  `manifest: { ciphertext, base_revision }`, appliqués dans la même
-  transaction — un écrivain concurrent reçoit `409` et recommence, comme
-  aujourd'hui.
-- **Lire** : chaque client déchiffre le manifeste, vérifie que son compteur
-  ne recule pas (retenu par appareil, comme les révisions et les paramètres
-  Argon2id), que chaque item servi a l'empreinte annoncée, qu'aucun item du
-  manifeste ne manque et qu'aucun supprimé ne revient.
-- **Rotation** : le manifeste est re-chiffré avec le reste.
-- **Taille** : ~50 octets par item ; 10 000 items ≈ 500 Ko, sous la limite
-  d'un item (1 Mio). Au-delà, le découper.
+Scellé exactement comme un item (`seal_item`, format `0x01` inchangé) sous
+l'id `00000000-0000-0000-0000-000000000000` et le type `manifest` : l'AAD
+diffère de celle de tout item, un chiffré d'item ne passe pas pour un
+manifeste ni l'inverse, et le type `manifest` est refusé pour un item
+ordinaire (`400 invalid_item_type`). Pas de liste de supprimés : un item
+servi que le manifeste ne connaît pas suffit à trahir une résurrection.
 
-## Ce qu'il faut trancher
+**Serveur** (migration `0010`) : `vaults.manifest` (le blob) et
+`vaults.manifest_revision` (verrou optimiste, égal au `counter` scellé).
+Rangé à part des items : un client qui ne le connaît pas ne voit rien de
+nouveau dans la liste.
 
-1. **Qui peut écrire un manifeste valide ?** Chiffré sous la clé du vault,
-   il peut être fabriqué par **n'importe quel membre**, lecteurs compris —
-   un lecteur de mèche avec le serveur pourrait donc maquiller. Deux voies :
-   - *simple* : l'accepter (un lecteur a déjà tous les secrets du vault) ;
-   - *solide* : faire **signer** le manifeste par son écrivain, ce qui
-     demande une paire de signature (Ed25519) par compte — nouvelle clé dans
-     le compte, publiée comme la clé X25519, empreinte à vérifier pareil.
-     Gros chantier, mais il servirait aussi ailleurs (invitations, accès
-     d'urgence).
-2. **Sévérité** en cas d'écart : bloquer le vault (comme Guiterm le fait
-   pour un retour en arrière) ou l'alerter en rouge et continuer ?
-3. **Historique et corbeille** : dans le manifeste (plus gros, plus de
-   garanties) ou hors de lui (ils ne servent qu'à restaurer, et une
-   restauration repasse par une écriture) ?
-4. **Déploiement** : un vault passe « avec manifeste » quand un client
-   capable l'y met ; ensuite, un client qui ne sait pas l'entretenir ne doit
-   plus y écrire. Serveur qui refuse (`409 manifest_required`) les écritures
-   sans manifeste sur un tel vault, ou confiance aux clients ?
-5. **Ordre** : web et extension (même code), puis `gv`, puis Guiterm — le
-   serveur refusant les écritures sans manifeste, Guiterm à jour doit sortir
-   *avant* qu'un vault partagé avec lui passe au manifeste.
+- `GET /vaults/{id}/items` : items, révision **et** manifeste lus dans un
+  même instantané (`REPEATABLE READ`), pour que la vérification ne voie pas
+  d'écart qui n'existe pas. Idem pour les vaults d'un accès d'urgence.
+- `PUT …/items/{id}` et `DELETE …/items/{id}` (corps JSON facultatif)
+  portent `manifest: { ciphertext, base_revision }`, appliqué dans la même
+  transaction. Base dépassée : `409 manifest_conflict` avec le manifeste
+  courant ; absent sur un vault qui en a un : `409 manifest_required`.
+- `GET /vaults/{id}/manifest` : le manifeste seul (écrire sans tout relire).
+- `PUT /vaults/{id}/manifest` `{ ciphertext, base_revision, vault_revision }`
+  : le créer (base 0) ou le réécrire d'après ce que sert le serveur (prise
+  d'acte). Refusé si le vault a bougé depuis la lecture (`vault_revision`).
+  Écrivain et plus ; audit `vault.manifest_create` / `vault.manifest_rewrite`.
+- Rotation de clé : `manifest` re-scellé sous la nouvelle clé, obligatoire
+  si le vault en a un.
+- Taille : jusqu'à 8 fois `GUIVAULT_MAX_ITEM_BYTES` (`413
+  manifest_too_large`) ; ≈ 85 octets par item.
 
-Ma recommandation : 1 *simple* d'abord (sans fermer la porte à la
-signature), 2 alerte rouge + blocage des écritures sur le vault concerné,
-3 hors du manifeste, 4 refus serveur, 5 dans cet ordre.
+**Vérification** (`verify_manifest` / `verifyManifest`), sur **l'état
+complet** des items vivants et le plus grand compteur vu d'ici :
+
+| Écart | Ce que ça veut dire |
+|---|---|
+| `Missing` | le serveur ne sert plus de manifeste alors qu'on en a vu un |
+| `Unreadable` | il ne s'ouvre pas avec la clé du vault |
+| `Mismatch` | son compteur n'est pas la révision annoncée |
+| `Rollback` | plus ancien que le dernier vu d'ici |
+| `Unexpected` | un item servi qu'il ne connaît pas (ajouté hors des clients, ressuscité) |
+| `Altered` | un item servi dont le chiffré n'est pas celui annoncé (rejoué) |
+| `Withheld` | un item annoncé que le serveur ne sert pas (retenu) |
+
+**Client web** (`web/src/lib/session.ts`) : `loadItems` vérifie et rend
+`problems` ; le compteur vu est retenu par serveur et par vault
+(`manifestCounters.ts`, `localStorage`). Chaque écriture (`putPayload`,
+`restoreVersion`, `deleteItem`, `moveItem`, rotation) passe par
+`withManifest` : le manifeste courant plus le changement, compteur + 1 ; sur
+`manifest_conflict`, reprise depuis le manifeste courant joint (il vient
+d'un membre, le serveur ne sait pas le fabriquer ; on vérifie seulement
+qu'il s'ouvre et ne recule pas). Un vault en écart refuse les écritures
+(`IntegrityError`) jusqu'à `acceptIntegrity` : un écrivain réécrit le
+manifeste d'après les items servis, un lecteur accepte le compteur.
+
+**Tests** : `manifest.rs` (unitaires) et
+`vault_manifest_is_written_with_every_change_and_catches_a_lying_server`
+(`tests/api.rs`) — un serveur qui ment simulé en modifiant la base : version
+rejouée, item ressuscité, item retenu, ancien manifeste, manifeste disparu ;
+rotation ; écritures refusées sans manifeste ou sur une base dépassée.
+
+## Ce qui reste, dans l'ordre
+
+1. **Web** : l'interface — bandeau rouge sur la page du vault avec les
+   écarts (`vaultIntegrity`, `problemText`), bouton « Prendre acte »
+   (`acceptIntegrity`), écritures désactivées, repère sur l'élément en
+   cause. Aujourd'hui une écriture refusée ne montre que le message
+   d'`IntegrityError`.
+2. **Tests web et vecteurs d'interopérabilité** : `manifest.test.ts`
+   (mêmes cas que `manifest.rs`), et le manifeste dans les deux vecteurs
+   (`examples/vectors.rs` → `crypto.vectors.json`, et
+   `GUIVAULT_WRITE_VECTORS=1 npx vitest run` → `web-vectors.json`, lu par
+   `tests/web_interop.rs`) : un manifeste scellé par Rust s'ouvre dans le
+   navigateur et inversement, et `itemDigest` = `item_digest`.
+3. **`gv`** (lecture seule) : vérifier à chaque lecture complète, retenir le
+   compteur dans son `store.rs`, avertir sur la sortie d'erreur (sans
+   bloquer la lecture).
+4. **Guiterm** : monter l'épinglage des crates GuiVault sur le commit qui
+   contient `manifest.rs` ; vérifier au pull (état complet reconstitué
+   depuis ses deltas `?since=`), réécrire le manifeste à chaque push et
+   suppression (`PutItemRequest.manifest`, `DeleteItemRequest`), reprendre
+   sur `manifest_conflict`, et en cas d'écart **suspendre** la
+   synchronisation du vault comme pour un retour en arrière de révision
+   (`SyncState::vault_revisions`), avec reprise explicite qui réécrit le
+   manifeste.
+5. **Activer** : `AUTO_ENABLE_MANIFEST = true` dans `session.ts` (le web
+   donne alors un manifeste à chaque vault où il peut écrire, à la lecture
+   et à la rotation) — **seulement une fois 3 et 4 publiés**.
+6. Docs : `SECURITY.md` (ligne « rejoue » et « Limites connues »),
+   `ROADMAP.md` §0 à cocher.
+
+## Déploiement
+
+Tant que `AUTO_ENABLE_MANIFEST` est faux, ce serveur se déploie sans
+risque : aucun vault n'a de manifeste, tout se comporte comme avant, et les
+anciens clients ignorent le champ `manifest` des réponses. **Ne pas
+l'activer**, ni créer de manifeste à la main, avant que Guiterm sache
+l'entretenir : dès qu'un vault en a un, le serveur refuse les écritures du
+Guiterm actuel sur ce vault (il continue à le lire). `gv` ne fait que lire.

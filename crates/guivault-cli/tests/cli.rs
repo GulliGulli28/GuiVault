@@ -176,6 +176,7 @@ fn seed(server: &Server, email: &str, password: &str) {
                 item_type: kind.into(),
                 ciphertext: ct,
                 base_revision: None,
+                manifest: None,
             })
             .send()
             .unwrap();

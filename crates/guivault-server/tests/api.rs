@@ -324,6 +324,7 @@ impl User {
                 item_type: item_type.into(),
                 ciphertext: ct,
                 base_revision,
+                manifest: None,
             })
             .send()
             .await
@@ -844,6 +845,7 @@ async fn shared_vault_invite_existing_user_roles_and_rotation() {
         items: rotated,
         versions: None,
         emergency: None,
+        manifest: None,
         base_revision: current.revision,
     };
     // Un item manquant → refus.
@@ -1655,6 +1657,7 @@ async fn item_history_trash_restore_and_rotation() {
                 item_type: "note".into(),
                 ciphertext,
                 base_revision,
+                manifest: None,
             })
             .send()
     };
@@ -1789,6 +1792,7 @@ async fn item_history_trash_restore_and_rotation() {
             items: vec![],
             versions,
             emergency: None,
+            manifest: None,
             base_revision: base,
         };
     let new_key = gc::SymmetricKey::random();
@@ -2402,6 +2406,7 @@ async fn rotate_as_owner(
                 .collect(),
         ),
         emergency,
+        manifest: None,
         base_revision: cur.revision,
     };
     owner
@@ -3871,5 +3876,349 @@ async fn mail_goes_out_when_configured_and_never_blocks() {
         StatusCode::BAD_REQUEST
     );
     assert!(body.contains("mail_disabled"), "{body}");
+    server.stop().await;
+}
+
+/// Écrit un item avec (ou sans) le manifeste qui l'accompagne.
+async fn put_with_manifest(
+    user: &User,
+    vault: Uuid,
+    key: &gc::SymmetricKey,
+    item_id: Uuid,
+    text: &str,
+    base: Option<i64>,
+    manifest: Option<ManifestWrite>,
+) -> (reqwest::Response, Vec<u8>) {
+    let ct = gc::seal_item(key, &vault.to_string(), &item_id.to_string(), "note", text.as_bytes()).unwrap();
+    let resp = user
+        .req(reqwest::Method::PUT, &format!("/vaults/{vault}/items/{item_id}"))
+        .json(&PutItemRequest {
+            item_type: "note".into(),
+            ciphertext: ct.clone(),
+            base_revision: base,
+            manifest,
+        })
+        .send()
+        .await
+        .unwrap();
+    (resp, ct)
+}
+
+/// Ce qu'un client vérifie après une lecture complète.
+fn verify_page(key: &gc::SymmetricKey, vault: Uuid, page: &ItemsPage, seen: Option<i64>) -> gc::Verified {
+    gc::verify_manifest(
+        key,
+        &vault.to_string(),
+        page.manifest.as_ref().map(|m| (m.revision, m.ciphertext.as_slice())),
+        page.items
+            .iter()
+            .filter(|i| !i.deleted)
+            .map(|i| (i.id.to_string(), i.ciphertext.clone()))
+            .collect::<Vec<_>>()
+            .iter()
+            .map(|(i, c)| (i.as_str(), c.as_slice()))
+            .collect::<Vec<_>>(),
+        seen,
+    )
+}
+
+#[tokio::test]
+async fn vault_manifest_is_written_with_every_change_and_catches_a_lying_server() {
+    use gc::{Manifest, ManifestProblem};
+    let Some(server) = TestServer::start(RegistrationMode::Open).await else {
+        return;
+    };
+    let alice = User::register(&server, "alice@t.io", "pw-alice").await;
+    let bob = User::register(&server, "bob@t.io", "pw-bob").await;
+    let (vault, key) = alice.create_vault("Équipe").await;
+    add_member(&alice, &vault, &key, &bob, Role::Reader).await;
+    let vid = vault.id.to_string();
+    let seal = |m: &Manifest| gc::seal_manifest(&key, &vid, m).unwrap();
+
+    // Un vault d'avant les manifestes : on y écrit comme avant.
+    let a = Uuid::new_v4();
+    let (r, ct_a) = put_with_manifest(&alice, vault.id, &key, a, "A", None, None).await;
+    status!(r, StatusCode::CREATED);
+    let page: ItemsPage = alice.get(&format!("/vaults/{}/items", vault.id)).await;
+    assert!(page.manifest.is_none());
+    let none: Option<VaultManifest> = alice.get(&format!("/vaults/{}/manifest", vault.id)).await;
+    assert!(none.is_none());
+
+    // Un client capable y met le manifeste, sur la révision qu'il a lue.
+    let m1 = Manifest::of(1, [(a.to_string().as_str(), ct_a.as_slice())]);
+    let put_manifest = |ciphertext: Vec<u8>, base_revision: i64, vault_revision: i64| {
+        alice
+            .req(reqwest::Method::PUT, &format!("/vaults/{}/manifest", vault.id))
+            .json(&PutManifestRequest {
+                ciphertext,
+                base_revision,
+                vault_revision,
+            })
+            .send()
+    };
+    status!(
+        put_manifest(seal(&m1), 0, page.revision - 1).await.unwrap(),
+        StatusCode::CONFLICT
+    );
+    let body = status!(
+        bob.req(reqwest::Method::PUT, &format!("/vaults/{}/manifest", vault.id))
+            .json(&PutManifestRequest {
+                ciphertext: seal(&m1),
+                base_revision: 0,
+                vault_revision: page.revision,
+            })
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::FORBIDDEN
+    );
+    assert!(
+        body.contains("forbidden"),
+        "un lecteur n'écrit pas le manifeste : {body}"
+    );
+    let created: VaultManifest = serde_json::from_str(&status!(
+        put_manifest(seal(&m1), 0, page.revision).await.unwrap(),
+        StatusCode::OK
+    ))
+    .unwrap();
+    assert_eq!(created.revision, 1);
+
+    // Désormais : pas d'écriture sans manifeste, ni sur une base dépassée.
+    let b = Uuid::new_v4();
+    let (r, _) = put_with_manifest(&alice, vault.id, &key, b, "B", None, None).await;
+    assert!(status!(r, StatusCode::CONFLICT).contains("manifest_required"));
+    let (_, ct_b) = put_with_manifest(&alice, vault.id, &key, b, "B", None, None).await;
+    let mut m2 = m1.next(1);
+    m2.put(&b.to_string(), &ct_b);
+    let (r, ct_b) = {
+        let ct = ct_b.clone();
+        let resp = alice
+            .req(reqwest::Method::PUT, &format!("/vaults/{}/items/{b}", vault.id))
+            .json(&PutItemRequest {
+                item_type: "note".into(),
+                ciphertext: ct.clone(),
+                base_revision: None,
+                manifest: Some(ManifestWrite {
+                    ciphertext: seal(&m2),
+                    base_revision: 1,
+                }),
+            })
+            .send()
+            .await
+            .unwrap();
+        (resp, ct)
+    };
+    status!(r, StatusCode::CREATED);
+    let c = Uuid::new_v4();
+    let (r, _) = put_with_manifest(
+        &alice,
+        vault.id,
+        &key,
+        c,
+        "C",
+        None,
+        Some(ManifestWrite {
+            ciphertext: seal(&m2),
+            base_revision: 1,
+        }),
+    )
+    .await;
+    let body = status!(r, StatusCode::CONFLICT);
+    let conflict: serde_json::Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(conflict["code"], "manifest_conflict");
+    assert_eq!(conflict["current"]["revision"], 2, "le manifeste courant est joint");
+    // Un item ne se fait pas passer pour le manifeste.
+    let r = alice
+        .req(
+            reqwest::Method::PUT,
+            &format!("/vaults/{}/items/{}", vault.id, Uuid::nil()),
+        )
+        .json(&PutItemRequest {
+            item_type: "manifest".into(),
+            ciphertext: seal(&m2),
+            base_revision: None,
+            manifest: None,
+        })
+        .send()
+        .await
+        .unwrap();
+    assert!(status!(r, StatusCode::BAD_REQUEST).contains("invalid_item_type"));
+
+    // Ce que sert le serveur se vérifie, pour Alice comme pour Bob (lecteur).
+    let page: ItemsPage = bob.get(&format!("/vaults/{}/items", vault.id)).await;
+    let v = verify_page(&key, vault.id, &page, Some(1));
+    assert!(v.problems.is_empty(), "{:?}", v.problems);
+    assert_eq!(v.manifest.unwrap(), m2);
+
+    // Supprimer : sans manifeste, refusé ; avec, le manifeste perd l'item.
+    status!(
+        alice
+            .req(reqwest::Method::DELETE, &format!("/vaults/{}/items/{a}", vault.id))
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::CONFLICT
+    );
+    let mut m3 = m2.next(2);
+    m3.remove(&a.to_string());
+    status!(
+        alice
+            .req(reqwest::Method::DELETE, &format!("/vaults/{}/items/{a}", vault.id))
+            .json(&DeleteItemRequest {
+                manifest: Some(ManifestWrite {
+                    ciphertext: seal(&m3),
+                    base_revision: 2,
+                }),
+            })
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::NO_CONTENT
+    );
+    let page: ItemsPage = alice.get(&format!("/vaults/{}/items", vault.id)).await;
+    assert!(verify_page(&key, vault.id, &page, Some(3)).problems.is_empty());
+
+    // Un serveur qui ment — simulé en touchant la base.
+    let db = server.db().await;
+    let manifest_blob: Vec<u8> = sqlx::query_scalar("SELECT manifest FROM vaults WHERE id = $1")
+        .bind(vault.id)
+        .fetch_one(&db)
+        .await
+        .unwrap();
+    // 1. Il rejoue l'ancienne version de B.
+    let old_b = gc::seal_item(&key, &vid, &b.to_string(), "note", b"B d'avant").unwrap();
+    sqlx::query("UPDATE items SET ciphertext = $3 WHERE vault_id = $1 AND id = $2")
+        .bind(vault.id)
+        .bind(b)
+        .bind(&old_b)
+        .execute(&db)
+        .await
+        .unwrap();
+    // 2. Il ressuscite A.
+    sqlx::query("UPDATE items SET deleted_at = NULL, ciphertext = $3 WHERE vault_id = $1 AND id = $2")
+        .bind(vault.id)
+        .bind(a)
+        .bind(&ct_a)
+        .execute(&db)
+        .await
+        .unwrap();
+    let page: ItemsPage = alice.get(&format!("/vaults/{}/items", vault.id)).await;
+    assert_eq!(
+        verify_page(&key, vault.id, &page, Some(3)).problems,
+        vec![
+            ManifestProblem::Altered { item_id: b.to_string() },
+            ManifestProblem::Unexpected { item_id: a.to_string() },
+        ]
+    );
+    // 3. Il retient B.
+    sqlx::query("UPDATE items SET deleted_at = now() WHERE vault_id = $1 AND id = $2")
+        .bind(vault.id)
+        .bind(b)
+        .execute(&db)
+        .await
+        .unwrap();
+    sqlx::query("UPDATE items SET deleted_at = now() WHERE vault_id = $1 AND id = $2")
+        .bind(vault.id)
+        .bind(a)
+        .execute(&db)
+        .await
+        .unwrap();
+    let page: ItemsPage = alice.get(&format!("/vaults/{}/items", vault.id)).await;
+    assert_eq!(
+        verify_page(&key, vault.id, &page, Some(3)).problems,
+        vec![ManifestProblem::Withheld { item_id: b.to_string() }]
+    );
+    // 4. Il ressert un ancien manifeste (et la révision qui va avec) : vu
+    // d'ici, il a reculé.
+    sqlx::query("UPDATE vaults SET manifest = $2, manifest_revision = 2 WHERE id = $1")
+        .bind(vault.id)
+        .bind(seal(&m2))
+        .execute(&db)
+        .await
+        .unwrap();
+    let page: ItemsPage = alice.get(&format!("/vaults/{}/items", vault.id)).await;
+    assert!(
+        verify_page(&key, vault.id, &page, Some(3))
+            .problems
+            .contains(&ManifestProblem::Rollback { counter: 2, seen: 3 })
+    );
+    // 5. Il ne sert plus de manifeste du tout.
+    sqlx::query("UPDATE vaults SET manifest = NULL, manifest_revision = 0 WHERE id = $1")
+        .bind(vault.id)
+        .execute(&db)
+        .await
+        .unwrap();
+    let page: ItemsPage = alice.get(&format!("/vaults/{}/items", vault.id)).await;
+    assert_eq!(
+        verify_page(&key, vault.id, &page, Some(3)).problems,
+        vec![ManifestProblem::Missing { seen: 3 }]
+    );
+    // Remis en état (restauration « honnête »), pour la suite.
+    sqlx::query("UPDATE items SET deleted_at = NULL, ciphertext = $3 WHERE vault_id = $1 AND id = $2")
+        .bind(vault.id)
+        .bind(b)
+        .bind(&ct_b)
+        .execute(&db)
+        .await
+        .unwrap();
+    sqlx::query("UPDATE vaults SET manifest = $2, manifest_revision = 3 WHERE id = $1")
+        .bind(vault.id)
+        .bind(&manifest_blob)
+        .execute(&db)
+        .await
+        .unwrap();
+
+    // La rotation de clé emporte le manifeste, re-scellé sous la nouvelle clé.
+    let current: Vault = alice.get(&format!("/vaults/{}", vault.id)).await;
+    let new_key = gc::SymmetricKey::random();
+    let new_b = gc::seal_item(&new_key, &vid, &b.to_string(), "note", b"B").unwrap();
+    let rotate = |manifest: Option<Vec<u8>>| RotateVaultKeyRequest {
+        name_enc: gc::seal_vault_name(&new_key, &vid, "Équipe").unwrap(),
+        members: [&alice, &bob]
+            .iter()
+            .map(|u| RotatedMemberKey {
+                user_id: u.profile.id,
+                wrapped_vault_key: gc::wrap_vault_key(
+                    &alice.account.keypair,
+                    &u.account.keypair.public,
+                    &vid,
+                    &new_key,
+                )
+                .unwrap(),
+            })
+            .collect(),
+        items: vec![RotatedItem {
+            id: b,
+            ciphertext: new_b.clone(),
+        }],
+        versions: None,
+        emergency: None,
+        manifest,
+        base_revision: current.revision,
+    };
+    let body = status!(
+        alice
+            .req(reqwest::Method::POST, &format!("/vaults/{}/rotate-key", vault.id))
+            .json(&rotate(None))
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::CONFLICT
+    );
+    assert!(body.contains("manifest_required"), "{body}");
+    let m4 = Manifest::of(4, [(b.to_string().as_str(), new_b.as_slice())]);
+    status!(
+        alice
+            .req(reqwest::Method::POST, &format!("/vaults/{}/rotate-key", vault.id))
+            .json(&rotate(Some(gc::seal_manifest(&new_key, &vid, &m4).unwrap())))
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::OK
+    );
+    let page: ItemsPage = bob.get(&format!("/vaults/{}/items", vault.id)).await;
+    let v = verify_page(&new_key, vault.id, &page, Some(3));
+    assert!(v.problems.is_empty(), "{:?}", v.problems);
+    assert_eq!(page.manifest.unwrap().revision, 4);
     server.stop().await;
 }

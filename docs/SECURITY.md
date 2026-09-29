@@ -73,8 +73,11 @@ pour appliquer le délai.
   détectent une **révision de vault qui recule** — ce que produit une base
   restaurée, ou un serveur qui rejoue sans maquiller — mais la révision
   n'est pas authentifiée : un serveur qui sert d'anciens chiffrés sous des
-  révisions qui montent passe. Il faudrait un manifeste de vault signé
-  (`ROADMAP.md`).
+  révisions qui montent passe. Le **manifeste de vault** qui le couvre est
+  en cours (`MANIFESTE.md`) : serveur et web prêts, pas encore activé tant
+  que Guiterm ne sait pas l'entretenir. Une fois actif, il restera cette
+  limite assumée : n'importe quel membre (lecteur compris) peut écrire un
+  manifeste valide.
 - **Vault fabriqué par le serveur.** Un serveur malveillant peut créer un
   vault avec une clé à lui et y inscrire un utilisateur, pour qu'il y range
   des secrets. Les enveloppes de format 2 sont authentifiées : il ne peut

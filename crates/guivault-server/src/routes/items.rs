@@ -8,7 +8,9 @@ use crate::validate;
 use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use guivault_protocol::{Item, ItemsPage, PutItemRequest, Role, ServerEvent};
+use guivault_protocol::{
+    DeleteItemRequest, Item, ItemsPage, PutItemRequest, PutManifestRequest, Role, ServerEvent, VaultManifest,
+};
 use serde::Deserialize;
 use uuid::Uuid;
 
@@ -25,28 +27,8 @@ pub async fn list(
     Path(vault_id): Path<Uuid>,
     Query(q): Query<SinceQuery>,
 ) -> ApiResult<Json<ItemsPage>> {
-    let vault = db::vault_for_user(&state.db, user.id, vault_id).await?;
-    let rows = match q.since {
-        Some(since) => {
-            sqlx::query_as::<_, ItemRow>("SELECT * FROM items WHERE vault_id = $1 AND revision > $2 ORDER BY revision")
-                .bind(vault_id)
-                .bind(since)
-                .fetch_all(&state.db)
-                .await?
-        }
-        None => {
-            sqlx::query_as::<_, ItemRow>(
-                "SELECT * FROM items WHERE vault_id = $1 AND deleted_at IS NULL ORDER BY revision",
-            )
-            .bind(vault_id)
-            .fetch_all(&state.db)
-            .await?
-        }
-    };
-    Ok(Json(ItemsPage {
-        items: rows.into_iter().map(Into::into).collect(),
-        revision: vault.revision,
-    }))
+    db::vault_for_user(&state.db, user.id, vault_id).await?;
+    Ok(Json(db::items_page(&state.db, vault_id, q.since).await?))
 }
 
 pub async fn get(
@@ -93,6 +75,12 @@ pub async fn put(
         .bind(item_id)
         .fetch_optional(&mut *tx)
         .await?;
+
+    let manifest = db::next_manifest(
+        &db::locked_manifest(&mut tx, vault_id).await?,
+        req.manifest.as_ref(),
+        state.config.max_item_bytes,
+    )?;
 
     let current_rev = current.as_ref().filter(|c| c.deleted_at.is_none()).map(|c| c.revision);
     if current_rev != req.base_revision {
@@ -150,6 +138,9 @@ pub async fn put(
     .bind(&req.ciphertext)
     .fetch_one(&mut *tx)
     .await?;
+    if let Some((blob, revision)) = &manifest {
+        db::store_manifest(&mut tx, vault_id, blob, *revision).await?;
+    }
 
     Audit::new(if created { "item.create" } else { "item.update" })
         .actor(user.id)
@@ -196,7 +187,9 @@ pub async fn delete(
     ClientIp(ip): ClientIp,
     Path((vault_id, item_id)): Path<(Uuid, Uuid)>,
     Query(q): Query<DeleteQuery>,
+    body: Option<Json<DeleteItemRequest>>,
 ) -> ApiResult<StatusCode> {
+    let req = body.map(|Json(b)| b).unwrap_or_default();
     db::vault_with_role(&state.db, user.id, vault_id, Role::Writer).await?;
     let mut tx = state.db.begin().await?;
     sqlx::query("SELECT 1 FROM vaults WHERE id = $1 FOR UPDATE")
@@ -212,6 +205,14 @@ pub async fn delete(
     else {
         return Err(AppError::not_found("item"));
     };
+    let manifest = db::next_manifest(
+        &db::locked_manifest(&mut tx, vault_id).await?,
+        req.manifest.as_ref(),
+        state.config.max_item_bytes,
+    )?;
+    if let Some((blob, revision)) = &manifest {
+        db::store_manifest(&mut tx, vault_id, blob, *revision).await?;
+    }
     if !q.moved {
         db::keep_version(&mut tx, &current, user.id, state.config.item_history).await?;
     }
@@ -245,4 +246,84 @@ pub async fn delete(
         )
         .await?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+// ─── Manifeste ──────────────────────────────────────────────────────────────
+
+/// Le manifeste courant, sans les items : de quoi écrire sans tout relire
+/// (l'extension, une écriture après un conflit). `null` : pas de manifeste.
+pub async fn get_manifest(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path(vault_id): Path<Uuid>,
+) -> ApiResult<Json<Option<VaultManifest>>> {
+    db::vault_for_user(&state.db, user.id, vault_id).await?;
+    let (blob, revision): (Option<Vec<u8>>, i64) =
+        sqlx::query_as("SELECT manifest, manifest_revision FROM vaults WHERE id = $1")
+            .bind(vault_id)
+            .fetch_one(&state.db)
+            .await?;
+    Ok(Json(blob.map(|ciphertext| VaultManifest { ciphertext, revision })))
+}
+
+/// Crée le manifeste d'un vault qui n'en a pas, ou le réécrit d'après ce que
+/// sert le serveur (un membre qui prend acte d'un écart). Rien d'autre ne
+/// change dans le vault ; sa révision monte pour que les autres clients
+/// relisent et vérifient.
+pub async fn put_manifest(
+    State(state): State<AppState>,
+    user: AuthUser,
+    ClientIp(ip): ClientIp,
+    Path(vault_id): Path<Uuid>,
+    Json(req): Json<PutManifestRequest>,
+) -> ApiResult<Json<VaultManifest>> {
+    validate::manifest(&req.ciphertext, state.config.max_item_bytes)?;
+    db::vault_with_role(&state.db, user.id, vault_id, Role::Writer).await?;
+    let mut tx = state.db.begin().await?;
+    let (revision,): (i64,) = sqlx::query_as("SELECT revision FROM vaults WHERE id = $1 FOR UPDATE")
+        .bind(vault_id)
+        .fetch_one(&mut *tx)
+        .await?;
+    if revision != req.vault_revision {
+        return Err(AppError::conflict(
+            "revision_mismatch",
+            "le vault a changé depuis votre lecture : relire, puis recommencer",
+        )
+        .with_extra(serde_json::json!({ "current": revision })));
+    }
+    let current = db::locked_manifest(&mut tx, vault_id).await?;
+    if req.base_revision != current.1 {
+        return Err(db::manifest_conflict(&current));
+    }
+    let created = current.0.is_none();
+    let next = current.1 + 1;
+    db::store_manifest(&mut tx, vault_id, &req.ciphertext, next).await?;
+    let rev = db::bump_revision(&mut *tx, vault_id).await?;
+    Audit::new(if created {
+        "vault.manifest_create"
+    } else {
+        "vault.manifest_rewrite"
+    })
+    .actor(user.id)
+    .vault(vault_id)
+    .ip(ip)
+    .meta(serde_json::json!({ "manifest_revision": next }))
+    .write(&mut *tx)
+    .await?;
+    tx.commit().await?;
+    state
+        .events
+        .vault(
+            &state.db,
+            vault_id,
+            ServerEvent::VaultChanged {
+                vault_id,
+                revision: rev,
+            },
+        )
+        .await?;
+    Ok(Json(VaultManifest {
+        ciphertext: req.ciphertext,
+        revision: next,
+    }))
 }

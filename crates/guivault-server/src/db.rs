@@ -2,7 +2,9 @@
 //! n'ont qu'un seul consommateur gardent leurs requêtes chez elles.
 use crate::error::AppError;
 use chrono::{DateTime, Utc};
-use guivault_protocol::{Invitation, InvitationStatus, Item, ItemVersion, Role, UserProfile, Vault, VaultKind};
+use guivault_protocol::{
+    Invitation, InvitationStatus, Item, ItemVersion, ItemsPage, Role, UserProfile, Vault, VaultKind, VaultManifest,
+};
 use sqlx::{PgConnection, PgExecutor};
 use uuid::Uuid;
 
@@ -43,6 +45,110 @@ pub async fn user_by_email<'e>(db: impl PgExecutor<'e>, email: &str) -> sqlx::Re
     .bind(email)
     .fetch_optional(db)
     .await
+}
+
+/// Items, révision et manifeste d'un vault, lus dans **un seul instantané** :
+/// un client vérifie les uns contre l'autre, une écriture entre deux lectures
+/// y ferait voir un écart qui n'existe pas. `since` : seulement ce qui a
+/// changé après (tombales comprises) ; sinon tout le vivant.
+pub async fn items_page(db: &sqlx::PgPool, vault_id: Uuid, since: Option<i64>) -> sqlx::Result<ItemsPage> {
+    let mut tx = db.begin().await?;
+    sqlx::query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY")
+        .execute(&mut *tx)
+        .await?;
+    let (revision, manifest, manifest_revision): (i64, Option<Vec<u8>>, i64) =
+        sqlx::query_as("SELECT revision, manifest, manifest_revision FROM vaults WHERE id = $1")
+            .bind(vault_id)
+            .fetch_one(&mut *tx)
+            .await?;
+    let rows = match since {
+        Some(since) => {
+            sqlx::query_as::<_, ItemRow>("SELECT * FROM items WHERE vault_id = $1 AND revision > $2 ORDER BY revision")
+                .bind(vault_id)
+                .bind(since)
+                .fetch_all(&mut *tx)
+                .await?
+        }
+        None => {
+            sqlx::query_as::<_, ItemRow>(
+                "SELECT * FROM items WHERE vault_id = $1 AND deleted_at IS NULL ORDER BY revision",
+            )
+            .bind(vault_id)
+            .fetch_all(&mut *tx)
+            .await?
+        }
+    };
+    tx.commit().await?;
+    Ok(ItemsPage {
+        items: rows.into_iter().map(Into::into).collect(),
+        revision,
+        manifest: manifest.map(|ciphertext| VaultManifest {
+            ciphertext,
+            revision: manifest_revision,
+        }),
+    })
+}
+
+/// Le manifeste d'un vault **verrouillé** (`FOR UPDATE` déjà pris) : ce que
+/// l'écriture en cours doit respecter.
+pub async fn locked_manifest(tx: &mut PgConnection, vault_id: Uuid) -> sqlx::Result<(Option<Vec<u8>>, i64)> {
+    sqlx::query_as("SELECT manifest, manifest_revision FROM vaults WHERE id = $1")
+        .bind(vault_id)
+        .fetch_one(tx)
+        .await
+}
+
+/// Ce qu'une écriture fait du manifeste : refusée si le vault en a un et
+/// qu'elle n'en apporte pas (un client d'avant les manifestes ne doit pas y
+/// écrire sans le tenir à jour), en conflit si elle s'appuie sur une révision
+/// dépassée (le courant est joint, le client refait le sien). `Some` : le
+/// blob et la révision à enregistrer.
+pub fn next_manifest(
+    current: &(Option<Vec<u8>>, i64),
+    write: Option<&guivault_protocol::ManifestWrite>,
+    max_item: usize,
+) -> Result<Option<(Vec<u8>, i64)>, AppError> {
+    let (blob, revision) = current;
+    let Some(write) = write else {
+        if blob.is_some() {
+            return Err(manifest_required());
+        }
+        return Ok(None);
+    };
+    crate::validate::manifest(&write.ciphertext, max_item)?;
+    if write.base_revision != *revision {
+        return Err(manifest_conflict(current));
+    }
+    Ok(Some((write.ciphertext.clone(), revision + 1)))
+}
+
+pub fn manifest_required() -> AppError {
+    AppError::conflict(
+        "manifest_required",
+        "ce vault est protégé par un manifeste : mettez à jour ce client pour y écrire",
+    )
+}
+
+pub fn manifest_conflict(current: &(Option<Vec<u8>>, i64)) -> AppError {
+    let body = current.0.as_ref().map(|ciphertext| VaultManifest {
+        ciphertext: ciphertext.clone(),
+        revision: current.1,
+    });
+    AppError::conflict(
+        "manifest_conflict",
+        "le manifeste du vault a changé depuis votre lecture",
+    )
+    .with_extra(serde_json::json!({ "current": body }))
+}
+
+pub async fn store_manifest(tx: &mut PgConnection, vault_id: Uuid, blob: &[u8], revision: i64) -> sqlx::Result<()> {
+    sqlx::query("UPDATE vaults SET manifest = $2, manifest_revision = $3 WHERE id = $1")
+        .bind(vault_id)
+        .bind(blob)
+        .bind(revision)
+        .execute(tx)
+        .await?;
+    Ok(())
 }
 
 /// Le propriétaire du vault a-t-il la place d'écrire ce chiffré ? Son usage :

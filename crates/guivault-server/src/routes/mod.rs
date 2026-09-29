@@ -98,6 +98,10 @@ pub fn router(state: AppState) -> Router {
             get(invitations::list_for_vault).post(invitations::create),
         )
         .route("/vaults/{id}/items", get(items::list))
+        .route(
+            "/vaults/{id}/manifest",
+            get(items::get_manifest).put(items::put_manifest),
+        )
         .route("/vaults/{id}/versions", get(history::vault_versions))
         .route("/vaults/{id}/items/{item_id}/versions", get(history::item_versions))
         .route("/vaults/{id}/trash", get(history::trash).delete(history::empty_trash))

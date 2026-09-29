@@ -23,6 +23,12 @@ HMAC pour les sels fictifs de prelogin.
   sur celles de Guiterm (`argon2 0.5`, `chacha20poly1305 0.10`, …) pour
   qu'elles s'unifient dans son binaire.
 - `crates/guivault-protocol` — types JSON. Même contrainte de compatibilité.
+- **Manifeste de vault** (`guivault-crypto/src/manifest.rs`, web
+  `lib/manifest.ts` + `session.ts`) : **en cours**, état et reste à faire
+  dans `docs/MANIFESTE.md`. Toute nouvelle route qui écrit ou supprime un
+  item doit porter le manifeste (`db::next_manifest` / `store_manifest`
+  côté serveur, `withManifest` côté web). Ne pas passer
+  `AUTO_ENABLE_MANIFEST` à vrai avant que Guiterm sache l'entretenir.
 - `crates/guivault-items` — formats en clair des secrets (`login`, `note`,
   `card`, `identity`, `aws`, `api-key`), miroir Rust de `web/src/lib/types.ts`, à consommer
   par Guiterm le jour de l'intégration (plan dans `docs/ITEMS.md`). Champs

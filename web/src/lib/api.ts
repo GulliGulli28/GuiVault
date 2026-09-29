@@ -2,7 +2,7 @@
  * `core/src/guivault/client.rs` dans Guiterm. Une méthode par route ; les
  * blobs restent en base64, c'est `session.ts` qui chiffre et déchiffre. */
 import type { TwoFactorSite } from "./types";
-import type { AdminOverview, AdminUserInfo, AuditEntry, BackupsStatus, EmergencyGrant, EmergencyOverview, EmergencyVault, HealthResponse, Invitation, Item, ItemVersion, ItemsPage, KdfParams, LoginResponse, PreloginResponse, Role, SendContent, SendInfo, SendPassword, SendSummary, RegistrationInvite, ServerEvent, Session, SyncResponse, TokenPair, TotpChallenge, TrashedItem, UserLookupResponse, UserProfile, UserSettings, Vault, VaultMember } from "./types";
+import type { AdminOverview, AdminUserInfo, AuditEntry, BackupsStatus, EmergencyGrant, EmergencyOverview, EmergencyVault, HealthResponse, Invitation, Item, ItemVersion, ItemsPage, KdfParams, ManifestWrite, LoginResponse, PreloginResponse, Role, SendContent, SendInfo, SendPassword, SendSummary, RegistrationInvite, ServerEvent, Session, SyncResponse, TokenPair, TotpChallenge, TrashedItem, UserLookupResponse, UserProfile, UserSettings, Vault, VaultManifest, VaultMember } from "./types";
 
 /** Une enveloppe de clé de vault pour un contact d'urgence. */
 export interface EmergencyVaultKey {
@@ -219,7 +219,7 @@ export const api = {
   renameVault: (id: string, name_enc: string) => authed<Vault>("PATCH", `/vaults/${id}`, { name_enc }),
   deleteVault: (id: string) => authed<void>("DELETE", `/vaults/${id}`),
   leaveVault: (id: string) => authed<void>("POST", `/vaults/${id}/leave`),
-  rotateVaultKey: (id: string, req: { name_enc: string; members: { user_id: string; wrapped_vault_key: string }[]; items: { id: string; ciphertext: string }[]; versions: { item_id: string; revision: number; ciphertext: string }[]; emergency?: { grant_id: string; wrapped_vault_key: string }[]; base_revision: number }) =>
+  rotateVaultKey: (id: string, req: { name_enc: string; members: { user_id: string; wrapped_vault_key: string }[]; items: { id: string; ciphertext: string }[]; versions: { item_id: string; revision: number; ciphertext: string }[]; emergency?: { grant_id: string; wrapped_vault_key: string }[]; manifest?: string; base_revision: number }) =>
     authed<Vault>("POST", `/vaults/${id}/rotate-key`, req),
   vaultAudit: (id: string, limit = 100) => authed<AuditEntry[]>("GET", `/vaults/${id}/audit?limit=${limit}`),
 
@@ -240,9 +240,12 @@ export const api = {
 
   // ── Items ──
   items: (vault: string, since?: number) => authed<ItemsPage>("GET", `/vaults/${vault}/items${since === undefined ? "" : `?since=${since}`}`),
-  putItem: (vault: string, id: string, req: { item_type: string; ciphertext: string; base_revision?: number }) => authed<Item>("PUT", `/vaults/${vault}/items/${id}`, req),
+  putItem: (vault: string, id: string, req: { item_type: string; ciphertext: string; base_revision?: number; manifest?: ManifestWrite }) => authed<Item>("PUT", `/vaults/${vault}/items/${id}`, req),
   /** `moved` : l'item part vers un autre vault, pas dans la corbeille. */
-  deleteItem: (vault: string, id: string, opts: { moved?: boolean } = {}) => authed<void>("DELETE", `/vaults/${vault}/items/${id}${opts.moved ? "?moved=true" : ""}`),
+  deleteItem: (vault: string, id: string, opts: { moved?: boolean; manifest?: ManifestWrite } = {}) =>
+    authed<void>("DELETE", `/vaults/${vault}/items/${id}${opts.moved ? "?moved=true" : ""}`, opts.manifest ? { manifest: opts.manifest } : undefined),
+  manifest: (vault: string) => authed<VaultManifest | null>("GET", `/vaults/${vault}/manifest`),
+  putManifest: (vault: string, req: { ciphertext: string; base_revision: number; vault_revision: number }) => authed<VaultManifest>("PUT", `/vaults/${vault}/manifest`, req),
   itemVersions: (vault: string, id: string) => authed<ItemVersion[]>("GET", `/vaults/${vault}/items/${id}/versions`),
   vaultVersions: (vault: string) => authed<ItemVersion[]>("GET", `/vaults/${vault}/versions`),
   trash: (vault: string) => authed<TrashedItem[]>("GET", `/vaults/${vault}/trash`),
