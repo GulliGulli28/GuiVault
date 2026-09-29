@@ -152,8 +152,8 @@ pub async fn store_manifest(tx: &mut PgConnection, vault_id: Uuid, blob: &[u8], 
 }
 
 /// Le propriétaire du vault a-t-il la place d'écrire ce chiffré ? Son usage :
-/// les chiffrés vivants de tous les vaults qu'il possède et leurs pièces
-/// jointes (ni l'historique, borné par `GUIVAULT_ITEM_HISTORY`, ni les
+/// les chiffrés vivants de tous les vaults qu'il possède, leurs pièces
+/// jointes et les fichiers de ses liens ([`USAGE`] ; ni l'historique, borné par `GUIVAULT_ITEM_HISTORY`, ni les
 /// tombales). Une écriture qui ne
 /// grossit pas passe toujours — un quota abaissé sous l'usage n'empêche pas
 /// de corriger ou d'alléger. À appeler sous le verrou du vault.
@@ -168,30 +168,70 @@ pub async fn check_quota(
     if new_len <= old_len {
         return Ok(());
     }
-    let row: Option<(Option<i64>, i64)> = sqlx::query_as(
-        "SELECT u.quota_bytes,
-                (coalesce((SELECT sum(octet_length(i.ciphertext))
-                          FROM items i JOIN vault_members o ON o.vault_id = i.vault_id AND o.role = 'owner'
-                          WHERE o.user_id = m.user_id AND i.deleted_at IS NULL
-                            AND NOT (i.vault_id = $1 AND i.id = $2)), 0)
-                 + coalesce((SELECT sum(a.size_bytes)
-                          FROM attachments a JOIN vault_members o ON o.vault_id = a.vault_id AND o.role = 'owner'
-                          WHERE o.user_id = m.user_id), 0))::bigint
+    let row: Option<(Option<i64>, i64)> = sqlx::query_as(&format!(
+        "SELECT u.quota_bytes, {USAGE}
          FROM vault_members m JOIN users u ON u.id = m.user_id
-         WHERE m.vault_id = $1 AND m.role = 'owner'",
-    )
+         WHERE m.vault_id = $1 AND m.role = 'owner'"
+    ))
     .bind(vault_id)
     .bind(item_id)
     .fetch_optional(&mut *tx)
     .await?;
     let Some((own, used)) = row else { return Ok(()) };
+    enforce_quota(
+        own,
+        used,
+        default_quota,
+        new_len,
+        "quota de stockage atteint pour le propriétaire de ce vault",
+    )
+}
+
+/// Le compte a-t-il la place de garder `new_len` octets de plus à son nom
+/// (le fichier d'un lien de partage) ? À appeler sous le verrou du compte.
+pub async fn check_user_quota(
+    tx: &mut PgConnection,
+    default_quota: u64,
+    user_id: Uuid,
+    new_len: usize,
+) -> Result<(), AppError> {
+    let (own, used): (Option<i64>, i64) =
+        sqlx::query_as(&format!("SELECT u.quota_bytes, {USAGE} FROM users u WHERE u.id = $3"))
+            .bind(Uuid::nil())
+            .bind(Uuid::nil())
+            .bind(user_id)
+            .fetch_one(&mut *tx)
+            .await?;
+    enforce_quota(own, used, default_quota, new_len, "quota de stockage atteint")
+}
+
+/// L'usage du compte `u` : les chiffrés vivants des vaults qu'il possède
+/// (sauf l'item `($1, $2)`, en passe d'être remplacé), leurs pièces jointes,
+/// et les fichiers de ses liens de partage encore gardés (en cours d'envoi,
+/// ou dont les morceaux n'ont pas été effacés).
+const USAGE: &str = "(coalesce((SELECT sum(octet_length(i.ciphertext))
+          FROM items i JOIN vault_members o ON o.vault_id = i.vault_id AND o.role = 'owner'
+          WHERE o.user_id = u.id AND i.deleted_at IS NULL AND NOT (i.vault_id = $1 AND i.id = $2)), 0)
+     + coalesce((SELECT sum(a.size_bytes)
+          FROM attachments a JOIN vault_members o ON o.vault_id = a.vault_id AND o.role = 'owner'
+          WHERE o.user_id = u.id), 0)
+     + coalesce((SELECT sum(s.file_size) FROM sends s
+          WHERE s.owner_id = u.id AND (NOT s.file_complete OR EXISTS (SELECT 1 FROM send_chunks c WHERE c.send_id = s.id))), 0))::bigint";
+
+fn enforce_quota(
+    own: Option<i64>,
+    used: i64,
+    default_quota: u64,
+    new_len: usize,
+    message: &str,
+) -> Result<(), AppError> {
     let quota = crate::routes::admin::effective_quota(own, default_quota);
     let after = used.max(0) as u64 + new_len as u64;
     if quota > 0 && after > quota {
         return Err(AppError::new(
             axum::http::StatusCode::INSUFFICIENT_STORAGE,
             "quota_exceeded",
-            "quota de stockage atteint pour le propriétaire de ce vault",
+            message.to_string(),
         )
         .with_extra(serde_json::json!({ "used": used, "quota": quota })));
     }

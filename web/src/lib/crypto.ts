@@ -454,6 +454,18 @@ export function openSendOwner(userKey: Uint8Array, sendId: string, blob: Uint8Ar
   return utf8.decode(open(userKey, blob, sendAad("guivault/v1/send-owner", sendId)));
 }
 
+/** Un morceau du fichier d'un lien (`kind: "file"`), sous la clé du lien, lié
+ * à sa place comme ceux des pièces jointes (`seal_send_chunk`). */
+const sendChunkAad = (sendId: string, index: number, last: boolean) => utf8.encode(`guivault/v1/send-file\0${sendId}\0${index}\0${last ? 1 : 0}`);
+
+export function sealSendChunk(keys: SendKeys, sendId: string, index: number, last: boolean, plaintext: Uint8Array): Uint8Array {
+  return seal(keys.enc, plaintext, sendChunkAad(sendId, index, last));
+}
+
+export function openSendChunk(keys: SendKeys, sendId: string, index: number, last: boolean, blob: Uint8Array): Uint8Array {
+  return open(keys.enc, blob, sendChunkAad(sendId, index, last));
+}
+
 // ─── Pièces jointes (`guivault_crypto::attachment`) ─────────────────────────
 //
 // Une clé par pièce jointe, gardée dans l'item qui la porte ; le fichier en

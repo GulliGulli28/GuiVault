@@ -131,7 +131,8 @@ paramètres ou formats anciens.
   `send_keys` / `sendKeys` (vecteurs d'interop) ; serveur :
   `routes/sends.rs`, migration `0005` ; web : `lib/sends.ts`, page « Liens
   de partage », « Partager par lien » sur un élément, page publique
-  `SendView.tsx`. Reste : fichiers (avec les pièces jointes), `gv send`,
+  `SendView.tsx`. **Fichiers** aussi (jeton de téléchargement d'une heure
+  par ouverture, voir `PIECES-JOINTES.md`). Reste : `gv send`,
   l'extension.
 - [x] **Pièces jointes chiffrées** ([`PIECES-JOINTES.md`](PIECES-JOINTES.md)) :
   une clé par fichier, gardée dans l'item (une rotation de clé de vault ne
@@ -142,7 +143,8 @@ paramètres ou formats anciens.
   Serveur : `routes/attachments.rs`, migration `0011` ; web :
   `lib/attachments.ts`, « Pièces jointes » sous la fiche d'un secret.
   Extension : listées et téléchargées depuis le popup ; `gv attachment
-  list|get`. Reste : les liens de partage avec fichier.
+  list|get` ; liens de partage avec fichier (et « Partager par lien » sur
+  une pièce jointe).
 - [x] **Rapport de santé** (web, « Santé du coffre ») : faibles,
   réutilisés (identifiants, hôtes, connexions SQL, passphrases de clés),
   inchangés depuis un an ; sites qui acceptent la 2FA sans TOTP ni passkey

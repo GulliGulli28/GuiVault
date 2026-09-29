@@ -349,6 +349,8 @@ export interface SendSummary {
   expires_at: string;
   last_viewed_at: string | null;
   available: boolean;
+  /** Taille chiffrée du fichier d'un lien à fichier. */
+  file_size?: number | null;
 }
 
 export interface SendInfo {
@@ -361,6 +363,8 @@ export interface SendContent {
   ciphertext: string;
   expires_at: string;
   views_left: number | null;
+  /** Un lien à fichier : de quoi en télécharger les morceaux, une heure. */
+  download?: { token: string; chunks: number; expires_at: string };
 }
 
 /** Les réglages synchronisés, scellés sous la user key (`sealUserSettings`). */

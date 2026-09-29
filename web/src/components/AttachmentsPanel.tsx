@@ -8,18 +8,21 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { attachFile, attachmentLimit, attachmentsOf, downloadAttachment, formatSize, removeAttachment, saveBlob } from "../lib/attachments";
 import { errorMessage } from "../lib/api";
 import { attachmentSealedSize } from "../lib/crypto";
-import type { DecodedItem, VaultView } from "../lib/session";
+import type { DecodedItem, SessionState, VaultView } from "../lib/session";
 import type { FileAttachment } from "../lib/types";
 import { ConfirmDialog } from "./ConfirmDialog";
-import { IconPaperclip } from "./secret-icons";
+import { IconLink, IconPaperclip } from "./secret-icons";
+import { ShareLinkDialog } from "./SendsPage";
 import { Eyebrow } from "./ui";
 import { IconDownload, IconPlus, IconTrash } from "./ui-icons";
 
-export function AttachmentsPanel({ vault, item, writable, offline = false, onChanged, notify, error }: {
+export function AttachmentsPanel({ vault, item, writable, offline = false, session, onChanged, notify, error }: {
   vault: VaultView;
   item: DecodedItem & { ok: true };
   writable: boolean;
   offline?: boolean;
+  /** Pour proposer « Partager par lien » (page du vault). */
+  session?: SessionState;
   onChanged: () => void;
   notify: (m: string) => void;
   error: (m: string) => void;
@@ -31,6 +34,8 @@ export function AttachmentsPanel({ vault, item, writable, offline = false, onCha
   const input = useRef<HTMLInputElement>(null);
   // Stable : `useModalSurface` rend le focus à l'ouvreur quand `onClose` change.
   const cancelRemove = useCallback(() => setRemoving(null), []);
+  const [sharing, setSharing] = useState<File | null>(null);
+  const closeSharing = useCallback(() => setSharing(null), []);
   useEffect(() => {
     void attachmentLimit().then(setLimit);
   }, []);
@@ -61,6 +66,20 @@ export function AttachmentsPanel({ vault, item, writable, offline = false, onCha
     setBusy(`Téléchargement de « ${a.name} »…`);
     try {
       saveBlob(await downloadAttachment(vault, a, progress("Téléchargement de", a.name)), a.name);
+    } catch (e) {
+      error(`« ${a.name} » : ${errorMessage(e)}`);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  /** Un lien de partage avec ce fichier : déchiffré ici, rechiffré sous la
+   * clé du lien. */
+  const share = async (a: FileAttachment) => {
+    setBusy(`Préparation de « ${a.name} »…`);
+    try {
+      const blob = await downloadAttachment(vault, a, progress("Préparation de", a.name));
+      setSharing(new File([blob], a.name, { type: a.mime || "application/octet-stream" }));
     } catch (e) {
       error(`« ${a.name} » : ${errorMessage(e)}`);
     } finally {
@@ -118,6 +137,11 @@ export function AttachmentsPanel({ vault, item, writable, offline = false, onCha
               <IconPaperclip size={13} className="shrink-0 text-[var(--c-text-muted)]" />
               <span className="min-w-0 flex-1 truncate text-[var(--c-text)]" title={a.name}>{a.name}</span>
               <span className="shrink-0 text-[11px] text-[var(--c-text-faint)]">{formatSize(a.size)}</span>
+              {session && !offline && (
+                <button type="button" onClick={() => void share(a)} disabled={busy !== null} className="btn btn-ghost btn-sm btn-icon" title="Partager par lien : une copie chiffrée, qui expire" aria-label={`Partager ${a.name} par lien`}>
+                  <IconLink size={12} />
+                </button>
+              )}
               <button type="button" onClick={() => void download(a)} disabled={busy !== null || offline} className="btn btn-ghost btn-sm btn-icon" title={offline ? "Hors ligne : les fichiers ne sont pas dans la copie" : "Télécharger"} aria-label={`Télécharger ${a.name}`}>
                 <IconDownload size={12} />
               </button>
@@ -132,6 +156,7 @@ export function AttachmentsPanel({ vault, item, writable, offline = false, onCha
       )}
       {offline && attachments.length > 0 && <p className="mt-1 text-[11.5px] text-[var(--c-text-muted)]">Hors ligne : les fichiers sont sur le serveur, pas dans la copie.</p>}
       {busy && <p role="status" className="mt-1 text-[11.5px] text-[var(--c-text-muted)]">{busy}</p>}
+      {sharing && session && <ShareLinkDialog session={session} file={sharing} onClose={closeSharing} />}
       {removing && (
         <ConfirmDialog
           title={`Retirer « ${removing.name} » ?`}

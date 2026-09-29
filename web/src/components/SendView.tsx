@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { api, ApiError, errorMessage } from "../lib/api";
+import { formatSize, saveBlob } from "../lib/attachments";
 import { indexItems } from "../lib/entities";
 import { openSend, parseSendFragment, sendName, type SendPayload } from "../lib/sends";
 import { KIND_LABELS, type SendInfo } from "../lib/types";
@@ -17,7 +18,8 @@ export function SendView({ id, secret }: { id: string; secret: string }) {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [opened, setOpened] = useState<{ content: SendPayload; viewsLeft: number | null; expiresAt: string } | null>(null);
+  const [opened, setOpened] = useState<{ content: SendPayload; viewsLeft: number | null; expiresAt: string; file?: Blob } | null>(null);
+  const [progress, setProgress] = useState<string | null>(null);
 
   useEffect(() => {
     if (!parsed) return;
@@ -32,7 +34,8 @@ export function SendView({ id, secret }: { id: string; secret: string }) {
     setBusy(true);
     setError(null);
     try {
-      const out = await openSend(parsed.id, parsed.secret, info, password);
+      const out = await openSend(parsed.id, parsed.secret, info, password, (done, total) =>
+        setProgress(total > 1 ? `Téléchargement du fichier… ${Math.round((done / total) * 100)} %` : "Téléchargement du fichier…"));
       setOpened(out);
       // Le secret quitte la barre d'adresse (et l'historique de l'onglet) :
       // ce qu'il ouvrait est affiché, il n'a plus rien à y faire.
@@ -42,6 +45,7 @@ export function SendView({ id, secret }: { id: string; secret: string }) {
       else setError(errorMessage(err));
     } finally {
       setBusy(false);
+      setProgress(null);
     }
   };
 
@@ -72,7 +76,7 @@ export function SendView({ id, secret }: { id: string; secret: string }) {
         )}
         {error && <p className="callout callout-danger">{error}</p>}
         <button type="submit" disabled={busy || (!!info.password && !password)} className="btn btn-primary w-full justify-center">
-          {busy ? (info.password ? "Dérivation de la clé…" : "Ouverture…") : "Ouvrir"}
+          {busy ? progress ?? (info.password ? "Dérivation de la clé…" : "Ouverture…") : "Ouvrir"}
         </button>
         {info.views_left !== null && <p className="help-text text-center">Chaque ouverture est comptée.</p>}
       </form>
@@ -95,7 +99,7 @@ export function SendView({ id, secret }: { id: string; secret: string }) {
   );
 }
 
-function Opened({ content, viewsLeft, expiresAt }: { content: SendPayload; viewsLeft: number | null; expiresAt: string }) {
+function Opened({ content, viewsLeft, expiresAt, file }: { content: SendPayload; viewsLeft: number | null; expiresAt: string; file?: Blob }) {
   const index = useMemo(() => indexItems([]), []);
   return (
     <div className="space-y-3">
@@ -104,16 +108,22 @@ function Opened({ content, viewsLeft, expiresAt }: { content: SendPayload; views
           <h2 className="min-w-0 flex-1 truncate text-[13px] font-semibold text-[var(--c-text)]">{sendName(content)}</h2>
           {content.kind === "item" && <span className="tag">{KIND_LABELS[content.payload.kind]}</span>}
           {content.kind === "text" && <CopyButton value={content.text} label="Copier le texte" />}
+          {content.kind === "file" && <span className="tag">fichier · {formatSize(content.size)}</span>}
         </div>
         {content.kind === "text" ? (
           <pre className="max-h-[60vh] overflow-auto whitespace-pre-wrap break-words rounded-md bg-[var(--c-bg2)] p-3 font-mono text-[12.5px] text-[var(--c-text)]">{content.text}</pre>
+        ) : content.kind === "file" ? (
+          <div className="space-y-2">
+            <p className="text-[12.5px] text-[var(--c-text-secondary)]">Le fichier a été téléchargé et déchiffré dans ce navigateur.</p>
+            {file && <button type="button" onClick={() => saveBlob(file, content.name)} className="btn btn-primary">Enregistrer « {content.name} »</button>}
+          </div>
         ) : (
           <ItemView payload={content.payload} index={index} shared />
         )}
       </div>
       <p className="help-text">
-        {viewsLeft === 0 ? "C'était la dernière ouverture : le serveur a effacé le contenu." : `Le lien reste valable jusqu'au ${formatWhen(expiresAt)}${viewsLeft === null ? "" : `, pour ${viewsLeft} ouverture${viewsLeft > 1 ? "s" : ""}`}.`}{" "}
-        Copiez ce dont vous avez besoin avant de fermer cette page.
+        {viewsLeft === 0 ? (content.kind === "file" ? "C'était la dernière ouverture : le serveur efface le fichier dans l'heure." : "C'était la dernière ouverture : le serveur a effacé le contenu.") : `Le lien reste valable jusqu'au ${formatWhen(expiresAt)}${viewsLeft === null ? "" : `, pour ${viewsLeft} ouverture${viewsLeft > 1 ? "s" : ""}`}.`}{" "}
+        {content.kind === "file" ? "Enregistrez le fichier avant de fermer cette page." : "Copiez ce dont vous avez besoin avant de fermer cette page."}
       </p>
     </div>
   );

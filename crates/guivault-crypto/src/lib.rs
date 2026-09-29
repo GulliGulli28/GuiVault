@@ -759,6 +759,34 @@ pub fn open_send_owner(user_key: &SymmetricKey, send_id: &str, blob: &[u8]) -> R
     open(user_key, blob, &send_aad("guivault/v1/send-owner", send_id))
 }
 
+/// Un morceau du fichier d'un lien (`kind: "file"`), sous la clé du lien —
+/// donc derrière son mot de passe s'il en a un —, lié à sa place comme ceux
+/// des pièces jointes ([`attachment`]) : ni réordonné, ni tronqué, ni
+/// emprunté à un autre lien. Mêmes morceaux de [`ATTACHMENT_CHUNK`] octets.
+fn send_chunk_aad(send_id: &str, index: u32, last: bool) -> Vec<u8> {
+    format!("guivault/v1/send-file\0{send_id}\0{index}\0{}", u8::from(last)).into_bytes()
+}
+
+pub fn seal_send_chunk(
+    keys: &SendKeys,
+    send_id: &str,
+    index: u32,
+    last: bool,
+    plaintext: &[u8],
+) -> Result<Vec<u8>, CryptoError> {
+    seal(&keys.enc, plaintext, &send_chunk_aad(send_id, index, last))
+}
+
+pub fn open_send_chunk(
+    keys: &SendKeys,
+    send_id: &str,
+    index: u32,
+    last: bool,
+    blob: &[u8],
+) -> Result<Vec<u8>, CryptoError> {
+    open(&keys.enc, blob, &send_chunk_aad(send_id, index, last))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -986,6 +1014,20 @@ mod tests {
         assert_eq!(open_send_owner(&uk, "s-1", &owner).unwrap(), b"{}");
         assert!(open_send_owner(&uk, "s-2", &owner).is_err());
         assert!(open_user_settings(&uk, &owner).is_err());
+    }
+
+    #[test]
+    fn send_file_chunks_are_tied_to_their_link_and_place() {
+        let keys = send_keys(b"link-secret-16by", None).unwrap();
+        let other = send_keys(b"other-secret-16b", None).unwrap();
+        let c = seal_send_chunk(&keys, "s-1", 0, true, b"fichier").unwrap();
+        assert_eq!(open_send_chunk(&keys, "s-1", 0, true, &c).unwrap(), b"fichier");
+        assert!(open_send_chunk(&keys, "s-1", 0, false, &c).is_err());
+        assert!(open_send_chunk(&keys, "s-1", 1, true, &c).is_err());
+        assert!(open_send_chunk(&keys, "s-2", 0, true, &c).is_err());
+        assert!(open_send_chunk(&other, "s-1", 0, true, &c).is_err());
+        // Pas un contenu de lien, ni l'inverse.
+        assert!(open_send(&keys, "s-1", &c).is_err());
     }
 
     #[test]

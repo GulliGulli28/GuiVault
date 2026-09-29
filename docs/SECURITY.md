@@ -60,7 +60,10 @@ re-chiffre les versions sous la nouvelle clé.
 
 Des **liens de partage**, il voit qui en crée, quand, leur taille, s'ils ont
 un mot de passe, leurs expirations et chaque ouverture (date, IP) — pas leur
-contenu ni leur nom (dans la fiche de l'auteur, sous sa user key). Du **rapport de santé**, rien, sauf s'il relaie la recherche de fuites :
+contenu ni leur nom (dans la fiche de l'auteur, sous sa user key). D'un lien
+avec un fichier, il voit en plus la taille du fichier et chaque morceau
+téléchargé ; le jeton de téléchargement qu'une ouverture donne (une heure,
+seul son SHA-256 gardé) ne sert qu'à ce lien. Du **rapport de santé**, rien, sauf s'il relaie la recherche de fuites :
 alors des préfixes de 5 caractères de SHA-1 (et leur nombre, à peu près
 celui des mots de passe distincts du coffre), et qui demande la liste des
 sites à 2FA. De

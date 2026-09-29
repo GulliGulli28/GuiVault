@@ -694,6 +694,36 @@ pub struct CreateSendRequest {
     pub max_views: Option<u32>,
     /// Durée de vie, en secondes (une heure au moins, `send_max_days` au plus).
     pub expires_in_secs: u64,
+    /// Un fichier (`kind: "file"`) : annoncé ici, ses morceaux s'envoient
+    /// ensuite (`PUT /sends/{id}/file/{index}`, corps brut) puis
+    /// `POST /sends/{id}/complete` ; le lien ne s'ouvre qu'une fois complet.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub file: Option<SendFile>,
+}
+
+/// Le fichier d'un lien : taille chiffrée totale et nombre de morceaux
+/// (`seal_send_chunk`, morceaux de `ATTACHMENT_CHUNK`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SendFile {
+    pub size: i64,
+    pub chunks: i32,
+}
+
+/// Ouvrir un lien à fichier donne de quoi en télécharger les morceaux
+/// (`POST /sends/{id}/file/{index}` `{ token }`), le temps d'une heure, sans
+/// consommer d'autre vue.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SendDownload {
+    #[serde(with = "b64")]
+    pub token: Vec<u8>,
+    pub chunks: i32,
+    pub expires_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SendFileChunkRequest {
+    #[serde(with = "b64")]
+    pub token: Vec<u8>,
 }
 
 /// Un lien, vu par son auteur (`GET /sends`).
@@ -708,8 +738,12 @@ pub struct SendSummary {
     pub created_at: DateTime<Utc>,
     pub expires_at: DateTime<Utc>,
     pub last_viewed_at: Option<DateTime<Utc>>,
-    /// Encore ouvrable : ni expiré, ni épuisé.
+    /// Encore ouvrable : ni expiré, ni épuisé (ni, pour un fichier, envoyé à
+    /// moitié).
     pub available: bool,
+    /// Taille chiffrée du fichier d'un lien à fichier.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub file_size: Option<i64>,
 }
 
 /// `GET /sends/{id}/access`, sans authentification : ce qu'il faut savoir
@@ -736,6 +770,9 @@ pub struct SendContent {
     pub ciphertext: Vec<u8>,
     pub expires_at: DateTime<Utc>,
     pub views_left: Option<u32>,
+    /// Pour un lien à fichier : de quoi télécharger ses morceaux.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub download: Option<SendDownload>,
 }
 
 // ─── Administration du serveur ──────────────────────────────────────────────

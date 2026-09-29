@@ -111,8 +111,10 @@ HMAC pour les sels fictifs de prelogin.
     seule, hors du formulaire (`AttachmentsPanel` sous la fiche). Côté
     serveur `routes/attachments.rs` ; un item déplacé emmène ses fichiers
     (`moveItem`), les exports ne les contiennent pas.
-  - `lib/sends.ts` — les liens de partage (secret dans le fragment
-    `#/send/<id>/<secret>`, jamais vu par le serveur) ; `SendView` est la
+  - `lib/sends.ts` — les liens de partage, texte, élément ou fichier
+    (secret dans le fragment `#/send/<id>/<secret>`, jamais vu par le
+    serveur ; un fichier se télécharge avec le jeton d'une heure que donne
+    l'ouverture) ; `SendView` est la
     page publique qui les ouvre (hors session, avant l'écran de connexion),
     `SendsPage` la liste de l'auteur et le dialogue « Partager par lien ».
   - Accès d'urgence : dans `lib/session.ts` (`emergencyVaults`, à part des

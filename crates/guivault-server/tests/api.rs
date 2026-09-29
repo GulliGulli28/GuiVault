@@ -1911,6 +1911,7 @@ fn new_send(
         password,
         max_views,
         expires_in_secs,
+        file: None,
     };
     (req, secret)
 }
@@ -4549,5 +4550,213 @@ async fn attachments_are_chunked_bounded_moved_and_cleaned() {
     );
     let listed: Vec<Attachment> = alice.get(&format!("/vaults/{}/attachments", personal.id)).await;
     assert!(listed.is_empty());
+    server.stop().await;
+}
+
+#[tokio::test]
+async fn send_files_download_with_a_token_even_after_the_last_view() {
+    const MIB: usize = 1024 * 1024;
+    let Some(server) = TestServer::start(RegistrationMode::Open).await else {
+        return;
+    };
+    let alice = User::register(&server, "alice-sf@t.io", "pw").await;
+    let bob = User::register(&server, "bob-sf@t.io", "pw").await;
+    let anon = Client::new();
+
+    // Un fichier de 1,5 Mio (deux morceaux), une seule vue.
+    let data: Vec<u8> = (0..3 * MIB / 2).map(|i| (i % 241) as u8).collect();
+    let (mut req, secret) = new_send(
+        &alice,
+        r#"{"v":1,"kind":"file","name":"scan.pdf"}"#,
+        None,
+        Some(1),
+        3600,
+    );
+    let keys = gc::send_keys(&secret, None).unwrap();
+    let count = gc::attachment_chunk_count(data.len() as u64);
+    let chunks: Vec<Vec<u8>> = (0..count)
+        .map(|i| {
+            let part = &data[i as usize * MIB..((i as usize + 1) * MIB).min(data.len())];
+            gc::seal_send_chunk(&keys, &req.id.to_string(), i, i + 1 == count, part).unwrap()
+        })
+        .collect();
+    let size: usize = chunks.iter().map(Vec::len).sum();
+    req.file = Some(SendFile {
+        size: size as i64,
+        chunks: count as i32,
+    });
+    let id = req.id;
+    // Trop gros, ou incohérent : refusé.
+    let mut huge = req.clone();
+    huge.file = Some(SendFile {
+        size: 200 * MIB as i64,
+        chunks: 200,
+    });
+    status!(
+        alice
+            .req(reqwest::Method::POST, "/sends")
+            .json(&huge)
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::PAYLOAD_TOO_LARGE
+    );
+    let mut odd = req.clone();
+    odd.file = Some(SendFile {
+        size: size as i64,
+        chunks: 3,
+    });
+    status!(
+        alice
+            .req(reqwest::Method::POST, "/sends")
+            .json(&odd)
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::BAD_REQUEST
+    );
+    status!(
+        alice
+            .req(reqwest::Method::POST, "/sends")
+            .json(&req)
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::CREATED
+    );
+
+    // Tant que le fichier n'est pas complet, le lien ne s'ouvre pas ; seul
+    // son auteur y envoie des morceaux.
+    status!(
+        anon.get(format!("{}/sends/{id}/access", server.base))
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::NOT_FOUND
+    );
+    status!(
+        bob.req(reqwest::Method::PUT, &format!("/sends/{id}/file/0"))
+            .body(chunks[0].clone())
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::NOT_FOUND
+    );
+    status!(
+        alice
+            .req(reqwest::Method::PUT, &format!("/sends/{id}/file/0"))
+            .body(chunks[0].clone())
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::NO_CONTENT
+    );
+    status!(
+        alice
+            .req(reqwest::Method::POST, &format!("/sends/{id}/complete"))
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::CONFLICT
+    );
+    status!(
+        alice
+            .req(reqwest::Method::PUT, &format!("/sends/{id}/file/1"))
+            .body(chunks[1].clone())
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::NO_CONTENT
+    );
+    let summary: SendSummary = serde_json::from_str(&status!(
+        alice
+            .req(reqwest::Method::POST, &format!("/sends/{id}/complete"))
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::OK
+    ))
+    .unwrap();
+    assert!(summary.available && summary.file_size == Some(size as i64));
+
+    // L'unique vue : le contenu, et un jeton pour le fichier.
+    let content: SendContent = serde_json::from_str(&status!(
+        anon.post(format!("{}/sends/{id}/access", server.base))
+            .json(&SendAccessRequest {
+                access_key: keys.access.as_bytes().to_vec()
+            })
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::OK
+    ))
+    .unwrap();
+    assert_eq!(content.views_left, Some(0));
+    let download = content.download.expect("un jeton de téléchargement");
+    assert_eq!(download.chunks, 2);
+    // Épuisé : le lien ne s'ouvre plus…
+    status!(
+        anon.get(format!("{}/sends/{id}/access", server.base))
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::NOT_FOUND
+    );
+    // … mais le fichier se télécharge encore avec le jeton, et seulement avec lui.
+    let fetch = |token: Vec<u8>, i: i32| {
+        anon.post(format!("{}/sends/{id}/file/{i}", server.base))
+            .json(&SendFileChunkRequest { token })
+            .send()
+    };
+    let mut got = Vec::new();
+    for i in 0..2 {
+        let r = fetch(download.token.clone(), i).await.unwrap();
+        assert_eq!(r.status(), StatusCode::OK);
+        let sealed = r.bytes().await.unwrap();
+        got.extend(gc::open_send_chunk(&keys, &id.to_string(), i as u32, i == 1, &sealed).unwrap());
+    }
+    assert_eq!(got, data);
+    status!(fetch(vec![9u8; 32], 0).await.unwrap(), StatusCode::NOT_FOUND);
+
+    // Le jeton expire : le fichier part à la tournée.
+    let db = server.db().await;
+    guivault_server::routes::sends::prune(&db).await.unwrap();
+    let (left,): (i64,) = sqlx::query_as("SELECT count(*) FROM send_chunks WHERE send_id = $1")
+        .bind(id)
+        .fetch_one(&db)
+        .await
+        .unwrap();
+    assert_eq!(left, 2, "un téléchargement en cours garde le fichier");
+    sqlx::query("UPDATE send_downloads SET expires_at = now() - interval '1 minute'")
+        .execute(&db)
+        .await
+        .unwrap();
+    guivault_server::routes::sends::prune(&db).await.unwrap();
+    let (left,): (i64,) = sqlx::query_as("SELECT count(*) FROM send_chunks WHERE send_id = $1")
+        .bind(id)
+        .fetch_one(&db)
+        .await
+        .unwrap();
+    assert_eq!(left, 0);
+    status!(fetch(download.token.clone(), 0).await.unwrap(), StatusCode::NOT_FOUND);
+
+    // Le fichier compte dans le quota de son auteur.
+    sqlx::query("UPDATE users SET quota_bytes = $1 WHERE id = $2")
+        .bind(MIB as i64)
+        .bind(alice.profile.id)
+        .execute(&db)
+        .await
+        .unwrap();
+    let (mut again, _) = new_send(&alice, "x", None, None, 3600);
+    again.file = req.file;
+    status!(
+        alice
+            .req(reqwest::Method::POST, "/sends")
+            .json(&again)
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::INSUFFICIENT_STORAGE
+    );
     server.stop().await;
 }

@@ -59,6 +59,8 @@ pub const TABLES: &[&str] = &[
     "totp_challenges",
     "user_settings",
     "sends",
+    "send_chunks",
+    "send_downloads",
     "emergency_grants",
     "emergency_vault_keys",
     "registration_invites",

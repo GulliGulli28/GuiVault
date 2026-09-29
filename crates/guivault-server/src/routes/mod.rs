@@ -132,6 +132,13 @@ pub fn router(state: AppState) -> Router {
         .route("/lookups/2fa-directory", get(lookups::twofa_directory))
         .route("/sends", get(sends::list).post(sends::create))
         .route("/sends/{id}", delete(sends::delete))
+        .route("/sends/{id}/complete", post(sends::complete))
+        // PUT : l'auteur envoie un morceau ; POST : le destinataire le
+        // télécharge avec son jeton (public, hors du frein par IP).
+        .route(
+            "/sends/{id}/file/{index}",
+            put(sends::put_file_chunk).post(sends::file_chunk),
+        )
         .route("/emergency", get(emergency::overview).post(emergency::create))
         .route(
             "/emergency/{id}",

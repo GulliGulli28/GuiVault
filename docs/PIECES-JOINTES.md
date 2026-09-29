@@ -43,6 +43,22 @@ vault. Gratuit, comme le reste — c'est une fonction payante chez Bitwarden.
    elle échoue) ; le retrait la suit. Sur un conflit, le changement est
    rejoué sur la version du serveur (il ne touche qu'un champ).
 
+## Liens de partage avec un fichier
+
+Un lien peut porter un fichier (page « Liens de partage » › Nouveau lien ›
+Fichier, ou « Partager par lien » sur une pièce jointe, déchiffrée puis
+rechiffrée pour le lien). Mêmes morceaux, mais sous la **clé du lien**
+(`seal_send_chunk`, AAD `guivault/v1/send-file\0<id>\0<index>\0<dernier>`) :
+derrière son mot de passe s'il en a un, et rien à ajouter au secret du
+fragment. La difficulté est le compte des vues : ouvrir le lien consomme une
+vue et donne un **jeton de téléchargement d'une heure** (seul son SHA-256 est
+gardé) qui récupère les morceaux sans en consommer d'autre ; ils restent le
+temps qu'un jeton vit, même après la dernière vue, puis partent. Le
+destinataire télécharge tout à l'ouverture et enregistre le fichier depuis
+la page. Serveur : `routes/sends.rs`, migration `0012` ; web :
+`lib/sends.ts`, `SendView.tsx`, `ShareLinkDialog`. Test
+`send_files_download_with_a_token_even_after_the_last_view`.
+
 ## Ce que voit le serveur
 
 La taille chiffrée (la taille du fichier à 41 octets par Mio près), le
@@ -75,7 +91,6 @@ type, ni le contenu. Voir `SECURITY.md`.
 
 ## Reste
 
-- **Liens de partage** avec un fichier (le §2 de la feuille de route).
 - **Copie hors ligne** : les fichiers n'y sont pas (seulement leur
   description) ; les télécharger hors ligne échoue avec un message.
 - **Guiterm** ne les affiche pas (il ignore les secrets de l'interface web,

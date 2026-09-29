@@ -279,12 +279,20 @@ export const api = {
 
   // ── Liens de partage ──
   sends: () => authed<SendSummary[]>("GET", "/sends"),
-  createSend: (req: { id: string; ciphertext: string; access_hash: string; owner_blob: string; password?: SendPassword; max_views?: number; expires_in_secs: number }) =>
+  createSend: (req: { id: string; ciphertext: string; access_hash: string; owner_blob: string; password?: SendPassword; max_views?: number; expires_in_secs: number; file?: { size: number; chunks: number } }) =>
     authed<SendSummary>("POST", "/sends", req),
+  putSendChunk: (id: string, index: number, bytes: Uint8Array) => authedBytes("PUT", `/sends/${id}/file/${index}`, bytes),
+  completeSend: (id: string) => authed<SendSummary>("POST", `/sends/${id}/complete`),
   deleteSend: (id: string) => authed<void>("DELETE", `/sends/${id}`),
   /** Sans compte : ce que le destinataire d'un lien appelle. */
   sendInfo: (id: string) => raw<SendInfo>("GET", `/sends/${id}/access`, undefined, false),
   openSend: (id: string, access_key: string) => raw<SendContent>("POST", `/sends/${id}/access`, { access_key }, false),
+  /** Un morceau du fichier d'un lien, contre le jeton de son ouverture. */
+  sendFileChunk: async (id: string, index: number, token: string): Promise<Uint8Array> => {
+    const res = await fetch(`${BASE}/sends/${id}/file/${index}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token }) });
+    if (!res.ok) await parse(res);
+    return new Uint8Array(await res.arrayBuffer());
+  },
 
   // ── Rapport de santé (relais du serveur) ──
   /** Les suffixes HIBP sous un préfixe de 5 caractères du SHA-1. */

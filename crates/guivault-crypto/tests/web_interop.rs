@@ -166,4 +166,11 @@ fn opens_browser_send_link() {
         open_send_owner(&owner_key, id, &h(&v["owner_blob"])).unwrap(),
         v["owner_plaintext"].as_str().unwrap().as_bytes()
     );
+    // Le fichier d'un lien protégé : ses morceaux, à leur place.
+    for c in v["file_chunks"].as_array().unwrap() {
+        let (index, last) = (c["index"].as_u64().unwrap() as u32, c["last"].as_bool().unwrap());
+        let plain = open_send_chunk(&locked, id, index, last, &h(&c["blob"])).unwrap();
+        assert_eq!(plain, c["plaintext"].as_str().unwrap().as_bytes());
+        assert!(open_send_chunk(&keys, id, index, last, &h(&c["blob"])).is_err());
+    }
 }

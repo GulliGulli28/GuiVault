@@ -61,6 +61,14 @@ fn main() {
     let locked_blob = seal_send(&locked_keys, send_id, send_plain.as_bytes()).unwrap();
     let owner_key = SymmetricKey::from_bytes([3u8; 32]);
     let owner_blob = seal_send_owner(&owner_key, send_id, br#"{"name":"Wi-Fi"}"#).unwrap();
+    // Le fichier d'un lien, sous la clé du lien protégé par mot de passe.
+    let send_chunks: Vec<_> = [(0u32, false, "début"), (1, true, "fin")]
+        .iter()
+        .map(|(i, last, text)| {
+            json!({ "index": i, "last": last, "plaintext": text,
+                    "blob": hex(&seal_send_chunk(&locked_keys, send_id, *i, *last, text.as_bytes()).unwrap()) })
+        })
+        .collect();
 
     // Le manifeste du vault de `item` : cet item, et un second dont seule
     // l'empreinte compte.
@@ -129,6 +137,7 @@ fn main() {
             "owner_key": hex(owner_key.as_bytes()),
             "owner_plaintext": r#"{"name":"Wi-Fi"}"#,
             "owner_blob": hex(&owner_blob),
+            "file_chunks": send_chunks,
         },
         "item": {
             "vault_key": hex(vault_key.as_bytes()),

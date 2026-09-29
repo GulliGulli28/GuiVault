@@ -23,7 +23,8 @@ Erreurs : `{ "code": "…", "message": "…" }` (+ champs selon le code, ex.
 `account_disabled`, `quota_exceeded`, `ip_not_allowed`, `self_action`, `target_is_admin`,
 `backups_disabled`, `backup_running`, `mail_disabled`, `mail_failed`, `manifest_required`,
 `manifest_conflict`, `manifest_too_large`, `attachments_disabled`, `attachment_too_large`,
-`attachment_exists`, `attachment_complete`, `attachment_incomplete`, `invalid_*`, `internal`.
+`attachment_exists`, `attachment_complete`, `attachment_incomplete`, `send_complete`,
+`send_incomplete`, `invalid_*`, `internal`.
 
 Partout : `403 ip_not_allowed` si l'adresse du client n'est pas dans
 `GUIVAULT_ALLOWED_IPS` (sauf `GET /health`).
@@ -203,6 +204,19 @@ routes d'ouverture, sans compte, sont plus haut (rate-limitées par IP).
 | `POST /sends` | `CreateSendRequest { id, ciphertext, access_hash, owner_blob, password?, max_views?, expires_in_secs }` → `201` `SendSummary`. Une heure à `GUIVAULT_SEND_MAX_DAYS` jours (`400 invalid_expiry`), 1 à 1000 vues (`invalid_max_views`), taille d'un item au plus (`413 send_too_large`), 100 liens ouvrables par compte (`409 too_many_sends`) ; `403` si les liens sont désactivés |
 | `GET /sends` | mes liens, du plus récent au plus ancien : `[SendSummary { id, owner_blob, has_password, max_views, views, created_at, expires_at, last_viewed_at, available }]` — expirés compris jusqu'à leur effacement (horaire) |
 | `DELETE /sends/{id}` | supprime (`404` si ce n'est pas le mien) |
+| `PUT /sends/{id}/file/{index}` | l'auteur envoie un morceau du fichier (corps **brut**, au plus 1 Mio + 41 octets) → `204` ; `409 send_complete` une fois terminé |
+| `POST /sends/{id}/complete` | tous les morceaux reçus, taille totale annoncée → `SendSummary` ; sinon `409 send_incomplete`. Avant, le lien ne s'ouvre pas |
+| `POST /sends/{id}/file/{index}` | **sans compte**, hors du frein par IP : `{ token }` → le morceau, brut ; `404` sans jeton valable |
+
+**Lien avec un fichier** : `CreateSendRequest.file = { size, chunks }` (taille
+chiffrée totale, nombre de morceaux ; même limite que les pièces jointes,
+`413 send_too_large`, `400 invalid_send_file`, et compté dans le quota de
+l'auteur, `507 quota_exceeded`). L'ouvrir (`POST /sends/{id}/access`)
+consomme une vue comme d'habitude et rend en plus `download { token,
+chunks, expires_at }` : un jeton d'une heure (seul son SHA-256 est gardé)
+pour télécharger les morceaux sans consommer d'autre vue. Les morceaux
+restent le temps qu'un jeton vit, même après la dernière vue ; un fichier
+jamais terminé part au bout d'un jour. `SendSummary.file_size`.
 
 ## Pièces jointes
 
@@ -313,7 +327,10 @@ ciphertext  = 0x01 ‖ nonce(24) ‖ XChaCha20-Poly1305(enc_key, nonce, json, aa
 owner_blob  = même enveloppe sous la user key, aad = "guivault/v1/send-owner\0" ‖ id   ({ name, secret, kind })
 ```
 
-Le contenu (`json`) est `{ "v": 1, "kind": "text", "name", "text" }` ou
+Le contenu (`json`) est `{ "v": 1, "kind": "text", "name", "text" }`,
 `{ "v": 1, "kind": "item", "payload": <Payload d'un secret> }` (sans dossier,
-tags ni favori). Les paramètres `kdf` viennent du serveur : le client refuse
+tags ni favori), ou `{ "v": 1, "kind": "file", "name", "size", "mime"? }` —
+le fichier lui-même en morceaux de 1 Mio, `0x01 ‖ nonce(24) ‖
+XChaCha20-Poly1305(enc_key, nonce, tranche, aad = "guivault/v1/send-file\0" ‖ id
+‖ "\0" ‖ i ‖ "\0" ‖ (1 si dernier, sinon 0))`. Les paramètres `kdf` viennent du serveur : le client refuse
 ceux hors de `KdfParams::is_sane`.

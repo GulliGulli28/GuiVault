@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import type { PageContext } from "../App";
 import { api, errorMessage } from "../lib/api";
+import { formatSize } from "../lib/attachments";
+import { attachmentSealedSize } from "../lib/crypto";
 import { createSend, listSends, SEND_LIFETIMES, shareablePayload, type MySend, type SendPayload } from "../lib/sends";
 import type { SessionState } from "../lib/session";
 import { KIND_LABELS, type Payload, type SecretKind } from "../lib/types";
@@ -9,7 +11,8 @@ import { IconPlus, IconTrash } from "./ui-icons";
 import { CopyButton, Eyebrow, Field, formatWhen, Loading, Modal, PasswordInput, useDelayed } from "./ui";
 
 /** Les liens de partage de ce compte : qui en est où (ouvertures,
- * expiration), les recopier, les supprimer — et en créer un pour un texte. */
+ * expiration), les recopier, les supprimer — et en créer un pour un texte ou
+ * un fichier. */
 export function SendsPage({ ctx }: { ctx: PageContext }) {
   const [sends, setSends] = useState<MySend[] | null>(null);
   const [creating, setCreating] = useState(false);
@@ -30,7 +33,7 @@ export function SendsPage({ ctx }: { ctx: PageContext }) {
     <div className="flex h-full min-h-0 flex-col">
       <header className="flex shrink-0 items-center gap-2 border-b border-[var(--c-border)] px-4 py-2.5 max-md:pl-14">
         <h1 className="text-[14px] font-semibold text-[var(--c-text)]">Liens de partage</h1>
-        <button onClick={() => setCreating(true)} className="btn btn-primary btn-sm ml-auto"><IconPlus size={12} /> Nouveau texte</button>
+        <button onClick={() => setCreating(true)} className="btn btn-primary btn-sm ml-auto"><IconPlus size={12} /> Nouveau lien</button>
       </header>
       <div className="sidebar-scroll min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
         <p className="help-text max-w-2xl">
@@ -47,7 +50,7 @@ export function SendsPage({ ctx }: { ctx: PageContext }) {
                 <div className="min-w-0 flex-1">
                   <p className="flex min-w-0 items-center gap-1.5 text-[12.5px] text-[var(--c-text)]">
                     <span className="truncate">{s.name}</span>
-                    {s.kind && <span className="tag shrink-0">{s.kind === "text" ? "texte" : "élément"}</span>}
+                    {s.kind && <span className="tag shrink-0">{s.kind === "text" ? "texte" : s.kind === "file" ? `fichier${s.file_size ? ` · ${formatSize(s.file_size)}` : ""}` : "élément"}</span>}
                     {s.has_password && <span className="tag shrink-0" title="Un mot de passe est demandé à l'ouverture">mot de passe</span>}
                     {!s.available && <span className="tag shrink-0">{new Date(s.expires_at) <= new Date() ? "expiré" : "épuisé"}</span>}
                   </p>
@@ -97,10 +100,15 @@ const VIEW_CHOICES: { label: string; value: number | null }[] = [
   { label: "Sans limite", value: null },
 ];
 
-/** Créer un lien : pour un élément (`item`) ou un texte saisi ici. `onClose`
- * doit être stable (`useModalSurface`). */
-export function ShareLinkDialog({ session, item, onClose }: { session: SessionState; item?: Extract<Payload, { kind: SecretKind }>; onClose: () => void }) {
+/** Créer un lien : pour un élément (`item`), un fichier (`file`, une pièce
+ * jointe déchiffrée), ou un texte ou un fichier choisis ici. `onClose` doit
+ * être stable (`useModalSurface`). */
+export function ShareLinkDialog({ session, item, file, onClose }: { session: SessionState; item?: Extract<Payload, { kind: SecretKind }>; file?: File; onClose: () => void }) {
   const [maxDays, setMaxDays] = useState<number | null>(null);
+  const [maxFile, setMaxFile] = useState(0);
+  const [mode, setMode] = useState<"text" | "file">(file ? "file" : "text");
+  const [picked, setPicked] = useState<File | null>(file ?? null);
+  const [progress, setProgress] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [text, setText] = useState("");
   const [lifetime, setLifetime] = useState(86_400);
@@ -111,7 +119,10 @@ export function ShareLinkDialog({ session, item, onClose }: { session: SessionSt
   const [result, setResult] = useState<{ link: string; expiresAt: string; views: number | null; password: boolean } | null>(null);
 
   useEffect(() => {
-    api.health().then((h) => setMaxDays(h.send_max_days ?? 0)).catch(() => setMaxDays(0));
+    api.health().then((h) => {
+      setMaxDays(h.send_max_days ?? 0);
+      setMaxFile(h.max_attachment_bytes ?? 0);
+    }).catch(() => setMaxDays(0));
   }, []);
   const lifetimes = SEND_LIFETIMES.filter((l) => maxDays === null || l.secs <= maxDays * 86_400);
 
@@ -120,17 +131,30 @@ export function ShareLinkDialog({ session, item, onClose }: { session: SessionSt
     setBusy(true);
     setError(null);
     try {
-      const content: SendPayload = item ? { v: 1, kind: "item", payload: shareablePayload(item) } : { v: 1, kind: "text", name: name.trim() || "Texte", text };
-      const out = await createSend(session, content, { expiresIn: lifetime, maxViews: views ?? undefined, password: password || undefined });
+      const opts = { expiresIn: lifetime, maxViews: views ?? undefined, password: password || undefined };
+      let out;
+      if (!item && mode === "file" && picked) {
+        const data = new Uint8Array(await picked.arrayBuffer());
+        const content: SendPayload = { v: 1, kind: "file", name: picked.name || "fichier", size: data.length, mime: picked.type || null };
+        out = await createSend(session, content, opts, {
+          data,
+          onProgress: (done, total) => setProgress(total > 1 ? `Envoi… ${Math.round((done / total) * 100)} %` : "Envoi…"),
+        });
+      } else {
+        const content: SendPayload = item ? { v: 1, kind: "item", payload: shareablePayload(item) } : { v: 1, kind: "text", name: name.trim() || "Texte", text };
+        out = await createSend(session, content, opts);
+      }
       setResult({ link: out.link, expiresAt: out.summary.expires_at, views, password: !!password });
     } catch (err) {
       setError(errorMessage(err));
     } finally {
       setBusy(false);
+      setProgress(null);
     }
   };
 
-  const title = item ? "Partager par lien" : "Nouveau lien de partage";
+  const title = item ? "Partager par lien" : file ? `Partager « ${file.name} » par lien` : "Nouveau lien de partage";
+  const tooBig = mode === "file" && !!picked && maxFile > 0 && attachmentSealedSize(picked.size) > maxFile;
   if (maxDays === 0) {
     return (
       <Modal title={title} onClose={onClose}>
@@ -165,16 +189,37 @@ export function ShareLinkDialog({ session, item, onClose }: { session: SessionSt
             Le contenu de cet élément ({KIND_LABELS[item.kind]}, sans son dossier) est chiffré dans votre navigateur ; le lien porte la clé.
             Une copie : le modifier ensuite ne change pas ce que le lien montre.
           </p>
+        ) : file ? (
+          <p className="text-[12.5px] text-[var(--c-text-secondary)]">
+            « {file.name} » ({formatSize(file.size)}) est chiffré dans votre navigateur sous la clé du lien, puis envoyé ; le lien porte la clé.
+          </p>
         ) : (
           <>
-            <Field label="Nom" hint="Pour vous retrouver dans vos liens ; le destinataire le voit aussi.">
-              <input value={name} onChange={(e) => setName(e.target.value)} autoFocus placeholder="Code Wi-Fi" className="input" />
-            </Field>
-            <Field label="Texte">
-              <textarea value={text} onChange={(e) => setText(e.target.value)} rows={5} className="input input-mono min-h-[6rem] py-1.5" />
-            </Field>
+            {maxFile > 0 && (
+              <div className="segmented">
+                <button type="button" data-active={mode === "text"} onClick={() => setMode("text")}>Texte</button>
+                <button type="button" data-active={mode === "file"} onClick={() => setMode("file")}>Fichier</button>
+              </div>
+            )}
+            {mode === "text" ? (
+              <>
+                <Field label="Nom" hint="Pour vous retrouver dans vos liens ; le destinataire le voit aussi.">
+                  <input value={name} onChange={(e) => setName(e.target.value)} autoFocus placeholder="Code Wi-Fi" className="input" />
+                </Field>
+                <Field label="Texte">
+                  <textarea value={text} onChange={(e) => setText(e.target.value)} rows={5} className="input input-mono min-h-[6rem] py-1.5" />
+                </Field>
+              </>
+            ) : (
+              <div>
+                <label htmlFor="send-file" className="field-label">Fichier</label>
+                <input id="send-file" type="file" onChange={(e) => setPicked(e.target.files?.[0] ?? null)} className="block text-[12px] text-[var(--c-text-secondary)]" />
+                <p className="help-text mt-1">Chiffré dans votre navigateur avant l'envoi, {formatSize(maxFile)} au plus. Son nom est visible du destinataire, pas du serveur.</p>
+              </div>
+            )}
           </>
         )}
+        {tooBig && <p className="callout callout-danger">Ce fichier dépasse la taille permise sur ce serveur ({formatSize(maxFile)}).</p>}
         <div className="grid grid-cols-2 gap-3">
           <Field label="Expire dans">
             <select value={lifetime} onChange={(e) => setLifetime(Number(e.target.value))} className="input">
@@ -195,7 +240,7 @@ export function ShareLinkDialog({ session, item, onClose }: { session: SessionSt
         {error && <p className="callout callout-danger">{error}</p>}
         <div className="flex justify-end gap-2">
           <button type="button" onClick={onClose} className="btn btn-ghost">Annuler</button>
-          <button type="submit" disabled={busy || maxDays === null || (!item && !text)} className="btn btn-primary">{busy ? "Chiffrement…" : "Créer le lien"}</button>
+          <button type="submit" disabled={busy || maxDays === null || tooBig || (!item && (mode === "file" ? !picked : !text))} className="btn btn-primary">{busy ? progress ?? "Chiffrement…" : "Créer le lien"}</button>
         </div>
       </form>
     </Modal>

@@ -71,6 +71,10 @@ describe("guivault-crypto interop", () => {
     expect(() => c.openSend(keys, "autre-lien", fromHex(v.blob))).toThrow(c.CryptoError);
     const pw = await c.sendPasswordKey(v.password, fromHex(v.password_salt), v.password_kdf);
     const locked = c.sendKeys(fromHex(v.secret), pw);
+    for (const ch of v.file_chunks) {
+      expect(utf8.decode(c.openSendChunk(locked, v.id, ch.index, ch.last, fromHex(ch.blob)))).toBe(ch.plaintext);
+      expect(() => c.openSendChunk(keys, v.id, ch.index, ch.last, fromHex(ch.blob))).toThrow();
+    }
     expect(toHex(locked.access)).toBe(v.locked_access_key);
     expect(utf8.decode(c.openSend(locked, v.id, fromHex(v.locked_blob)))).toBe(v.plaintext);
     expect(() => c.openSend(keys, v.id, fromHex(v.locked_blob))).toThrow(c.CryptoError);
@@ -177,6 +181,9 @@ describe("guivault-crypto interop", () => {
         locked_access_hash: toHex(c.sendAccessHash(sendLocked)),
         locked_blob: toHex(c.sealSend(sendLocked, sendId, utf8.encode("partagé depuis le navigateur"))),
         owner_key: toHex(ownerKey), owner_plaintext: "{\"name\":\"Clé\"}", owner_blob: toHex(c.sealSendOwner(ownerKey, sendId, "{\"name\":\"Clé\"}")),
+        file_chunks: [[0, false, "du navigateur"], [1, true, "fin"]].map(([index, last, plaintext]) => ({
+          index, last, plaintext, blob: toHex(c.sealSendChunk(sendLocked, sendId, index as number, last as boolean, utf8.encode(plaintext as string))),
+        })),
       },
       item: { vault_key: toHex(vaultKey), vault_id: vaultId, item_id: itemId, item_type: "snippet", plaintext: "{\"kind\":\"snippet\"}", blob: toHex(itemBlob), name: "Équipe réseau", name_blob: toHex(c.sealVaultName(vaultKey, vaultId, "Équipe réseau")) },
       attachment: {

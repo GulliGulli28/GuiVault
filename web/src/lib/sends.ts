@@ -1,4 +1,5 @@
-/** Les liens de partage éphémères (« Send ») : un texte ou un élément,
+/** Les liens de partage éphémères (« Send ») : un texte, un élément ou un
+ * fichier (ses morceaux sous la clé du lien, `sealSendChunk`),
  * chiffré sous une clé tirée d'un secret qui ne voyage que dans le fragment
  * de l'URL (`#/send/<id>/<secret>`) — le navigateur ne l'envoie jamais au
  * serveur. Le serveur garde le chiffré, l'expiration et le compte des vues,
@@ -15,7 +16,9 @@ import type { Payload, SecretKind, SendSummary } from "./types";
  * format sans casser les liens déjà donnés. */
 export type SendPayload =
   | { v: 1; kind: "text"; name: string; text: string }
-  | { v: 1; kind: "item"; payload: Extract<Payload, { kind: SecretKind }> };
+  | { v: 1; kind: "item"; payload: Extract<Payload, { kind: SecretKind }> }
+  /** Le fichier lui-même est à part, en morceaux ; ici, de quoi le décrire. */
+  | { v: 1; kind: "file"; name: string; size: number; mime?: string | null };
 
 /** Ce que l'auteur garde pour lui, sous sa user key : de quoi reconnaître le
  * lien dans sa liste et le recopier. */
@@ -70,12 +73,20 @@ export function shareablePayload<P extends Extract<Payload, { kind: SecretKind }
 }
 
 export function sendName(content: SendPayload): string {
-  if (content.kind === "text") return content.name;
+  if (content.kind === "text" || content.kind === "file") return content.name;
   const entity = Object.values(content.payload).find((v) => typeof v === "object" && v !== null && "name" in v) as { name?: string } | undefined;
   return entity?.name || "Élément";
 }
 
-export async function createSend(state: SessionState, content: SendPayload, opts: SendOptions): Promise<{ link: string; summary: SendSummary }> {
+/** Crée un lien. Pour un fichier (`file`, avec un contenu `kind: "file"`),
+ * ses morceaux sont chiffrés et envoyés ensuite ; le lien ne s'ouvre qu'une
+ * fois le dernier reçu (sinon il est supprimé). */
+export async function createSend(
+  state: SessionState,
+  content: SendPayload,
+  opts: SendOptions,
+  file?: { data: Uint8Array; onProgress?: (done: number, total: number) => void },
+): Promise<{ link: string; summary: SendSummary }> {
   const id = uuid();
   const secret = randomBytes(c.SEND_SECRET_LEN);
   let password: { kdf: c.KdfParams; salt: string } | undefined;
@@ -88,8 +99,9 @@ export async function createSend(state: SessionState, content: SendPayload, opts
   const keys = c.sendKeys(secret, passwordKey);
   passwordKey?.fill(0);
   const note: OwnerNote = { name: sendName(content), secret: toBase64Url(secret), kind: content.kind };
+  const chunks = file ? c.attachmentChunkCount(file.data.length) : 0;
   try {
-    const summary = await api.createSend({
+    let summary = await api.createSend({
       id,
       ciphertext: toBase64(c.sealSend(keys, id, utf8.encode(JSON.stringify(content)))),
       access_hash: toBase64(c.sendAccessHash(keys)),
@@ -97,7 +109,21 @@ export async function createSend(state: SessionState, content: SendPayload, opts
       password,
       max_views: opts.maxViews,
       expires_in_secs: opts.expiresIn,
+      file: file ? { size: c.attachmentSealedSize(file.data.length), chunks } : undefined,
     });
+    if (file) {
+      try {
+        for (let i = 0; i < chunks; i++) {
+          const part = file.data.subarray(i * c.ATTACHMENT_CHUNK, Math.min(file.data.length, (i + 1) * c.ATTACHMENT_CHUNK));
+          await api.putSendChunk(id, i, c.sealSendChunk(keys, id, i, i === chunks - 1, part));
+          file.onProgress?.(i + 1, chunks);
+        }
+        summary = await api.completeSend(id);
+      } catch (e) {
+        void api.deleteSend(id).catch(() => {});
+        throw e;
+      }
+    }
     return { link: sendLink(id, secret), summary };
   } finally {
     keys.enc.fill(0);
@@ -143,7 +169,8 @@ export async function openSend(
   secret: Uint8Array,
   info: { password?: { kdf: c.KdfParams; salt: string } },
   password?: string,
-): Promise<{ content: SendPayload; viewsLeft: number | null; expiresAt: string }> {
+  onProgress?: (done: number, total: number) => void,
+): Promise<{ content: SendPayload; viewsLeft: number | null; expiresAt: string; file?: Blob }> {
   let passwordKey: Uint8Array | undefined;
   if (info.password) {
     if (!password) throw new Error("Ce lien demande un mot de passe.");
@@ -159,10 +186,30 @@ export async function openSend(
     } catch {
       throw new Error("Le contenu de ce lien ne s'ouvre pas : le lien est incomplet, ou le contenu a été altéré.");
     }
-    if (content.v !== 1 || (content.kind !== "text" && !(content.kind === "item" && isSecret(content.payload)))) {
+    if (content.v !== 1 || (content.kind !== "text" && content.kind !== "file" && !(content.kind === "item" && isSecret(content.payload)))) {
       throw new Error("Ce lien contient un format inconnu de cette version de GuiVault.");
     }
-    return { content, viewsLeft: res.views_left, expiresAt: res.expires_at };
+    let file: Blob | undefined;
+    if (content.kind === "file") {
+      // La vue est consommée : on télécharge tout de suite, avec le jeton
+      // qu'elle a donné (une heure).
+      if (!res.download) throw new Error("Le serveur n'a pas donné de quoi télécharger le fichier.");
+      const parts: Uint8Array[] = [];
+      const n = res.download.chunks;
+      for (let i = 0; i < n; i++) {
+        const sealed = await api.sendFileChunk(id, i, res.download.token);
+        try {
+          parts.push(c.openSendChunk(keys, id, i, i === n - 1, sealed));
+        } catch {
+          throw new Error("Le fichier de ce lien ne s'ouvre pas : un morceau manque, est déplacé ou altéré.");
+        }
+        onProgress?.(i + 1, n);
+      }
+      const size = parts.reduce((t, p) => t + p.length, 0);
+      if (size !== content.size) throw new Error(`Fichier incomplet : ${size} octets sur ${content.size}.`);
+      file = new Blob(parts as BlobPart[], { type: content.mime || "application/octet-stream" });
+    }
+    return { content, viewsLeft: res.views_left, expiresAt: res.expires_at, file };
   } finally {
     keys.enc.fill(0);
     keys.access.fill(0);

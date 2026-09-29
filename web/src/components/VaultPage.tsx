@@ -547,7 +547,7 @@ function VaultBody({ ctx, vault, itemId }: { ctx: PageContext; vault: VaultView;
                     <>
                       <ItemView payload={current.payload} index={index} />
                       {isSecret(current.payload) && (
-                        <AttachmentsPanel key={current.id} vault={vault} item={current} writable={writable} offline={!!ctx.session.offline} onChanged={() => void load()} notify={ctx.notify} error={ctx.error} />
+                        <AttachmentsPanel key={current.id} vault={vault} item={current} writable={writable} offline={!!ctx.session.offline} session={ctx.session} onChanged={() => void load()} notify={ctx.notify} error={ctx.error} />
                       )}
                     </>
                   ) : (
