@@ -654,8 +654,12 @@ export async function acceptIntegrity(vault: VaultView): Promise<void> {
   integrity.delete(vault.id);
 }
 
+/** L'écriture d'un élément refusée parce qu'il a changé entre-temps
+ * (`409 revision_mismatch`). `current` : sa version sur le serveur, telle que
+ * le refus la joint — chiffrée, `null` s'il n'y est pas ; supprimé, il est
+ * là avec `deleted`. De quoi proposer une fusion (`lib/merge.ts`). */
 export class RevisionConflict extends Error {
-  constructor(public readonly current: number) {
+  constructor(public readonly current: Item | null) {
     super("Cet élément a été modifié entre-temps par quelqu'un d'autre : rechargez-le avant de réessayer.");
   }
 }
@@ -673,7 +677,7 @@ export async function putPayload(vault: VaultView, payload: Payload, baseRevisio
       (manifest) => api.putItem(vault.id, id, { item_type: payload.kind, ciphertext: b64(ciphertext), base_revision: baseRevision, manifest }),
     );
   } catch (e) {
-    if (e instanceof ApiError && e.code === "revision_mismatch") throw new RevisionConflict(Number(e.extra.current));
+    if (e instanceof ApiError && e.code === "revision_mismatch") throw new RevisionConflict((e.extra.current as Item | null) ?? null);
     throw e;
   }
 }
@@ -717,7 +721,7 @@ export async function restoreVersion(vault: VaultView, v: { item_id: string; ite
       (manifest) => api.putItem(vault.id, v.item_id, { item_type: v.item_type, ciphertext: v.ciphertext, base_revision: baseRevision, manifest }),
     );
   } catch (e) {
-    if (e instanceof ApiError && e.code === "revision_mismatch") throw new RevisionConflict(Number(e.extra.current));
+    if (e instanceof ApiError && e.code === "revision_mismatch") throw new RevisionConflict((e.extra.current as Item | null) ?? null);
     throw e;
   }
 }

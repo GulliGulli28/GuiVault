@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { VaultIndex } from "../../lib/entities";
-import { emptyLogin } from "../../lib/items";
+import { emptyLogin, PASSWORD_HISTORY_MAX } from "../../lib/items";
 import { decodeQrImage } from "../../lib/qr";
 import { parseTotp } from "../../lib/totp";
 import type { Login, LoginUri, Payload, UriMatch } from "../../lib/types";
@@ -14,7 +14,6 @@ import { Field, FormShell, useSeed } from "./common";
 import { SecretFooter, SecretHeader } from "./SecretBits";
 
 const MATCH_LABELS: Record<UriMatch, string> = { domain: "domaine", host: "hôte", startsWith: "commence par", exact: "exact", regex: "expression régulière", never: "jamais" };
-const HISTORY_MAX = 10;
 
 export function LoginForm({ initial, index, defaultGroupId, onSave, onCancel }: {
   initial?: Login;
@@ -45,7 +44,7 @@ export function LoginForm({ initial, index, defaultGroupId, onSave, onCancel }: 
     // Un mot de passe remplacé passe dans l'historique, borné aux dix
     // derniers — le format de Bitwarden, qu'on relit et réexporte.
     if (initial && initial.password && initial.password !== out.password) {
-      out.passwordHistory = [{ password: initial.password, changedAt: new Date().toISOString() }, ...login.passwordHistory].slice(0, HISTORY_MAX);
+      out.passwordHistory = [{ password: initial.password, changedAt: new Date().toISOString() }, ...login.passwordHistory].slice(0, PASSWORD_HISTORY_MAX);
     }
     await onSave({ kind: "login", login: out });
   };

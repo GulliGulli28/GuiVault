@@ -137,7 +137,10 @@ HMAC pour les sels fictifs de prelogin.
     apparence/compte/sécurité/sessions, `InvitationsPage`, `GeneratorPanel`,
     `AdminPage` administration du serveur, si `user.is_admin`),
     `SearchPalette` (Ctrl+K, tous les vaults), `ItemHistory` (versions d'un
-    élément), `ShortcutsHelp` (« ? ») — les raccourcis à une touche passent
+    élément), `MergeDialog` (+ `useMerge`, logique dans `lib/merge.ts` : un
+    enregistrement refusé pour modification concurrente se fusionne champ
+    par champ — page du vault et popup ; une nouvelle écriture depuis un
+    formulaire de modification passe par lui), `ShortcutsHelp` (« ? ») — les raccourcis à une touche passent
     par `lib/keyboard.ts` (`plainShortcut` : ni en saisie, ni sous une
     fenêtre). Un `onClose` passé à une fenêtre (`useModalSurface`) doit être
     stable (`useCallback`) : le hook rend le focus à l'ouvreur quand il

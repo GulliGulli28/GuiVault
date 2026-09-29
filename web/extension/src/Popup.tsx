@@ -22,6 +22,7 @@ import { Logo } from "../../src/components/Logo";
 import { CLEAR_CHOICES, clipboardHash, loadClearSeconds, saveClearSeconds, setClearScheduler } from "../../src/lib/clipboard";
 import { IntegrityBanner } from "../../src/components/IntegrityBanner";
 import { RollbackBanner } from "../../src/components/RollbackBanner";
+import { useMerge } from "../../src/components/MergeDialog";
 import { OfflineSetting } from "../../src/components/OfflineSetting";
 import { loadOfflineCopy, refreshOfflineCopy, type OfflineCopy } from "../../src/lib/offline";
 import { copyText, PasswordInput, SecretValue } from "../../src/components/ui";
@@ -327,6 +328,27 @@ export function Popup() {
     setScreen({ kind: "login", reason: "manual" });
   };
 
+  // Modifier un élément qui a changé entre-temps : la fusion champ par
+  // champ, comme sur la page du vault (`useMerge`).
+  const editing = view.kind === "edit" ? entries.find((e) => e.item.id === view.id) ?? null : null;
+  const editingIndex = useMemo(() => indexItems(editing ? cache[editing.vaultId]?.items ?? [] : []), [editing, cache]);
+  const merging = useMerge({
+    vault: screen.kind === "vault" && editing ? screen.state.vaults.find((v) => v.id === editing.vaultId) : undefined,
+    index: editingIndex,
+    write: async (p, revision) => {
+      if (editing) await savePayload(editing.vaultId, p, revision);
+    },
+    done: async (p, message) => {
+      await reloadCache();
+      say(message);
+      go({ kind: "detail", id: payloadEntity(p).id });
+    },
+    discard: () => {
+      void reloadCache();
+      if (editing) go({ kind: "detail", id: editing.item.id });
+    },
+  });
+
   if (!settings || screen.kind === "loading") return <div className="p-4 text-[12px] text-[var(--c-text-muted)]">Chargement…</div>;
 
   /** Prendre acte d'un écart au manifeste, puis relire le vault. */
@@ -407,7 +429,12 @@ export function Popup() {
             onDraft={setDraft}
             index={indexFor(current.vaultId)}
             onSave={async (p) => {
-              await savePayload(current.vaultId, p, current.item.revision);
+              try {
+                await savePayload(current.vaultId, p, current.item.revision);
+              } catch (e) {
+                if (merging.offer(current.payload, p, e)) return;
+                throw e;
+              }
               await reloadCache();
               say(`« ${payloadName(p)} » enregistré.`);
               go({ kind: "detail", id: payloadEntity(p).id });
@@ -570,6 +597,7 @@ export function Popup() {
         </div>
       )}
       {notice && <div role="status" className="shrink-0 border-t border-[var(--c-border)] bg-[var(--c-bg)] px-3 py-1.5 text-[11.5px] text-[var(--c-text-secondary)]">{notice}</div>}
+      {merging.dialog}
     </div>
   );
 }

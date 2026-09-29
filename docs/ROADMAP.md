@@ -15,7 +15,7 @@ des blobs qu'il ne sait pas lire. Cocher au fur et à mesure.
 paramètres Argon2id épinglés, retour en arrière détecté, enveloppes
 authentifiées, empreinte de l'inviteur) ; dans les §1, §3 et §4 : presse-papiers
 effacé, historique et corbeille, copie hors ligne, recherche globale
-(Ctrl+K), raccourcis, tri, CLI `gv`, **remplissage fiable** de l'extension
+(Ctrl+K), raccourcis, tri, **fusion des conflits**, CLI `gv`, **remplissage fiable** de l'extension
 (shadow DOM, cadres, corpus rejoué en CI), **agent SSH dans Guiterm** ; dans le §2 : **accès d'urgence**,
 **liens de partage** et **rapport de santé** (web). Chaque point est coché ci-dessous avec où il
 vit dans le code.
@@ -27,8 +27,9 @@ confortable :
    (alerte comprise), extension, vecteurs d'interop, `gv` et Guiterm faits ;
    reste l'activation, une fois ce Guiterm publié. La liste exacte, dans l'ordre :
    [`MANIFESTE.md`](MANIFESTE.md), « Ce qui reste ».
-2. **Conflits (409)** (§4) : proposer une fusion champ par champ au lieu
-   de recharger. L'exploitation (§5) et le mobile sont faits.
+2. ~~**Conflits (409)**~~ (§4) : fait — fusion champ par champ. L'exploitation
+   (§5) et le mobile sont faits aussi ; la suite est à choisir parmi les
+   cases encore vides ci-dessous.
 
 ## 0. Sécurité face à un serveur malveillant
 
@@ -194,8 +195,17 @@ paramètres ou formats anciens.
   Échap. **PWA installable** (`manifest.webmanifest`, icônes 192/512 et
   masquable ; Chrome la juge installable). Pas d'app native : la PWA et la
   copie hors ligne couvrent consultation, copie, TOTP et liens reçus.
-- [ ] **Conflits (409)** : on recharge et on lève une erreur ; proposer une
-  fusion champ par champ (ma version / celle du serveur).
+- [x] **Conflits (409)** : fusion champ par champ au lieu d'un
+  rechargement qui perdait la saisie. Le refus joint la version du serveur
+  (`RevisionConflict.current`) ; `lib/merge.ts` fusionne à trois versions
+  (celle ouverte, la nôtre, celle du serveur) : un champ changé d'un seul
+  côté est repris, changé des deux côtés il se choisit (`MergeDialog`,
+  secrets masqués) ; le résultat part de la version du serveur (champs
+  inconnus gardés), l'historique des mots de passe s'unit et le mot de
+  passe écarté y entre. Supprimé entre-temps : recréer avec sa version.
+  Page du vault et popup de l'extension (`useMerge`). Reste : les petites
+  écritures (favori, glisser vers un dossier, TOTP retiré) rechargent
+  encore sur un conflit.
 
 ## 5. Exploitation (auto-hébergement)
 

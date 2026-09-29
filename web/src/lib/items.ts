@@ -3,6 +3,9 @@
 import { uuid } from "./bytes";
 import type { ApiKey, AwsAccess, Card, Identity, Login, Note, Payload, SecretKind } from "./types";
 
+/** Les anciens mots de passe gardés sur un identifiant. */
+export const PASSWORD_HISTORY_MAX = 10;
+
 export function emptyLogin(groupId: string | null = null): Login {
   return { id: uuid(), name: "", groupId, tags: [], username: "", password: "", uris: [], totp: null, passkeys: [], passwordHistory: [] };
 }

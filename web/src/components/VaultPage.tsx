@@ -18,6 +18,7 @@ import { IconHistory, IconLink, IconStar, IconTools } from "./secret-icons";
 import { ShareLinkDialog } from "./SendsPage";
 import { ItemHistory } from "./ItemHistory";
 import { IntegrityBanner } from "./IntegrityBanner";
+import { useMerge } from "./MergeDialog";
 import { ShortcutsHelp } from "./ShortcutsHelp";
 import { IconChevronDown, IconCopy, IconEdit, IconFolder, IconPlus, IconRefresh, IconSearch, IconSettings, IconTrash } from "./ui-icons";
 import { copyText, formatWhen, Loading, useDelayed } from "./ui";
@@ -195,21 +196,41 @@ function VaultBody({ ctx, vault, itemId }: { ctx: PageContext; vault: VaultView;
     await load();
   };
 
+  const leaveEdit = async (payload: Payload, message: string) => {
+    ctx.notify(message);
+    setMode({ kind: "view" });
+    setStale(false);
+    await load();
+    setSelected(payloadIdOf(payload));
+  };
+
+  // Enregistrer une modification refusée parce que l'élément a changé
+  // entre-temps : la fusion plutôt qu'un rechargement qui perdrait la saisie.
+  const merging = useMerge({
+    vault,
+    index,
+    write: async (p, revision) => {
+      await putPayload(vault, p, revision);
+    },
+    done: leaveEdit,
+    discard: () => {
+      setMode({ kind: "view" });
+      setStale(false);
+      void load();
+    },
+  });
+
   const save = async (payload: Payload, baseRevision?: number) => {
     try {
       await putPayload(vault, payload, baseRevision);
     } catch (e) {
       if (e instanceof RevisionConflict) {
+        if (baseRevision !== undefined && current?.ok && merging.offer(current.payload, payload, e)) return;
         await load();
-        throw e;
       }
       throw e;
     }
-    ctx.notify(`« ${payloadName(payload)} » enregistré.`);
-    setMode({ kind: "view" });
-    setStale(false);
-    await load();
-    setSelected(payloadIdOf(payload));
+    await leaveEdit(payload, `« ${payloadName(payload)} » enregistré.`);
   };
 
   const remove = async () => {
@@ -477,7 +498,7 @@ function VaultBody({ ctx, vault, itemId }: { ctx: PageContext; vault: VaultView;
         <PaneHandle onMouseDown={list.onMouseDown} />
         <section className={`flex min-h-0 flex-1 flex-col ${list.isDragging ? "pointer-events-none select-none" : ""}`}>
           {stale && mode.kind !== "view" && (
-            <p className="callout callout-warn m-3 mb-0">Ce vault a été modifié entre-temps. Si cet élément l'a été aussi, l'enregistrement sera refusé : rechargez alors avant de réessayer.</p>
+            <p className="callout callout-warn m-3 mb-0">Ce vault a été modifié entre-temps. Si cet élément l'a été aussi, l'enregistrement vous proposera de fusionner les deux versions.</p>
           )}
           {mode.kind === "new" && (
             <ItemForm key={`${mode.itemKind}-${mode.groupId ?? ""}`} kind={mode.itemKind} index={index} defaultGroupId={mode.groupId !== undefined ? mode.groupId : selectedGroupId} onSave={(p) => save(p)} onCancel={() => setMode({ kind: "view" })} onAddIcon={addIcon} />
@@ -565,6 +586,7 @@ function VaultBody({ ctx, vault, itemId }: { ctx: PageContext; vault: VaultView;
         />
       )}
       {help && <ShortcutsHelp onClose={closeHelp} />}
+      {merging.dialog}
       {sharing && current?.ok && isSecret(current.payload) && <ShareLinkDialog session={ctx.session} item={current.payload} onClose={closeSharing} />}
       {history && current && (
         <ItemHistory
