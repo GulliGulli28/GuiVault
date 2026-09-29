@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { api, ApiError, errorMessage } from "../lib/api";
+import { loginWithPasskey, passkeysSupported } from "../lib/accountPasskeys";
 import { loadOfflineCopy, type OfflineCopy } from "../lib/offline";
 import { login, openOffline, register, type SessionState } from "../lib/session";
 import type { HealthResponse } from "../lib/types";
@@ -70,6 +71,19 @@ export function LoginScreen({ onSession }: { onSession: (s: SessionState) => voi
       const down = !(err instanceof ApiError) || err.status >= 500;
       if (down) setUnreachable(true);
       setError(down && !(err instanceof ApiError) ? "Serveur injoignable." : errorMessage(err));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  /** Sans mot de passe maître : la passkey signe, sa PRF rouvre le coffre. */
+  const withPasskey = async () => {
+    setError(null);
+    setBusy("Passkey…");
+    try {
+      onSession(await loginWithPasskey());
+    } catch (err) {
+      setError(err instanceof DOMException && err.name === "NotAllowedError" ? "Connexion par passkey annulée, ou aucune passkey de ce coffre sur cet appareil." : errorMessage(err));
     } finally {
       setBusy(null);
     }
@@ -169,6 +183,11 @@ export function LoginScreen({ onSession }: { onSession: (s: SessionState) => voi
                 {busy ?? (mode === "register" ? "Créer le compte" : "Se connecter")}
               </button>
             </div>
+            {mode === "login" && health?.passkeys && passkeysSupported() && (
+              <button type="button" onClick={() => void withPasskey()} disabled={busy !== null} className="btn btn-secondary w-full justify-center">
+                Se connecter avec une passkey
+              </button>
+            )}
           </form>
         )}
         <p className="help-text mt-3 text-center">Le déchiffrement se fait dans ce navigateur. Rien n'est conservé après fermeture de l'onglet — sauf, si vous l'avez activée, une copie chiffrée pour l'accès hors ligne.</p>

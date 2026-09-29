@@ -17,7 +17,8 @@ authentifiées, empreinte de l'inviteur) ; dans les §1, §3 et §4 : presse-pap
 effacé, historique et corbeille, copie hors ligne, recherche globale
 (Ctrl+K), raccourcis, tri, **fusion des conflits**, CLI `gv`, **remplissage fiable** de l'extension
 (shadow DOM, cadres, corpus rejoué en CI), **agent SSH dans Guiterm** ; dans le §2 : **accès d'urgence**,
-**liens de partage**, **rapport de santé** (web) et **pièces jointes**. Chaque point est coché ci-dessous avec où il
+**liens de partage**, **rapport de santé** (web), **pièces jointes** et
+**connexion par passkey**. Chaque point est coché ci-dessous avec où il
 vit dans le code.
 
 **Ensuite, dans cet ordre** — du plus demandé ou du plus exposé au plus
@@ -153,8 +154,15 @@ paramètres ou formats anciens.
   `web/src/lib/health.ts` ; relais : `routes/lookups.rs`
   (`GUIVAULT_HEALTH_LOOKUPS`, désactivable). Reste : dans l'extension et
   Guiterm ; « ignorer » un élément signalé ; doublons avec fusion (§1).
-- [ ] **Déverrouillage par passkey** (extension WebAuthn PRF) et code PIN
-  dans l'extension ; **2FA WebAuthn** (seul TOTP aujourd'hui).
+- [x] **Connexion par passkey** ([`PASSKEYS.md`](PASSKEYS.md)) : sans mot de
+  passe maître ni code TOTP, dans l'interface web. La PRF de WebAuthn tire
+  une clé qui enveloppe la user key ; le serveur garde l'enveloppe sans
+  pouvoir l'ouvrir et vérifie les signatures (`src/webauthn.rs`, Rust pur,
+  utilisateur vérifié exigé, compteur contre les clones). Ajouter redemande
+  le mot de passe maître. Activée par `GUIVAULT_PUBLIC_URL`.
+- [ ] Passkey et **code PIN dans l'extension** (ses pages ont leur propre
+  origine) ; **2FA WebAuthn** (une clé en second facteur du mot de passe :
+  la vérification est là, restent les routes et l'interface).
 - [ ] Alias d'e-mail dans le générateur (SimpleLogin / addy.io), comme
   Proton Pass — moins prioritaire.
 

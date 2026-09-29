@@ -11,6 +11,7 @@ pub async fn health(State(state): State<AppState>) -> Json<HealthResponse> {
         registration: state.config.registration,
         send_max_days: state.config.send_max_days,
         max_attachment_bytes: state.config.max_attachment_bytes,
+        passkeys: state.config.passkeys.is_some(),
         health_lookups: state.config.health_lookups,
     })
 }

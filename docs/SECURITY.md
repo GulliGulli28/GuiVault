@@ -17,6 +17,7 @@ chiffrées.
 | Serveur malveillant qui **substitue une clé publique** pour lire un vault partagé | C'est l'attaque principale contre tout système de partage E2E. Défense : l'**empreinte** de la clé publique (`fingerprint`) est renvoyée partout où une clé publique apparaît ; le client DOIT l'afficher et demander une vérification hors bande (voix, messagerie interne) avant le premier partage vers une personne, puis épingler la clé (TOFU) et alerter si elle change. Dans l'autre sens, l'enveloppe de la clé de vault est authentifiée (format 2) : le destinataire voit l'empreinte de qui la lui a remise et la vérifie de même. |
 | Vol du mot de passe maître seul (hameçonnage, épaule) | Second facteur TOTP optionnel : sans le code, pas de session. Ne protège pas contre un vol de mot de passe **plus** un dump de base. |
 | Vol d'un jeton d'accès | Durée 15 min. Révocable (sessions). |
+| Connexion par passkey (`PASSKEYS.md`) | La passkey remplace mot de passe **et** second facteur : sa signature WebAuthn est vérifiée (site, origine, défi à usage unique, utilisateur vérifié exigé, compteur qui doit monter), et la user key ne revient que sous une clé tirée de sa PRF, que le serveur n'a jamais. Un serveur compromis ne peut ni fabriquer une connexion qui ouvre le coffre, ni rouvrir l'enveloppe. En ajouter une redemande le mot de passe maître : une session volée ne plante pas de porte d'entrée durable. |
 | Vol d'un jeton de rafraîchissement | Rotation à chaque usage ; le rejeu de l'ancien révoque la session entière. |
 | Force brute sur le mot de passe (en ligne) | Rate-limit par IP sur `/auth/*` ; réponses 401 uniformes ; hachage à coût constant même pour un e-mail inconnu (pas de différence de temps mesurable). |
 | Force brute (hors ligne, avec le dump) | Argon2id 64 MiB côté client **puis** Argon2id 19 MiB côté serveur sur la clé d'auth. La clé d'auth est dérivée par HKDF *à côté* de la clé de chiffrement : la casser ne donne rien sur les données sans refaire toute la dérivation depuis le mot de passe. |
@@ -44,7 +45,10 @@ chiffrées.
 Adresses e-mail, appartenance aux vaults et rôles, nombre et **types**
 d'items (`host`, `ssh-key`, `password`…), dates, révisions, IP/user-agent
 des sessions, journal d'audit. Ces métadonnées suffisent à dire « Alice
-partage 12 hôtes et 3 clés avec Bob », jamais lesquels. Des **pièces
+partage 12 hôtes et 3 clés avec Bob », jamais lesquels. Des **passkeys**
+du compte, il garde la clé publique, le nom, le compteur de signatures et
+les dates d'usage — et une enveloppe de la user key qu'il ne sait pas
+ouvrir. Des **pièces
 jointes**, il voit la taille chiffrée (donc, à 41 octets par Mio près, la
 taille du fichier), quand elles sont ajoutées, et à quel item elles
 appartiennent — ni leur nom, ni leur type, ni leur contenu : chacune est

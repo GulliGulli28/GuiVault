@@ -25,6 +25,7 @@ pub mod history;
 pub mod invitations;
 pub mod items;
 pub mod lookups;
+pub mod passkeys;
 pub mod sends;
 pub mod sync;
 pub mod totp;
@@ -54,6 +55,8 @@ pub fn router(state: AppState) -> Router {
         .route("/auth/login", post(auth::login))
         .route("/auth/refresh", post(auth::refresh))
         .route("/auth/totp/verify", post(totp::verify))
+        .route("/auth/passkeys/login/start", post(passkeys::login_start))
+        .route("/auth/passkeys/login", post(passkeys::login))
         .route("/sends/{id}/access", get(sends::info).post(sends::access))
         .layer(GovernorLayer::new(Arc::new(governor)));
 
@@ -65,6 +68,9 @@ pub fn router(state: AppState) -> Router {
         .route("/auth/sessions", get(auth::list_sessions))
         .route("/auth/sessions/{id}", delete(auth::revoke_session))
         .route("/auth/totp", get(totp::status))
+        .route("/auth/passkeys", get(passkeys::list).post(passkeys::register))
+        .route("/auth/passkeys/register/start", post(passkeys::register_start))
+        .route("/auth/passkeys/{id}", delete(passkeys::delete))
         .route("/auth/totp/setup", post(totp::setup))
         .route("/auth/totp/enable", post(totp::enable))
         .route("/auth/totp/disable", post(totp::disable))

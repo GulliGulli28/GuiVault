@@ -55,6 +55,13 @@ mime_guess = "2"
 flate2 = "1"
 # E-mails facultatifs (`src/mail.rs`) : SMTP en rustls/ring, comme le reste.
 lettre = { version = "0.11", default-features = false, features = ["smtp-transport", "builder", "hostname", "pool", "tokio1-rustls-tls"] }
+# Connexion par passkey (`src/webauthn.rs`) : la vérification WebAuthn, en
+# Rust pur (webauthn-rs tire OpenSSL). ES256, EdDSA et RS256 (Windows
+# Hello) ; CBOR pour l'attestation et les clés COSE.
+p256 = { version = "0.13", default-features = false, features = ["ecdsa", "std"] }
+ed25519-dalek = { version = "2", default-features = false, features = ["std"] }
+rsa = { version = "0.9", default-features = false, features = ["std", "sha2"] }
+ciborium = "0.2"
 
 [dev-dependencies]
 flate2 = "1"

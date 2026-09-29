@@ -759,6 +759,57 @@ pub fn open_send_owner(user_key: &SymmetricKey, send_id: &str, blob: &[u8]) -> R
     open(user_key, blob, &send_aad("guivault/v1/send-owner", send_id))
 }
 
+// ─── Connexion par passkey ──────────────────────────────────────────────────
+//
+// `docs/PASSKEYS.md`. L'extension PRF de WebAuthn fait calculer à
+// l'authentificateur un secret propre à la passkey, jamais vu du serveur ;
+// on en tire une clé qui enveloppe la user key, gardée par le serveur à côté
+// de la passkey. Se connecter avec elle : le serveur vérifie la signature
+// WebAuthn et rend l'enveloppe, que seule la PRF rouvre.
+
+/// Le sel donné à la PRF : fixe, la sortie dépend déjà de la passkey (et le
+/// navigateur le hache encore avant l'authentificateur).
+pub fn passkey_prf_salt() -> [u8; 32] {
+    Sha256::digest(b"guivault/v1/passkey-prf").into()
+}
+
+/// La clé tirée de la sortie PRF (32 octets au moins).
+pub fn passkey_key(prf_output: &[u8]) -> Result<SymmetricKey, CryptoError> {
+    if prf_output.len() < KEY_LEN {
+        return Err(CryptoError::Format);
+    }
+    let mut key = [0u8; KEY_LEN];
+    Hkdf::<Sha256>::new(None, prf_output)
+        .expand(b"guivault/v1/passkey-key", &mut key)
+        .expect("32 octets est une longueur HKDF valide");
+    Ok(SymmetricKey(key))
+}
+
+fn passkey_aad(credential_id: &[u8]) -> Vec<u8> {
+    let mut aad = b"guivault/v1/passkey-user-key\0".to_vec();
+    aad.extend_from_slice(credential_id);
+    aad
+}
+
+/// La user key sous la clé d'une passkey, liée à l'identifiant de celle-ci :
+/// l'enveloppe d'une passkey ne s'ouvre pas avec la PRF d'une autre.
+pub fn seal_passkey_user_key(
+    key: &SymmetricKey,
+    credential_id: &[u8],
+    user_key: &SymmetricKey,
+) -> Result<Vec<u8>, CryptoError> {
+    seal(key, user_key.as_bytes(), &passkey_aad(credential_id))
+}
+
+pub fn open_passkey_user_key(
+    key: &SymmetricKey,
+    credential_id: &[u8],
+    blob: &[u8],
+) -> Result<SymmetricKey, CryptoError> {
+    let plain = open(key, blob, &passkey_aad(credential_id))?;
+    SymmetricKey::from_slice(&plain)
+}
+
 /// Un morceau du fichier d'un lien (`kind: "file"`), sous la clé du lien —
 /// donc derrière son mot de passe s'il en a un —, lié à sa place comme ceux
 /// des pièces jointes ([`attachment`]) : ni réordonné, ni tronqué, ni
@@ -1014,6 +1065,21 @@ mod tests {
         assert_eq!(open_send_owner(&uk, "s-1", &owner).unwrap(), b"{}");
         assert!(open_send_owner(&uk, "s-2", &owner).is_err());
         assert!(open_user_settings(&uk, &owner).is_err());
+    }
+
+    #[test]
+    fn passkey_envelope_needs_the_prf_and_its_credential() {
+        let user_key = SymmetricKey::random();
+        let k = passkey_key(&[1u8; 32]).unwrap();
+        let blob = seal_passkey_user_key(&k, b"cred-1", &user_key).unwrap();
+        assert_eq!(
+            open_passkey_user_key(&k, b"cred-1", &blob).unwrap().as_bytes(),
+            user_key.as_bytes()
+        );
+        assert!(open_passkey_user_key(&k, b"cred-2", &blob).is_err());
+        assert!(open_passkey_user_key(&passkey_key(&[2u8; 32]).unwrap(), b"cred-1", &blob).is_err());
+        assert!(passkey_key(&[0u8; 16]).is_err());
+        assert_ne!(passkey_prf_salt(), [0u8; 32]);
     }
 
     #[test]

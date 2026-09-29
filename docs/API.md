@@ -24,7 +24,8 @@ Erreurs : `{ "code": "…", "message": "…" }` (+ champs selon le code, ex.
 `backups_disabled`, `backup_running`, `mail_disabled`, `mail_failed`, `manifest_required`,
 `manifest_conflict`, `manifest_too_large`, `attachments_disabled`, `attachment_too_large`,
 `attachment_exists`, `attachment_complete`, `attachment_incomplete`, `send_complete`,
-`send_incomplete`, `invalid_*`, `internal`.
+`send_incomplete`, `passkeys_disabled`, `invalid_challenge`, `invalid_passkey`,
+`passkey_exists`, `too_many_passkeys`, `invalid_*`, `internal`.
 
 Partout : `403 ip_not_allowed` si l'adresse du client n'est pas dans
 `GUIVAULT_ALLOWED_IPS` (sauf `GET /health`).
@@ -33,7 +34,7 @@ Partout : `403 ip_not_allowed` si l'adresse du client n'est pas dans
 
 | | |
 |---|---|
-| `GET /health` | `{ status, protocol_version, server_version, registration, send_max_days, health_lookups }` — `send_max_days` : durée de vie maximale d'un lien de partage, `0` (ou absent, serveur plus ancien) si les liens sont désactivés ; `health_lookups` : le serveur relaie les recherches du rapport de santé |
+| `GET /health` | `{ status, protocol_version, server_version, registration, send_max_days, health_lookups, max_attachment_bytes, passkeys }` — `send_max_days` : durée de vie maximale d'un lien de partage, `0` (ou absent, serveur plus ancien) si les liens sont désactivés ; `health_lookups` : le serveur relaie les recherches du rapport de santé |
 
 ## Authentification (rate-limitées par IP)
 
@@ -44,6 +45,8 @@ Partout : `403 ip_not_allowed` si l'adresse du client n'est pas dans
 | `POST /auth/login` | `{ email, auth_key, device_name? }` → `200` `LoginResponse` (`access_token`, `refresh_token`, `user`, `protected_user_key`, `protected_private_key`) — ou `202` `TotpChallenge { totp_token }` si le compte a un second facteur ; `403 account_disabled` si un administrateur l'a désactivé (dit seulement avec le bon mot de passe) |
 | `POST /auth/totp/verify` | `{ totp_token, code }` → `LoginResponse` (code à 6 chiffres ou code de récupération ; 5 essais, 5 min) |
 | `POST /auth/refresh` | `{ refresh_token }` → `TokenPair` (rotation) |
+| `POST /auth/passkeys/login/start` | → `{ challenge_id, challenge, rp_id, prf_salt }` : un défi de connexion par passkey (cinq minutes, usage unique) ; `403 passkeys_disabled` sans `GUIVAULT_PUBLIC_URL`. Voir `docs/PASSKEYS.md` |
+| `POST /auth/passkeys/login` | `{ challenge_id, credential_id, client_data_json, authenticator_data, signature, device_name? }` → `PasskeyLoginResponse` : un `LoginResponse` et `passkey_user_key` (la user key sous la clé tirée de la PRF de la passkey). Signature WebAuthn vérifiée, utilisateur vérifié exigé ; pas de second facteur en plus. `400 invalid_challenge`, `401 invalid_credentials` (passkey inconnue ou refusée), `403 account_disabled` |
 | `GET /sends/{id}/access` | sans compte : `SendInfo { password?: { kdf, salt }, expires_at, views_left }`, ou `404 send_unavailable` (inconnu, expiré, épuisé, supprimé — ou liens désactivés). Ne consomme rien |
 | `POST /sends/{id}/access` | sans compte : `{ access_key }` → `SendContent { ciphertext, expires_at, views_left }` et une vue consommée (la dernière efface le chiffré), ou `403 invalid_send_key` (lien incomplet, mauvais mot de passe) |
 
@@ -67,6 +70,16 @@ Partout : `403 ip_not_allowed` si l'adresse du client n'est pas dans
 | `GET /users/me/audit?limit=&before=` | mes actions |
 | `GET /users/lookup?email=` | `{ id, email, public_key, fingerprint }` |
 | `GET /sync` | `{ user, vaults, invitations, server_time }` |
+
+
+### Passkeys du compte
+
+| | |
+|---|---|
+| `GET /auth/passkeys` | `[PasskeyInfo { id, name, created_at, last_used_at }]` |
+| `POST /auth/passkeys/register/start` | → `PasskeyRegistrationOptions { challenge_id, challenge, rp_id, rp_name, user_handle, user_name, exclude, prf_salt }` |
+| `POST /auth/passkeys` | `{ challenge_id, auth_key, name, credential_id, client_data_json, attestation_object, protected_user_key }` → `201 PasskeyInfo`. Le mot de passe maître (clé d'auth) est vérifié (`401 invalid_credentials`) ; la création WebAuthn aussi (`400 invalid_passkey` : défi, origine, site, utilisateur non vérifié, type de clé) ; `409 passkey_exists`, `409 too_many_passkeys` (20) |
+| `DELETE /auth/passkeys/{id}` | la retire (`404` si ce n'est pas la mienne) |
 
 ## Vaults
 

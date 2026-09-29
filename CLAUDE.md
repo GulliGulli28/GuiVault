@@ -12,7 +12,9 @@ d'amélioration, à cocher au fur et à mesure).
 Toute fonctionnalité qui aurait besoin que le serveur déchiffre quelque
 chose est à reconcevoir côté client. Les seules primitives crypto que le
 serveur exécute : hachage Argon2id de la clé d'auth, SHA-256 des jetons,
-HMAC pour les sels fictifs de prelogin.
+HMAC pour les sels fictifs de prelogin, et la **vérification** des
+signatures WebAuthn des passkeys (`src/webauthn.rs`, `docs/PASSKEYS.md` —
+il ne déchiffre rien : la user key reste sous la clé que seule la PRF donne).
 
 ## Structure
 
@@ -46,6 +48,9 @@ HMAC pour les sels fictifs de prelogin.
   jetons), `sessions.rs`, `validate.rs` (tailles des blobs), `audit.rs`,
   `admin.rs` (`guivault admin grant|revoke|list` : le rôle d'administrateur
   ne se donne que depuis le shell ; les routes sont dans `routes/admin.rs`),
+  `webauthn.rs` (vérification WebAuthn en Rust pur, et un authentificateur
+  logiciel pour les tests) et `routes/passkeys.rs` (connexion par passkey,
+  `docs/PASSKEYS.md`),
   `mail.rs` (e-mails facultatifs : envoyés après la transaction, en
   arrière-plan — **rien ne doit en dépendre**, une route n'attend jamais
   un envoi ; ni secret, ni nom de vault, ni autre lien que
@@ -111,6 +116,10 @@ HMAC pour les sels fictifs de prelogin.
     seule, hors du formulaire (`AttachmentsPanel` sous la fiche). Côté
     serveur `routes/attachments.rs` ; un item déplacé emmène ses fichiers
     (`moveItem`), les exports ne les contiennent pas.
+  - `lib/accountPasskeys.ts` — se connecter avec une passkey (PRF de
+    WebAuthn, `docs/PASSKEYS.md`) ; `components/PasskeySettings.tsx`
+    (Paramètres › Sécurité) et le bouton de `LoginScreen`. À ne pas
+    confondre avec les passkeys rangées dans un identifiant (`Passkey`).
   - `lib/sends.ts` — les liens de partage, texte, élément ou fichier
     (secret dans le fragment `#/send/<id>/<secret>`, jamais vu par le
     serveur ; un fichier se télécharge avec le jeton d'une heure que donne

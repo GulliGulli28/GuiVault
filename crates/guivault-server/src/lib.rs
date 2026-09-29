@@ -18,6 +18,7 @@ pub mod sessions;
 pub mod state;
 pub mod validate;
 pub mod web;
+pub mod webauthn;
 
 use crate::config::Config;
 use crate::state::AppState;

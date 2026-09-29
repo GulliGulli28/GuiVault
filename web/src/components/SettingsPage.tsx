@@ -13,6 +13,7 @@ import { forgetRevisions } from "../lib/vaultRevisions";
 import { forgetCounters } from "../lib/manifestCounters";
 import type { AuditEntry, Session } from "../lib/types";
 import { AppearanceSettings, SettingsSyncToggle } from "./AppearanceSettings";
+import { PasskeySettings } from "./PasskeySettings";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { AuditList } from "./VaultSettings";
 import { IconIdentity, IconLifebuoy } from "./secret-icons";
@@ -146,6 +147,7 @@ export function SettingsPage({ ctx, section }: { ctx: PageContext; section: Sett
               </div>
             </section>
           )}
+          {current.key === "securite" && <PasskeySettings ctx={ctx} />}
 
           {current.key === "urgence" && <EmergencySettings ctx={ctx} />}
 

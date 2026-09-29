@@ -56,6 +56,7 @@ impl Server {
             trash_days: 30,
             send_max_days: 30,
             max_attachment_bytes: 10 * 1024 * 1024,
+            passkeys: None,
             health_lookups: false,
             hibp_url: String::new(),
             twofa_directory_url: String::new(),

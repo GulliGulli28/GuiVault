@@ -105,6 +105,15 @@ describe("guivault-crypto interop", () => {
     expect(() => openManifest(key, "autre-vault", blob)).toThrow();
   });
 
+  it("ouvre l'enveloppe de passkey scellée par Rust", () => {
+    const v = vectors.passkey;
+    expect(toHex(c.passkeyPrfSalt())).toBe(v.prf_salt);
+    const key = c.passkeyKey(fromHex(v.prf_output));
+    expect(toHex(key)).toBe(v.key);
+    expect(toHex(c.openPasskeyUserKey(key, fromHex(v.credential_id), fromHex(v.blob)))).toBe(v.user_key);
+    expect(() => c.openPasskeyUserKey(key, utf8.encode("autre"), fromHex(v.blob))).toThrow();
+  });
+
   it("ouvre les morceaux d'une pièce jointe scellés par Rust", () => {
     const v = vectors.attachment;
     const key = fromHex(v.key);
@@ -186,6 +195,12 @@ describe("guivault-crypto interop", () => {
         })),
       },
       item: { vault_key: toHex(vaultKey), vault_id: vaultId, item_id: itemId, item_type: "snippet", plaintext: "{\"kind\":\"snippet\"}", blob: toHex(itemBlob), name: "Équipe réseau", name_blob: toHex(c.sealVaultName(vaultKey, vaultId, "Équipe réseau")) },
+      passkey: (() => {
+        const prf = new Uint8Array(32).fill(11);
+        const cred = utf8.encode("browser-credential");
+        const userKey = new Uint8Array(32).fill(12);
+        return { prf_salt: toHex(c.passkeyPrfSalt()), prf_output: toHex(prf), key: toHex(c.passkeyKey(prf)), credential_id: toHex(cred), user_key: toHex(userKey), blob: toHex(c.sealPasskeyUserKey(c.passkeyKey(prf), cred, userKey)) };
+      })(),
       attachment: {
         key: toHex(key), id: itemId,
         chunks: [[0, false, "du navigateur"], [1, true, " — fin"]].map(([index, last, plaintext]) => ({

@@ -197,6 +197,9 @@ pub struct Config {
     /// Taille maximale d'une pièce jointe, chiffrée, en octets ; `0` : pièces
     /// jointes désactivées (`docs/PIECES-JOINTES.md`).
     pub max_attachment_bytes: u64,
+    /// Le site des passkeys (`GUIVAULT_PUBLIC_URL`) ; absent : connexion par
+    /// passkey désactivée (`docs/PASSKEYS.md`).
+    pub passkeys: Option<crate::webauthn::RelyingParty>,
     /// Les recherches du rapport de santé relayées vers des services publics
     /// (fuites de mots de passe, sites qui proposent la 2FA) ; `false` :
     /// aucune requête sortante.
@@ -287,6 +290,14 @@ impl Config {
             trash_days: env_parse("GUIVAULT_TRASH_DAYS", 30)?,
             send_max_days: env_parse("GUIVAULT_SEND_MAX_DAYS", 30)?,
             max_attachment_bytes: env_parse::<u64>("GUIVAULT_MAX_ATTACHMENT_MB", 100)?.saturating_mul(1024 * 1024),
+            passkeys: match env("GUIVAULT_PUBLIC_URL") {
+                Some(url) => {
+                    Some(crate::webauthn::RelyingParty::from_public_url(&url).ok_or_else(|| {
+                        anyhow::anyhow!("GUIVAULT_PUBLIC_URL={url:?} : attendu https://domaine[:port]")
+                    })?)
+                }
+                None => None,
+            },
             health_lookups: env_parse("GUIVAULT_HEALTH_LOOKUPS", true)?,
             hibp_url: env("GUIVAULT_HIBP_URL").unwrap_or_else(|| "https://api.pwnedpasswords.com".into()),
             twofa_directory_url: env("GUIVAULT_2FA_DIRECTORY_URL")
@@ -371,6 +382,7 @@ mod tests {
             trash_days: 0,
             send_max_days: 0,
             max_attachment_bytes: 0,
+            passkeys: None,
             health_lookups: false,
             hibp_url: String::new(),
             twofa_directory_url: String::new(),

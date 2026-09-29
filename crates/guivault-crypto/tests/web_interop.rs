@@ -128,6 +128,16 @@ fn opens_browser_attachment_chunks() {
 }
 
 #[test]
+fn opens_browser_passkey_envelope() {
+    let v = &vectors()["passkey"];
+    assert_eq!(passkey_prf_salt().as_slice(), h(&v["prf_salt"]));
+    let key = passkey_key(&h(&v["prf_output"])).unwrap();
+    assert_eq!(key.as_bytes().as_slice(), h(&v["key"]));
+    let user_key = open_passkey_user_key(&key, &h(&v["credential_id"]), &h(&v["blob"])).unwrap();
+    assert_eq!(user_key.as_bytes().as_slice(), h(&v["user_key"]));
+}
+
+#[test]
 fn opens_browser_emergency_envelope() {
     let v = &vectors()["vault_envelope"];
     let private = PrivateKey::try_from(h(&v["recipient_private"]).as_slice()).unwrap();

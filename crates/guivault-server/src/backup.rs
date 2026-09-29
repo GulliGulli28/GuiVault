@@ -56,6 +56,8 @@ pub const TABLES: &[&str] = &[
     "sessions",
     "user_totp",
     "user_recovery_codes",
+    "passkeys",
+    "webauthn_challenges",
     "totp_challenges",
     "user_settings",
     "sends",

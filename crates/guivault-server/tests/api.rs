@@ -65,6 +65,7 @@ impl TestServer {
             trash_days: 30,
             send_max_days: 30,
             max_attachment_bytes: 100 * 1024 * 1024,
+            passkeys: None,
             health_lookups: false,
             hibp_url: String::new(),
             twofa_directory_url: String::new(),
@@ -4759,4 +4760,236 @@ async fn send_files_download_with_a_token_even_after_the_last_view() {
         StatusCode::INSUFFICIENT_STORAGE
     );
     server.stop().await;
+}
+
+/// La clé d'auth d'un utilisateur (prelogin + dérivation), pour les routes
+/// qui redemandent le mot de passe maître.
+async fn auth_key_of(u: &User, password: &str) -> Vec<u8> {
+    let pre: PreloginResponse = u
+        .http
+        .post(format!("{}/auth/prelogin", u.base))
+        .json(&PreloginRequest { email: u.email.clone() })
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    gc::prepare_login(password, &pre.kdf_salt, pre.kdf)
+        .unwrap()
+        .auth_key
+        .as_bytes()
+        .to_vec()
+}
+
+#[tokio::test]
+async fn passkeys_log_in_without_the_master_password() {
+    use guivault_server::webauthn::{RelyingParty, testing::SoftAuthenticator};
+    let rp = RelyingParty::from_public_url("https://vault.test").unwrap();
+    let rp2 = rp.clone();
+    let Some(server) = TestServer::start_with(RegistrationMode::Open, move |c| c.passkeys = Some(rp2)).await else {
+        return;
+    };
+    let h: HealthResponse = Client::new()
+        .get(format!("{}/health", server.base))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert!(h.passkeys);
+    let alice = User::register(&server, "alice-pk@t.io", "pw-alice").await;
+    let anon = Client::new();
+
+    // Enregistrer : défi, réponse de l'authentificateur, user key sous la clé
+    // tirée de la PRF (simulée ici), mot de passe maître redemandé.
+    let mut key = SoftAuthenticator::new(7);
+    let prf = [0x42u8; 32];
+    let wrapped = gc::seal_passkey_user_key(
+        &gc::passkey_key(&prf).unwrap(),
+        &key.credential_id,
+        &alice.account.user_key,
+    )
+    .unwrap();
+    let start = || async {
+        serde_json::from_str::<PasskeyRegistrationOptions>(&status!(
+            alice
+                .req(reqwest::Method::POST, "/auth/passkeys/register/start")
+                .send()
+                .await
+                .unwrap(),
+            StatusCode::OK
+        ))
+        .unwrap()
+    };
+    let opts = start().await;
+    assert_eq!(
+        (opts.rp_id.as_str(), opts.user_name.as_str()),
+        ("vault.test", "alice-pk@t.io")
+    );
+    let register = |opts: PasskeyRegistrationOptions, auth_key: Vec<u8>, key: &SoftAuthenticator| {
+        let (client_data_json, attestation_object) = key.register(&rp.id, &rp.origin, &opts.challenge);
+        alice
+            .req(reqwest::Method::POST, "/auth/passkeys")
+            .json(&PasskeyRegistrationRequest {
+                challenge_id: opts.challenge_id,
+                auth_key,
+                name: "Clé USB".into(),
+                credential_id: key.credential_id.clone(),
+                client_data_json,
+                attestation_object,
+                protected_user_key: wrapped.clone(),
+            })
+            .send()
+    };
+    // Mauvais mot de passe : refusé (et le défi n'est pas consommé).
+    let wrong = auth_key_of(&alice, "pas le bon").await;
+    status!(
+        register(opts.clone(), wrong, &key).await.unwrap(),
+        StatusCode::UNAUTHORIZED
+    );
+    let good = auth_key_of(&alice, "pw-alice").await;
+    let info: PasskeyInfo = serde_json::from_str(&status!(
+        register(opts.clone(), good.clone(), &key).await.unwrap(),
+        StatusCode::CREATED
+    ))
+    .unwrap();
+    // Le défi était à usage unique.
+    status!(
+        register(opts, good.clone(), &key).await.unwrap(),
+        StatusCode::BAD_REQUEST
+    );
+    let listed: Vec<PasskeyInfo> = alice.get("/auth/passkeys").await;
+    assert_eq!(listed, vec![info.clone()]);
+    // La même passkey une seconde fois : exclue, puis refusée.
+    let opts = start().await;
+    assert_eq!(opts.exclude.len(), 1);
+    status!(register(opts, good.clone(), &key).await.unwrap(), StatusCode::CONFLICT);
+
+    // Se connecter : sans mot de passe, et la user key revient sous la PRF.
+    let login_start = || async {
+        serde_json::from_str::<PasskeyLoginOptions>(&status!(
+            anon.post(format!("{}/auth/passkeys/login/start", server.base))
+                .send()
+                .await
+                .unwrap(),
+            StatusCode::OK
+        ))
+        .unwrap()
+    };
+    let login = |opts: &PasskeyLoginOptions, cd: Vec<u8>, ad: Vec<u8>, sig: Vec<u8>, id: Vec<u8>| {
+        anon.post(format!("{}/auth/passkeys/login", server.base))
+            .json(&PasskeyLoginRequest {
+                challenge_id: opts.challenge_id,
+                credential_id: id,
+                client_data_json: cd,
+                authenticator_data: ad,
+                signature: sig,
+                device_name: Some("test".into()),
+            })
+            .send()
+    };
+    let opts = login_start().await;
+    assert_eq!(opts.prf_salt, gc::passkey_prf_salt());
+    let (cd, ad, sig) = key.assert(&rp.id, &rp.origin, &opts.challenge);
+    let res: PasskeyLoginResponse = serde_json::from_str(&status!(
+        login(&opts, cd.clone(), ad.clone(), sig.clone(), key.credential_id.clone())
+            .await
+            .unwrap(),
+        StatusCode::OK
+    ))
+    .unwrap();
+    assert_eq!(res.login.user.id, alice.profile.id);
+    let user_key = gc::open_passkey_user_key(
+        &gc::passkey_key(&prf).unwrap(),
+        &key.credential_id,
+        &res.passkey_user_key,
+    )
+    .unwrap();
+    assert_eq!(user_key.as_bytes(), alice.account.user_key.as_bytes());
+    // La session marche.
+    status!(
+        anon.get(format!("{}/sync", server.base))
+            .bearer_auth(&res.login.tokens.access_token)
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::OK
+    );
+    // Rejouer la même réponse : défi consommé.
+    status!(
+        login(&opts, cd, ad, sig, key.credential_id.clone()).await.unwrap(),
+        StatusCode::BAD_REQUEST
+    );
+    // Une réponse pour un autre site, un clone (compteur qui recule), une
+    // passkey inconnue, sans vérification de l'utilisateur : refusées.
+    let opts = login_start().await;
+    let (cd, ad, sig) = key.assert("evil.test", &rp.origin, &opts.challenge);
+    status!(
+        login(&opts, cd, ad, sig, key.credential_id.clone()).await.unwrap(),
+        StatusCode::UNAUTHORIZED
+    );
+    let opts = login_start().await;
+    let mut clone = SoftAuthenticator::new(7);
+    let (cd, ad, sig) = clone.assert(&rp.id, &rp.origin, &opts.challenge);
+    status!(
+        login(&opts, cd, ad, sig, key.credential_id.clone()).await.unwrap(),
+        StatusCode::UNAUTHORIZED
+    );
+    let opts = login_start().await;
+    let mut stranger = SoftAuthenticator::new(8);
+    let (cd, ad, sig) = stranger.assert(&rp.id, &rp.origin, &opts.challenge);
+    status!(
+        login(&opts, cd, ad, sig, stranger.credential_id.clone()).await.unwrap(),
+        StatusCode::UNAUTHORIZED
+    );
+    key.user_verified = false;
+    let opts = login_start().await;
+    let (cd, ad, sig) = key.assert(&rp.id, &rp.origin, &opts.challenge);
+    status!(
+        login(&opts, cd, ad, sig, key.credential_id.clone()).await.unwrap(),
+        StatusCode::UNAUTHORIZED
+    );
+    key.user_verified = true;
+
+    // Supprimée : elle n'ouvre plus rien.
+    status!(
+        alice
+            .req(reqwest::Method::DELETE, &format!("/auth/passkeys/{}", info.id))
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::NO_CONTENT
+    );
+    let opts = login_start().await;
+    let (cd, ad, sig) = key.assert(&rp.id, &rp.origin, &opts.challenge);
+    status!(
+        login(&opts, cd, ad, sig, key.credential_id.clone()).await.unwrap(),
+        StatusCode::UNAUTHORIZED
+    );
+    server.stop().await;
+
+    // Sans GUIVAULT_PUBLIC_URL : pas de passkeys.
+    let Some(plain) = TestServer::start(RegistrationMode::Open).await else {
+        return;
+    };
+    let h: HealthResponse = Client::new()
+        .get(format!("{}/health", plain.base))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert!(!h.passkeys);
+    status!(
+        Client::new()
+            .post(format!("{}/auth/passkeys/login/start", plain.base))
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::FORBIDDEN
+    );
+    plain.stop().await;
 }

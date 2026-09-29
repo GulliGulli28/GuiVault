@@ -19,6 +19,35 @@ export interface HealthResponse {
   health_lookups?: boolean;
   /** Taille maximale d'une pièce jointe, chiffrée ; 0 ou absent : désactivées. */
   max_attachment_bytes?: number;
+  /** Connexion par passkey proposée (`GUIVAULT_PUBLIC_URL` réglé). */
+  passkeys?: boolean;
+}
+
+/** Une passkey du compte, pour se connecter (`docs/PASSKEYS.md`) — à ne pas
+ * confondre avec `Passkey`, celles rangées dans un identifiant. */
+export interface AccountPasskey {
+  id: string;
+  name: string;
+  created_at: string;
+  last_used_at: string | null;
+}
+
+export interface PasskeyRegistrationOptions {
+  challenge_id: string;
+  challenge: string;
+  rp_id: string;
+  rp_name: string;
+  user_handle: string;
+  user_name: string;
+  exclude: string[];
+  prf_salt: string;
+}
+
+export interface PasskeyLoginOptions {
+  challenge_id: string;
+  challenge: string;
+  rp_id: string;
+  prf_salt: string;
 }
 
 /** Une pièce jointe côté serveur (`guivault_protocol::Attachment`) : des

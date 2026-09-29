@@ -18,7 +18,7 @@ use hmac::{Hmac, Mac};
 use sha2::Sha256;
 use uuid::Uuid;
 
-fn user_agent(headers: &HeaderMap) -> Option<&str> {
+pub(crate) fn user_agent(headers: &HeaderMap) -> Option<&str> {
     headers.get(header::USER_AGENT).and_then(|v| v.to_str().ok())
 }
 

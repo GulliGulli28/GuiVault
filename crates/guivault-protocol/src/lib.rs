@@ -79,6 +79,9 @@ pub struct HealthResponse {
     /// désactivées (ou serveur d'avant les pièces jointes).
     #[serde(default)]
     pub max_attachment_bytes: u64,
+    /// La connexion par passkey est proposée (`GUIVAULT_PUBLIC_URL` réglé).
+    #[serde(default)]
+    pub passkeys: bool,
 }
 
 /// Un site qui accepte un code TOTP (liste publique 2fa.directory, relayée
@@ -170,6 +173,92 @@ pub struct LoginResponse {
     pub protected_user_key: Vec<u8>,
     #[serde(with = "b64")]
     pub protected_private_key: Vec<u8>,
+}
+
+// ─── Connexion par passkey (`docs/PASSKEYS.md`) ──────────────────────────────
+
+/// `POST /auth/passkeys/register/start` : de quoi appeler
+/// `navigator.credentials.create` (défi, site, compte, passkeys à exclure),
+/// et le sel de la PRF.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PasskeyRegistrationOptions {
+    pub challenge_id: Uuid,
+    #[serde(with = "b64")]
+    pub challenge: Vec<u8>,
+    pub rp_id: String,
+    pub rp_name: String,
+    #[serde(with = "b64")]
+    pub user_handle: Vec<u8>,
+    pub user_name: String,
+    /// Les passkeys déjà enregistrées (identifiants en base64 standard).
+    pub exclude: Vec<String>,
+    #[serde(with = "b64")]
+    pub prf_salt: Vec<u8>,
+}
+
+/// `POST /auth/passkeys/register` : la réponse de l'authentificateur, la user
+/// key sous la clé tirée de sa PRF, et le mot de passe maître (sa clé
+/// d'auth) — une session volée ne suffit pas à ajouter une porte d'entrée.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PasskeyRegistrationRequest {
+    pub challenge_id: Uuid,
+    #[serde(with = "b64")]
+    pub auth_key: Vec<u8>,
+    pub name: String,
+    #[serde(with = "b64")]
+    pub credential_id: Vec<u8>,
+    #[serde(with = "b64")]
+    pub client_data_json: Vec<u8>,
+    #[serde(with = "b64")]
+    pub attestation_object: Vec<u8>,
+    #[serde(with = "b64")]
+    pub protected_user_key: Vec<u8>,
+}
+
+/// Une passkey du compte (`GET /auth/passkeys`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PasskeyInfo {
+    pub id: Uuid,
+    pub name: String,
+    pub created_at: DateTime<Utc>,
+    pub last_used_at: Option<DateTime<Utc>>,
+}
+
+/// `POST /auth/passkeys/login/start` : un défi, sans dire à quel compte
+/// (passkeys découvrables).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PasskeyLoginOptions {
+    pub challenge_id: Uuid,
+    #[serde(with = "b64")]
+    pub challenge: Vec<u8>,
+    pub rp_id: String,
+    #[serde(with = "b64")]
+    pub prf_salt: Vec<u8>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PasskeyLoginRequest {
+    pub challenge_id: Uuid,
+    #[serde(with = "b64")]
+    pub credential_id: Vec<u8>,
+    #[serde(with = "b64")]
+    pub client_data_json: Vec<u8>,
+    #[serde(with = "b64")]
+    pub authenticator_data: Vec<u8>,
+    #[serde(with = "b64")]
+    pub signature: Vec<u8>,
+    #[serde(default)]
+    pub device_name: Option<String>,
+}
+
+/// Une session, comme `/auth/login`, et la user key sous la clé de la
+/// passkey : le client la rouvre avec la sortie de sa PRF.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PasskeyLoginResponse {
+    #[serde(flatten)]
+    pub login: LoginResponse,
+    #[serde(with = "b64")]
+    pub passkey_user_key: Vec<u8>,
 }
 
 /// Réponse `202` de `/auth/login` quand le compte a un second facteur : le

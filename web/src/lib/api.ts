@@ -2,7 +2,7 @@
  * `core/src/guivault/client.rs` dans Guiterm. Une méthode par route ; les
  * blobs restent en base64, c'est `session.ts` qui chiffre et déchiffre. */
 import type { TwoFactorSite } from "./types";
-import type { AdminOverview, AdminUserInfo, AuditEntry, BackupsStatus, EmergencyGrant, EmergencyOverview, EmergencyVault, HealthResponse, Invitation, Item, ItemVersion, ItemsPage, KdfParams, ManifestWrite, LoginResponse, PreloginResponse, Role, SendContent, SendInfo, SendPassword, SendSummary, RegistrationInvite, ServerAttachment, ServerEvent, Session, SyncResponse, TokenPair, TotpChallenge, TrashedItem, UserLookupResponse, UserProfile, UserSettings, Vault, VaultManifest, VaultMember } from "./types";
+import type { AccountPasskey, AdminOverview, AdminUserInfo, AuditEntry, BackupsStatus, EmergencyGrant, EmergencyOverview, EmergencyVault, HealthResponse, Invitation, Item, ItemVersion, ItemsPage, KdfParams, ManifestWrite, LoginResponse, PasskeyLoginOptions, PasskeyRegistrationOptions, PreloginResponse, Role, SendContent, SendInfo, SendPassword, SendSummary, RegistrationInvite, ServerAttachment, ServerEvent, Session, SyncResponse, TokenPair, TotpChallenge, TrashedItem, UserLookupResponse, UserProfile, UserSettings, Vault, VaultManifest, VaultMember } from "./types";
 
 /** Une enveloppe de clé de vault pour un contact d'urgence. */
 export interface EmergencyVaultKey {
@@ -179,6 +179,16 @@ export const api = {
 
   // ── Authentification ──
   prelogin: (email: string) => raw<PreloginResponse>("POST", "/auth/prelogin", { email }, false),
+
+  // ── Passkeys du compte (`lib/accountPasskeys.ts`) ──
+  passkeys: () => authed<AccountPasskey[]>("GET", "/auth/passkeys"),
+  passkeyRegisterStart: () => authed<PasskeyRegistrationOptions>("POST", "/auth/passkeys/register/start"),
+  registerPasskey: (req: { challenge_id: string; auth_key: string; name: string; credential_id: string; client_data_json: string; attestation_object: string; protected_user_key: string }) =>
+    authed<AccountPasskey>("POST", "/auth/passkeys", req),
+  deletePasskey: (id: string) => authed<void>("DELETE", `/auth/passkeys/${id}`),
+  passkeyLoginStart: () => raw<PasskeyLoginOptions>("POST", "/auth/passkeys/login/start", undefined, false),
+  passkeyLogin: (req: { challenge_id: string; credential_id: string; client_data_json: string; authenticator_data: string; signature: string; device_name: string }) =>
+    raw<LoginResponse & { passkey_user_key: string }>("POST", "/auth/passkeys/login", req, false),
   register: (req: {
     email: string; kdf: KdfParams; kdf_salt: string; auth_key: string; protected_user_key: string; public_key: string;
     protected_private_key: string; personal_vault: { id: string; name_enc: string; wrapped_vault_key: string }; device_name?: string;

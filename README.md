@@ -204,7 +204,7 @@ dans [`docs/SECURITY.md`](docs/SECURITY.md).
 | `GUIVAULT_ADMIN_ALLOWED_IPS` | — | Plages d'où l'administration (`/admin`) répond ; vide : toutes |
 | `GUIVAULT_SMTP_URL` | — | E-mails, facultatifs : `smtps://utilisateur:motdepasse@hote:465` ou `smtp://…:587?tls=required` (STARTTLS). Sans lui, ou injoignable, tout fonctionne pareil |
 | `GUIVAULT_SMTP_FROM` | — | Expéditeur, ex. `GuiVault <coffre@exemple.fr>` (requis avec `GUIVAULT_SMTP_URL`) |
-| `GUIVAULT_PUBLIC_URL` | — | L'adresse publique du serveur, citée dans les e-mails |
+| `GUIVAULT_PUBLIC_URL` | — | L'adresse publique du serveur (`https://vault.exemple.fr`), citée dans les e-mails ; elle active aussi la **connexion par passkey** (son domaine est le site des passkeys, son origine la seule acceptée — voir `docs/PASSKEYS.md`) |
 | `GUIVAULT_BACKUP_DIR` | — (`/backups` avec le compose) | Dossier des sauvegardes automatiques ; vide : aucune |
 | `GUIVAULT_BACKUP_INTERVAL_HOURS` / `_KEEP` | `24` / `7` | Fréquence ; nombre gardé |
 | `GUIVAULT_BACKUP_VERIFY_DATABASE_URL` | — (réglée par le compose) | Base d'essai où chaque sauvegarde est restaurée et comparée — **effacée à chaque fois** : vide ou réservée à ça (créée si absente sur le même Postgres) |

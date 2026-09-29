@@ -90,6 +90,12 @@ fn main() {
         })
         .collect();
 
+    // Une passkey : sortie PRF fixe, l'enveloppe de la user key du compte.
+    let prf_output = [6u8; 32];
+    let credential_id = b"credential-id-bytes";
+    let passkey_blob =
+        seal_passkey_user_key(&passkey_key(&prf_output).unwrap(), credential_id, &account.user_key).unwrap();
+
     let v = json!({
         "kdf": {
             "password": password,
@@ -150,6 +156,14 @@ fn main() {
             "id": attachment_id,
             "chunks": attachment_chunks,
             "sealed_size_of_3_mib_plus_1": attachment_sealed_size(3 * ATTACHMENT_CHUNK as u64 + 1),
+        },
+        "passkey": {
+            "prf_salt": hex(&passkey_prf_salt()),
+            "prf_output": hex(&prf_output),
+            "key": hex(passkey_key(&prf_output).unwrap().as_bytes()),
+            "credential_id": hex(credential_id),
+            "user_key": hex(account.user_key.as_bytes()),
+            "blob": hex(&passkey_blob),
         },
         "manifest": {
             "vault_key": hex(vault_key.as_bytes()),

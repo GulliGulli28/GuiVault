@@ -243,7 +243,12 @@ export async function createAccount(password: string): Promise<{ material: Accou
 /** Un mauvais mot de passe échoue ici (tag AEAD) — le serveur l'aura déjà
  * refusé sur la clé d'auth, sauf s'il ment. */
 export function unlockAccount(stretchedKey: Uint8Array, protectedUserKey: Uint8Array, protectedPrivateKey: Uint8Array): UnlockedAccount {
-  const userKey = open(stretchedKey, protectedUserKey, AAD_USER_KEY);
+  return unlockAccountWithUserKey(open(stretchedKey, protectedUserKey, AAD_USER_KEY), protectedPrivateKey);
+}
+
+/** Le compte à partir de la user key elle-même (connexion par passkey : elle
+ * vient de l'enveloppe que la PRF rouvre). */
+export function unlockAccountWithUserKey(userKey: Uint8Array, protectedPrivateKey: Uint8Array): UnlockedAccount {
   if (userKey.length !== KEY_LEN) throw new CryptoError("format", "user key de taille inattendue");
   const privateKey = open(userKey, protectedPrivateKey, AAD_PRIVATE_KEY);
   if (privateKey.length !== KEY_LEN) throw new CryptoError("format", "clé privée de taille inattendue");
@@ -452,6 +457,29 @@ export function sealSendOwner(userKey: Uint8Array, sendId: string, json: string)
 
 export function openSendOwner(userKey: Uint8Array, sendId: string, blob: Uint8Array): string {
   return utf8.decode(open(userKey, blob, sendAad("guivault/v1/send-owner", sendId)));
+}
+
+// ─── Connexion par passkey (`guivault_crypto`, `docs/PASSKEYS.md`) ──────────
+
+/** Le sel donné à la PRF de WebAuthn : fixe. */
+export function passkeyPrfSalt(): Uint8Array {
+  return sha256(utf8.encode("guivault/v1/passkey-prf"));
+}
+
+/** La clé tirée de la sortie PRF de la passkey. */
+export function passkeyKey(prfOutput: Uint8Array): Uint8Array {
+  if (prfOutput.length < KEY_LEN) throw new CryptoError("format", "sortie PRF trop courte");
+  return hkdf(sha256, prfOutput, undefined, utf8.encode("guivault/v1/passkey-key"), KEY_LEN);
+}
+
+const passkeyAad = (credentialId: Uint8Array) => concat(utf8.encode("guivault/v1/passkey-user-key\0"), credentialId);
+
+export function sealPasskeyUserKey(key: Uint8Array, credentialId: Uint8Array, userKey: Uint8Array): Uint8Array {
+  return seal(key, userKey, passkeyAad(credentialId));
+}
+
+export function openPasskeyUserKey(key: Uint8Array, credentialId: Uint8Array, blob: Uint8Array): Uint8Array {
+  return open(key, blob, passkeyAad(credentialId));
 }
 
 /** Un morceau du fichier d'un lien (`kind: "file"`), sous la clé du lien, lié
