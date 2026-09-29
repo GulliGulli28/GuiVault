@@ -74,8 +74,8 @@ pour appliquer le délai.
   restaurée, ou un serveur qui rejoue sans maquiller — mais la révision
   n'est pas authentifiée : un serveur qui sert d'anciens chiffrés sous des
   révisions qui montent passe. Le **manifeste de vault** qui le couvre est
-  en cours (`MANIFESTE.md`) : serveur, web, extension et `gv` prêts, pas encore activé tant
-  que Guiterm ne sait pas l'entretenir. Une fois actif, il restera cette
+  en cours (`MANIFESTE.md`) : serveur, web, extension, `gv` et Guiterm
+  prêts, pas encore activé tant que ce Guiterm n'est pas publié. Une fois actif, il restera cette
   limite assumée : n'importe quel membre (lecteur compris) peut écrire un
   manifeste valide.
 - **Vault fabriqué par le serveur.** Un serveur malveillant peut créer un

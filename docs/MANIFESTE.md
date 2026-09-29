@@ -1,10 +1,10 @@
 # Manifeste de vault authentifié
 
 Statut : **adopté, en cours d'implémentation** (29 septembre 2026). Serveur,
-format, client web, extension et `gv` faits et testés, vecteurs
-d'interopérabilité compris ; Guiterm à faire. **L'activation est coupée** (voir « Déploiement ») :
-aucun vault ne reçoit de manifeste tant que tous les clients ne savent pas
-l'entretenir.
+format, client web, extension, `gv` et Guiterm faits et testés, vecteurs
+d'interopérabilité compris. **L'activation est coupée** (voir « Déploiement ») :
+aucun vault ne reçoit de manifeste tant que le Guiterm qui l'entretient
+n'est pas publié.
 
 ## Le problème
 
@@ -130,17 +130,19 @@ rotation ; écritures refusées sans manifeste ou sur une base dépassée.
 1. ~~**Web** : l'interface d'alerte~~ — fait (« Interface » ci-dessus).
 2. ~~**Tests web et vecteurs d'interopérabilité**~~ — fait.
 3. ~~**`gv`**~~ — fait (« `gv` » ci-dessus).
-4. **Guiterm** : monter l'épinglage des crates GuiVault sur le commit qui
-   contient `manifest.rs` ; vérifier au pull (état complet reconstitué
-   depuis ses deltas `?since=`), réécrire le manifeste à chaque push et
-   suppression (`PutItemRequest.manifest`, `DeleteItemRequest`), reprendre
-   sur `manifest_conflict`, et en cas d'écart **suspendre** la
-   synchronisation du vault comme pour un retour en arrière de révision
-   (`SyncState::vault_revisions`), avec reprise explicite qui réécrit le
-   manifeste.
+4. ~~**Guiterm**~~ — fait (`core/src/guivault/manifest.rs` dans Guiterm) :
+   l'état complet de chaque vault reconstitué de ses deltas (empreintes,
+   secrets compris ; `verify_manifest_digests` ici), vérifié au pull ; un
+   écart suspend le vault comme un retour en arrière de révision, la
+   reprise réécrit le manifeste d'après le serveur puis renvoie les
+   versions du poste ; toute écriture (push, suppression, retrait après
+   déplacement, accès AWS) porte le manifeste et reprend sur
+   `manifest_conflict` / `manifest_required` ; la rotation le re-scelle.
+   Test `vault_manifest_is_maintained_and_checked` (`guivault_integration`).
 5. **Activer** : `AUTO_ENABLE_MANIFEST = true` dans `session.ts` (le web
    donne alors un manifeste à chaque vault où il peut écrire, à la lecture
-   et à la rotation) — **seulement une fois 3 et 4 publiés**.
+   et à la rotation) — **seulement une fois 3 et 4 publiés** : une version
+   de Guiterm qui les contient installée par ceux qui partagent des vaults.
 6. Docs : `SECURITY.md` (ligne « rejoue » et « Limites connues »),
    `ROADMAP.md` §0 à cocher.
 
@@ -149,6 +151,7 @@ rotation ; écritures refusées sans manifeste ou sur une base dépassée.
 Tant que `AUTO_ENABLE_MANIFEST` est faux, ce serveur se déploie sans
 risque : aucun vault n'a de manifeste, tout se comporte comme avant, et les
 anciens clients ignorent le champ `manifest` des réponses. **Ne pas
-l'activer**, ni créer de manifeste à la main, avant que Guiterm sache
-l'entretenir : dès qu'un vault en a un, le serveur refuse les écritures du
-Guiterm actuel sur ce vault (il continue à le lire). `gv` ne fait que lire.
+l'activer**, ni créer de manifeste à la main, avant que la version de
+Guiterm qui l'entretient soit publiée et installée : dès qu'un vault en a
+un, le serveur refuse les écritures d'un Guiterm plus ancien sur ce vault
+(il continue à le lire). `gv` ne fait que lire.

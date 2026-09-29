@@ -170,6 +170,26 @@ pub fn verify_manifest<'a>(
     items: impl IntoIterator<Item = (&'a str, &'a [u8])>,
     seen: Option<i64>,
 ) -> Verified {
+    let digests: Vec<(&str, String)> = items.into_iter().map(|(id, ct)| (id, item_digest(ct))).collect();
+    verify_manifest_digests(
+        vault_key,
+        vault_id,
+        served,
+        digests.iter().map(|(id, d)| (*id, d.as_str())),
+        seen,
+    )
+}
+
+/// [`verify_manifest`] sur les empreintes des items (`item_digest`) plutôt
+/// que leurs chiffrés : pour un client qui ne garde pas les chiffrés et tient
+/// l'état complet à jour delta après delta (Guiterm).
+pub fn verify_manifest_digests<'a>(
+    vault_key: &SymmetricKey,
+    vault_id: &str,
+    served: Option<(i64, &[u8])>,
+    digests: impl IntoIterator<Item = (&'a str, &'a str)>,
+    seen: Option<i64>,
+) -> Verified {
     let mut problems = Vec::new();
     let Some((revision, blob)) = served else {
         if let Some(seen) = seen.filter(|s| *s > 0) {
@@ -203,13 +223,13 @@ pub fn verify_manifest<'a>(
     }
     let mut served_ids = std::collections::BTreeSet::new();
     let mut item_problems = Vec::new();
-    for (id, ct) in items {
+    for (id, digest) in digests {
         served_ids.insert(id.to_string());
         match manifest.items.get(id) {
             None => item_problems.push(ManifestProblem::Unexpected {
                 item_id: id.to_string(),
             }),
-            Some(d) if *d != item_digest(ct) => item_problems.push(ManifestProblem::Altered {
+            Some(d) if d != digest => item_problems.push(ManifestProblem::Altered {
                 item_id: id.to_string(),
             }),
             Some(_) => {}
@@ -317,6 +337,30 @@ mod tests {
         assert_eq!(
             verify_manifest(&key, VAULT, Some((4, &other)), view(&items), None).problems,
             vec![ManifestProblem::Unreadable]
+        );
+    }
+
+    #[test]
+    fn digests_verify_like_ciphertexts() {
+        let (key, items) = setup();
+        let blob = seal_manifest(&key, VAULT, &Manifest::of(2, view(&items))).unwrap();
+        let digests: Vec<(String, String)> = items.iter().map(|(i, c)| (i.clone(), item_digest(c))).collect();
+        let d = |n: usize| {
+            digests[..n]
+                .iter()
+                .map(|(i, d)| (i.as_str(), d.as_str()))
+                .collect::<Vec<_>>()
+        };
+        assert!(
+            verify_manifest_digests(&key, VAULT, Some((2, &blob)), d(3), Some(2))
+                .problems
+                .is_empty()
+        );
+        assert_eq!(
+            verify_manifest_digests(&key, VAULT, Some((2, &blob)), d(2), None).problems,
+            vec![ManifestProblem::Withheld {
+                item_id: items[2].0.clone()
+            }]
         );
     }
 

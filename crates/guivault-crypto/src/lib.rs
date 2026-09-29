@@ -60,7 +60,7 @@ pub use crypto_box::{PublicKey, SecretKey as PrivateKey};
 pub mod manifest;
 pub use manifest::{
     MANIFEST_ID, MANIFEST_TYPE, Manifest, ManifestProblem, Verified, item_digest, open_manifest, seal_manifest,
-    verify_manifest,
+    verify_manifest, verify_manifest_digests,
 };
 
 pub const KEY_LEN: usize = 32;
