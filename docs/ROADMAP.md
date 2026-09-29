@@ -141,7 +141,8 @@ paramètres ou formats anciens.
   effacées quand l'item quitte la corbeille, suivent un item déplacé.
   Serveur : `routes/attachments.rs`, migration `0011` ; web :
   `lib/attachments.ts`, « Pièces jointes » sous la fiche d'un secret.
-  Reste : l'extension, `gv`, les liens de partage avec fichier.
+  Extension : listées et téléchargées depuis le popup. Reste : `gv`, les
+  liens de partage avec fichier.
 - [x] **Rapport de santé** (web, « Santé du coffre ») : faibles,
   réutilisés (identifiants, hôtes, connexions SQL, passphrases de clés),
   inchangés depuis un an ; sites qui acceptent la 2FA sans TOTP ni passkey

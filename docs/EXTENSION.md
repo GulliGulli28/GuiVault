@@ -29,7 +29,10 @@ maître et le délai de verrouillage.
   (identifiants, notes, cartes, identités, hôtes, dossiers, connexions,
   clés, snippets, icônes) avec des filtres par type. Sur un identifiant :
   « Remplir », copier l'utilisateur, copier le mot de passe ; en ouvrant un
-  item : sa fiche (celle de l'interface web), **Modifier**, **Supprimer**.
+  item : sa fiche (celle de l'interface web), **Modifier**, **Supprimer**,
+  et ses **pièces jointes** à télécharger (`AttachmentsPanel`, en lecture :
+  joindre un fichier se fait dans l'interface web, un sélecteur de fichier
+  fermerait le popup).
   « Nouveau » propose tous les types, avec les formulaires de l'interface
   web, dans le vault de son choix ; un identifiant sans site reçoit l'URI de
   la page courante.
@@ -248,8 +251,9 @@ c'est bien celui qu'il a rempli dans *cet* onglet.
   d'identité sur un autre domaine que le site demande confirmation tant
   que son URL n'est pas dans l'identifiant (l'ajouter à l'identifiant la
   supprime).
-- Le partage (membres, invitations, rotation), l'import/export et les
-  réglages du compte : l'interface web.
+- Le partage (membres, invitations, rotation), l'import/export, les
+  réglages du compte et l'ajout ou le retrait de pièces jointes :
+  l'interface web.
 - Passkeys : pas de compteur de signatures, pas de médiation
   conditionnelle, pas de suppression depuis l'extension (l'interface web le
   fait).

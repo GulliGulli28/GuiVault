@@ -1,7 +1,7 @@
 # Pièces jointes chiffrées
 
-Statut : **fait** côté serveur, crypto (Rust et web, vecteurs d'interop) et
-interface web (29 septembre 2026). Ce qui reste est en fin de page.
+Statut : **fait** côté serveur, crypto (Rust et web, vecteurs d'interop),
+interface web et extension (lecture) — 29 septembre 2026. Ce qui reste est en fin de page.
 
 ## Ce que ça donne
 
@@ -61,14 +61,18 @@ type, ni le contenu. Voir `SECURITY.md`.
 - Web : `lib/attachments.ts` (envoi, téléchargement, joindre/retirer),
   `components/AttachmentsPanel.tsx`, `moveItem` (les fichiers suivent),
   exports (sans les pièces jointes, dit dans la page Outils).
+- Extension : la fiche d'un secret dans le popup les liste et les
+  télécharge (`AttachmentsPanel` en lecture) ; les joindre ou les retirer
+  se fait dans l'interface web — dans Chrome, ouvrir un sélecteur de
+  fichier depuis le popup le ferme.
 - Tests : `attachments_are_chunked_bounded_moved_and_cleaned`
   (`tests/api.rs`), `attachment.rs` (unitaires), et un envoi de 2,5 Mio
   vérifié dans Chromium (contenu jamais en clair en base, téléchargement
-  identique).
+  identique) ; puis depuis l'extension réelle (fiche d'une note et d'un
+  identifiant, téléchargements identiques).
 
 ## Reste
 
-- **Extension** : le popup ne montre pas encore les pièces jointes.
 - **`gv`** : `gv attachment get <réf> [fichier]`.
 - **Liens de partage** avec un fichier (le §2 de la feuille de route).
 - **Copie hors ligne** : les fichiers n'y sont pas (seulement leur

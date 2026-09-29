@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react
 import { api, ApiError, errorMessage, setBaseUrl, setSessionLostHandler, setTokensChangedHandler } from "../../src/lib/api";
 import { filterEntities, indexItems, toEntities } from "../../src/lib/entities";
 import { buildVaultTree } from "../../src/lib/vaultTree";
-import { describeSecret } from "../../src/lib/items";
+import { describeSecret, isSecret } from "../../src/lib/items";
 import { openOffline, acceptIntegrity, acceptRollback, loadItems, login, payloadEntity, payloadName, refresh, setDeviceLabel, type DecodedItem, type SessionState, type VaultView } from "../../src/lib/session";
 import { loginMatches } from "../../src/lib/urimatch";
 import { canWrite, KIND_LABELS, KIND_LABELS_PLURAL, type CustomIcon, type GuiVaultEntity, type ItemKind, type Login, type Payload, type TokenPair } from "../../src/lib/types";
@@ -23,6 +23,7 @@ import { CLEAR_CHOICES, clipboardHash, loadClearSeconds, saveClearSeconds, setCl
 import { IntegrityBanner } from "../../src/components/IntegrityBanner";
 import { RollbackBanner } from "../../src/components/RollbackBanner";
 import { useMerge } from "../../src/components/MergeDialog";
+import { AttachmentsPanel } from "../../src/components/AttachmentsPanel";
 import { OfflineSetting } from "../../src/components/OfflineSetting";
 import { loadOfflineCopy, refreshOfflineCopy, type OfflineCopy } from "../../src/lib/offline";
 import { copyText, PasswordInput, SecretValue } from "../../src/components/ui";
@@ -469,6 +470,8 @@ export function Popup() {
       ) : view.kind === "detail" && current ? (
         <Detail
           entry={current}
+          vault={screen.state.vaults.find((v) => v.id === current.vaultId)}
+          offline={!!screen.state.offline}
           index={indexFor(current.vaultId)}
           canFill={canFill}
           writable={screen.state.vaults.find((v) => v.id === current.vaultId)?.role !== "reader"}
@@ -647,7 +650,7 @@ function LoginActions({ entry, canFill, onFill, say }: { entry: LoginEntry; canF
   );
 }
 
-function Detail({ entry, index, canFill, writable, onBack, onFill, onEdit, onDelete, say }: { entry: Entry; index: ReturnType<typeof indexItems>; canFill: boolean; writable: boolean; onBack: () => void; onFill: (e: LoginEntry, what: "credentials" | "totp") => Promise<void>; onEdit: () => void; onDelete: () => Promise<void>; say: (m: string) => void }) {
+function Detail({ entry, vault, offline, index, canFill, writable, onBack, onFill, onEdit, onDelete, say }: { entry: Entry; vault: VaultView | undefined; offline: boolean; index: ReturnType<typeof indexItems>; canFill: boolean; writable: boolean; onBack: () => void; onFill: (e: LoginEntry, what: "credentials" | "totp") => Promise<void>; onEdit: () => void; onDelete: () => Promise<void>; say: (m: string) => void }) {
   const [confirm, setConfirm] = useState(false);
   const header = (
     <div className="flex shrink-0 items-center gap-1 border-b border-[var(--c-border)] px-2 py-1.5">
@@ -657,6 +660,11 @@ function Detail({ entry, index, canFill, writable, onBack, onFill, onEdit, onDel
       {writable && <button onClick={onEdit} className="btn btn-secondary btn-sm" title="Modifier"><IconEdit size={11} /> Modifier</button>}
       {writable && <button onClick={() => setConfirm(true)} className="btn btn-ghost btn-sm btn-icon hover:text-[var(--c-danger)]" title="Supprimer" aria-label="Supprimer"><IconTrash size={11} /></button>}
     </div>
+  );
+  // Les pièces jointes : lecture et téléchargement (joindre se fait dans
+  // l'interface web — le sélecteur de fichier fermerait le popup).
+  const attachments = vault && isSecret(entry.payload) && (
+    <AttachmentsPanel vault={vault} item={entry.item} writable={false} offline={offline} onChanged={() => {}} notify={say} error={say} />
   );
   const confirmBox = confirm && (
     <div className="shrink-0 border-t border-[var(--c-border)] bg-[var(--c-bg)] p-3">
@@ -675,6 +683,7 @@ function Detail({ entry, index, canFill, writable, onBack, onFill, onEdit, onDel
         <div className="sidebar-scroll min-h-0 flex-1 overflow-y-auto px-3 py-2">
           <p className="mb-2 flex items-center gap-1 text-[11px] text-[var(--c-text-muted)]"><IconVault size={11} /> {entry.vaultName} · {KIND_LABELS[entry.payload.kind]}</p>
           <ItemView payload={entry.payload} index={index} />
+          {attachments}
         </div>
         {confirmBox}
       </div>
@@ -699,6 +708,7 @@ function Detail({ entry, index, canFill, writable, onBack, onFill, onEdit, onDel
         {l.uris.length > 0 && row(l.uris.length > 1 ? "Sites" : "Site", <span className="flex flex-col gap-0.5">{l.uris.map((u, i) => <a key={i} href={/^[a-z][a-z0-9+.-]*:/i.test(u.uri) ? u.uri : `https://${u.uri}`} target="_blank" rel="noopener noreferrer" className="truncate font-mono text-[11.5px] text-[var(--c-accent-text)] hover:underline">{u.uri}</a>)}</span>)}
         {l.notes && row("Notes", <span className="whitespace-pre-wrap text-[12px]">{l.notes}</span>)}
         {l.passkeys.length > 0 && row("Passkeys", <span className="text-[12px]">{l.passkeys.map((k) => k.rpName || k.rpId).join(", ")}</span>)}
+        {attachments}
         {canFill && <button onClick={() => void onFill(entry, "credentials")} className="btn btn-primary btn-sm mt-3 w-full">Remplir la page</button>}
       </div>
       {confirmBox}

@@ -1,7 +1,9 @@
-/** Les pièces jointes d'un secret, sous sa fiche (page du vault) : les
- * télécharger, en ajouter, en retirer. Chaque ajout ou retrait est une
+/** Les pièces jointes d'un secret, sous sa fiche (page du vault, et popup de
+ * l'extension en lecture seule — un sélecteur de fichier y ferme le popup) :
+ * les télécharger, en ajouter, en retirer. Chaque ajout ou retrait est une
  * écriture de l'item à lui seul (`lib/attachments.ts`), hors du formulaire
- * de modification. */
+ * de modification. Hors ligne (`offline`), la liste seulement : les
+ * fichiers ne sont pas dans la copie. */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { attachFile, attachmentLimit, attachmentsOf, downloadAttachment, formatSize, removeAttachment, saveBlob } from "../lib/attachments";
 import { errorMessage } from "../lib/api";
@@ -13,10 +15,11 @@ import { IconPaperclip } from "./secret-icons";
 import { Eyebrow } from "./ui";
 import { IconDownload, IconPlus, IconTrash } from "./ui-icons";
 
-export function AttachmentsPanel({ vault, item, writable, onChanged, notify, error }: {
+export function AttachmentsPanel({ vault, item, writable, offline = false, onChanged, notify, error }: {
   vault: VaultView;
   item: DecodedItem & { ok: true };
   writable: boolean;
+  offline?: boolean;
   onChanged: () => void;
   notify: (m: string) => void;
   error: (m: string) => void;
@@ -31,7 +34,7 @@ export function AttachmentsPanel({ vault, item, writable, onChanged, notify, err
   useEffect(() => {
     void attachmentLimit().then(setLimit);
   }, []);
-  const canAdd = writable && !vault.emergency && (limit ?? 0) > 0;
+  const canAdd = writable && !offline && !vault.emergency && (limit ?? 0) > 0;
   if (attachments.length === 0 && !canAdd) return null;
 
   const progress = (verb: string, name: string) => (done: number, total: number) =>
@@ -115,10 +118,10 @@ export function AttachmentsPanel({ vault, item, writable, onChanged, notify, err
               <IconPaperclip size={13} className="shrink-0 text-[var(--c-text-muted)]" />
               <span className="min-w-0 flex-1 truncate text-[var(--c-text)]" title={a.name}>{a.name}</span>
               <span className="shrink-0 text-[11px] text-[var(--c-text-faint)]">{formatSize(a.size)}</span>
-              <button type="button" onClick={() => void download(a)} disabled={busy !== null} className="btn btn-ghost btn-sm btn-icon" title="Télécharger" aria-label={`Télécharger ${a.name}`}>
+              <button type="button" onClick={() => void download(a)} disabled={busy !== null || offline} className="btn btn-ghost btn-sm btn-icon" title={offline ? "Hors ligne : les fichiers ne sont pas dans la copie" : "Télécharger"} aria-label={`Télécharger ${a.name}`}>
                 <IconDownload size={12} />
               </button>
-              {writable && !vault.emergency && (
+              {writable && !offline && !vault.emergency && (
                 <button type="button" onClick={() => setRemoving(a)} disabled={busy !== null} className="btn btn-ghost btn-sm btn-icon hover:text-[var(--c-danger)]" title="Retirer" aria-label={`Retirer ${a.name}`}>
                   <IconTrash size={12} />
                 </button>
@@ -127,6 +130,7 @@ export function AttachmentsPanel({ vault, item, writable, onChanged, notify, err
           ))}
         </ul>
       )}
+      {offline && attachments.length > 0 && <p className="mt-1 text-[11.5px] text-[var(--c-text-muted)]">Hors ligne : les fichiers sont sur le serveur, pas dans la copie.</p>}
       {busy && <p role="status" className="mt-1 text-[11.5px] text-[var(--c-text-muted)]">{busy}</p>}
       {removing && (
         <ConfirmDialog
