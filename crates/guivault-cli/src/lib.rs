@@ -23,7 +23,7 @@ use std::collections::HashMap;
 
 use crate::api::{Api, LoginStep};
 use crate::store::{Account, Cache, Home, SessionFile, VaultItems};
-use crate::vault::Opened;
+use crate::vault::{Entry, Opened};
 
 /// Au-delà, `gv` resynchronise avant de lire (s'il peut).
 pub const CACHE_MAX_AGE: chrono::Duration = chrono::Duration::minutes(5);
@@ -401,6 +401,119 @@ pub fn parse_env_file(text: &str) -> Vec<(String, String)> {
             Some((k.trim().to_string(), v.to_string()))
         })
         .collect()
+}
+
+// ─── Pièces jointes ─────────────────────────────────────────────────────────
+
+/// Une pièce jointe telle que l'item la décrit (`docs/PIECES-JOINTES.md`) :
+/// le fichier chiffré est sur le serveur, sa clé est ici.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub struct AttachmentRef {
+    pub id: uuid::Uuid,
+    #[serde(default)]
+    pub name: String,
+    /// Taille en clair, en octets.
+    #[serde(default)]
+    pub size: u64,
+    #[serde(default)]
+    pub mime: Option<String>,
+    /// La clé du fichier, en base64.
+    pub key: String,
+}
+
+/// Les pièces jointes d'un élément (celles qu'on ne sait pas lire sont
+/// ignorées).
+pub fn attachments(entry: &Entry) -> Vec<AttachmentRef> {
+    vault::entity(&entry.payload)
+        .and_then(|e| e.get("attachments"))
+        .and_then(Value::as_array)
+        .map(|list| {
+            list.iter()
+                .filter_map(|a| serde_json::from_value(a.clone()).ok())
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// La pièce jointe `wanted` (nom sans tenir compte de la casse, ou id) d'un
+/// élément ; sans `wanted`, la seule qu'il a.
+pub fn find_attachment(entry: &Entry, wanted: Option<&str>) -> Result<AttachmentRef> {
+    let all = attachments(entry);
+    let names = || all.iter().map(|a| a.name.as_str()).collect::<Vec<_>>().join(", ");
+    match wanted {
+        None => match all.as_slice() {
+            [] => bail!("« {} » n'a pas de pièce jointe", entry.name),
+            [one] => Ok(one.clone()),
+            _ => bail!(
+                "« {} » a {} pièces jointes ({}) : précisez laquelle",
+                entry.name,
+                all.len(),
+                names()
+            ),
+        },
+        Some(w) => {
+            let w = w.to_lowercase();
+            if let Some(a) = all.iter().find(|a| a.id.to_string() == w) {
+                return Ok(a.clone());
+            }
+            let found: Vec<&AttachmentRef> = all.iter().filter(|a| a.name.to_lowercase() == w).collect();
+            match found.as_slice() {
+                [one] => Ok((*one).clone()),
+                [] => bail!("« {} » n'a pas de pièce jointe « {w} » ({})", entry.name, names()),
+                _ => bail!(
+                    "« {} » a plusieurs pièces jointes « {w} » : précisez par l'id",
+                    entry.name
+                ),
+            }
+        }
+    }
+}
+
+/// Télécharge et déchiffre une pièce jointe du vault `vault`. Il faut le
+/// serveur : les fichiers ne sont pas dans le cache. Le verrou de
+/// synchronisation n'est tenu que le temps d'avoir un jeton d'accès.
+pub fn download_attachment(
+    home: &Home,
+    account: &mut Account,
+    vault: uuid::Uuid,
+    a: &AttachmentRef,
+) -> Result<Vec<u8>> {
+    let key = base64::engine::general_purpose::STANDARD
+        .decode(&a.key)
+        .ok()
+        .and_then(|k| gc::SymmetricKey::from_slice(&k).ok())
+        .ok_or_else(|| anyhow!("« {} » : clé de pièce jointe illisible", a.name))?;
+    let api = Api::new(&account.server)?;
+    let access = {
+        let Some(_lock) = home.try_sync_lock()? else {
+            bail!("synchronisation en cours dans un autre `gv` : réessayez");
+        };
+        if let Some(fresh) = home.account()? {
+            *account = fresh;
+        }
+        let access = api.access_token(account)?;
+        home.save_account(account)?;
+        access
+    };
+    let count = gc::attachment_chunk_count(a.size);
+    let mut out = Vec::with_capacity(a.size as usize);
+    for i in 0..count {
+        let sealed = api
+            .attachment_chunk(&access, vault, a.id, i)
+            .with_context(|| format!("« {} », morceau {}", a.name, i + 1))?;
+        let plain = gc::open_attachment_chunk(&key, &a.id.to_string(), i, i + 1 == count, &sealed).map_err(|_| {
+            anyhow!(
+                "« {} » : le morceau {} ne s'ouvre pas (altéré, ou d'un autre fichier)",
+                a.name,
+                i + 1
+            )
+        })?;
+        out.extend(plain);
+    }
+    if out.len() as u64 != a.size {
+        bail!("« {} » : {} octets reçus au lieu de {}", a.name, out.len(), a.size);
+    }
+    Ok(out)
 }
 
 // ─── AWS et Git ─────────────────────────────────────────────────────────────

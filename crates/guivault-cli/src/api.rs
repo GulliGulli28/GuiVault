@@ -1,5 +1,6 @@
 //! Le client HTTP de `gv`, bloquant (une commande, quelques requêtes) :
-//! connexion, rafraîchissement des jetons, `/sync` et les items. Les jetons
+//! connexion, rafraîchissement des jetons, `/sync`, les items et les
+//! morceaux des pièces jointes. Les jetons
 //! tournent à chaque rafraîchissement ; ils sont réécrits dans
 //! `account.json` aussitôt, sous le verrou de synchronisation.
 use crate::store::{Account, Tokens};
@@ -111,6 +112,20 @@ impl Api {
                 .bearer_auth(access),
         )
     }
+
+    /// Un morceau d'une pièce jointe, brut (chiffré).
+    pub fn attachment_chunk(&self, access: &str, vault: Uuid, id: Uuid, index: u32) -> Result<Vec<u8>> {
+        let res = self
+            .http
+            .get(self.url(&format!("/vaults/{vault}/attachments/{id}/chunks/{index}")))
+            .bearer_auth(access)
+            .send()
+            .map_err(|e| anyhow!("serveur injoignable : {e}"))?;
+        if !res.status().is_success() {
+            return Err(error(res));
+        }
+        Ok(res.bytes()?.to_vec())
+    }
 }
 
 pub fn tokens(pair: &TokenPair) -> Tokens {
@@ -122,12 +137,17 @@ pub fn tokens(pair: &TokenPair) -> Tokens {
 }
 
 fn decode<T: DeserializeOwned>(res: Response) -> Result<T> {
-    let status = res.status();
-    if status.is_success() {
+    if res.status().is_success() {
         return Ok(res.json()?);
     }
+    Err(error(res))
+}
+
+/// Le refus du serveur, en clair (`message (code)`).
+fn error(res: Response) -> anyhow::Error {
+    let status = res.status();
     match res.json::<ApiError>() {
-        Ok(e) => bail!("{} ({})", e.message, e.code),
-        Err(_) => bail!("le serveur a répondu {status}"),
+        Ok(e) => anyhow!("{} ({})", e.message, e.code),
+        Err(_) => anyhow!("le serveur a répondu {status}"),
     }
 }

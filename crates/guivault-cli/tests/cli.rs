@@ -55,7 +55,7 @@ impl Server {
             item_history: 20,
             trash_days: 30,
             send_max_days: 30,
-            max_attachment_bytes: 0,
+            max_attachment_bytes: 10 * 1024 * 1024,
             health_lookups: false,
             hibp_url: String::new(),
             twofa_directory_url: String::new(),
@@ -534,6 +534,164 @@ fn gv_checks_vault_manifests() {
     assert!(ok, "{err}");
     let (_, _, err) = gv(&["get", "gv://Personnel/GitHub/password"]);
     assert!(err.contains("« GitHub » n'est pas la version annoncée"), "{err}");
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// Une pièce jointe envoyée comme l'interface web l'envoie, puis rattachée à
+/// l'item (`docs/PIECES-JOINTES.md`). Rend sa description.
+fn attach(server: &Server, token: &str, vid: Uuid, item: Uuid, name: &str, data: &[u8]) -> Value {
+    let http = reqwest::blocking::Client::new();
+    let key = gc::SymmetricKey::random();
+    let id = Uuid::new_v4();
+    let chunks = gc::seal_attachment(&key, &id.to_string(), data).unwrap();
+    let size: usize = chunks.iter().map(Vec::len).sum();
+    let res = http
+        .post(server.api(&format!("/vaults/{vid}/attachments")))
+        .bearer_auth(token)
+        .json(&CreateAttachmentRequest {
+            id,
+            item_id: item,
+            size: size as i64,
+            chunks: chunks.len() as i32,
+        })
+        .send()
+        .unwrap();
+    assert_eq!(res.status(), 201);
+    for (i, c) in chunks.iter().enumerate() {
+        let res = http
+            .put(server.api(&format!("/vaults/{vid}/attachments/{id}/chunks/{i}")))
+            .bearer_auth(token)
+            .body(c.clone())
+            .send()
+            .unwrap();
+        assert_eq!(res.status(), 204);
+    }
+    let res = http
+        .post(server.api(&format!("/vaults/{vid}/attachments/{id}/complete")))
+        .bearer_auth(token)
+        .send()
+        .unwrap();
+    assert_eq!(res.status(), 200);
+    use base64::Engine;
+    json!({ "id": id, "name": name, "size": data.len(), "key": base64::engine::general_purpose::STANDARD.encode(key.as_bytes()) })
+}
+
+#[test]
+fn gv_downloads_attachments() {
+    let Some(server) = Server::start() else {
+        return;
+    };
+    let dir = std::env::temp_dir().join(format!("gv-test-{}", Uuid::new_v4().simple()));
+    let home = Home(dir.clone());
+    let (email, pw) = ("carol@t.io", "cli master password");
+    let (key, vid, token) = seed(&server, email, pw);
+    let http = reqwest::blocking::Client::new();
+
+    // Une note, puis deux fichiers qu'on lui rattache (1,5 Mio : deux morceaux).
+    let note = Uuid::new_v4();
+    let put = |body: Value, base: Option<i64>| -> Item {
+        let ct = gc::seal_item(
+            &key,
+            &vid.to_string(),
+            &note.to_string(),
+            "note",
+            body.to_string().as_bytes(),
+        )
+        .unwrap();
+        let res = http
+            .put(server.api(&format!("/vaults/{vid}/items/{note}")))
+            .bearer_auth(&token)
+            .json(&PutItemRequest {
+                item_type: "note".into(),
+                ciphertext: ct,
+                base_revision: base,
+                manifest: None,
+            })
+            .send()
+            .unwrap();
+        assert!(res.status().is_success());
+        res.json().unwrap()
+    };
+    let first = put(
+        json!({ "kind": "note", "note": { "id": note, "name": "Contrat", "content": "voir le scan" } }),
+        None,
+    );
+    let scan: Vec<u8> = (0..3 * 512 * 1024).map(|i| (i % 253) as u8).collect();
+    let codes = b"1234-5678\n".to_vec();
+    let a1 = attach(&server, &token, vid, note, "scan.pdf", &scan);
+    let a2 = attach(&server, &token, vid, note, "codes.txt", &codes);
+    put(
+        json!({ "kind": "note", "note": { "id": note, "name": "Contrat", "content": "voir le scan", "attachments": [a1, a2] } }),
+        Some(first.revision),
+    );
+
+    // La bibliothèque : trouver, désigner, télécharger.
+    let session = guivault_cli::login(&home, &server.root, email, "test", &Fixed(pw)).unwrap();
+    let (mut account, unlocked) = guivault_cli::unlocked(&home, Some(&session), None).unwrap();
+    let (cache, _) = guivault_cli::cache(&home, &mut account).unwrap();
+    let opened = vault::open(&unlocked, &cache);
+    let entry = opened.find(None, "Contrat").unwrap();
+    let list = guivault_cli::attachments(entry);
+    assert_eq!(
+        list.iter().map(|a| a.name.as_str()).collect::<Vec<_>>(),
+        ["scan.pdf", "codes.txt"]
+    );
+    let err = guivault_cli::find_attachment(entry, None).unwrap_err().to_string();
+    assert!(err.contains("précisez laquelle"), "{err}");
+    assert!(guivault_cli::find_attachment(entry, Some("absent.pdf")).is_err());
+    let scan_ref = guivault_cli::find_attachment(entry, Some("SCAN.PDF")).unwrap();
+    let got = guivault_cli::download_attachment(&home, &mut account, vid, &scan_ref).unwrap();
+    assert_eq!(got, scan);
+    // Une clé qui n'est pas la sienne : le morceau ne s'ouvre pas.
+    let mut forged = scan_ref.clone();
+    use base64::Engine;
+    forged.key = base64::engine::general_purpose::STANDARD.encode([7u8; 32]);
+    let err = guivault_cli::download_attachment(&home, &mut account, vid, &forged)
+        .unwrap_err()
+        .to_string();
+    assert!(err.contains("ne s'ouvre pas"), "{err}");
+
+    // Le binaire : la liste, un fichier à son nom (jamais par-dessus), la sortie.
+    let work = dir.join("out");
+    std::fs::create_dir_all(&work).unwrap();
+    let gv = |args: &[&str]| {
+        let out = std::process::Command::new(env!("CARGO_BIN_EXE_gv"))
+            .args(args)
+            .current_dir(&work)
+            .env("GV_HOME", &dir)
+            .env("GUIVAULT_SESSION", &session)
+            .output()
+            .unwrap();
+        (
+            out.status.success(),
+            out.stdout,
+            String::from_utf8_lossy(&out.stderr).to_string(),
+        )
+    };
+    let (ok, out, err) = gv(&["attachment", "list", "Contrat"]);
+    assert!(ok, "{err}");
+    let listing = String::from_utf8(out).unwrap();
+    assert!(
+        listing.contains("scan.pdf\t1572864") && listing.contains("codes.txt\t10"),
+        "{listing}"
+    );
+    let (ok, _, err) = gv(&["attachment", "get", "Contrat", "scan.pdf"]);
+    assert!(ok, "{err}");
+    assert_eq!(std::fs::read(work.join("scan.pdf")).unwrap(), scan);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mode = std::fs::metadata(work.join("scan.pdf")).unwrap().permissions().mode();
+        assert_eq!(mode & 0o777, 0o600);
+    }
+    let (ok, _, err) = gv(&["attachment", "get", "Contrat", "scan.pdf"]);
+    assert!(!ok && err.contains("existe déjà"), "{err}");
+    let (ok, out, err) = gv(&["attachment", "get", "gv://Personnel/Contrat/codes.txt", "-o", "-"]);
+    assert!(ok, "{err}");
+    assert_eq!(out, codes);
+    let (ok, _, err) = gv(&["attachment", "get", "Contrat"]);
+    assert!(!ok && err.contains("précisez laquelle"), "{err}");
 
     let _ = std::fs::remove_dir_all(&dir);
 }

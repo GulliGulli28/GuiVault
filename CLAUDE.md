@@ -37,7 +37,7 @@ HMAC pour les sels fictifs de prelogin.
   run` : changer un type ici, c'est le changer là-bas, et régénérer.
 - `crates/guivault-cli` — `gv`, le coffre en ligne de commande
   (`docs/CLI.md`) : une bibliothèque (`login`, `unlock`, `sync`, `resolve`,
-  `aws_credential_process`, `git_credential` ; `store.rs` ce qui est gardé
+  `aws_credential_process`, `git_credential`, `download_attachment` ; `store.rs` ce qui est gardé
   sur le disque, `vault.rs` les champs lus génériquement dans le JSON des
   items) et `main.rs` (arguments à la main, invites sur le terminal). Son
   test `tests/cli.rs` lance un vrai serveur, comme `tests/api.rs`.

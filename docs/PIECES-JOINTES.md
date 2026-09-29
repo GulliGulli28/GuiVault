@@ -1,7 +1,7 @@
 # Pièces jointes chiffrées
 
 Statut : **fait** côté serveur, crypto (Rust et web, vecteurs d'interop),
-interface web et extension (lecture) — 29 septembre 2026. Ce qui reste est en fin de page.
+interface web, extension (lecture) et `gv` — 29 septembre 2026. Ce qui reste est en fin de page.
 
 ## Ce que ça donne
 
@@ -65,6 +65,8 @@ type, ni le contenu. Voir `SECURITY.md`.
   télécharge (`AttachmentsPanel` en lecture) ; les joindre ou les retirer
   se fait dans l'interface web — dans Chrome, ouvrir un sélecteur de
   fichier depuis le popup le ferme.
+- `gv` : `gv attachment list|get` (`guivault-cli/src/lib.rs`,
+  « Pièces jointes » ; `docs/CLI.md`), test `gv_downloads_attachments`.
 - Tests : `attachments_are_chunked_bounded_moved_and_cleaned`
   (`tests/api.rs`), `attachment.rs` (unitaires), et un envoi de 2,5 Mio
   vérifié dans Chromium (contenu jamais en clair en base, téléchargement
@@ -73,7 +75,6 @@ type, ni le contenu. Voir `SECURITY.md`.
 
 ## Reste
 
-- **`gv`** : `gv attachment get <réf> [fichier]`.
 - **Liens de partage** avec un fichier (le §2 de la feuille de route).
 - **Copie hors ligne** : les fichiers n'y sont pas (seulement leur
   description) ; les télécharger hors ligne échoue avec un message.

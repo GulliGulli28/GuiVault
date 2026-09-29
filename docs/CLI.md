@@ -24,6 +24,8 @@ gv get gv://Personnel/GitHub/password
 | `gv list [--vault V] [--type T] [--json]` | les éléments (vault, type, nom, id) |
 | `gv get <réf \| élément> [champ] [--vault V] [-n]` | un secret sur la sortie (`-n` : sans retour à la ligne) |
 | `gv run [--env-file F]… -- cmd…` | lance `cmd` avec les variables dont la valeur est une référence `gv://` remplacées par le secret |
+| `gv attachment list <réf \| élément> [--vault V]` | les pièces jointes d'un élément (nom, taille, id) |
+| `gv attachment get <réf \| élément> [pièce jointe] [--vault V] [-o fichier \| -]` | la télécharge et la déchiffre : par défaut un fichier à son nom dans le dossier courant (`0600`, jamais par-dessus un existant), `-o -` sur la sortie ; `gv://vault/élément/pièce jointe` marche aussi |
 | `gv aws credential-process <accès \| réf>` | le JSON attendu par `credential_process` (accès AWS par clés) |
 | `gv git-credential get` | credential helper Git |
 
@@ -101,6 +103,14 @@ paramètres épinglés — un `gv login` à qui le serveur demande moins de
 mémoire ou de passes que la dernière fois est refusé avant d'envoyer quoi
 que ce soit. `gv run` passe les secrets dans l'environnement de la
 commande, qui en fait ce qu'elle veut ; `gv get` les écrit sur la sortie.
+
+### Pièces jointes
+
+La clé d'un fichier est dans son élément, donc dans le cache ; le fichier
+lui-même n'y est pas : `gv attachment get` demande le serveur. Chaque
+morceau est vérifié (sa place, le fait d'être le dernier) : un fichier
+tronqué, réordonné ou altéré ne se déchiffre pas. Voir
+[`PIECES-JOINTES.md`](PIECES-JOINTES.md).
 
 ### Manifestes
 

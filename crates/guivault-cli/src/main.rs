@@ -3,7 +3,7 @@ use anyhow::{Context, Result, anyhow, bail};
 use guivault_cli::store::Home;
 use guivault_cli::vault::Opened;
 use guivault_cli::{Prompt, SecretRef};
-use std::io::{IsTerminal, Read};
+use std::io::{IsTerminal, Read, Write};
 use std::process::ExitCode;
 
 const HELP: &str = "gv — le coffre GuiVault en ligne de commande
@@ -20,6 +20,11 @@ const HELP: &str = "gv — le coffre GuiVault en ligne de commande
   gv get <réf|élément> [champ] [--vault V] [-n]
                                              un secret sur la sortie (-n : sans retour à la ligne)
   gv run [--env-file F]… -- <commande…>      la commande, avec les variables gv:// remplacées
+  gv attachment list <réf|élément> [--vault V]
+                                             les pièces jointes d'un élément
+  gv attachment get <réf|élément> [pièce jointe] [--vault V] [-o fichier|-]
+                                             la télécharger et la déchiffrer (par défaut : un fichier
+                                             à son nom ici, jamais par-dessus un existant ; -o - : la sortie)
   gv aws credential-process <accès|réf>      pour `credential_process` dans ~/.aws/config
   gv git-credential get                      credential helper Git
                                              (git config --global credential.helper '!gv git-credential')
@@ -45,6 +50,21 @@ impl Prompt for Terminal {
     fn code(&self, prompt: &str) -> Result<String> {
         rpassword::prompt_password(prompt).context("lecture du code sur le terminal")
     }
+}
+
+/// Un nouveau fichier (jamais par-dessus un existant), en `0600` : ce qu'on
+/// télécharge d'un coffre est secret par défaut.
+fn write_new(path: &str, data: &[u8]) -> Result<()> {
+    let mut opts = std::fs::OpenOptions::new();
+    opts.write(true).create_new(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        opts.mode(0o600);
+    }
+    let mut f = opts.open(path).with_context(|| format!("écriture de {path}"))?;
+    f.write_all(data)?;
+    Ok(())
 }
 
 /// Les options `--nom valeur` d'une sous-commande, et le reste.
@@ -233,6 +253,53 @@ fn run() -> Result<ExitCode> {
                 for e in rows {
                     println!("{}\t{}\t{}\t{}", opened.vaults[e.vault].name, e.kind, e.name, e.id);
                 }
+            }
+        }
+        "attachment" | "attachments" => {
+            let (sub, rest) = args.split_first().map(|(s, r)| (s.as_str(), r)).unwrap_or(("", &[]));
+            let a = parse(rest, &["--vault", "-o", "--output"], &[])?;
+            // gv://vault/élément[/pièce jointe], ou élément [pièce jointe].
+            let (vault, item, wanted) = match a.rest.as_slice() {
+                [one, more @ ..] if one.starts_with("gv://") && more.len() <= 1 => {
+                    let r = guivault_cli::parse_ref(one)?;
+                    (r.vault, r.item, more.first().cloned().or(r.field))
+                }
+                [item] => (a.opt("--vault").map(str::to_string), item.clone(), None),
+                [item, name] => (a.opt("--vault").map(str::to_string), item.clone(), Some(name.clone())),
+                _ => bail!("gv attachment list|get <gv://vault/élément[/pièce jointe] | élément [pièce jointe]>"),
+            };
+            let opened = open(&home)?;
+            let entry = opened.find(vault.as_deref(), &item)?;
+            match sub {
+                "list" | "ls" => {
+                    for att in guivault_cli::attachments(entry) {
+                        println!("{}	{}	{}", att.name, att.size, att.id);
+                    }
+                }
+                "get" => {
+                    let att = guivault_cli::find_attachment(entry, wanted.as_deref())?;
+                    let mut account = home.account()?.ok_or_else(|| anyhow!("aucun compte (gv login)"))?;
+                    let target = a.opt("-o").or(a.opt("--output"));
+                    // Le nom seul, jamais un chemin choisi par qui a écrit l'élément.
+                    let default = std::path::Path::new(&att.name)
+                        .file_name()
+                        .map(|n| n.to_string_lossy().into_owned())
+                        .filter(|n| !n.is_empty() && n != "." && n != "..")
+                        .unwrap_or_else(|| att.id.to_string());
+                    let path = target.map(str::to_string).unwrap_or(default);
+                    if path != "-" && std::path::Path::new(&path).exists() {
+                        bail!("{path} existe déjà : -o pour un autre nom");
+                    }
+                    let data =
+                        guivault_cli::download_attachment(&home, &mut account, opened.vaults[entry.vault].id, &att)?;
+                    if path == "-" {
+                        std::io::stdout().write_all(&data)?;
+                    } else {
+                        write_new(&path, &data)?;
+                        eprintln!("« {} » enregistré dans {path} ({} octets).", att.name, data.len());
+                    }
+                }
+                _ => bail!("gv attachment list|get … (gv help)"),
             }
         }
         "get" => {
