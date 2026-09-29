@@ -83,7 +83,8 @@ pub async fn overview(State(state): State<AppState>, _admin: Admin) -> ApiResult
             (SELECT count(*) FROM vaults) AS vaults,
             (SELECT count(*) FROM vaults WHERE kind = 'shared') AS shared_vaults,
             (SELECT count(*) FROM items WHERE deleted_at IS NULL) AS items,
-            (SELECT coalesce(sum(octet_length(ciphertext)), 0)::bigint FROM items WHERE deleted_at IS NULL) AS storage_bytes,
+            ((SELECT coalesce(sum(octet_length(ciphertext)), 0) FROM items WHERE deleted_at IS NULL)
+             + (SELECT coalesce(sum(size_bytes), 0) FROM attachments))::bigint AS storage_bytes,
             (SELECT count(*) FROM sends) AS sends,
             (SELECT count(*) FROM sessions WHERE revoked_at IS NULL AND refresh_expires_at > now()) AS active_sessions,
             (SELECT count(*) FROM registration_invites WHERE expires_at > now()) AS pending_registrations",
@@ -135,7 +136,10 @@ const USER_INFO: &str = "SELECT u.id, u.email::text AS email, u.created_at, u.di
           WHERE s.user_id = u.id AND s.revoked_at IS NULL AND s.refresh_expires_at > now()) AS active_sessions,
         (SELECT count(*) FROM vault_members m WHERE m.user_id = u.id AND m.role = 'owner') AS vaults_owned,
         (SELECT count(*) FROM vault_members m WHERE m.user_id = u.id AND m.role <> 'owner') AS vaults_joined,
-        coalesce(st.items, 0) AS items, coalesce(st.bytes, 0) AS storage_bytes
+        coalesce(st.items, 0) AS items,
+        (coalesce(st.bytes, 0) + coalesce((SELECT sum(a.size_bytes) FROM attachments a
+            JOIN vault_members m ON m.vault_id = a.vault_id AND m.role = 'owner' WHERE m.user_id = u.id), 0))::bigint
+            AS storage_bytes
     FROM users u
     LEFT JOIN LATERAL (
         SELECT count(*) AS items, sum(octet_length(i.ciphertext))::bigint AS bytes

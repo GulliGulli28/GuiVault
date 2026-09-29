@@ -152,8 +152,9 @@ pub async fn store_manifest(tx: &mut PgConnection, vault_id: Uuid, blob: &[u8], 
 }
 
 /// Le propriétaire du vault a-t-il la place d'écrire ce chiffré ? Son usage :
-/// les chiffrés vivants de tous les vaults qu'il possède (ni l'historique,
-/// borné par `GUIVAULT_ITEM_HISTORY`, ni les tombales). Une écriture qui ne
+/// les chiffrés vivants de tous les vaults qu'il possède et leurs pièces
+/// jointes (ni l'historique, borné par `GUIVAULT_ITEM_HISTORY`, ni les
+/// tombales). Une écriture qui ne
 /// grossit pas passe toujours — un quota abaissé sous l'usage n'empêche pas
 /// de corriger ou d'alléger. À appeler sous le verrou du vault.
 pub async fn check_quota(
@@ -169,10 +170,13 @@ pub async fn check_quota(
     }
     let row: Option<(Option<i64>, i64)> = sqlx::query_as(
         "SELECT u.quota_bytes,
-                coalesce((SELECT sum(octet_length(i.ciphertext))
+                (coalesce((SELECT sum(octet_length(i.ciphertext))
                           FROM items i JOIN vault_members o ON o.vault_id = i.vault_id AND o.role = 'owner'
                           WHERE o.user_id = m.user_id AND i.deleted_at IS NULL
-                            AND NOT (i.vault_id = $1 AND i.id = $2)), 0)::bigint
+                            AND NOT (i.vault_id = $1 AND i.id = $2)), 0)
+                 + coalesce((SELECT sum(a.size_bytes)
+                          FROM attachments a JOIN vault_members o ON o.vault_id = a.vault_id AND o.role = 'owner'
+                          WHERE o.user_id = m.user_id), 0))::bigint
          FROM vault_members m JOIN users u ON u.id = m.user_id
          WHERE m.vault_id = $1 AND m.role = 'owner'",
     )

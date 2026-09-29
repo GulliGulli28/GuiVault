@@ -17,6 +17,21 @@ export interface HealthResponse {
   send_max_days?: number;
   /** Le serveur relaie les recherches du rapport de santé (fuites, 2FA). */
   health_lookups?: boolean;
+  /** Taille maximale d'une pièce jointe, chiffrée ; 0 ou absent : désactivées. */
+  max_attachment_bytes?: number;
+}
+
+/** Une pièce jointe côté serveur (`guivault_protocol::Attachment`) : des
+ * morceaux chiffrés qu'il ne lit pas. Son nom et sa clé sont dans l'item. */
+export interface ServerAttachment {
+  id: string;
+  vault_id: string;
+  item_id: string;
+  /** Taille chiffrée totale. */
+  size: number;
+  chunks: number;
+  complete: boolean;
+  created_at: string;
 }
 
 /** Un site qui accepte un code TOTP (2fa.directory, relayé par le serveur). */
@@ -545,7 +560,22 @@ export interface SecretBase {
   favorite?: boolean;
   notes?: string;
   fields?: CustomField[];
+  /** Les pièces jointes (`lib/attachments.ts`, `docs/PIECES-JOINTES.md`). */
+  attachments?: FileAttachment[];
   [extra: string]: unknown;
+}
+
+/** Une pièce jointe telle que l'item la décrit : le fichier chiffré est
+ * sur le serveur, rangé à part ; sa clé n'est qu'ici, sous la clé du vault. */
+export interface FileAttachment {
+  id: string;
+  name: string;
+  /** Taille en clair, en octets. */
+  size: number;
+  /** Type MIME, si le navigateur l'a donné. */
+  mime?: string | null;
+  /** La clé du fichier, en base64. */
+  key: string;
 }
 
 /** Comment une URI enregistrée se compare à celle d'une page (même sens que

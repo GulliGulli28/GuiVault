@@ -198,6 +198,7 @@ dans [`docs/SECURITY.md`](docs/SECURITY.md).
 | `GUIVAULT_SEND_MAX_DAYS` | `30` | Durée de vie maximale d'un lien de partage (jours) ; `0` : liens désactivés, routes publiques comprises |
 | `GUIVAULT_HEALTH_LOOKUPS` | `true` | Relayer les recherches du rapport de santé (fuites par k-anonymat, liste des sites à 2FA) ; `false` : aucune requête sortante |
 | `GUIVAULT_HIBP_URL` / `GUIVAULT_2FA_DIRECTORY_URL` | services publics | Où les relayer (miroir interne, tests) |
+| `GUIVAULT_MAX_ATTACHMENT_MB` | `100` | Taille maximale d'une pièce jointe (chiffrée) ; `0` : pièces jointes désactivées |
 | `GUIVAULT_QUOTA_MB` | `0` | Quota de stockage par compte (Mio de chiffrés dans les vaults qu'il possède) ; `0` : aucun. Modifiable compte par compte dans l'administration |
 | `GUIVAULT_ALLOWED_IPS` | — | Plages (IP/CIDR, séparées par des virgules) seules servies : API, interface, liens de partage ; `/api/v1/health` reste joignable. Vide : toutes |
 | `GUIVAULT_ADMIN_ALLOWED_IPS` | — | Plages d'où l'administration (`/admin`) répond ; vide : toutes |

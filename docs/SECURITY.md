@@ -12,7 +12,7 @@ chiffrées.
 | Menace | Réponse |
 |---|---|
 | Fuite de la base (dump, sauvegarde, disque) | Aucune clé côté serveur. Les blobs sont XChaCha20-Poly1305 sous des clés dérivées d'un mot de passe maître via Argon2id (64 MiB, 3 passes). La clé d'authentification est re-hachée (Argon2id) : le dump ne permet pas non plus de se connecter. Les jetons sont stockés hachés (SHA-256). |
-| Serveur malveillant qui **modifie** des données | Chaque blob est AEAD. L'AAD lie un item à son vault, son id et son type : un item déplacé, renommé ou substitué ne s'ouvre plus. |
+| Serveur malveillant qui **modifie** des données | Chaque blob est AEAD. L'AAD lie un item à son vault, son id et son type : un item déplacé, renommé ou substitué ne s'ouvre plus. Un morceau de pièce jointe est lié à sa pièce jointe, à sa place et au fait d'être le dernier : ni réordonné, ni tronqué, ni emprunté à un autre fichier. |
 | Serveur malveillant qui **rejoue** une ancienne version d'un vault (ou base restaurée depuis une sauvegarde) | Les clients retiennent la dernière révision vue de chaque vault (web et extension : `web/src/lib/vaultRevisions.ts`, `localStorage` ; Guiterm : `SyncState::vault_revisions`) et, si le serveur en annonce une plus basse, le disent en rouge jusqu'à ce que l'utilisateur en prenne acte. Guiterm **suspend** en plus la synchronisation de ce vault (ni pull, ni push, ni suppression) jusqu'à reprise explicite, où sa version fait foi. Non couvert cryptographiquement : voir « Limites ». |
 | Serveur malveillant qui **substitue une clé publique** pour lire un vault partagé | C'est l'attaque principale contre tout système de partage E2E. Défense : l'**empreinte** de la clé publique (`fingerprint`) est renvoyée partout où une clé publique apparaît ; le client DOIT l'afficher et demander une vérification hors bande (voix, messagerie interne) avant le premier partage vers une personne, puis épingler la clé (TOFU) et alerter si elle change. Dans l'autre sens, l'enveloppe de la clé de vault est authentifiée (format 2) : le destinataire voit l'empreinte de qui la lui a remise et la vérifie de même. |
 | Vol du mot de passe maître seul (hameçonnage, épaule) | Second facteur TOTP optionnel : sans le code, pas de session. Ne protège pas contre un vol de mot de passe **plus** un dump de base. |
@@ -44,7 +44,11 @@ chiffrées.
 Adresses e-mail, appartenance aux vaults et rôles, nombre et **types**
 d'items (`host`, `ssh-key`, `password`…), dates, révisions, IP/user-agent
 des sessions, journal d'audit. Ces métadonnées suffisent à dire « Alice
-partage 12 hôtes et 3 clés avec Bob », jamais lesquels. Des réglages
+partage 12 hôtes et 3 clés avec Bob », jamais lesquels. Des **pièces
+jointes**, il voit la taille chiffrée (donc, à 41 octets par Mio près, la
+taille du fichier), quand elles sont ajoutées, et à quel item elles
+appartiennent — ni leur nom, ni leur type, ni leur contenu : chacune est
+chiffrée sous une clé propre, gardée dans l'item. Des réglages
 synchronisés, il voit la taille du blob et quand il change (chaque réglage
 d'apparence modifié en est un) — pas son contenu. De l'historique et de la
 corbeille, il garde les versions précédentes **chiffrées** (combien, quand,

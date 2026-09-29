@@ -2,7 +2,7 @@
  * `core/src/guivault/client.rs` dans Guiterm. Une méthode par route ; les
  * blobs restent en base64, c'est `session.ts` qui chiffre et déchiffre. */
 import type { TwoFactorSite } from "./types";
-import type { AdminOverview, AdminUserInfo, AuditEntry, BackupsStatus, EmergencyGrant, EmergencyOverview, EmergencyVault, HealthResponse, Invitation, Item, ItemVersion, ItemsPage, KdfParams, ManifestWrite, LoginResponse, PreloginResponse, Role, SendContent, SendInfo, SendPassword, SendSummary, RegistrationInvite, ServerEvent, Session, SyncResponse, TokenPair, TotpChallenge, TrashedItem, UserLookupResponse, UserProfile, UserSettings, Vault, VaultManifest, VaultMember } from "./types";
+import type { AdminOverview, AdminUserInfo, AuditEntry, BackupsStatus, EmergencyGrant, EmergencyOverview, EmergencyVault, HealthResponse, Invitation, Item, ItemVersion, ItemsPage, KdfParams, ManifestWrite, LoginResponse, PreloginResponse, Role, SendContent, SendInfo, SendPassword, SendSummary, RegistrationInvite, ServerAttachment, ServerEvent, Session, SyncResponse, TokenPair, TotpChallenge, TrashedItem, UserLookupResponse, UserProfile, UserSettings, Vault, VaultManifest, VaultMember } from "./types";
 
 /** Une enveloppe de clé de vault pour un contact d'urgence. */
 export interface EmergencyVaultKey {
@@ -156,6 +156,22 @@ async function authedText(path: string): Promise<string> {
   return res.text();
 }
 
+/** Des octets bruts (morceaux de pièces jointes), dans un sens ou l'autre. */
+async function authedBytes(method: string, path: string, body?: Uint8Array): Promise<Uint8Array> {
+  const send = () => fetch(BASE + path, {
+    method,
+    headers: { ...(tokens ? { authorization: `Bearer ${tokens.access}` } : {}), ...(body ? { "content-type": "application/octet-stream" } : {}) },
+    body: body as BodyInit | undefined,
+  });
+  let res = await send();
+  if (res.status === 401 && tokens) {
+    await refreshTokens();
+    res = await send();
+  }
+  if (!res.ok) await parse(res);
+  return new Uint8Array(await res.arrayBuffer());
+}
+
 const q = (s: string) => encodeURIComponent(s);
 
 export const api = {
@@ -245,6 +261,15 @@ export const api = {
   deleteItem: (vault: string, id: string, opts: { moved?: boolean; manifest?: ManifestWrite } = {}) =>
     authed<void>("DELETE", `/vaults/${vault}/items/${id}${opts.moved ? "?moved=true" : ""}`, opts.manifest ? { manifest: opts.manifest } : undefined),
   manifest: (vault: string) => authed<VaultManifest | null>("GET", `/vaults/${vault}/manifest`),
+  // ── Pièces jointes (`lib/attachments.ts`) ──
+  attachments: (vault: string, itemId?: string) => authed<ServerAttachment[]>("GET", `/vaults/${vault}/attachments${itemId ? `?item_id=${q(itemId)}` : ""}`),
+  createAttachment: (vault: string, req: { id: string; item_id: string; size: number; chunks: number }) => authed<ServerAttachment>("POST", `/vaults/${vault}/attachments`, req),
+  putAttachmentChunk: (vault: string, id: string, index: number, bytes: Uint8Array) => authedBytes("PUT", `/vaults/${vault}/attachments/${id}/chunks/${index}`, bytes),
+  completeAttachment: (vault: string, id: string) => authed<ServerAttachment>("POST", `/vaults/${vault}/attachments/${id}/complete`),
+  attachmentChunk: (vault: string, id: string, index: number) => authedBytes("GET", `/vaults/${vault}/attachments/${id}/chunks/${index}`),
+  emergencyAttachmentChunk: (grant: string, vault: string, id: string, index: number) => authedBytes("GET", `/emergency/${grant}/vaults/${vault}/attachments/${id}/chunks/${index}`),
+  deleteAttachment: (vault: string, id: string) => authed<void>("DELETE", `/vaults/${vault}/attachments/${id}`),
+  moveAttachment: (vault: string, id: string, req: { vault_id: string; item_id: string }) => authed<ServerAttachment>("POST", `/vaults/${vault}/attachments/${id}/move`, req),
   putManifest: (vault: string, req: { ciphertext: string; base_revision: number; vault_revision: number }) => authed<VaultManifest>("PUT", `/vaults/${vault}/manifest`, req),
   itemVersions: (vault: string, id: string) => authed<ItemVersion[]>("GET", `/vaults/${vault}/items/${id}/versions`),
   vaultVersions: (vault: string) => authed<ItemVersion[]>("GET", `/vaults/${vault}/versions`),

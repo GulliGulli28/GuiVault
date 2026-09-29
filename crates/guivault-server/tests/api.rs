@@ -64,6 +64,7 @@ impl TestServer {
             item_history: 20,
             trash_days: 30,
             send_max_days: 30,
+            max_attachment_bytes: 100 * 1024 * 1024,
             health_lookups: false,
             hibp_url: String::new(),
             twofa_directory_url: String::new(),
@@ -4220,5 +4221,329 @@ async fn vault_manifest_is_written_with_every_change_and_catches_a_lying_server(
     let v = verify_page(&new_key, vault.id, &page, Some(3));
     assert!(v.problems.is_empty(), "{:?}", v.problems);
     assert_eq!(page.manifest.unwrap().revision, 4);
+    server.stop().await;
+}
+
+/// Une pièce jointe annoncée puis envoyée morceau par morceau (`docs/PIECES-JOINTES.md`).
+async fn upload_attachment(user: &User, vault: Uuid, item: Uuid, id: Uuid, chunks: &[Vec<u8>]) -> reqwest::Response {
+    let size: usize = chunks.iter().map(Vec::len).sum();
+    let r = user
+        .req(reqwest::Method::POST, &format!("/vaults/{vault}/attachments"))
+        .json(&CreateAttachmentRequest {
+            id,
+            item_id: item,
+            size: size as i64,
+            chunks: chunks.len() as i32,
+        })
+        .send()
+        .await
+        .unwrap();
+    if r.status() != StatusCode::CREATED {
+        return r;
+    }
+    for (i, c) in chunks.iter().enumerate() {
+        status!(
+            user.req(
+                reqwest::Method::PUT,
+                &format!("/vaults/{vault}/attachments/{id}/chunks/{i}")
+            )
+            .body(c.clone())
+            .send()
+            .await
+            .unwrap(),
+            StatusCode::NO_CONTENT
+        );
+    }
+    user.req(
+        reqwest::Method::POST,
+        &format!("/vaults/{vault}/attachments/{id}/complete"),
+    )
+    .send()
+    .await
+    .unwrap()
+}
+
+async fn download_attachment(user: &User, vault: Uuid, id: Uuid, count: usize) -> Vec<Vec<u8>> {
+    let mut out = Vec::new();
+    for i in 0..count {
+        let r = user
+            .req(
+                reqwest::Method::GET,
+                &format!("/vaults/{vault}/attachments/{id}/chunks/{i}"),
+            )
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(r.status(), StatusCode::OK);
+        out.push(r.bytes().await.unwrap().to_vec());
+    }
+    out
+}
+
+#[tokio::test]
+async fn attachments_are_chunked_bounded_moved_and_cleaned() {
+    const MIB: u64 = 1024 * 1024;
+    let Some(server) = TestServer::start_with(RegistrationMode::Open, |c| c.max_attachment_bytes = 3 * MIB).await
+    else {
+        return;
+    };
+    let h: HealthResponse = reqwest::get(format!("{}/health", server.base))
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(h.max_attachment_bytes, 3 * MIB);
+    let alice = User::register(&server, "alice-att@test.local", "alice-pw").await;
+    let bob = User::register(&server, "bob-att@test.local", "bob-pw").await;
+    let personal = alice
+        .sync()
+        .await
+        .vaults
+        .into_iter()
+        .find(|v| v.kind == VaultKind::Personal)
+        .unwrap();
+    let pkey = alice.vault_key(&personal);
+    let item = Uuid::new_v4();
+    status!(
+        alice
+            .put_item(personal.id, &pkey, item, "note", r#"{"kind":"note"}"#, None)
+            .await,
+        StatusCode::CREATED
+    );
+
+    // 2,5 Mio en trois morceaux, sous une clé propre à la pièce jointe.
+    let data: Vec<u8> = (0..(5 * MIB / 2) as usize).map(|i| (i * 31 % 251) as u8).collect();
+    let fkey = gc::SymmetricKey::random();
+    let aid = Uuid::new_v4();
+    let chunks = gc::seal_attachment(&fkey, &aid.to_string(), &data).unwrap();
+    assert_eq!(chunks.len(), 3);
+    let size: usize = chunks.iter().map(Vec::len).sum();
+    let announce = |id: Uuid, item: Uuid, size: i64, chunks: i32| {
+        alice
+            .req(reqwest::Method::POST, &format!("/vaults/{}/attachments", personal.id))
+            .json(&CreateAttachmentRequest {
+                id,
+                item_id: item,
+                size,
+                chunks,
+            })
+            .send()
+    };
+    // Incohérente, trop grosse, pour un item qui n'existe pas : refusée.
+    status!(
+        announce(aid, item, size as i64, 2).await.unwrap(),
+        StatusCode::BAD_REQUEST
+    );
+    status!(
+        announce(aid, item, (4 * MIB) as i64, 4).await.unwrap(),
+        StatusCode::PAYLOAD_TOO_LARGE
+    );
+    status!(
+        announce(aid, Uuid::new_v4(), size as i64, 3).await.unwrap(),
+        StatusCode::NOT_FOUND
+    );
+
+    // Annoncée, deux morceaux sur trois : ni terminée, ni servie.
+    status!(announce(aid, item, size as i64, 3).await.unwrap(), StatusCode::CREATED);
+    for (i, chunk) in chunks.iter().enumerate().take(2) {
+        status!(
+            alice
+                .req(
+                    reqwest::Method::PUT,
+                    &format!("/vaults/{}/attachments/{aid}/chunks/{i}", personal.id)
+                )
+                .body(chunk.clone())
+                .send()
+                .await
+                .unwrap(),
+            StatusCode::NO_CONTENT
+        );
+    }
+    let path = |v: Uuid, rest: &str| format!("/vaults/{v}/attachments/{aid}{rest}");
+    let body = status!(
+        alice
+            .req(reqwest::Method::POST, &path(personal.id, "/complete"))
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::CONFLICT
+    );
+    assert!(body.contains("attachment_incomplete"), "{body}");
+    status!(
+        alice
+            .req(reqwest::Method::GET, &path(personal.id, "/chunks/0"))
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::NOT_FOUND
+    );
+    status!(
+        alice
+            .req(reqwest::Method::PUT, &path(personal.id, "/chunks/2"))
+            .body(chunks[2].clone())
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::NO_CONTENT
+    );
+    let done: Attachment = serde_json::from_str(&status!(
+        alice
+            .req(reqwest::Method::POST, &path(personal.id, "/complete"))
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::OK
+    ))
+    .unwrap();
+    assert!(done.complete && done.size == size as i64 && done.chunks == 3);
+    // Terminée : plus de morceau accepté, et rien pour qui n'est pas membre.
+    status!(
+        alice
+            .req(reqwest::Method::PUT, &path(personal.id, "/chunks/0"))
+            .body(chunks[0].clone())
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::CONFLICT
+    );
+    status!(
+        bob.req(reqwest::Method::GET, &path(personal.id, "/chunks/0"))
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::NOT_FOUND
+    );
+    let got = download_attachment(&alice, personal.id, aid, 3).await;
+    assert_eq!(gc::open_attachment(&fkey, &aid.to_string(), &got).unwrap(), data);
+    let listed: Vec<Attachment> = alice
+        .get(&format!("/vaults/{}/attachments?item_id={item}", personal.id))
+        .await;
+    assert_eq!(listed, vec![done.clone()]);
+
+    // L'item part dans un vault partagé : la pièce jointe suit, sans rien
+    // re-chiffrer.
+    let (shared, skey) = alice.create_vault("Équipe").await;
+    status!(
+        alice
+            .put_item(shared.id, &skey, item, "note", r#"{"kind":"note"}"#, None)
+            .await,
+        StatusCode::CREATED
+    );
+    let moved: Attachment = serde_json::from_str(&status!(
+        alice
+            .req(reqwest::Method::POST, &path(personal.id, "/move"))
+            .json(&MoveAttachmentRequest {
+                vault_id: shared.id,
+                item_id: item
+            })
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::OK
+    ))
+    .unwrap();
+    assert_eq!(moved.vault_id, shared.id);
+    let got = download_attachment(&alice, shared.id, aid, 3).await;
+    assert_eq!(gc::open_attachment(&fkey, &aid.to_string(), &got).unwrap(), data);
+    status!(
+        alice
+            .req(reqwest::Method::GET, &path(personal.id, "/chunks/0"))
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::NOT_FOUND
+    );
+
+    // Le quota compte les pièces jointes.
+    let db = server.db().await;
+    sqlx::query("UPDATE users SET quota_bytes = $1 WHERE id = $2")
+        .bind((3 * MIB) as i64)
+        .bind(alice.profile.id)
+        .execute(&db)
+        .await
+        .unwrap();
+    let big = gc::seal_attachment(&fkey, &Uuid::new_v4().to_string(), &vec![0u8; MIB as usize]).unwrap();
+    let r = upload_attachment(&alice, shared.id, item, Uuid::new_v4(), &big).await;
+    assert_eq!(r.status(), StatusCode::INSUFFICIENT_STORAGE);
+    sqlx::query("UPDATE users SET quota_bytes = NULL WHERE id = $1")
+        .bind(alice.profile.id)
+        .execute(&db)
+        .await
+        .unwrap();
+
+    // Supprimé, l'item garde sa pièce jointe le temps de la corbeille ; purgé,
+    // elle part avec lui.
+    status!(
+        alice
+            .req(reqwest::Method::DELETE, &format!("/vaults/{}/items/{item}", shared.id))
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::NO_CONTENT
+    );
+    let listed: Vec<Attachment> = alice.get(&format!("/vaults/{}/attachments", shared.id)).await;
+    assert_eq!(listed.len(), 1);
+    status!(
+        alice
+            .req(reqwest::Method::DELETE, &format!("/vaults/{}/trash/{item}", shared.id))
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::NO_CONTENT
+    );
+    let listed: Vec<Attachment> = alice.get(&format!("/vaults/{}/attachments", shared.id)).await;
+    assert!(listed.is_empty());
+
+    // Un envoi resté incomplet un jour, ou rattaché à un item qui n'existe
+    // plus : effacé à la tournée horaire. Une pièce jointe en règle reste.
+    let item2 = Uuid::new_v4();
+    status!(
+        alice
+            .put_item(personal.id, &pkey, item2, "note", r#"{"kind":"note"}"#, None)
+            .await,
+        StatusCode::CREATED
+    );
+    let small = gc::seal_attachment(&fkey, "x", b"hello").unwrap();
+    let (kept, stale) = (Uuid::new_v4(), Uuid::new_v4());
+    status!(
+        upload_attachment(&alice, personal.id, item2, kept, &small).await,
+        StatusCode::OK
+    );
+    status!(
+        alice
+            .req(reqwest::Method::POST, &format!("/vaults/{}/attachments", personal.id))
+            .json(&CreateAttachmentRequest {
+                id: stale,
+                item_id: item2,
+                size: small[0].len() as i64,
+                chunks: 1
+            })
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::CREATED
+    );
+    sqlx::query("UPDATE attachments SET created_at = now() - interval '2 days'")
+        .execute(&db)
+        .await
+        .unwrap();
+    assert_eq!(guivault_server::routes::attachments::prune(&db, 30).await.unwrap(), 1);
+    let listed: Vec<Attachment> = alice.get(&format!("/vaults/{}/attachments", personal.id)).await;
+    assert_eq!(listed.iter().map(|a| a.id).collect::<Vec<_>>(), vec![kept]);
+    // Supprimée explicitement.
+    status!(
+        alice
+            .req(
+                reqwest::Method::DELETE,
+                &format!("/vaults/{}/attachments/{kept}", personal.id)
+            )
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::NO_CONTENT
+    );
+    let listed: Vec<Attachment> = alice.get(&format!("/vaults/{}/attachments", personal.id)).await;
+    assert!(listed.is_empty());
     server.stop().await;
 }

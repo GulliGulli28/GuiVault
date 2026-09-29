@@ -105,6 +105,12 @@ HMAC pour les sels fictifs de prelogin.
     seulement s'il est encore dans le presse-papiers ; le popup de
     l'extension confie l'effacement au service worker (`setClearScheduler`,
     document hors écran dans Chrome).
+  - `lib/attachments.ts` — les pièces jointes (`docs/PIECES-JOINTES.md`) :
+    une clé par fichier dans l'item (`SecretBase.attachments`), morceaux de
+    1 Mio (`crypto.ts`), joindre/retirer = une écriture de l'item à elle
+    seule, hors du formulaire (`AttachmentsPanel` sous la fiche). Côté
+    serveur `routes/attachments.rs` ; un item déplacé emmène ses fichiers
+    (`moveItem`), les exports ne les contiennent pas.
   - `lib/sends.ts` — les liens de partage (secret dans le fragment
     `#/send/<id>/<secret>`, jamais vu par le serveur) ; `SendView` est la
     page publique qui les ouvre (hors session, avant l'écran de connexion),

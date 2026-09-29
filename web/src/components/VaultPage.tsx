@@ -17,6 +17,7 @@ import { ItemForm } from "./forms/ItemForm";
 import { IconHistory, IconLink, IconStar, IconTools } from "./secret-icons";
 import { ShareLinkDialog } from "./SendsPage";
 import { ItemHistory } from "./ItemHistory";
+import { AttachmentsPanel } from "./AttachmentsPanel";
 import { IntegrityBanner } from "./IntegrityBanner";
 import { useMerge } from "./MergeDialog";
 import { ShortcutsHelp } from "./ShortcutsHelp";
@@ -543,7 +544,12 @@ function VaultBody({ ctx, vault, itemId }: { ctx: PageContext; vault: VaultView;
                 <div className="max-w-2xl">
                   {alerts.has(current.id) && <p className="callout callout-danger mb-3">{capitalize(alerts.get(current.id)!)} : ne vous y fiez pas avant de l'avoir vérifié.</p>}
                   {current.ok ? (
-                    <ItemView payload={current.payload} index={index} />
+                    <>
+                      <ItemView payload={current.payload} index={index} />
+                      {isSecret(current.payload) && (
+                        <AttachmentsPanel key={current.id} vault={vault} item={current} writable={writable} onChanged={() => void load()} notify={ctx.notify} error={ctx.error} />
+                      )}
+                    </>
                   ) : (
                     <p className="callout callout-danger">Impossible de déchiffrer cet élément : {current.error}. Il a peut-être été chiffré avec une clé de vault antérieure, ou altéré.</p>
                   )}

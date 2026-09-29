@@ -194,6 +194,9 @@ pub struct Config {
     /// Durée de vie maximale d'un lien de partage, en jours ; `0` : liens
     /// désactivés (les routes publiques `/sends/{id}/access` aussi).
     pub send_max_days: u32,
+    /// Taille maximale d'une pièce jointe, chiffrée, en octets ; `0` : pièces
+    /// jointes désactivées (`docs/PIECES-JOINTES.md`).
+    pub max_attachment_bytes: u64,
     /// Les recherches du rapport de santé relayées vers des services publics
     /// (fuites de mots de passe, sites qui proposent la 2FA) ; `false` :
     /// aucune requête sortante.
@@ -283,6 +286,7 @@ impl Config {
             item_history: env_parse("GUIVAULT_ITEM_HISTORY", 20)?,
             trash_days: env_parse("GUIVAULT_TRASH_DAYS", 30)?,
             send_max_days: env_parse("GUIVAULT_SEND_MAX_DAYS", 30)?,
+            max_attachment_bytes: env_parse::<u64>("GUIVAULT_MAX_ATTACHMENT_MB", 100)?.saturating_mul(1024 * 1024),
             health_lookups: env_parse("GUIVAULT_HEALTH_LOOKUPS", true)?,
             hibp_url: env("GUIVAULT_HIBP_URL").unwrap_or_else(|| "https://api.pwnedpasswords.com".into()),
             twofa_directory_url: env("GUIVAULT_2FA_DIRECTORY_URL")
@@ -366,6 +370,7 @@ mod tests {
             item_history: 0,
             trash_days: 0,
             send_max_days: 0,
+            max_attachment_bytes: 0,
             health_lookups: false,
             hibp_url: String::new(),
             twofa_directory_url: String::new(),

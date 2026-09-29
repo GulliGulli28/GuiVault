@@ -625,6 +625,23 @@ pub async fn items(
     Ok(Json(db::items_page(&state.db, vault_id, None).await?))
 }
 
+/// Un morceau d'une pièce jointe d'un vault confié (lecture seule, comme ses
+/// items).
+pub async fn attachment_chunk(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path((id, vault_id, attachment_id, index)): Path<(Uuid, Uuid, Uuid, i32)>,
+) -> ApiResult<axum::response::Response> {
+    granted(&state.db, id, &user).await?;
+    sqlx::query_as::<_, EmergencyVaultRow>(&format!("{EMERGENCY_VAULT_SELECT} AND v.id = $2"))
+        .bind(id)
+        .bind(vault_id)
+        .fetch_optional(&state.db)
+        .await?
+        .ok_or_else(|| AppError::not_found("vault"))?;
+    super::attachments::chunk_bytes(&state.db, vault_id, attachment_id, index).await
+}
+
 // ─── Rotation et transfert (appelés par `vaults`) ───────────────────────────
 
 /// La clé du vault a tourné. Le propriétaire fournit les nouvelles

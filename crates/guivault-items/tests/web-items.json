@@ -61,7 +61,16 @@
       "name": "Codes",
       "groupId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
       "tags": [],
-      "content": "a\nb"
+      "content": "a\nb",
+      "attachments": [
+        {
+          "id": "77777777-7777-4777-8777-777777777777",
+          "name": "scan.pdf",
+          "size": 12345,
+          "mime": "application/pdf",
+          "key": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+        }
+      ]
     }
   },
   {

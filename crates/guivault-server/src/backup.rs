@@ -50,6 +50,8 @@ pub const TABLES: &[&str] = &[
     "vault_members",
     "items",
     "item_versions",
+    "attachments",
+    "attachment_chunks",
     "invitations",
     "sessions",
     "user_totp",

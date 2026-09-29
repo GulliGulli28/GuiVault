@@ -108,6 +108,26 @@ fn opens_and_verifies_browser_manifest() {
 }
 
 #[test]
+fn opens_browser_attachment_chunks() {
+    let v = &vectors()["attachment"];
+    let key = SymmetricKey::from_slice(&h(&v["key"])).unwrap();
+    let id = v["id"].as_str().unwrap();
+    let chunks = v["chunks"].as_array().unwrap();
+    for c in chunks {
+        let (index, last) = (c["index"].as_u64().unwrap() as u32, c["last"].as_bool().unwrap());
+        let plain = open_attachment_chunk(&key, id, index, last, &h(&c["blob"])).unwrap();
+        assert_eq!(plain, c["plaintext"].as_str().unwrap().as_bytes());
+        // Ailleurs, ou pas à sa place : refusé.
+        assert!(open_attachment_chunk(&key, id, index + 1, last, &h(&c["blob"])).is_err());
+        assert!(open_attachment_chunk(&key, id, index, !last, &h(&c["blob"])).is_err());
+    }
+    // Le fichier entier, par les morceaux dans l'ordre.
+    let blobs: Vec<Vec<u8>> = chunks.iter().map(|c| h(&c["blob"])).collect();
+    let whole: String = chunks.iter().map(|c| c["plaintext"].as_str().unwrap()).collect();
+    assert_eq!(open_attachment(&key, id, &blobs).unwrap(), whole.as_bytes());
+}
+
+#[test]
 fn opens_browser_emergency_envelope() {
     let v = &vectors()["vault_envelope"];
     let private = PrivateKey::try_from(h(&v["recipient_private"]).as_slice()).unwrap();

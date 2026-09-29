@@ -57,6 +57,11 @@ use zeroize::{Zeroize, ZeroizeOnDrop};
 
 pub use crypto_box::{PublicKey, SecretKey as PrivateKey};
 
+pub mod attachment;
+pub use attachment::{
+    ATTACHMENT_CHUNK, ATTACHMENT_CHUNK_OVERHEAD, attachment_chunk_count, attachment_sealed_size, open_attachment,
+    open_attachment_chunk, seal_attachment, seal_attachment_chunk,
+};
 pub mod manifest;
 pub use manifest::{
     MANIFEST_ID, MANIFEST_TYPE, Manifest, ManifestProblem, Verified, item_digest, open_manifest, seal_manifest,

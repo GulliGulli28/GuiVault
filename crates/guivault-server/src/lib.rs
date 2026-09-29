@@ -80,6 +80,11 @@ pub async fn serve(
                 Ok(n) => tracing::info!(versions = n, "corbeille : versions expirées effacées"),
                 Err(e) => tracing::warn!(error = %e, "corbeille : effacement des versions expirées impossible"),
             }
+            match routes::attachments::prune(&pool, days).await {
+                Ok(0) => {}
+                Ok(n) => tracing::info!(pieces_jointes = n, "pièces jointes orphelines ou expirées effacées"),
+                Err(e) => tracing::warn!(error = %e, "pièces jointes : effacement des orphelines impossible"),
+            }
             match routes::sends::prune(&pool).await {
                 Ok(0) => {}
                 Ok(n) => tracing::info!(liens = n, "liens de partage expirés effacés"),

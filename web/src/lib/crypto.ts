@@ -454,6 +454,34 @@ export function openSendOwner(userKey: Uint8Array, sendId: string, blob: Uint8Ar
   return utf8.decode(open(userKey, blob, sendAad("guivault/v1/send-owner", sendId)));
 }
 
+// ─── Pièces jointes (`guivault_crypto::attachment`) ─────────────────────────
+//
+// Une clé par pièce jointe, gardée dans l'item qui la porte ; le fichier en
+// morceaux de `ATTACHMENT_CHUNK` octets, chacun lié à la pièce jointe, à sa
+// place et au fait d'être le dernier (ni réordonnés, ni tronqués).
+
+export const ATTACHMENT_CHUNK = 1024 * 1024;
+export const ATTACHMENT_CHUNK_OVERHEAD = 1 + NONCE_LEN + TAG_LEN;
+
+export function attachmentChunkCount(size: number): number {
+  return Math.max(1, Math.ceil(size / ATTACHMENT_CHUNK));
+}
+
+/** Ce que le serveur voit et compte : la taille chiffrée totale. */
+export function attachmentSealedSize(size: number): number {
+  return size + attachmentChunkCount(size) * ATTACHMENT_CHUNK_OVERHEAD;
+}
+
+const attachmentAad = (id: string, index: number, last: boolean) => utf8.encode(`guivault/v1/attachment\0${id}\0${index}\0${last ? 1 : 0}`);
+
+export function sealAttachmentChunk(key: Uint8Array, attachmentId: string, index: number, last: boolean, plaintext: Uint8Array): Uint8Array {
+  return seal(key, plaintext, attachmentAad(attachmentId, index, last));
+}
+
+export function openAttachmentChunk(key: Uint8Array, attachmentId: string, index: number, last: boolean, blob: Uint8Array): Uint8Array {
+  return open(key, blob, attachmentAad(attachmentId, index, last));
+}
+
 // ─── Exports chiffrés ───────────────────────────────────────────────────────
 
 export const AAD_EXPORT = utf8.encode("guivault/v1/export");

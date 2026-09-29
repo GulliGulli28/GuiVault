@@ -151,3 +151,12 @@ export function IconPulse({ size = 16, className }: P) {
     </svg>
   );
 }
+
+/** Une pièce jointe : un trombone. */
+export function IconPaperclip({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <path d="M10.5 5.5l-4.6 4.6a1.3 1.3 0 0 0 1.85 1.85l5-5a2.6 2.6 0 0 0-3.7-3.7l-5.1 5.1a3.9 3.9 0 0 0 5.5 5.5l4.3-4.3" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}

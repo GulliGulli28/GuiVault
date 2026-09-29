@@ -75,6 +75,10 @@ pub struct HealthResponse {
     /// qui proposent la 2FA) ; faux : désactivées (ou serveur plus ancien).
     #[serde(default)]
     pub health_lookups: bool,
+    /// Taille maximale d'une pièce jointe, chiffrée, en octets ; `0` :
+    /// désactivées (ou serveur d'avant les pièces jointes).
+    #[serde(default)]
+    pub max_attachment_bytes: u64,
 }
 
 /// Un site qui accepte un code TOTP (liste publique 2fa.directory, relayée
@@ -919,6 +923,44 @@ pub struct PutItemRequest {
     /// vault qui n'en a pas, le crée (`base_revision` 0).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub manifest: Option<ManifestWrite>,
+}
+
+/// Une pièce jointe telle que le serveur la garde (`docs/PIECES-JOINTES.md`) :
+/// des morceaux chiffrés sous une clé que seul l'item qui la porte connaît.
+/// Le serveur voit sa taille, son nombre de morceaux et l'item auquel elle
+/// est rattachée — ni son nom, ni son type, ni son contenu.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Attachment {
+    /// Choisi par le client : il est dans l'AAD de chaque morceau.
+    pub id: Uuid,
+    pub vault_id: Uuid,
+    pub item_id: Uuid,
+    /// Taille chiffrée totale, en octets.
+    pub size: i64,
+    pub chunks: i32,
+    /// Tous les morceaux reçus (`POST …/complete`) : téléchargeable.
+    pub complete: bool,
+    pub created_at: DateTime<Utc>,
+}
+
+/// `POST /vaults/{id}/attachments` : annoncer une pièce jointe avant d'en
+/// envoyer les morceaux (`PUT …/chunks/{index}`, corps brut).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateAttachmentRequest {
+    pub id: Uuid,
+    pub item_id: Uuid,
+    /// Taille chiffrée totale annoncée, vérifiée à `complete`.
+    pub size: i64,
+    pub chunks: i32,
+}
+
+/// `POST /vaults/{id}/attachments/{attachment}/move` : suivre un item
+/// déplacé vers un autre vault (même id). Rien n'est re-chiffré : la clé de
+/// la pièce jointe voyage dans l'item.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MoveAttachmentRequest {
+    pub vault_id: Uuid,
+    pub item_id: Uuid,
 }
 
 /// `DELETE /vaults/{id}/items/{item}` : le corps, facultatif.

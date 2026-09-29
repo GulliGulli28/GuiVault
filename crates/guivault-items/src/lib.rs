@@ -32,6 +32,23 @@ pub const TYPE_IDENTITY: &str = "identity";
 pub const TYPE_AWS: &str = "aws";
 pub const TYPE_API_KEY: &str = "api-key";
 
+/// Une pièce jointe telle que l'item la décrit (`guivault_crypto::attachment`
+/// pour le fichier lui-même).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileAttachment {
+    pub id: Uuid,
+    #[serde(default)]
+    pub name: String,
+    /// Taille en clair, en octets.
+    #[serde(default)]
+    pub size: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mime: Option<String>,
+    /// La clé du fichier, en base64.
+    pub key: String,
+}
+
 /// Un champ libre ajouté à n'importe quel secret.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -131,6 +148,10 @@ pub struct SecretBase {
     pub notes: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fields: Option<Vec<CustomField>>,
+    /// Les pièces jointes : le fichier chiffré est sur le serveur, sa clé
+    /// n'est qu'ici (`docs/PIECES-JOINTES.md`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub attachments: Option<Vec<FileAttachment>>,
     /// Les champs que cette version ne connaît pas, conservés tels quels.
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,

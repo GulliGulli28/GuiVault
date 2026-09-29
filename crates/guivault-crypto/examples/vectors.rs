@@ -68,6 +68,20 @@ fn main() {
     let manifest = Manifest::of(3, [(item_id, item.as_slice()), (other_id, b"abc".as_slice())]);
     let manifest_blob = seal_manifest(&vault_key, vault_id, &manifest).unwrap();
 
+    // Une pièce jointe : des morceaux courts à plusieurs places, le dernier
+    // marqué — c'est l'AAD (id, index, dernier) qui est vérifié de l'autre côté.
+    let attachment_key = SymmetricKey::from_bytes([4u8; 32]);
+    let attachment_id = "cccccccc-dddd-eeee-ffff-000000000000";
+    let attachment_chunks: Vec<_> = [(0u32, false, "morceau 0"), (1, false, "morceau 1"), (2, true, "fin")]
+        .iter()
+        .map(|(i, last, text)| {
+            json!({
+                "index": i, "last": last, "plaintext": text,
+                "blob": hex(&seal_attachment_chunk(&attachment_key, attachment_id, *i, *last, text.as_bytes()).unwrap()),
+            })
+        })
+        .collect();
+
     let v = json!({
         "kdf": {
             "password": password,
@@ -121,6 +135,12 @@ fn main() {
             "vault_id": vault_id, "item_id": item_id, "item_type": "host",
             "plaintext": r#"{"kind":"host"}"#, "blob": hex(&item),
             "name": "Prod bancaire", "name_blob": hex(&name),
+        },
+        "attachment": {
+            "key": hex(attachment_key.as_bytes()),
+            "id": attachment_id,
+            "chunks": attachment_chunks,
+            "sealed_size_of_3_mib_plus_1": attachment_sealed_size(3 * ATTACHMENT_CHUNK as u64 + 1),
         },
         "manifest": {
             "vault_key": hex(vault_key.as_bytes()),

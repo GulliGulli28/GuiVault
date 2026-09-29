@@ -22,7 +22,8 @@ Erreurs : `{ "code": "…", "message": "…" }` (+ champs selon le code, ex.
 `duplicate_vault`, `lookups_disabled`, `lookup_failed`, `totp_required`, `owns_shared_vaults`,
 `account_disabled`, `quota_exceeded`, `ip_not_allowed`, `self_action`, `target_is_admin`,
 `backups_disabled`, `backup_running`, `mail_disabled`, `mail_failed`, `manifest_required`,
-`manifest_conflict`, `manifest_too_large`, `invalid_*`, `internal`.
+`manifest_conflict`, `manifest_too_large`, `attachments_disabled`, `attachment_too_large`,
+`attachment_exists`, `attachment_complete`, `attachment_incomplete`, `invalid_*`, `internal`.
 
 Partout : `403 ip_not_allowed` si l'adresse du client n'est pas dans
 `GUIVAULT_ALLOWED_IPS` (sauf `GET /health`).
@@ -203,6 +204,32 @@ routes d'ouverture, sans compte, sont plus haut (rate-limitées par IP).
 | `GET /sends` | mes liens, du plus récent au plus ancien : `[SendSummary { id, owner_blob, has_password, max_views, views, created_at, expires_at, last_viewed_at, available }]` — expirés compris jusqu'à leur effacement (horaire) |
 | `DELETE /sends/{id}` | supprime (`404` si ce n'est pas le mien) |
 
+## Pièces jointes
+
+Des fichiers chiffrés en morceaux par le client, chacun sous une clé tirée
+au hasard et gardée **dans l'item** qui le porte (`attachments` du JSON du
+secret) : le serveur ne voit que la taille chiffrée, le nombre de morceaux
+et l'item de rattachement. Voir `docs/PIECES-JOINTES.md`. `Attachment { id,
+vault_id, item_id, size, chunks, complete, created_at }`. Désactivées si
+`GUIVAULT_MAX_ATTACHMENT_MB=0` (`403 attachments_disabled`) ; la limite est
+dans `GET /health` (`max_attachment_bytes`).
+
+| | Rôle | |
+|---|---|---|
+| `GET /vaults/{id}/attachments[?item_id=…]` | membre | `[Attachment]` |
+| `POST /vaults/{id}/attachments` | writer | `{ id, item_id, size, chunks }` → `201 Attachment` : l'item doit exister (`404`), `size` = taille chiffrée totale, cohérente avec `chunks` (`400 invalid_attachment`), sous la limite (`413 attachment_too_large`) et le quota du propriétaire du vault (`507 quota_exceeded`) ; `409 attachment_exists` |
+| `PUT /vaults/{id}/attachments/{a}/chunks/{index}` | writer | corps **brut** (`application/octet-stream`), un morceau scellé (au plus 1 Mio + 41 octets) → `204` ; réécrire un morceau le remplace, tant que la pièce jointe n'est pas terminée (`409 attachment_complete`) |
+| `POST /vaults/{id}/attachments/{a}/complete` | writer | tous les morceaux reçus, taille totale = `size` → `Attachment` ; sinon `409 attachment_incomplete` |
+| `GET /vaults/{id}/attachments/{a}/chunks/{index}` | membre | le morceau, brut ; `404` tant que la pièce jointe n'est pas terminée |
+| `DELETE /vaults/{id}/attachments/{a}` | writer | l'efface (morceaux compris) |
+| `POST /vaults/{id}/attachments/{a}/move` | writer des deux côtés | `{ vault_id, item_id }` : suit un item déplacé (l'item doit déjà être dans le vault de destination), sans rien re-chiffrer ; quota du propriétaire de destination |
+| `GET /emergency/{g}/vaults/{v}/attachments/{a}/chunks/{index}` | contact, `granted` | lecture seule, comme les items |
+
+Une pièce jointe reste le temps que son item peut être restauré : effacée
+quand il quitte la corbeille (`DELETE …/trash[/{item}]`, ou au bout de
+`GUIVAULT_TRASH_DAYS`), et, à la tournée horaire, si elle est restée
+incomplète un jour ou si son item n'existe pas.
+
 ## Accès d'urgence
 
 Le donneur désigne un contact inscrit et lui enveloppe la clé de vaults dont
@@ -260,6 +287,18 @@ enveloppe de membre (ni l'inverse) : le serveur ne peut pas l'installer en
 appartenance pour ouvrir le vault sans attendre. Le contact vérifie que
 `sender_pk` est bien celle du donneur, dont il a épinglé l'empreinte en
 acceptant.
+
+### Chiffrement d'une pièce jointe (côté client)
+
+```
+key       = 32 octets aléatoires, gardés dans l'item : { id, name, size, mime?, key (base64) }
+morceaux  = le fichier en tranches de 1 Mio (la dernière plus courte ; un fichier vide en fait une)
+morceau i = 0x01 ‖ nonce(24) ‖ XChaCha20-Poly1305(key, nonce, tranche, aad = "guivault/v1/attachment\0" ‖ id ‖ "\0" ‖ i ‖ "\0" ‖ (1 si dernier, sinon 0))
+size      = taille en clair + 41 × nombre de morceaux     (ce que le serveur compte)
+```
+
+L'index et le drapeau « dernier » dans l'AAD : ni réordonnés, ni tronqués ;
+l'id : pas de mélange entre pièces jointes.
 
 ### Chiffrement d'un lien de partage (côté client)
 

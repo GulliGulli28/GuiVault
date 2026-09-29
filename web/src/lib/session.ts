@@ -687,6 +687,16 @@ export async function putPayload(vault: VaultView, payload: Payload, baseRevisio
  * l'autre clé. */
 export async function moveItem(from: VaultView, to: VaultView, item: DecodedItem & { ok: true }) {
   await putPayload(to, item.payload);
+  // Ses pièces jointes le suivent (sans re-chiffrement : leur clé est dans
+  // l'item), avant qu'il parte d'ici.
+  for (const a of (payloadEntity(item.payload).attachments as { id: string }[] | undefined) ?? []) {
+    try {
+      await api.moveAttachment(from.id, a.id, { vault_id: to.id, item_id: item.id });
+    } catch (e) {
+      // Déjà partie (effacée, ou déplacée par une tentative précédente).
+      if (!(e instanceof ApiError && e.status === 404)) throw e;
+    }
+  }
   // Pas une suppression : l'item ne va pas dans la corbeille d'ici.
   await deleteItem(from, item.id, { moved: true });
 }

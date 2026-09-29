@@ -127,6 +127,11 @@ pub async fn purge(
     if res.rows_affected() == 0 {
         return Err(AppError::not_found("item"));
     }
+    sqlx::query("DELETE FROM attachments WHERE vault_id = $1 AND item_id = $2")
+        .bind(vault_id)
+        .bind(item_id)
+        .execute(&mut *tx)
+        .await?;
     Audit::new("item.purge")
         .actor(user.id)
         .vault(vault_id)
@@ -150,6 +155,14 @@ pub async fn empty_trash(
     let res = sqlx::query(
         "DELETE FROM item_versions v USING items i
          WHERE v.vault_id = $1 AND i.vault_id = v.vault_id AND i.id = v.item_id AND i.deleted_at IS NOT NULL",
+    )
+    .bind(vault_id)
+    .execute(&mut *tx)
+    .await?;
+    // Leurs pièces jointes partent avec eux : plus rien ne peut les restaurer.
+    sqlx::query(
+        "DELETE FROM attachments a USING items i
+         WHERE a.vault_id = $1 AND i.vault_id = a.vault_id AND i.id = a.item_id AND i.deleted_at IS NOT NULL",
     )
     .bind(vault_id)
     .execute(&mut *tx)

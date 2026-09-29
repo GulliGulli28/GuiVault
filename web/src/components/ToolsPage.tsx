@@ -179,7 +179,7 @@ function ExportSection({ ctx, vault, items }: { ctx: PageContext; vault: VaultVi
   return (
     <section className="max-w-2xl space-y-3">
       <Eyebrow>Exporter « {vault.name} »</Eyebrow>
-      <p className="help-text">{items ? `${payloads.length} élément(s)` : "Chargement…"}{unreadable ? `, ${unreadable} illisible(s) laissé(s) de côté` : ""}. Tout est déchiffré dans le navigateur au moment de l'export.</p>
+      <p className="help-text">{items ? `${payloads.length} élément(s)` : "Chargement…"}{unreadable ? `, ${unreadable} illisible(s) laissé(s) de côté` : ""}. Tout est déchiffré dans le navigateur au moment de l'export. Les pièces jointes n'y sont pas : téléchargez-les depuis leur élément.</p>
       <div className="segmented">
         <button type="button" data-active={format === "encrypted"} onClick={() => setFormat("encrypted")}>JSON chiffré</button>
         <button type="button" data-active={format === "json"} onClick={() => setFormat("json")}>JSON en clair</button>

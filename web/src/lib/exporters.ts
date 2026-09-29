@@ -8,9 +8,17 @@ import { groupPath } from "./entities";
 import { GUIVAULT_ENCRYPTED_FORMAT, GUIVAULT_FORMAT, type GuiVaultEncryptedExport, type GuiVaultExport } from "./importers";
 import type { Group, Payload } from "./types";
 
+/** Sans ses pièces jointes : leur clé n'ouvre rien sans le fichier, resté
+ * sur le serveur, et un import ailleurs pointerait vers des fichiers absents. */
+function withoutAttachments(p: Payload): Payload {
+  const copy = JSON.parse(JSON.stringify(p)) as Record<string, unknown>;
+  for (const v of Object.values(copy)) if (v && typeof v === "object" && !Array.isArray(v)) delete (v as Record<string, unknown>).attachments;
+  return copy as Payload;
+}
+
 export function exportJson(vault: { id: string; name: string }, payloads: Payload[]): string {
   const groups = payloads.flatMap((p) => (p.kind === "group" ? [p.group] : []));
-  const doc: GuiVaultExport = { format: GUIVAULT_FORMAT, version: 1, exportedAt: new Date().toISOString(), vault, groups, items: payloads };
+  const doc: GuiVaultExport = { format: GUIVAULT_FORMAT, version: 1, exportedAt: new Date().toISOString(), vault, groups, items: payloads.map(withoutAttachments) };
   return JSON.stringify(doc, null, 2);
 }
 

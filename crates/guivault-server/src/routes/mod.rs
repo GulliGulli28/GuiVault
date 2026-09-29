@@ -15,6 +15,7 @@ use tower_http::timeout::TimeoutLayer;
 use tower_http::trace::TraceLayer;
 
 pub mod admin;
+pub mod attachments;
 pub mod audit;
 pub mod auth;
 pub mod emergency;
@@ -102,6 +103,23 @@ pub fn router(state: AppState) -> Router {
             "/vaults/{id}/manifest",
             get(items::get_manifest).put(items::put_manifest),
         )
+        .route(
+            "/vaults/{id}/attachments",
+            get(attachments::list).post(attachments::create),
+        )
+        .route("/vaults/{id}/attachments/{attachment_id}", delete(attachments::delete))
+        .route(
+            "/vaults/{id}/attachments/{attachment_id}/complete",
+            post(attachments::complete),
+        )
+        .route(
+            "/vaults/{id}/attachments/{attachment_id}/move",
+            post(attachments::move_to),
+        )
+        .route(
+            "/vaults/{id}/attachments/{attachment_id}/chunks/{index}",
+            put(attachments::put_chunk).get(attachments::get_chunk),
+        )
         .route("/vaults/{id}/versions", get(history::vault_versions))
         .route("/vaults/{id}/items/{item_id}/versions", get(history::item_versions))
         .route("/vaults/{id}/trash", get(history::trash).delete(history::empty_trash))
@@ -125,6 +143,10 @@ pub fn router(state: AppState) -> Router {
         .route("/emergency/{id}/reject", post(emergency::reject))
         .route("/emergency/{id}/vaults", get(emergency::vaults))
         .route("/emergency/{id}/vaults/{vault_id}/items", get(emergency::items))
+        .route(
+            "/emergency/{id}/vaults/{vault_id}/attachments/{attachment_id}/chunks/{index}",
+            get(emergency::attachment_chunk),
+        )
         .route("/invitations", get(invitations::list_mine))
         .route("/invitations/{id}", delete(invitations::revoke))
         .route("/invitations/{id}/accept", post(invitations::accept))

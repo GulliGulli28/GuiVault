@@ -17,7 +17,7 @@ authentifiées, empreinte de l'inviteur) ; dans les §1, §3 et §4 : presse-pap
 effacé, historique et corbeille, copie hors ligne, recherche globale
 (Ctrl+K), raccourcis, tri, **fusion des conflits**, CLI `gv`, **remplissage fiable** de l'extension
 (shadow DOM, cadres, corpus rejoué en CI), **agent SSH dans Guiterm** ; dans le §2 : **accès d'urgence**,
-**liens de partage** et **rapport de santé** (web). Chaque point est coché ci-dessous avec où il
+**liens de partage**, **rapport de santé** (web) et **pièces jointes**. Chaque point est coché ci-dessous avec où il
 vit dans le code.
 
 **Ensuite, dans cet ordre** — du plus demandé ou du plus exposé au plus
@@ -103,7 +103,7 @@ paramètres ou formats anciens.
 | ~~Presse-papier jamais effacé (très demandé)~~ **fait** | `lib/clipboard.ts` : effacé au bout du délai (30 s par défaut, section synchronisée `clipboard`) s'il contient encore ce qui a été copié ; extension : service worker + document hors écran ; web : à l'échéance si la page peut vérifier, sinon au clic suivant | — |
 | Tri, doublons, duplication | **Tri fait** (nom en dossiers, modifiés / créés récemment à plat, retenu par appareil) | Rapport de doublons avec fusion ; « Dupliquer » via `useSeed` ; tri par dernier usage (à tracer côté client) |
 | Re-demande du mot de passe maître pour un élément | — | Drapeau `reprompt` sur l'élément (affichage et copie du secret) |
-| Fonctions « premium » payantes (accès d'urgence, pièces jointes, Send, TOTP) ; +100 % sur Premium en janvier 2026 | **Accès d'urgence, Send et TOTP faits**, gratuits parce qu'auto-hébergés | Pièces jointes chiffrées — voir §2 |
+| Fonctions « premium » payantes (accès d'urgence, pièces jointes, Send, TOTP) ; +100 % sur Premium en janvier 2026 | **Accès d'urgence, Send, TOTP et pièces jointes faits**, gratuits parce qu'auto-hébergés | — |
 | Interface « datée », pas d'accompagnement | Pas de premier lancement guidé | Assistant d'import à la première connexion, puis une liste « activer la 2FA, installer l'extension, vérifier une empreinte » |
 
 ## 2. Fonctions nouvelles (zero-knowledge)
@@ -133,8 +133,15 @@ paramètres ou formats anciens.
   de partage », « Partager par lien » sur un élément, page publique
   `SendView.tsx`. Reste : fichiers (avec les pièces jointes), `gv send`,
   l'extension.
-- [ ] **Pièces jointes chiffrées**, découpées en morceaux, stockées à part
-  (la limite actuelle de 1 Mio par item les empêche).
+- [x] **Pièces jointes chiffrées** ([`PIECES-JOINTES.md`](PIECES-JOINTES.md)) :
+  une clé par fichier, gardée dans l'item (une rotation de clé de vault ne
+  re-chiffre pas les fichiers) ; morceaux de 1 Mio liés à leur place
+  (ni réordonnés, ni tronqués) ; rangées dans PostgreSQL, donc dans les
+  sauvegardes vérifiées ; `GUIVAULT_MAX_ATTACHMENT_MB` (100), dans le quota ;
+  effacées quand l'item quitte la corbeille, suivent un item déplacé.
+  Serveur : `routes/attachments.rs`, migration `0011` ; web :
+  `lib/attachments.ts`, « Pièces jointes » sous la fiche d'un secret.
+  Reste : l'extension, `gv`, les liens de partage avec fichier.
 - [x] **Rapport de santé** (web, « Santé du coffre ») : faibles,
   réutilisés (identifiants, hôtes, connexions SQL, passphrases de clés),
   inchangés depuis un an ; sites qui acceptent la 2FA sans TOTP ni passkey

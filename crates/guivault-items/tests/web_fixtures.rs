@@ -36,6 +36,11 @@ fn web_items_parse_and_roundtrip() {
     assert_eq!(login.password_history[0].password, "old");
     assert_eq!(login.base.fields.as_ref().unwrap()[0].r#type, FieldType::Hidden);
     assert_eq!(login.base.favorite, Some(true));
+    let SecretItem::Note { note } = SecretItem::from_json(values[1].to_string().as_bytes()).unwrap() else {
+        panic!()
+    };
+    let attachment = &note.base.attachments.as_ref().unwrap()[0];
+    assert_eq!((attachment.name.as_str(), attachment.size), ("scan.pdf", 12345));
 
     let SecretItem::Aws { aws } = SecretItem::from_json(values[4].to_string().as_bytes()).unwrap() else {
         panic!()

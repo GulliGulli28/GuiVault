@@ -101,6 +101,18 @@ describe("guivault-crypto interop", () => {
     expect(() => openManifest(key, "autre-vault", blob)).toThrow();
   });
 
+  it("ouvre les morceaux d'une pièce jointe scellés par Rust", () => {
+    const v = vectors.attachment;
+    const key = fromHex(v.key);
+    for (const ch of v.chunks) {
+      expect(utf8.decode(c.openAttachmentChunk(key, v.id, ch.index, ch.last, fromHex(ch.blob)))).toBe(ch.plaintext);
+      expect(() => c.openAttachmentChunk(key, v.id, ch.index + 1, ch.last, fromHex(ch.blob))).toThrow();
+      expect(() => c.openAttachmentChunk(key, v.id, ch.index, !ch.last, fromHex(ch.blob))).toThrow();
+    }
+    expect(c.attachmentSealedSize(3 * c.ATTACHMENT_CHUNK + 1)).toBe(v.sealed_size_of_3_mib_plus_1);
+    expect([0, 1, c.ATTACHMENT_CHUNK, c.ATTACHMENT_CHUNK + 1].map(c.attachmentChunkCount)).toEqual([1, 1, 1, 2]);
+  });
+
   it("fait l'aller-retour sur ses propres primitives", async () => {
     const { material, account } = await c.createAccount("pw");
     const m = await c.deriveMasterKey("pw", material.kdfSalt, material.kdf);
@@ -167,6 +179,13 @@ describe("guivault-crypto interop", () => {
         owner_key: toHex(ownerKey), owner_plaintext: "{\"name\":\"Clé\"}", owner_blob: toHex(c.sealSendOwner(ownerKey, sendId, "{\"name\":\"Clé\"}")),
       },
       item: { vault_key: toHex(vaultKey), vault_id: vaultId, item_id: itemId, item_type: "snippet", plaintext: "{\"kind\":\"snippet\"}", blob: toHex(itemBlob), name: "Équipe réseau", name_blob: toHex(c.sealVaultName(vaultKey, vaultId, "Équipe réseau")) },
+      attachment: {
+        key: toHex(key), id: itemId,
+        chunks: [[0, false, "du navigateur"], [1, true, " — fin"]].map(([index, last, plaintext]) => ({
+          index, last, plaintext,
+          blob: toHex(c.sealAttachmentChunk(key, itemId, index as number, last as boolean, utf8.encode(plaintext as string))),
+        })),
+      },
       manifest: {
         vault_key: toHex(vaultKey), vault_id: vaultId, counter: manifest.counter, items: manifest.items,
         blob: toHex(sealManifest(vaultKey, vaultId, manifest)),
