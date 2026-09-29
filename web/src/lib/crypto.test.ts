@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import { writeFileSync } from "node:fs";
 import { fromHex, randomBytes, toHex, utf8, uuid } from "./bytes";
 import * as c from "./crypto";
+import { itemDigest, manifestOf, openManifest, sealManifest, verifyManifest } from "./manifest";
 import vectors from "./crypto.vectors.json";
 
 describe("guivault-crypto interop", () => {
@@ -86,6 +87,20 @@ describe("guivault-crypto interop", () => {
     expect(c.openVaultName(key, v.vault_id, fromHex(v.name_blob))).toBe(v.name);
   });
 
+  it("ouvre et vérifie un manifeste scellé par Rust", () => {
+    const v = vectors.manifest;
+    const key = fromHex(v.vault_key);
+    const blob = fromHex(v.blob);
+    const m = openManifest(key, v.vault_id, blob);
+    expect(m).toEqual({ v: 1, counter: v.counter, items: v.items });
+    const served = [{ id: v.item_id, ciphertext: fromHex(v.item_blob) }, { id: v.other_id, ciphertext: fromHex(v.other_ciphertext) }];
+    // Les empreintes d'ici sont celles de Rust (`item_digest`).
+    for (const it of served) expect(itemDigest(it.ciphertext)).toBe((v.items as Record<string, string>)[it.id]);
+    expect(verifyManifest(key, v.vault_id, { revision: v.counter, ciphertext: blob }, served, v.counter).problems).toEqual([]);
+    expect(verifyManifest(key, v.vault_id, { revision: v.counter, ciphertext: blob }, served.slice(0, 1), null).problems).toEqual([{ kind: "withheld", itemId: v.other_id }]);
+    expect(() => openManifest(key, "autre-vault", blob)).toThrow();
+  });
+
   it("fait l'aller-retour sur ses propres primitives", async () => {
     const { material, account } = await c.createAccount("pw");
     const m = await c.deriveMasterKey("pw", material.kdfSalt, material.kdf);
@@ -133,6 +148,10 @@ describe("guivault-crypto interop", () => {
     const sendPassword = "lien du navigateur";
     const sendLocked = c.sendKeys(sendSecret, await c.sendPasswordKey(sendPassword, sendSalt, kdf));
     const ownerKey = new Uint8Array(32).fill(8);
+    const itemBlob = c.sealItem(vaultKey, vaultId, itemId, "snippet", utf8.encode("{\"kind\":\"snippet\"}"));
+    const otherId = uuid();
+    const other = utf8.encode("abc");
+    const manifest = manifestOf(7, [{ id: itemId, ciphertext: itemBlob }, { id: otherId, ciphertext: other }]);
     const out = {
       kdf: { password, salt: toHex(salt), params: kdf, stretched_key: toHex(master.stretchedKey), auth_key: toHex(master.authKey) },
       seal: { key: toHex(key), aad: "ctx-web", plaintext: "from the browser", blob: toHex(c.seal(key, utf8.encode("from the browser"), utf8.encode("ctx-web"))) },
@@ -147,7 +166,12 @@ describe("guivault-crypto interop", () => {
         locked_blob: toHex(c.sealSend(sendLocked, sendId, utf8.encode("partagé depuis le navigateur"))),
         owner_key: toHex(ownerKey), owner_plaintext: "{\"name\":\"Clé\"}", owner_blob: toHex(c.sealSendOwner(ownerKey, sendId, "{\"name\":\"Clé\"}")),
       },
-      item: { vault_key: toHex(vaultKey), vault_id: vaultId, item_id: itemId, item_type: "snippet", plaintext: "{\"kind\":\"snippet\"}", blob: toHex(c.sealItem(vaultKey, vaultId, itemId, "snippet", utf8.encode("{\"kind\":\"snippet\"}"))), name: "Équipe réseau", name_blob: toHex(c.sealVaultName(vaultKey, vaultId, "Équipe réseau")) },
+      item: { vault_key: toHex(vaultKey), vault_id: vaultId, item_id: itemId, item_type: "snippet", plaintext: "{\"kind\":\"snippet\"}", blob: toHex(itemBlob), name: "Équipe réseau", name_blob: toHex(c.sealVaultName(vaultKey, vaultId, "Équipe réseau")) },
+      manifest: {
+        vault_key: toHex(vaultKey), vault_id: vaultId, counter: manifest.counter, items: manifest.items,
+        blob: toHex(sealManifest(vaultKey, vaultId, manifest)),
+        item_id: itemId, item_blob: toHex(itemBlob), other_id: otherId, other_ciphertext: toHex(other),
+      },
     };
     writeFileSync(new URL("../../../crates/guivault-crypto/tests/web-vectors.json", import.meta.url), JSON.stringify(out, null, 2) + "\n");
   });

@@ -62,6 +62,12 @@ fn main() {
     let owner_key = SymmetricKey::from_bytes([3u8; 32]);
     let owner_blob = seal_send_owner(&owner_key, send_id, br#"{"name":"Wi-Fi"}"#).unwrap();
 
+    // Le manifeste du vault de `item` : cet item, et un second dont seule
+    // l'empreinte compte.
+    let other_id = "bbbbbbbb-cccc-dddd-eeee-ffffffffffff";
+    let manifest = Manifest::of(3, [(item_id, item.as_slice()), (other_id, b"abc".as_slice())]);
+    let manifest_blob = seal_manifest(&vault_key, vault_id, &manifest).unwrap();
+
     let v = json!({
         "kdf": {
             "password": password,
@@ -115,6 +121,17 @@ fn main() {
             "vault_id": vault_id, "item_id": item_id, "item_type": "host",
             "plaintext": r#"{"kind":"host"}"#, "blob": hex(&item),
             "name": "Prod bancaire", "name_blob": hex(&name),
+        },
+        "manifest": {
+            "vault_key": hex(vault_key.as_bytes()),
+            "vault_id": vault_id,
+            "counter": manifest.counter,
+            "items": manifest.items,
+            "blob": hex(&manifest_blob),
+            "item_id": item_id,
+            "item_blob": hex(&item),
+            "other_id": other_id,
+            "other_ciphertext": hex(b"abc"),
         },
     });
     println!("{}", serde_json::to_string_pretty(&v).unwrap());

@@ -78,6 +78,36 @@ fn opens_browser_item_and_vault_name() {
 }
 
 #[test]
+fn opens_and_verifies_browser_manifest() {
+    let v = &vectors()["manifest"];
+    let key = SymmetricKey::from_slice(&h(&v["vault_key"])).unwrap();
+    let vault_id = v["vault_id"].as_str().unwrap();
+    let blob = h(&v["blob"]);
+    let m = open_manifest(&key, vault_id, &blob).unwrap();
+    let counter = v["counter"].as_i64().unwrap();
+    assert_eq!(m.counter, counter);
+    let items: std::collections::BTreeMap<String, String> = serde_json::from_value(v["items"].clone()).unwrap();
+    assert_eq!(m.items, items);
+    // Les empreintes du navigateur sont celles d'ici.
+    let (item_id, item_blob) = (v["item_id"].as_str().unwrap(), h(&v["item_blob"]));
+    let (other_id, other) = (v["other_id"].as_str().unwrap(), h(&v["other_ciphertext"]));
+    assert_eq!(m.items[item_id], item_digest(&item_blob));
+    assert_eq!(m.items[other_id], item_digest(&other));
+    let served = [(item_id, item_blob.as_slice()), (other_id, other.as_slice())];
+    let ok = verify_manifest(&key, vault_id, Some((counter, &blob)), served, Some(counter));
+    assert!(ok.problems.is_empty(), "{:?}", ok.problems);
+    // Et un item retenu se voit.
+    let short = verify_manifest(&key, vault_id, Some((counter, &blob)), [served[0]], None);
+    assert_eq!(
+        short.problems,
+        vec![ManifestProblem::Withheld {
+            item_id: other_id.to_string()
+        }]
+    );
+    assert!(open_manifest(&key, "autre-vault", &blob).is_err());
+}
+
+#[test]
 fn opens_browser_emergency_envelope() {
     let v = &vectors()["vault_envelope"];
     let private = PrivateKey::try_from(h(&v["recipient_private"]).as_slice()).unwrap();

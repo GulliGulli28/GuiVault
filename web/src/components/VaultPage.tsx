@@ -7,7 +7,8 @@ import { uuid } from "../lib/bytes";
 import { isSecret, primarySecret, primaryUser } from "../lib/items";
 import { pinnedEmailFor } from "../lib/pins";
 import { navigate } from "../lib/route";
-import { deleteItem, findVault, loadItems, moveItem, payloadEntity, payloadName, putPayload, RevisionConflict, type DecodedItem, type VaultView } from "../lib/session";
+import { problemItem, problemText, type ManifestProblem } from "../lib/manifest";
+import { acceptIntegrity, deleteItem, findVault, loadItems, moveItem, payloadEntity, payloadName, putPayload, RevisionConflict, type DecodedItem, type VaultView } from "../lib/session";
 import { canWrite, KIND_LABELS, KIND_LABELS_PLURAL, ROLE_HINTS, ROLE_LABELS, type CustomIcon, type GuiVaultEntity, type ItemKind, type Payload } from "../lib/types";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { EntityIcon, ItemTree, KIND_ICONS, type FolderNaming } from "./ItemTree";
@@ -16,6 +17,7 @@ import { ItemForm } from "./forms/ItemForm";
 import { IconHistory, IconLink, IconStar, IconTools } from "./secret-icons";
 import { ShareLinkDialog } from "./SendsPage";
 import { ItemHistory } from "./ItemHistory";
+import { IntegrityBanner } from "./IntegrityBanner";
 import { ShortcutsHelp } from "./ShortcutsHelp";
 import { IconChevronDown, IconCopy, IconEdit, IconFolder, IconPlus, IconRefresh, IconSearch, IconSettings, IconTrash } from "./ui-icons";
 import { copyText, formatWhen, Loading, useDelayed } from "./ui";
@@ -54,6 +56,9 @@ function loadSort(): SortMode {
 
 function VaultBody({ ctx, vault, itemId }: { ctx: PageContext; vault: VaultView; itemId?: string }) {
   const [items, setItems] = useState<DecodedItem[] | null>(null);
+  /** Les écarts au manifeste de la dernière lecture : tant qu'il y en a, le
+   * vault est en lecture seule d'ici (`IntegrityError`). */
+  const [problems, setProblems] = useState<ManifestProblem[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
@@ -113,7 +118,7 @@ function VaultBody({ ctx, vault, itemId }: { ctx: PageContext; vault: VaultView;
   /** Le menu « + » d'un dossier, posé à l'endroit du bouton. */
   const [folderMenu, setFolderMenu] = useState<{ folderId: string; x: number; y: number } | null>(null);
   const slow = useDelayed(loading);
-  const writable = canWrite(vault.role);
+  const writable = canWrite(vault.role) && problems.length === 0;
   // La colonne de la liste se redimensionne, comme les panneaux de Guiterm.
   const list = usePersistedPane("vault-list", { initial: 340, min: 240, max: 720, axis: "horizontal", mode: "px" });
   const editingRef = useRef(false);
@@ -125,12 +130,18 @@ function VaultBody({ ctx, vault, itemId }: { ctx: PageContext; vault: VaultView;
   vaultRef.current = vault;
   const ctxRef = useRef(ctx);
   ctxRef.current = ctx;
+  /** Le nom de chaque élément lu depuis l'ouverture : un élément que le
+   * serveur ne sert plus (« retenu ») garde ainsi le sien dans l'alerte. */
+  const names = useRef(new Map<string, string>());
+  const nameOf = useCallback((id: string) => names.current.get(id), []);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const page = await loadItems(vaultRef.current);
+      for (const it of page.items) if (it.ok) names.current.set(it.id, payloadName(it.payload));
       setItems(page.items);
+      setProblems(page.problems);
     } catch (e) {
       ctxRef.current.error(errorMessage(e));
     } finally {
@@ -165,6 +176,24 @@ function VaultBody({ ctx, vault, itemId }: { ctx: PageContext; vault: VaultView;
     return filterEntities(entities, (e) => e.kind === filter);
   }, [entities, filter]);
   const current = selected ? items?.find((i) => i.id === selected) ?? null : null;
+  const alerts = useMemo(() => {
+    const out = new Map<string, string>();
+    for (const p of problems) {
+      const id = problemItem(p);
+      if (id) out.set(id, problemText(p, nameOf));
+    }
+    return out;
+  }, [problems, nameOf]);
+
+  const acceptProblems = async () => {
+    try {
+      await acceptIntegrity(vault);
+      ctx.notify(canWrite(vault.role) && !emergency ? "Manifeste réécrit d'après ce que sert le serveur." : "Pris acte.");
+    } catch (e) {
+      ctx.error(errorMessage(e));
+    }
+    await load();
+  };
 
   const save = async (payload: Payload, baseRevision?: number) => {
     try {
@@ -389,6 +418,7 @@ function VaultBody({ ctx, vault, itemId }: { ctx: PageContext; vault: VaultView;
           {!emergency && <button onClick={() => navigate({ page: "vault-settings", id: vault.id })} className="btn btn-secondary btn-sm btn-icon" title="Réglages du vault : membres, invitations, clé" aria-label="Réglages du vault"><IconSettings size={13} /></button>}
         </div>
       </header>
+      <IntegrityBanner name={vault.name} problems={problems} canFix={canWrite(vault.role) && !emergency} nameOf={nameOf} onAccept={acceptProblems} />
 
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
         <section
@@ -436,6 +466,7 @@ function VaultBody({ ctx, vault, itemId }: { ctx: PageContext; vault: VaultView;
                 rowActions={rowActions}
                 sort={sort}
                 keyboard={mode.kind === "view"}
+                alerts={alerts}
                 emptyMessage={writable ? "Rien ici pour l'instant — « Nouveau » pour commencer, importez un export, ou synchronisez depuis Guiterm." : "Rien ici pour l'instant."}
                 {...(writable && sort === "name" ? { folderActions, naming, onName: (n: string) => void submitFolderName(n), onNameCancel: () => setNaming(null), onMove: (id: string, folderId: string | null) => void moveToFolder(id, folderId) } : {})}
               />
@@ -489,6 +520,7 @@ function VaultBody({ ctx, vault, itemId }: { ctx: PageContext; vault: VaultView;
               </div>
               <div className="sidebar-scroll min-h-0 flex-1 overflow-y-auto p-4">
                 <div className="max-w-2xl">
+                  {alerts.has(current.id) && <p className="callout callout-danger mb-3">{capitalize(alerts.get(current.id)!)} : ne vous y fiez pas avant de l'avoir vérifié.</p>}
                   {current.ok ? (
                     <ItemView payload={current.payload} index={index} />
                   ) : (

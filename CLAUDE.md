@@ -24,7 +24,7 @@ HMAC pour les sels fictifs de prelogin.
   qu'elles s'unifient dans son binaire.
 - `crates/guivault-protocol` — types JSON. Même contrainte de compatibilité.
 - **Manifeste de vault** (`guivault-crypto/src/manifest.rs`, web
-  `lib/manifest.ts` + `session.ts`) : **en cours**, état et reste à faire
+  `lib/manifest.ts` + `session.ts`, alerte `components/IntegrityBanner.tsx`) : **en cours**, état et reste à faire
   dans `docs/MANIFESTE.md`. Toute nouvelle route qui écrit ou supprime un
   item doit porter le manifeste (`db::next_manifest` / `store_manifest`
   côté serveur, `withManifest` côté web). Ne pas passer

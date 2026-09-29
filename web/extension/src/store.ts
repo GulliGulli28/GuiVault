@@ -7,6 +7,7 @@
  *   (URL du serveur, e-mail, délai de verrouillage). */
 import { setTokens } from "../../src/lib/api";
 import { deserializeSession, serializeSession, type StoredSession } from "../../src/lib/persist";
+import type { ManifestProblem } from "../../src/lib/manifest";
 import type { DecodedItem, SessionState } from "../../src/lib/session";
 import type { Payload, TokenPair } from "../../src/lib/types";
 
@@ -55,9 +56,11 @@ export function parseOtpPatterns(text: string): { rules: OtpRule[]; errors: numb
   return { rules, errors };
 }
 
-/** Les items d'un vault, tels que déchiffrés à une révision donnée. */
+/** Les items d'un vault, tels que déchiffrés à une révision donnée, et les
+ * écarts à son manifeste trouvés à cette lecture : tant qu'il y en a, ni le
+ * popup ni le service worker n'y écrivent (`vaultops.ts`). */
 export interface ItemsCache {
-  [vaultId: string]: { revision: number; items: DecodedItem[] };
+  [vaultId: string]: { revision: number; items: DecodedItem[]; problems?: ManifestProblem[] };
 }
 
 export async function loadSettings(): Promise<Settings> {

@@ -110,8 +110,11 @@ function FolderNameInput({ depth, initial, onSubmit, onCancel }: { depth: number
  * élément, sous-dossier, renommer), dossier nommé sur place, et
  * glisser-déposer d'un élément ou d'un dossier dans un autre — ou sur la
  * bande « racine » qui apparaît pendant le glisser. */
-export function ItemTree({ entities, customIcons = [], query, selected, onSelect, emptyMessage = "Rien ici pour l'instant.", rowActions, folderActions, naming, onName, onNameCancel, onMove, sort = "name", keyboard = false }: {
+export function ItemTree({ entities, customIcons = [], query, selected, onSelect, emptyMessage = "Rien ici pour l'instant.", rowActions, folderActions, naming, onName, onNameCancel, onMove, sort = "name", keyboard = false, alerts }: {
   entities: GuiVaultEntity[];
+  /** Éléments signalés (id → raison), par exemple par le manifeste du vault :
+   * une étiquette rouge sur leur ligne. */
+  alerts?: ReadonlyMap<string, string>;
   /** « name » : l'arborescence ; par date : une liste à plat, sans dossiers. */
   sort?: SortMode;
   /** ↑/↓ (ou j/k) parcourent les éléments, hors saisie. */
@@ -264,6 +267,7 @@ export function ItemTree({ entities, customIcons = [], query, selected, onSelect
                   : <EntityIcon entity={row.entity} customIcons={customIcons} size={14} />}
                 name={row.entity.name}
                 count={row.keys.length - 1}
+                badge={alerts?.has(row.entity.id) ? <AlertTag reason={alerts.get(row.entity.id)!} /> : undefined}
                 actions={folderActions ? folderActions(row.entity) : (
                   <button onClick={() => onSelect(row.entity.id)} className={`btn btn-ghost btn-sm ${selected === row.entity.id ? "btn-toggled" : ""}`} title="Ouvrir le dossier">ouvrir</button>
                 )}
@@ -277,8 +281,10 @@ export function ItemTree({ entities, customIcons = [], query, selected, onSelect
           return <GroupRow key={row.id} depth={row.depth} expanded={!collapsed.has(row.id)} onToggle={() => toggle(row.id)} icon={<Icon size={14} />} name={row.label} count={row.keys.length} />;
         }
         const { entity } = row;
+        const alert = alerts?.get(entity.id);
         const badges = (
           <>
+            {alert && <AlertTag reason={alert} />}
             {entity.favorite && <IconStar size={11} filled className="text-[var(--c-warn)]" />}
             {entity.badge && <span className="tag">{entity.badge}</span>}
           </>
@@ -298,7 +304,7 @@ export function ItemTree({ entities, customIcons = [], query, selected, onSelect
             className="cursor-pointer"
             icon={<EntityIcon entity={entity} customIcons={customIcons} />}
             title={entity.name}
-            badges={entity.favorite || entity.badge ? badges : undefined}
+            badges={alert || entity.favorite || entity.badge ? badges : undefined}
             secondary={secondary}
             title_={`${KIND_LABELS[entity.kind]}${entity.path ? ` — ${entity.path}` : ""}`}
             onClick={() => onSelect(entity.id)}
@@ -309,4 +315,10 @@ export function ItemTree({ entities, customIcons = [], query, selected, onSelect
       })}
     </div>
   );
+}
+
+/** L'étiquette d'un élément signalé (`alerts`) ; la raison au survol et pour
+ * les lecteurs d'écran. */
+function AlertTag({ reason }: { reason: string }) {
+  return <span className="tag" style={{ color: "var(--c-danger)" }} title={reason}>écart<span className="sr-only"> : {reason}</span></span>;
 }

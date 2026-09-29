@@ -3,7 +3,7 @@
  * jour pour que la liste, le badge et les boutons dans les pages suivent
  * sans re-télécharger. */
 import { setBaseUrl } from "../../src/lib/api";
-import { deleteItem as deleteVaultItem, loadItems, payloadEntity, putPayload, RevisionConflict, type DecodedItem, type SessionState } from "../../src/lib/session";
+import { deleteItem as deleteVaultItem, IntegrityError, loadItems, payloadEntity, putPayload, RevisionConflict, type DecodedItem, type SessionState, type VaultView } from "../../src/lib/session";
 import type { Login, Payload } from "../../src/lib/types";
 import { loadItemsCache, loadSession, loadSettings, saveItemsCache } from "./store";
 
@@ -24,6 +24,13 @@ export async function findLogin(id: string): Promise<{ vaultId: string; login: L
   return null;
 }
 
+/** Un vault en écart avec son manifeste (vu par le popup, gardé dans le
+ * cache) ne reçoit rien d'ici : le service worker n'a pas lu le manifeste
+ * lui-même, `withManifest` ne le saurait pas. */
+async function assertIntact(vault: VaultView) {
+  if ((await loadItemsCache())[vault.id]?.problems?.length) throw new IntegrityError(vault.name);
+}
+
 /** Crée ou met à jour n'importe quel item ; `revision` = verrou optimiste
  * d'une modification. En cas de conflit, le vault est relu et l'erreur
  * remontée : l'appelant recommence sur la version fraîche. */
@@ -32,6 +39,7 @@ export async function savePayload(vaultId: string, payload: Payload, revision?: 
   const vault = state.vaults.find((v) => v.id === vaultId);
   if (!vault) throw new Error("Vault inconnu.");
   const id = payloadEntity(payload).id;
+  await assertIntact(vault);
   try {
     const item = await putPayload(vault, payload, revision);
     const decoded: DecodedItem = { id, revision: item.revision, updatedAt: item.updated_at, createdAt: item.created_at, ok: true, payload };
@@ -55,6 +63,7 @@ export async function deleteItem(vaultId: string, id: string): Promise<void> {
   const state = await session();
   const vault = state.vaults.find((v) => v.id === vaultId);
   if (!vault) throw new Error("Vault inconnu.");
+  await assertIntact(vault);
   await deleteVaultItem(vault, id);
   const cache = await loadItemsCache();
   if (cache[vaultId]) {
@@ -71,6 +80,6 @@ export async function refreshVault(vaultId: string): Promise<void> {
   if (!vault) return;
   const page = await loadItems(vault);
   const cache = await loadItemsCache();
-  cache[vaultId] = { revision: page.revision, items: page.items };
+  cache[vaultId] = { revision: page.revision, items: page.items, problems: page.problems };
   await saveItemsCache(cache);
 }

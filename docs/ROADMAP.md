@@ -9,7 +9,7 @@ l'auto-hébergement sans fonctions « premium »).
 Chaque piste respecte la règle n°1 (`CLAUDE.md`) : le serveur ne garde que
 des blobs qu'il ne sait pas lire. Cocher au fur et à mesure.
 
-## État (28 septembre 2026)
+## État (29 septembre 2026)
 
 **Fait** : tout le §0 sauf le manifeste authentifié (plancher et
 paramètres Argon2id épinglés, retour en arrière détecté, enveloppes
@@ -23,8 +23,8 @@ vit dans le code.
 **Ensuite, dans cet ordre** — du plus demandé ou du plus exposé au plus
 confortable :
 
-1. **Manifeste de vault authentifié** (§0) : **en cours** — serveur et web
-   faits ; restent l'interface d'alerte web, les vecteurs d'interop, `gv`,
+1. **Manifeste de vault authentifié** (§0) : **en cours** — serveur, web
+   (alerte comprise), extension et vecteurs d'interop faits ; restent `gv`,
    Guiterm, puis l'activation. La liste exacte, dans l'ordre :
    [`MANIFESTE.md`](MANIFESTE.md), « Ce qui reste ».
 2. **Conflits (409)** (§4) : proposer une fusion champ par champ au lieu
@@ -72,9 +72,10 @@ paramètres ou formats anciens.
   détail et reste à faire dans [`MANIFESTE.md`](MANIFESTE.md). Fait :
   format et vérification (`guivault-crypto/src/manifest.rs`), serveur
   (migration `0010`, écritures refusées sans manifeste, verrou optimiste,
-  lecture cohérente, rotation), client web (vérification, entretien à chaque
-  écriture, prise d'acte). Reste : interface d'alerte web, vecteurs
-  d'interop, `gv`, Guiterm, puis activation (`AUTO_ENABLE_MANIFEST`, coupé
+  lecture cohérente, rotation), client web et extension (vérification,
+  entretien à chaque écriture, bandeau d'alerte et prise d'acte,
+  `IntegrityBanner.tsx`), vecteurs d'interop. Reste : `gv`, Guiterm, puis
+  activation (`AUTO_ENABLE_MANIFEST`, coupé
   d'ici là : aucun vault n'en reçoit).
 - [x] **Enveloppes authentifiées.** Les enveloppes de clés de vault étaient
   des boîtes scellées anonymes : le serveur pouvait en fabriquer une pour un

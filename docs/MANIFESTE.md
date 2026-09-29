@@ -1,8 +1,8 @@
 # Manifeste de vault authentifié
 
-Statut : **adopté, en cours d'implémentation** (29 septembre 2026). Serveur
-et format faits et testés ; client web fait sauf l'interface d'alerte ;
-`gv` et Guiterm à faire. **L'activation est coupée** (voir « Déploiement ») :
+Statut : **adopté, en cours d'implémentation** (29 septembre 2026). Serveur,
+format, client web et extension faits et testés, vecteurs d'interopérabilité
+compris ; `gv` et Guiterm à faire. **L'activation est coupée** (voir « Déploiement ») :
 aucun vault ne reçoit de manifeste tant que tous les clients ne savent pas
 l'entretenir.
 
@@ -98,7 +98,20 @@ qu'il s'ouvre et ne recule pas). Un vault en écart refuse les écritures
 (`IntegrityError`) jusqu'à `acceptIntegrity` : un écrivain réécrit le
 manifeste d'après les items servis, un lecteur accepte le compteur.
 
-**Tests** : `manifest.rs` (unitaires) et
+**Interface** (`components/IntegrityBanner.tsx`) : sur la page du vault, un
+bandeau rouge liste les écarts (avec le nom de l'élément, y compris un
+élément retenu déjà lu depuis l'ouverture de la page) ; les éléments en
+cause portent une étiquette « écart » dans la liste et un avertissement sur
+leur fiche ; les boutons d'écriture disparaissent. « Prendre acte… »
+demande confirmation (ce que sert le serveur devient la référence) puis
+appelle `acceptIntegrity`. L'extension garde les écarts dans son cache
+d'items (`ItemsCache.problems`) : le popup montre le même bandeau, compact,
+et `vaultops.ts` refuse d'écrire — le service worker, qui enregistre les
+identifiants proposés par les pages, ne lit jamais le manifeste lui-même.
+
+**Tests** : `manifest.rs` et `manifest.test.ts` (mêmes cas), les deux
+vecteurs d'interopérabilité (section `manifest` : un manifeste scellé d'un
+côté s'ouvre et se vérifie de l'autre, empreintes identiques), et
 `vault_manifest_is_written_with_every_change_and_catches_a_lying_server`
 (`tests/api.rs`) — un serveur qui ment simulé en modifiant la base : version
 rejouée, item ressuscité, item retenu, ancien manifeste, manifeste disparu ;
@@ -106,17 +119,8 @@ rotation ; écritures refusées sans manifeste ou sur une base dépassée.
 
 ## Ce qui reste, dans l'ordre
 
-1. **Web** : l'interface — bandeau rouge sur la page du vault avec les
-   écarts (`vaultIntegrity`, `problemText`), bouton « Prendre acte »
-   (`acceptIntegrity`), écritures désactivées, repère sur l'élément en
-   cause. Aujourd'hui une écriture refusée ne montre que le message
-   d'`IntegrityError`.
-2. **Tests web et vecteurs d'interopérabilité** : `manifest.test.ts`
-   (mêmes cas que `manifest.rs`), et le manifeste dans les deux vecteurs
-   (`examples/vectors.rs` → `crypto.vectors.json`, et
-   `GUIVAULT_WRITE_VECTORS=1 npx vitest run` → `web-vectors.json`, lu par
-   `tests/web_interop.rs`) : un manifeste scellé par Rust s'ouvre dans le
-   navigateur et inversement, et `itemDigest` = `item_digest`.
+1. ~~**Web** : l'interface d'alerte~~ — fait (« Interface » ci-dessus).
+2. ~~**Tests web et vecteurs d'interopérabilité**~~ — fait.
 3. **`gv`** (lecture seule) : vérifier à chaque lecture complète, retenir le
    compteur dans son `store.rs`, avertir sur la sortie d'erreur (sans
    bloquer la lecture).

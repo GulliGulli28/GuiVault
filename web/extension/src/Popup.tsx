@@ -3,9 +3,9 @@ import { api, ApiError, errorMessage, setBaseUrl, setSessionLostHandler, setToke
 import { filterEntities, indexItems, toEntities } from "../../src/lib/entities";
 import { buildVaultTree } from "../../src/lib/vaultTree";
 import { describeSecret } from "../../src/lib/items";
-import { openOffline, acceptRollback, loadItems, login, payloadEntity, payloadName, refresh, setDeviceLabel, type DecodedItem, type SessionState } from "../../src/lib/session";
+import { openOffline, acceptIntegrity, acceptRollback, loadItems, login, payloadEntity, payloadName, refresh, setDeviceLabel, type DecodedItem, type SessionState, type VaultView } from "../../src/lib/session";
 import { loginMatches } from "../../src/lib/urimatch";
-import { KIND_LABELS, KIND_LABELS_PLURAL, type CustomIcon, type GuiVaultEntity, type ItemKind, type Login, type Payload, type TokenPair } from "../../src/lib/types";
+import { canWrite, KIND_LABELS, KIND_LABELS_PLURAL, type CustomIcon, type GuiVaultEntity, type ItemKind, type Login, type Payload, type TokenPair } from "../../src/lib/types";
 import { GeneratorPanel } from "../../src/components/GeneratorPanel";
 import { ItemView } from "../../src/components/ItemView";
 import { EntityIcon, ItemTree, KIND_ICONS } from "../../src/components/ItemTree";
@@ -20,6 +20,7 @@ import { onSettingsApplied, registerSettingsSection, settingsChanged, startSetti
 import "../../src/lib/settingsSections";
 import { Logo } from "../../src/components/Logo";
 import { CLEAR_CHOICES, clipboardHash, loadClearSeconds, saveClearSeconds, setClearScheduler } from "../../src/lib/clipboard";
+import { IntegrityBanner } from "../../src/components/IntegrityBanner";
 import { RollbackBanner } from "../../src/components/RollbackBanner";
 import { OfflineSetting } from "../../src/components/OfflineSetting";
 import { loadOfflineCopy, refreshOfflineCopy, type OfflineCopy } from "../../src/lib/offline";
@@ -151,7 +152,7 @@ export function Popup() {
         // lui que le service worker lit pour remplir les pages.
         const next: ItemsCache = { ...current };
         for (const v of state.vaults) {
-          if (!next[v.id]) next[v.id] = await loadItems(v).then((p) => ({ revision: p.revision, items: p.items }));
+          if (!next[v.id]) next[v.id] = await loadItems(v).then((p) => ({ revision: p.revision, items: p.items, problems: p.problems }));
         }
         setCache(next);
         await saveItemsCache(next);
@@ -162,7 +163,7 @@ export function Popup() {
       const next: ItemsCache = {};
       for (const v of state.vaults) {
         const c = current[v.id];
-        next[v.id] = c && c.revision === v.revision ? c : await loadItems(v).then((p) => ({ revision: p.revision, items: p.items }));
+        next[v.id] = c && c.revision === v.revision ? c : await loadItems(v).then((p) => ({ revision: p.revision, items: p.items, problems: p.problems }));
       }
       setCache(next);
       await saveItemsCache(next);
@@ -328,6 +329,19 @@ export function Popup() {
 
   if (!settings || screen.kind === "loading") return <div className="p-4 text-[12px] text-[var(--c-text-muted)]">Chargement…</div>;
 
+  /** Prendre acte d'un écart au manifeste, puis relire le vault. */
+  const acceptProblems = async (vault: VaultView) => {
+    try {
+      await acceptIntegrity(vault);
+      const p = await loadItems(vault);
+      const next: ItemsCache = { ...(await loadItemsCache()), [vault.id]: { revision: p.revision, items: p.items, problems: p.problems } };
+      setCache(next);
+      await saveItemsCache(next);
+    } catch (e) {
+      say(errorMessage(e));
+    }
+  };
+
   const current = view.kind === "detail" || view.kind === "edit" ? entries.find((e) => e.item.id === view.id) ?? null : null;
   const indexFor = (vaultId: string) => indexItems(cache[vaultId]?.items ?? []);
 
@@ -360,6 +374,12 @@ export function Popup() {
       {screen.kind === "vault" && (
         <RollbackBanner compact rollbacks={screen.state.rollbacks} onAccept={(id) => { acceptRollback(screen.state, id); setScreen({ kind: "vault", state: { ...screen.state } }); }} />
       )}
+      {screen.kind === "vault" && screen.state.vaults.map((v) => {
+        const entry = cache[v.id];
+        if (!entry?.problems?.length) return null;
+        const nameOf = (id: string) => { const it = entry.items.find((i) => i.id === id); return it?.ok ? payloadName(it.payload) : undefined; };
+        return <IntegrityBanner key={v.id} compact name={v.name} problems={entry.problems} canFix={canWrite(v.role)} nameOf={nameOf} onAccept={() => acceptProblems(v)} />;
+      })}
 
       {screen.kind === "login" ? (
         <LoginView
