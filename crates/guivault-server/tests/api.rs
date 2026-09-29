@@ -3681,22 +3681,26 @@ async fn mail_goes_out_when_configured_and_never_blocks() {
         );
     }
     let mails = smtp.wait(6).await;
-    let got: Vec<(&str, &str)> = mails[2..].iter().map(|m| (m.to.as_str(), m.subject.as_str())).collect();
-    assert_eq!(
-        got,
-        vec![
-            ("bob@t.io", "alice@t.io vous désigne comme contact d'urgence"),
-            ("alice@t.io", "bob@t.io a accepté d'être votre contact d'urgence"),
-            ("alice@t.io", "bob@t.io demande l'accès d'urgence à votre coffre"),
-            ("bob@t.io", "alice@t.io a refusé votre demande d'accès d'urgence"),
-        ]
-    );
+    // Envoyés en arrière-plan après chaque action : deux actions rapprochées
+    // (la demande, puis le refus) peuvent arriver dans l'autre ordre.
+    let mut got: Vec<(&str, &str)> = mails[2..].iter().map(|m| (m.to.as_str(), m.subject.as_str())).collect();
+    got.sort();
+    let mut want = vec![
+        ("bob@t.io", "alice@t.io vous désigne comme contact d'urgence"),
+        ("alice@t.io", "bob@t.io a accepté d'être votre contact d'urgence"),
+        ("alice@t.io", "bob@t.io demande l'accès d'urgence à votre coffre"),
+        ("bob@t.io", "alice@t.io a refusé votre demande d'accès d'urgence"),
+    ];
+    want.sort();
+    assert_eq!(got, want);
+    let request = mails[2..]
+        .iter()
+        .find(|m| m.subject == "bob@t.io demande l'accès d'urgence à votre coffre")
+        .unwrap();
     assert!(
-        mails[4]
-            .body
-            .contains("Sans refus de votre part, il lui sera ouvert le"),
+        request.body.contains("Sans refus de votre part, il lui sera ouvert le"),
         "{}",
-        mails[4].body
+        request.body
     );
 
     // Nouvelle demande, puis le délai s'écoule sans réponse : les deux
