@@ -10,13 +10,18 @@
 //!   (`GUIVAULT_SESSION`) — sans elle, ce fichier est illisible ;
 //! - `cache.json` : les vaults et leurs items, chiffrés comme sur le
 //!   serveur — ce qui permet de lire un secret sans lui ;
+//! - `manifests.json` : par serveur, le plus grand compteur de manifeste vu
+//!   pour chaque vault (`docs/MANIFESTE.md`) — un manifeste plus ancien, ou
+//!   disparu, se voit ainsi. Pas secret, et gardé après `gv logout`, comme
+//!   le `localStorage` de l'interface web : un serveur ne l'efface pas en
+//!   déconnectant la session ;
 //! - `sync.lock` : pendant une synchronisation, pour que deux `gv` lancés en
 //!   même temps ne fassent pas tourner le même jeton de rafraîchissement
 //!   (le serveur y verrait un rejeu et révoquerait la session).
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use guivault_crypto::KdfParams;
-use guivault_protocol::{Item, Vault};
+use guivault_protocol::{Item, Vault, VaultManifest};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -119,11 +124,23 @@ impl Home {
         self.write("cache.json", c)
     }
 
+    /// Les compteurs de manifeste vus d'ici pour les vaults de `server`.
+    pub fn manifest_counters(&self, server: &str) -> Result<HashMap<Uuid, i64>> {
+        let mut all: HashMap<String, HashMap<Uuid, i64>> = self.read("manifests.json")?.unwrap_or_default();
+        Ok(all.remove(server).unwrap_or_default())
+    }
+
+    pub fn save_manifest_counters(&self, server: &str, counters: &HashMap<Uuid, i64>) -> Result<()> {
+        let mut all: HashMap<String, HashMap<Uuid, i64>> = self.read("manifests.json")?.unwrap_or_default();
+        all.insert(server.to_string(), counters.clone());
+        self.write("manifests.json", &all)
+    }
+
     pub fn lock(&self) {
         self.remove("session.json");
     }
 
-    /// Tout, compte compris : `gv logout`.
+    /// Tout, compte compris : `gv logout` — sauf les compteurs de manifeste.
     pub fn forget(&self) {
         for f in ["session.json", "cache.json", "account.json", "sync.lock"] {
             self.remove(f);
@@ -206,4 +223,8 @@ pub struct Cache {
 pub struct VaultItems {
     pub revision: i64,
     pub items: Vec<Item>,
+    /// Le manifeste servi avec ces items, dans le même instantané (absent :
+    /// vault sans manifeste, ou cache d'avant les manifestes).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub manifest: Option<VaultManifest>,
 }

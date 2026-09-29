@@ -1,8 +1,8 @@
 # Manifeste de vault authentifié
 
 Statut : **adopté, en cours d'implémentation** (29 septembre 2026). Serveur,
-format, client web et extension faits et testés, vecteurs d'interopérabilité
-compris ; `gv` et Guiterm à faire. **L'activation est coupée** (voir « Déploiement ») :
+format, client web, extension et `gv` faits et testés, vecteurs
+d'interopérabilité compris ; Guiterm à faire. **L'activation est coupée** (voir « Déploiement ») :
 aucun vault ne reçoit de manifeste tant que tous les clients ne savent pas
 l'entretenir.
 
@@ -109,6 +109,14 @@ d'items (`ItemsCache.problems`) : le popup montre le même bandeau, compact,
 et `vaultops.ts` refuse d'écrire — le service worker, qui enregistre les
 identifiants proposés par les pages, ne lit jamais le manifeste lui-même.
 
+**`gv`** (lecture seule) : le manifeste est gardé avec les items de chaque
+vault dans `cache.json` (même instantané) ; chaque ouverture le vérifie
+(`vault::open_with`), dit les écarts sur la sortie d'erreur sans bloquer, et
+retient les compteurs dans `manifests.json` (par serveur, gardé après
+`gv logout`). `gv sync --accept` : prise d'acte des compteurs servis. Test
+`gv_checks_vault_manifests` (`tests/cli.rs`) : manifeste qui recule, prise
+d'acte, version rejouée et item retenu, avec le binaire.
+
 **Tests** : `manifest.rs` et `manifest.test.ts` (mêmes cas), les deux
 vecteurs d'interopérabilité (section `manifest` : un manifeste scellé d'un
 côté s'ouvre et se vérifie de l'autre, empreintes identiques), et
@@ -121,9 +129,7 @@ rotation ; écritures refusées sans manifeste ou sur une base dépassée.
 
 1. ~~**Web** : l'interface d'alerte~~ — fait (« Interface » ci-dessus).
 2. ~~**Tests web et vecteurs d'interopérabilité**~~ — fait.
-3. **`gv`** (lecture seule) : vérifier à chaque lecture complète, retenir le
-   compteur dans son `store.rs`, avertir sur la sortie d'erreur (sans
-   bloquer la lecture).
+3. ~~**`gv`**~~ — fait (« `gv` » ci-dessus).
 4. **Guiterm** : monter l'épinglage des crates GuiVault sur le commit qui
    contient `manifest.rs` ; vérifier au pull (état complet reconstitué
    depuis ses deltas `?since=`), réécrire le manifeste à chaque push et

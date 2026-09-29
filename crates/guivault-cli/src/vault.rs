@@ -7,6 +7,7 @@ use anyhow::{Result, anyhow, bail};
 use guivault_crypto as gc;
 use guivault_protocol::{Vault, VaultKind};
 use serde_json::Value;
+use std::collections::HashMap;
 use uuid::Uuid;
 
 use crate::store::Cache;
@@ -28,17 +29,30 @@ pub struct Entry {
 pub struct Opened {
     pub vaults: Vec<OpenVault>,
     pub entries: Vec<Entry>,
-    /// Ce qui ne s'est pas ouvert (un vault, un item) : dit sur la sortie
-    /// d'erreur, sans arrêter le reste.
+    /// Ce qui ne s'est pas ouvert (un vault, un item), et les écarts aux
+    /// manifestes : dit sur la sortie d'erreur, sans arrêter le reste.
     pub warnings: Vec<String>,
+    /// Les écarts au manifeste, par vault (`docs/MANIFESTE.md`). `gv` ne
+    /// fait que lire : il avertit, il ne bloque rien.
+    pub problems: Vec<(Uuid, gc::ManifestProblem)>,
+    /// Les compteurs de manifeste lus et cohérents, à retenir (`seen`).
+    pub counters: HashMap<Uuid, i64>,
 }
 
-/// Déchiffre le cache avec le compte déverrouillé.
+/// Déchiffre le cache avec le compte déverrouillé, sans compteurs vus.
 pub fn open(account: &gc::UnlockedAccount, cache: &Cache) -> Opened {
+    open_with(account, cache, &HashMap::new())
+}
+
+/// Déchiffre le cache et vérifie chaque vault contre son manifeste ; `seen` :
+/// le plus grand compteur vu d'ici pour chaque vault.
+pub fn open_with(account: &gc::UnlockedAccount, cache: &Cache, seen: &HashMap<Uuid, i64>) -> Opened {
     let mut out = Opened {
         vaults: Vec::new(),
         entries: Vec::new(),
         warnings: Vec::new(),
+        problems: Vec::new(),
+        counters: HashMap::new(),
     };
     let mut vaults: Vec<&Vault> = cache.vaults.iter().collect();
     vaults.sort_by_key(|v| v.kind != VaultKind::Personal);
@@ -60,12 +74,35 @@ pub fn open(account: &gc::UnlockedAccount, cache: &Cache) -> Opened {
             .to_string()
         });
         let index = out.vaults.len();
+        let stored = cache.items.get(&v.id);
+        let live: Vec<(String, &[u8])> = stored
+            .map(|x| x.items.as_slice())
+            .unwrap_or_default()
+            .iter()
+            .filter(|i| !i.deleted)
+            .map(|i| (i.id.to_string(), i.ciphertext.as_slice()))
+            .collect();
+        let served = stored
+            .and_then(|x| x.manifest.as_ref())
+            .map(|m| (m.revision, m.ciphertext.as_slice()));
+        let verified = gc::verify_manifest(
+            &key,
+            &vid,
+            served,
+            live.iter().map(|(id, ct)| (id.as_str(), *ct)),
+            seen.get(&v.id).copied(),
+        );
+        if let (Some(m), Some((revision, _))) = (&verified.manifest, served)
+            && m.counter == revision
+        {
+            out.counters.insert(v.id, m.counter);
+        }
         out.vaults.push(OpenVault {
             id: v.id,
             name,
             kind: v.kind,
         });
-        for it in cache.items.get(&v.id).map(|x| x.items.as_slice()).unwrap_or_default() {
+        for it in stored.map(|x| x.items.as_slice()).unwrap_or_default() {
             if it.deleted {
                 continue;
             }
@@ -93,8 +130,49 @@ pub fn open(account: &gc::UnlockedAccount, cache: &Cache) -> Opened {
                 Err(e) => out.warnings.push(format!("item {} illisible : {e}", it.id)),
             }
         }
+        if !verified.problems.is_empty() {
+            let vault_name = out.vaults[index].name.clone();
+            let name_of = |id: &str| {
+                out.entries
+                    .iter()
+                    .find(|e| e.vault == index && e.id.to_string() == id)
+                    .map(|e| e.name.clone())
+            };
+            let mut lines: Vec<String> = verified
+                .problems
+                .iter()
+                .map(|p| format!("vault « {vault_name} » : {}", problem_text(p, name_of)))
+                .collect();
+            lines.push(format!(
+                "vault « {vault_name} » : il ne correspond pas à son manifeste — soit sa base a été restaurée, soit \
+                 le serveur est compromis. Vérifiez ces éléments avant de vous y fier ; prenez-en acte depuis \
+                 l'interface web (ou `gv sync --accept` pour une version du manifeste qui a reculé)."
+            ));
+            out.warnings.extend(lines);
+            out.problems.extend(verified.problems.into_iter().map(|p| (v.id, p)));
+        }
     }
     out
+}
+
+/// Le texte d'un écart, avec le nom de l'élément quand on le connaît — les
+/// mêmes mots que `problemText` dans l'interface web.
+fn problem_text(p: &gc::ManifestProblem, name_of: impl Fn(&str) -> Option<String>) -> String {
+    let item = |id: &str| name_of(id).map_or_else(|| format!("l'élément {id}"), |n| format!("« {n} »"));
+    match p {
+        gc::ManifestProblem::Unexpected { item_id } => format!(
+            "{} n'est pas dans le manifeste (ajouté hors des clients, ou revenu après suppression)",
+            item(item_id)
+        ),
+        gc::ManifestProblem::Altered { item_id } => format!(
+            "{} n'est pas la version annoncée par le manifeste (une ancienne version rejouée ?)",
+            item(item_id)
+        ),
+        gc::ManifestProblem::Withheld { item_id } => {
+            format!("{} est dans le manifeste mais le serveur ne le sert pas", item(item_id))
+        }
+        other => other.to_string(),
+    }
 }
 
 /// L'objet de l'entité dans le payload : `login`, `apiKey`, `connection`…

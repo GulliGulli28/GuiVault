@@ -223,6 +223,7 @@ pub fn sync(home: &Home, account: &mut Account) -> Result<Cache> {
             VaultItems {
                 revision: page.revision,
                 items: page.items.into_iter().filter(|i| !i.deleted).collect(),
+                manifest: page.manifest,
             },
         );
     }
@@ -264,6 +265,41 @@ pub fn cache(home: &Home, account: &mut Account) -> Result<(Cache, Option<String
             None => Err(e),
         },
     }
+}
+
+// ─── Manifestes ─────────────────────────────────────────────────────────────
+
+/// Les vaults du cache, déchiffrés et vérifiés contre leur manifeste
+/// (`docs/MANIFESTE.md`) ; les compteurs lus sont retenus pour la prochaine
+/// fois (seulement s'ils montent). Les écarts sont dans `warnings` et
+/// `problems` : la lecture continue.
+pub fn open(home: &Home, account: &Account, unlocked: &gc::UnlockedAccount, cache: &Cache) -> Result<Opened> {
+    let mut seen = home.manifest_counters(&account.server)?;
+    let opened = vault::open_with(unlocked, cache, &seen);
+    let mut changed = false;
+    for (id, counter) in &opened.counters {
+        if seen.get(id).is_none_or(|s| s < counter) {
+            seen.insert(*id, *counter);
+            changed = true;
+        }
+    }
+    if changed {
+        home.save_manifest_counters(&account.server, &seen)?;
+    }
+    Ok(opened)
+}
+
+/// `gv sync --accept` : prendre acte de l'état des manifestes que sert le
+/// serveur — les compteurs retenus d'ici deviennent les siens, même plus
+/// bas (une sauvegarde restaurée). Les écarts d'éléments, eux, restent
+/// jusqu'à ce qu'un membre qui écrit réécrive le manifeste (interface web).
+pub fn accept_manifests(home: &Home, account: &Account, cache: &Cache) -> Result<()> {
+    let counters = cache
+        .items
+        .iter()
+        .filter_map(|(id, v)| v.manifest.as_ref().map(|m| (*id, m.revision)))
+        .collect();
+    home.save_manifest_counters(&account.server, &counters)
 }
 
 // ─── Références ─────────────────────────────────────────────────────────────

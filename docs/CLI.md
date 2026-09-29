@@ -20,7 +20,7 @@ gv get gv://Personnel/GitHub/password
 | `eval "$(gv unlock)"` | déverrouille dans cette coquille — sans le serveur (`--raw` : la clé seule, pour fish ou PowerShell) |
 | `gv lock` | ferme la session : `GUIVAULT_SESSION` ne vaut plus rien |
 | `gv logout` | révoque la session au serveur et efface tout de ce poste |
-| `gv status`, `gv sync` | compte, session, fraîcheur du cache ; relire le serveur maintenant |
+| `gv status`, `gv sync [--accept]` | compte, session, fraîcheur du cache ; relire le serveur maintenant (`--accept` : voir « Manifestes ») |
 | `gv list [--vault V] [--type T] [--json]` | les éléments (vault, type, nom, id) |
 | `gv get <réf \| élément> [champ] [--vault V] [-n]` | un secret sur la sortie (`-n` : sans retour à la ligne) |
 | `gv run [--env-file F]… -- cmd…` | lance `cmd` avec les variables dont la valeur est une référence `gv://` remplacées par le secret |
@@ -87,6 +87,9 @@ Le modèle de la CLI de Bitwarden. Dans le dossier de `gv` (`GV_HOME`, sinon
   serveur, relus quand il a plus de cinq minutes. Serveur injoignable : le
   cache sert tel quel (avec un avertissement) — `gv` lit ses secrets
   hors ligne.
+- `manifests.json` — par serveur, le plus grand compteur de manifeste vu
+  pour chaque vault (voir plus bas). Pas secret, et gardé après `gv
+  logout`.
 - `sync.lock` — pendant une synchronisation. Les jetons de
   rafraîchissement tournent à chaque usage et le serveur prend la
   re-présentation d'un ancien pour un vol (la session est révoquée) : deux
@@ -98,3 +101,17 @@ paramètres épinglés — un `gv login` à qui le serveur demande moins de
 mémoire ou de passes que la dernière fois est refusé avant d'envoyer quoi
 que ce soit. `gv run` passe les secrets dans l'environnement de la
 commande, qui en fait ce qu'elle veut ; `gv get` les écrit sur la sortie.
+
+### Manifestes
+
+Chaque lecture vérifie que le serveur sert chaque vault tel que ses membres
+l'ont laissé, contre son manifeste ([`MANIFESTE.md`](MANIFESTE.md)) : ni
+ancienne version d'un élément rejouée, ni élément retenu ou revenu après
+suppression, ni manifeste plus ancien que le dernier vu d'ici. `gv` ne fait
+que lire : un écart est dit sur la sortie d'erreur, élément par élément, et
+**la lecture continue** — un script qui dépend de `gv get` ne casse pas, mais
+son journal le montre. L'écart se règle depuis l'interface web (« Prendre
+acte »), où un membre qui écrit réécrit le manifeste. Après une
+restauration connue du serveur, `gv sync --accept` fait des manifestes
+servis la référence de ce poste (les écarts d'éléments, eux, restent
+jusqu'à la réécriture).

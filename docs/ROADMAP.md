@@ -24,7 +24,7 @@ vit dans le code.
 confortable :
 
 1. **Manifeste de vault authentifié** (§0) : **en cours** — serveur, web
-   (alerte comprise), extension et vecteurs d'interop faits ; restent `gv`,
+   (alerte comprise), extension, vecteurs d'interop et `gv` faits ; restent
    Guiterm, puis l'activation. La liste exacte, dans l'ordre :
    [`MANIFESTE.md`](MANIFESTE.md), « Ce qui reste ».
 2. **Conflits (409)** (§4) : proposer une fusion champ par champ au lieu
@@ -74,8 +74,8 @@ paramètres ou formats anciens.
   (migration `0010`, écritures refusées sans manifeste, verrou optimiste,
   lecture cohérente, rotation), client web et extension (vérification,
   entretien à chaque écriture, bandeau d'alerte et prise d'acte,
-  `IntegrityBanner.tsx`), vecteurs d'interop. Reste : `gv`, Guiterm, puis
-  activation (`AUTO_ENABLE_MANIFEST`, coupé
+  `IntegrityBanner.tsx`), vecteurs d'interop, `gv` (avertit sans bloquer,
+  `gv sync --accept`). Reste : Guiterm, puis activation (`AUTO_ENABLE_MANIFEST`, coupé
   d'ici là : aucun vault n'en reçoit).
 - [x] **Enveloppes authentifiées.** Les enveloppes de clés de vault étaient
   des boîtes scellées anonymes : le serveur pouvait en fabriquer une pour un

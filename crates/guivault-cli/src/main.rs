@@ -1,7 +1,7 @@
 //! `gv` — voir `gv help` et `docs/CLI.md`.
 use anyhow::{Context, Result, anyhow, bail};
 use guivault_cli::store::Home;
-use guivault_cli::vault::{self, Opened};
+use guivault_cli::vault::Opened;
 use guivault_cli::{Prompt, SecretRef};
 use std::io::{IsTerminal, Read};
 use std::process::ExitCode;
@@ -13,7 +13,8 @@ const HELP: &str = "gv — le coffre GuiVault en ligne de commande
   gv lock                                    fermer la session (GUIVAULT_SESSION ne vaut plus rien)
   gv logout                                  se déconnecter et tout effacer de ce poste
   gv status                                  compte, session, fraîcheur du cache
-  gv sync                                    relire le serveur maintenant
+  gv sync [--accept]                         relire le serveur maintenant (--accept : prendre acte
+                                             des manifestes tels qu'il les sert, voir plus bas)
 
   gv list [--vault V] [--type T] [--json]    les éléments
   gv get <réf|élément> [champ] [--vault V] [-n]
@@ -27,6 +28,11 @@ Références : gv://<vault>/<élément>[/<champ>] — noms ou ids, %20 pour une 
 champ par défaut : le secret (mot de passe, secret d'une clé d'API, clé AWS…).
 Champs usuels : password, username, totp, uri, notes ; sinon tout champ de
 l'élément (access-key-id, key-id…) ou un champ personnalisé par son nom.
+
+Manifestes : chaque lecture vérifie que le serveur sert chaque vault tel que ses
+membres l'ont laissé (ni version rejouée, ni élément retenu ou revenu). Un écart
+est dit sur la sortie d'erreur, sans bloquer la lecture ; il se règle depuis
+l'interface web. Après une restauration connue du serveur, `gv sync --accept`.
 
 Environnement : GUIVAULT_SESSION (clé de session), GV_HOME (dossier de gv).";
 
@@ -120,7 +126,7 @@ fn open(home: &Home) -> Result<Opened> {
     if let Some(w) = warning {
         eprintln!("gv : {w}");
     }
-    let opened = vault::open(&unlocked, &cache);
+    let opened = guivault_cli::open(home, &account, &unlocked, &cache)?;
     for w in &opened.warnings {
         eprintln!("gv : {w}");
     }
@@ -192,10 +198,15 @@ fn run() -> Result<ExitCode> {
             }
         }
         "sync" => {
+            let a = parse(args, &[], &["--accept"])?;
             let mut account = home.account()?.ok_or_else(|| anyhow!("aucun compte (gv login)"))?;
             let cache = guivault_cli::sync(&home, &mut account)?;
             let n: usize = cache.items.values().map(|v| v.items.len()).sum();
             eprintln!("{n} élément(s) dans {} vault(s).", cache.vaults.len());
+            if a.flag("--accept") {
+                guivault_cli::accept_manifests(&home, &account, &cache)?;
+                eprintln!("Manifestes pris tels que le serveur les sert.");
+            }
         }
         "list" => {
             let a = parse(args, &["--vault", "--type"], &["--json"])?;

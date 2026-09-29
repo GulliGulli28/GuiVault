@@ -90,6 +90,21 @@ impl Server {
         format!("{}/api/v1{path}", self.root)
     }
 
+    /// La base du serveur, pour jouer un serveur qui ment.
+    fn sql(&self, query: &str, bytes: Option<Vec<u8>>) {
+        let mut url = url::Url::parse(&self.admin_url).unwrap();
+        url.set_path(&self.db_name);
+        self.rt.block_on(async {
+            let pool = sqlx::PgPool::connect(url.as_str()).await.unwrap();
+            let q = sqlx::query(query);
+            let q = match bytes {
+                Some(b) => q.bind(b),
+                None => q,
+            };
+            q.execute(&pool).await.unwrap();
+        });
+    }
+
     fn stop(&mut self) {
         if let Some(s) = self.stop.take() {
             let _ = s.send(());
@@ -123,8 +138,9 @@ impl Prompt for Fixed {
     }
 }
 
-/// Un compte et ses éléments, écrits comme l'interface web les écrit.
-fn seed(server: &Server, email: &str, password: &str) {
+/// Un compte et ses éléments, écrits comme l'interface web les écrit. Rend
+/// la clé et l'id du vault personnel, et un jeton d'accès.
+fn seed(server: &Server, email: &str, password: &str) -> (gc::SymmetricKey, Uuid, String) {
     let http = reqwest::blocking::Client::new();
     let (material, account) = gc::create_account(password).unwrap();
     let key = gc::SymmetricKey::random();
@@ -212,6 +228,7 @@ fn seed(server: &Server, email: &str, password: &str) {
     );
     put("note", "note", json!({ "name": "Doublon", "content": "a" }));
     put("note", "note", json!({ "name": "Doublon", "content": "b" }));
+    (key, vid, login.tokens.access_token)
 }
 
 #[test]
@@ -352,6 +369,170 @@ fn gv_end_to_end() {
         guivault_cli::resolve(&opened, &guivault_cli::parse_ref("gv://GitHub").unwrap()).unwrap(),
         "gh-pass"
     );
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn gv_checks_vault_manifests() {
+    let Some(server) = Server::start() else {
+        return;
+    };
+    let dir = std::env::temp_dir().join(format!("gv-test-{}", Uuid::new_v4().simple()));
+    let home = Home(dir.clone());
+    let (email, pw) = ("bob@t.io", "cli master password");
+    let (key, vid, token) = seed(&server, email, pw);
+    let http = reqwest::blocking::Client::new();
+
+    // Le manifeste, comme l'interface web l'écrit : créé (base 0), réécrit.
+    let write_manifest = |base: i64| {
+        let page: ItemsPage = http
+            .get(server.api(&format!("/vaults/{vid}/items")))
+            .bearer_auth(&token)
+            .send()
+            .unwrap()
+            .json()
+            .unwrap();
+        let live: Vec<(String, Vec<u8>)> = page
+            .items
+            .into_iter()
+            .filter(|i| !i.deleted)
+            .map(|i| (i.id.to_string(), i.ciphertext))
+            .collect();
+        let m = gc::Manifest::of(base + 1, live.iter().map(|(i, c)| (i.as_str(), c.as_slice())));
+        let res = http
+            .put(server.api(&format!("/vaults/{vid}/manifest")))
+            .bearer_auth(&token)
+            .json(&PutManifestRequest {
+                ciphertext: gc::seal_manifest(&key, &vid.to_string(), &m).unwrap(),
+                base_revision: base,
+                vault_revision: page.revision,
+            })
+            .send()
+            .unwrap();
+        assert!(res.status().is_success(), "{}", res.text().unwrap());
+        gc::seal_manifest(&key, &vid.to_string(), &m).unwrap()
+    };
+    let first = write_manifest(0);
+
+    let session = guivault_cli::login(&home, &server.root, email, "test", &Fixed(pw)).unwrap();
+    let (mut account, unlocked) = guivault_cli::unlocked(&home, Some(&session), None).unwrap();
+    let open = |account: &mut guivault_cli::store::Account| {
+        let cache = guivault_cli::sync(&home, account).unwrap();
+        guivault_cli::open(&home, account, &unlocked, &cache).unwrap()
+    };
+    let seen = || home.manifest_counters(&server.root).unwrap().get(&vid).copied();
+
+    // Un serveur fidèle : rien à dire, le compteur retenu.
+    let opened = open(&mut account);
+    assert!(opened.warnings.is_empty(), "{:?}", opened.warnings);
+    assert_eq!(seen(), Some(1));
+    write_manifest(1);
+    assert!(open(&mut account).problems.is_empty());
+    assert_eq!(seen(), Some(2));
+
+    // Il ressert l'ancien manifeste : vu, et le compteur ne recule pas.
+    server.sql(
+        &format!("UPDATE vaults SET manifest = $1, manifest_revision = 1, revision = revision + 1 WHERE id = '{vid}'"),
+        Some(first),
+    );
+    let opened = open(&mut account);
+    assert_eq!(
+        opened.problems,
+        vec![(vid, gc::ManifestProblem::Rollback { counter: 1, seen: 2 })]
+    );
+    assert!(
+        opened.warnings.iter().any(|w| w.contains("gv sync --accept")),
+        "{:?}",
+        opened.warnings
+    );
+    assert_eq!(seen(), Some(2));
+    // Une restauration connue : on en prend acte.
+    let cache = home.cache().unwrap().unwrap();
+    guivault_cli::accept_manifests(&home, &account, &cache).unwrap();
+    assert_eq!(seen(), Some(1));
+    assert!(open(&mut account).problems.is_empty());
+
+    // Une ancienne version de GitHub rejouée, Stripe retenu.
+    let id_of = |name: &str| opened.entries.iter().find(|e| e.name == name).unwrap().id;
+    let (github, stripe) = (id_of("GitHub"), id_of("Stripe"));
+    let old = json!({ "kind": "login", "login": { "id": github, "name": "GitHub", "password": "old-pass" } });
+    let replayed = gc::seal_item(
+        &key,
+        &vid.to_string(),
+        &github.to_string(),
+        "login",
+        old.to_string().as_bytes(),
+    )
+    .unwrap();
+    server.sql(
+        &format!("UPDATE items SET ciphertext = $1 WHERE id = '{github}'"),
+        Some(replayed),
+    );
+    server.sql(&format!("DELETE FROM items WHERE id = '{stripe}'"), None);
+    server.sql(
+        &format!("UPDATE vaults SET revision = revision + 1 WHERE id = '{vid}'"),
+        None,
+    );
+    let opened = open(&mut account);
+    assert_eq!(
+        opened.problems,
+        vec![
+            (
+                vid,
+                gc::ManifestProblem::Altered {
+                    item_id: github.to_string()
+                }
+            ),
+            (
+                vid,
+                gc::ManifestProblem::Withheld {
+                    item_id: stripe.to_string()
+                }
+            ),
+        ]
+    );
+    assert!(
+        opened
+            .warnings
+            .iter()
+            .any(|w| w.contains("« GitHub » n'est pas la version annoncée")),
+        "{:?}",
+        opened.warnings
+    );
+    // `gv` lit quand même (il ne fait que lire), et le dit.
+    assert_eq!(
+        guivault_cli::resolve(
+            &opened,
+            &guivault_cli::parse_ref("gv://Personnel/GitHub/password").unwrap()
+        )
+        .unwrap(),
+        "old-pass"
+    );
+
+    // Le binaire : le secret sur la sortie, l'alerte sur la sortie d'erreur ;
+    // `--accept` ne fait pas taire un écart d'élément.
+    let gv = |args: &[&str]| {
+        let out = std::process::Command::new(env!("CARGO_BIN_EXE_gv"))
+            .args(args)
+            .env("GV_HOME", &dir)
+            .env("GUIVAULT_SESSION", &session)
+            .output()
+            .unwrap();
+        (
+            out.status.success(),
+            String::from_utf8_lossy(&out.stdout).to_string(),
+            String::from_utf8_lossy(&out.stderr).to_string(),
+        )
+    };
+    let (ok, out, err) = gv(&["get", "gv://Personnel/GitHub/password", "-n"]);
+    assert!(ok, "{err}");
+    assert_eq!(out, "old-pass");
+    assert!(err.contains("manifeste"), "{err}");
+    let (ok, _, err) = gv(&["sync", "--accept"]);
+    assert!(ok, "{err}");
+    let (_, _, err) = gv(&["get", "gv://Personnel/GitHub/password"]);
+    assert!(err.contains("« GitHub » n'est pas la version annoncée"), "{err}");
 
     let _ = std::fs::remove_dir_all(&dir);
 }
