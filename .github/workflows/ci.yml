@@ -123,6 +123,8 @@ jobs:
         with:
           name: app-e2e
           path: web/app/e2e/.output
+          # `.output` commence par un point : upload-artifact v4 l'ignorerait.
+          include-hidden-files: true
           retention-days: 7
 
   # La même suite dans WebView2, ce que lancent les utilisateurs Windows :
@@ -186,11 +188,23 @@ jobs:
         env:
           CARGO_TARGET_DIR: ${{ github.workspace }}\app-tauri\target
           E2E_DRIVER_LOG: ${{ github.workspace }}\web\app\e2e\.output\driver.log
+      # Ce que disent tauri-driver et msedgedriver, dans le journal du job.
+      - if: failure()
+        shell: pwsh
+        run: |
+          $l = "web\app\e2e\.output\driver.log.msedgedriver.txt"
+          if (Test-Path $l) {
+            Select-String -Path $l -Pattern 'Launching|DevToolsActivePort|SEVERE|WARNING|exited|DevTools HTTP Request|Unable|failed' |
+              Select-Object -First 80 | ForEach-Object { $_.Line.Substring(0, [Math]::Min(300, $_.Line.Length)) }
+          } else { "pas de journal msedgedriver" }
+          "--- tauri-driver :"
+          Get-Content "web\app\e2e\.output\driver.log" -ErrorAction SilentlyContinue | Select-Object -Last 40
       - if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: app-e2e-windows
           path: web/app/e2e/.output
+          include-hidden-files: true
           retention-days: 7
 
   docker:
