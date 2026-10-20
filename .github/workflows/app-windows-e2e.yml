@@ -1,0 +1,99 @@
+name: Application — E2E Windows
+
+# L'E2E de l'application dans WebView2 (`web/app/e2e/run.mjs`), à part du CI.
+# En investigation (20 octobre 2026) : sur le runner, msedgedriver lance l'app
+# mais ne trouve jamais son port de débogage (« DevToolsActivePort file
+# doesn't exist »), alors que la même suite passe sur un poste Windows et que
+# l'app lancée seule démarre sur le runner (WebView2 154 présent). Écartés :
+# runtime absent, plantage, version du pilote. Tant que ce n'est pas résolu,
+# son échec reste visible ici sans bloquer `ci.yml` — et sans être maquillé
+# en succès (`continue-on-error`). L'E2E Linux, lui, est dans `ci.yml`.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: app-windows-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: app-tauri -> target
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - id: tauri-driver-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/tauri-driver.exe
+          key: tauri-driver-2.0.6-${{ runner.os }}
+      - if: steps.tauri-driver-cache.outputs.cache-hit != 'true'
+        run: cargo install tauri-driver --version 2.0.6 --locked
+      - run: npm ci --no-audit --no-fund
+        working-directory: web
+      - run: npm run build:app
+        working-directory: web
+      # La saisie automatique (`SendInput`) n'est compilée que sous Windows :
+      # c'est ici seulement que clippy la voit.
+      - run: cargo clippy --all-targets -- -D warnings && cargo build --release --features tauri/custom-protocol
+        working-directory: app-tauri
+      # Diagnostic en cours : la session WebDriver ne se crée pas
+      # (« DevToolsActivePort file doesn't exist »). Écarté le 20 octobre :
+      # le runtime WebView2 est là (154), et l'app lancée seule démarre
+      # (fenêtre, processus WebView2, rien sur stderr) — c'est sous
+      # msedgedriver seulement. D'où son journal détaillé (E2E_DRIVER_LOG,
+      # déposé avec les captures en cas d'échec).
+      - name: WebView2 (versions)
+        shell: pwsh
+        run: |
+          $wv2 = '{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}'; $edge = '{56EB18F8-B008-4CBD-B6D2-8C97FE7E9062}'
+          function Pv($k) { (Get-ItemProperty $k -ErrorAction SilentlyContinue).pv }
+          $runtime = @(Pv "HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\$wv2"; Pv "HKCU:\Software\Microsoft\EdgeUpdate\Clients\$wv2") | Where-Object { $_ -and $_ -ne '0.0.0.0' } | Select-Object -First 1
+          "WebView2 Runtime : $(if ($runtime) { $runtime } else { 'ABSENT' }) ; Edge : $(Pv "HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\$edge")"
+          if (-not $runtime) {
+            "Installation du runtime WebView2 (Evergreen, Microsoft)…"
+            Invoke-WebRequest -Uri 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' -OutFile "$env:RUNNER_TEMP\wv2.exe"
+            Start-Process "$env:RUNNER_TEMP\wv2.exe" -ArgumentList '/silent','/install' -Wait
+            "WebView2 Runtime après installation : $(Pv "HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\$wv2")"
+          }
+          exit 0
+      - run: |
+          New-Item -ItemType Directory -Force app/e2e/.output | Out-Null
+          node app/e2e/run.mjs
+        shell: pwsh
+        working-directory: web
+        env:
+          CARGO_TARGET_DIR: ${{ github.workspace }}\app-tauri\target
+          E2E_DRIVER_LOG: ${{ github.workspace }}\web\app\e2e\.output\driver.log
+      # Ce que disent tauri-driver et msedgedriver, dans le journal du job.
+      - if: failure()
+        shell: pwsh
+        run: |
+          $l = "web\app\e2e\.output\driver.log.msedgedriver.txt"
+          if (Test-Path $l) {
+            Select-String -Path $l -Pattern 'Launching|DevToolsActivePort|SEVERE|WARNING|exited|DevTools HTTP Request|Unable|failed' |
+              Select-Object -First 80 | ForEach-Object { $_.Line.Substring(0, [Math]::Min(300, $_.Line.Length)) }
+          } else { "pas de journal msedgedriver" }
+          "--- tauri-driver :"
+          Get-Content "web\app\e2e\.output\driver.log" -ErrorAction SilentlyContinue | Select-Object -Last 40
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-e2e-windows
+          path: web/app/e2e/.output
+          include-hidden-files: true
+          retention-days: 7

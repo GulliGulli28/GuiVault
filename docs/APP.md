@@ -318,7 +318,10 @@ où l'on vérifie que rien n'en est montré), fermer et rouvrir (coffres
 récents, mauvais mot de passe), une erreur de l'hôte (`local_exists`), un
 serveur qui ne répond pas. Sous Linux, l'interface est construite puis
 servie par `vite preview` (le serveur de dev rechargeait la page en
-découvrant ses dépendances, cache froid). Les boîtes de dialogue natives ne se pilotent pas
+découvrant ses dépendances, cache froid). Le scénario du presse-papiers lit
+et écrit **le vrai presse-papiers de Windows** (et le remet en état à la
+fin) : copier quelque chose sur le poste pendant ses ~15 secondes le fait
+échouer — le lancer quand on ne s'en sert pas. Les boîtes de dialogue natives ne se pilotent pas
 par WebDriver : le script pose le chemin dans `window.__GUIVAULT_E2E_PATH__`
 (`web/app/src/dialogs.ts`). Un échec laisse une capture et le texte visible
 (`web/app/e2e/.output/`, ignoré par git).
@@ -371,8 +374,14 @@ ce port bloque aussi le Windows d'à côté (relayé par `wslrelay.exe`).
 4. ~~**Interface en mode local**~~ — fait : voir plus haut ce qui est
    masqué ; `health` côté coffre ; E2E dans la vraie fenêtre (7 scénarios,
    WebKitGTK et WebView2) et job `app` du CI.
-5. ~~**CI**~~ — fait : jobs `app` (Linux, WebKitGTK sous Xvfb) et
-   `app-windows` (release, E2E dans WebView2) de `ci.yml` ;
-   `app-release.yml` pour les installeurs.
+5. ~~**CI**~~ — fait : jobs `app` (Linux : clippy, E2E dans WebKitGTK sous
+   Xvfb) et `app-windows` (clippy et build release, là où le code propre à
+   Windows se compile) de `ci.yml` ; `app-release.yml` pour les
+   installeurs. L'E2E dans WebView2 est à part (`app-windows-e2e.yml`) :
+   **en échec sur le runner GitHub**, enquête en cours — msedgedriver lance
+   l'app mais n'y trouve jamais le port de débogage, alors que la même suite
+   passe sur un poste Windows et que l'app démarre seule sur le runner
+   (WebView2 présent). Écartés : runtime absent, plantage, version du
+   pilote. `E2E_DRIVER_LOG` donne le journal détaillé du pilote.
 6. Plus tard : Android ; « Pousser vers un serveur » ; `gv` sur un coffre
    local ; Guiterm sur un coffre local.
