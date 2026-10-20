@@ -76,8 +76,12 @@ il ne déchiffre rien : la user key reste sous la clé que seule la PRF donne).
   quatre commandes qui passent le coffre local à `guivault_local::rpc`.
   Son interface est `web/app/` (`AppWelcome` : serveur ou coffre local,
   puis `App` tel quel), construite dans `web/dist-app` par `npm run build:app`.
-  Après un changement de comportement de l'app, construire et lancer le
-  vrai `.exe` Windows (recette dans `docs/APP.md`, « Construire et lancer »).
+  Après un changement de comportement de l'app, passer `npm run test:app`
+  (vrai binaire piloté par WebDriver ; un scénario de plus dans
+  `web/app/e2e/run.mjs` pour une fonction nouvelle), puis construire et
+  lancer le vrai `.exe` Windows (recettes dans `docs/APP.md`). Ce qu'un
+  coffre local n'a pas se masque par `supports(méthode)` ; `session.local`
+  sert aux libellés (nom du coffre au lieu de l'e-mail, « Fermer le coffre »).
 - `web/` — l'interface web, Vite + React 19 + TypeScript + Tailwind 3,
   **même charte que Guiterm** (le tactile à part : `src/touch.css`, pour
   ne pas diverger ; `hooks/useMediaQuery.ts`) : `src/index.css` (jetons et primitives
@@ -207,6 +211,7 @@ cd web && npm test && npm run lint && npm run build   # Node 20 via nvm (`source
 cd web && npm run build:ext                           # extension (dist-extension/, non embarquée)
 cd web && npm run build:app                           # interface de l'app (dist-app/, embarquée par app-tauri)
 cd app-tauri && cargo clippy --all-targets && cargo fmt --check   # l'app, workspace à part
+cd app-tauri && cargo build && cd ../web && npm run test:app   # E2E de l'app : vrai binaire, WebDriver (Windows : docs/APP.md)
 cd web && npm run test:ext                            # corpus de remplissage (Playwright, Chromium)
 docker build -f docker/Dockerfile -t guivault:dev .
 ```

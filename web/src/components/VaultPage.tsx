@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PageContext } from "../App";
-import { errorMessage } from "../lib/api";
+import { errorMessage, supports } from "../lib/api";
 import { filterEntities, indexItems, SORT_LABELS, toEntities, withParent, type SortMode } from "../lib/entities";
 import { plainShortcut } from "../lib/keyboard";
 import { uuid } from "../lib/bytes";
@@ -519,7 +519,7 @@ function VaultBody({ ctx, vault, itemId }: { ctx: PageContext; vault: VaultView;
                 {current.ok && (() => { const entity = entities.find((e) => e.id === current.id); return <span className="flex h-6 w-6 items-center justify-center rounded-md bg-[var(--c-bg3)] text-[var(--c-text-secondary)] [&>.host-icon]:h-[72%] [&>.host-icon]:w-[72%] [&>.host-icon>*]:h-full [&>.host-icon>*]:w-full">{entity ? <EntityIcon entity={entity} customIcons={index.icons} /> : null}</span>; })()}
                 <h2 className="min-w-0 truncate text-[13px] font-semibold text-[var(--c-text)]">{current.ok ? payloadName(current.payload) : "Élément illisible"}</h2>
                 <span className="text-[11px] text-[var(--c-text-faint)]" title={`Révision ${current.revision}`}>{current.ok ? KIND_LABELS[current.payload.kind] : current.itemType} · {formatWhen(current.updatedAt)}</span>
-                {!emergency && isSecretItem && (
+                {!emergency && isSecretItem && supports("createSend") && (
                   <button onClick={() => setSharing(true)} className={`btn btn-ghost btn-sm btn-icon ${writable ? "" : "ml-auto"}`} title="Partager par lien : une copie chiffrée, qui expire" aria-label="Partager par lien"><IconLink size={13} /></button>
                 )}
                 {!emergency && <button onClick={() => setHistory(true)} className={`btn btn-ghost btn-sm btn-icon ${writable || isSecretItem ? "" : "ml-auto"}`} title="Historique : ses versions précédentes" aria-label="Historique"><IconHistory size={13} /></button>}

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { PageContext } from "../App";
-import { api, errorMessage } from "../lib/api";
+import { api, errorMessage, supports } from "../lib/api";
 import { navigate } from "../lib/route";
 import { completeInvitation, invite, renameVault, rotateVaultKey, type VaultView } from "../lib/session";
 import { fingerprintTrust } from "../lib/pins";
@@ -23,7 +23,10 @@ type Confirm = null | { kind: "remove"; m: VaultMember } | { kind: "leave" } | {
 function Body({ ctx, vault }: { ctx: PageContext; vault: VaultView }) {
   const { session } = ctx;
   const isPersonal = vault.kind === "personal";
-  const manage = !isPersonal && canManage(vault.role);
+  // Un coffre local (l'app) n'a qu'un utilisateur : ni membres, ni
+  // invitations, ni journal, ni rotation — un vault y sert à ranger.
+  const sharing = supports("members");
+  const manage = !isPersonal && sharing && canManage(vault.role);
   const [members, setMembers] = useState<VaultMember[]>([]);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [inviteEmail, setInviteEmail] = useState("");
@@ -37,10 +40,10 @@ function Body({ ctx, vault }: { ctx: PageContext; vault: VaultView }) {
   const repaint = () => setTrustTick((t) => t + 1);
 
   const reload = useCallback(() => {
-    if (isPersonal) return;
+    if (isPersonal || !sharing) return;
     api.members(vault.id).then(setMembers).catch((e) => ctx.error(errorMessage(e)));
     if (manage) api.vaultInvitations(vault.id).then(setInvitations).catch((e) => ctx.error(errorMessage(e)));
-  }, [vault.id, manage, isPersonal, ctx]);
+  }, [vault.id, manage, isPersonal, sharing, ctx]);
   useEffect(() => { reload(); }, [reload]);
 
   const act = async (label: string, p: () => Promise<unknown>, after?: () => void) => {
@@ -107,16 +110,16 @@ function Body({ ctx, vault }: { ctx: PageContext; vault: VaultView }) {
               <button type="button" onClick={() => setRenaming(null)} className="btn btn-ghost btn-sm">Annuler</button>
             </form>
           )}
-          <p className="help-text">Chiffré sous la clé du vault : le serveur ne le lit pas.</p>
+          <p className="help-text">{sharing ? "Chiffré sous la clé du vault : le serveur ne le lit pas." : "Chiffré sous la clé du vault."}</p>
         </section>
 
-        {isPersonal && (
+        {isPersonal && sharing && (
           <p className="callout max-w-2xl">Votre vault personnel n'a ni membres ni invitations : c'est ce qui se synchronise entre vos appareils. Pour partager, créez un vault partagé depuis la barre latérale.</p>
         )}
 
-        {!isPersonal && <KeyProvenance vault={vault} members={members} onPinned={repaint} />}
+        {!isPersonal && sharing && <KeyProvenance vault={vault} members={members} onPinned={repaint} />}
 
-        {!isPersonal && (
+        {!isPersonal && sharing && (
           <section className="max-w-2xl space-y-1.5">
             <Eyebrow>Membres</Eyebrow>
             {members.map((m) => {
@@ -225,7 +228,7 @@ function Body({ ctx, vault }: { ctx: PageContext; vault: VaultView }) {
                 <button onClick={() => { if (audit === null) api.vaultAudit(vault.id).then(setAudit).catch((e) => ctx.error(errorMessage(e))); else setAudit(null); }} className="btn btn-ghost btn-sm">{audit === null ? "Journal" : "Masquer le journal"}</button>
               )}
               {manage && <button onClick={() => setConfirm({ kind: "rotate" })} disabled={busy !== null} className="btn btn-secondary btn-sm" title="Nouvelle clé de vault, tout re-chiffré">{busy === "rotate" ? "Rotation…" : "Faire tourner la clé"}</button>}
-              {vault.role !== "owner" && <button onClick={() => setConfirm({ kind: "leave" })} className="btn btn-secondary btn-sm">Quitter</button>}
+              {vault.role !== "owner" && sharing && <button onClick={() => setConfirm({ kind: "leave" })} className="btn btn-secondary btn-sm">Quitter</button>}
               {vault.role === "owner" && <button onClick={() => setConfirm({ kind: "delete" })} className="btn btn-danger btn-sm">Supprimer le vault</button>}
             </div>
             {audit && <AuditList entries={audit} />}
@@ -272,7 +275,7 @@ function Body({ ctx, vault }: { ctx: PageContext; vault: VaultView }) {
       {(confirm?.kind === "leave" || confirm?.kind === "delete") && (
         <ConfirmDialog
           title={confirm.kind === "delete" ? `Supprimer « ${vault.name} » ?` : `Quitter « ${vault.name} » ?`}
-          message={confirm.kind === "delete" ? "Le vault et tout son contenu sont supprimés pour tous ses membres. Les appareils qui l'avaient synchronisé en gardent une copie locale jusqu'à leur prochaine synchronisation." : "Vous n'y aurez plus accès. Vos appareils qui l'avaient synchronisé en gardent une copie locale."}
+          message={confirm.kind === "delete" && !sharing ? "Le vault et tout son contenu sont supprimés de ce coffre, pièces jointes comprises." : confirm.kind === "delete" ? "Le vault et tout son contenu sont supprimés pour tous ses membres. Les appareils qui l'avaient synchronisé en gardent une copie locale jusqu'à leur prochaine synchronisation." : "Vous n'y aurez plus accès. Vos appareils qui l'avaient synchronisé en gardent une copie locale."}
           confirmLabel={confirm.kind === "delete" ? "Supprimer" : "Quitter"}
           danger
           onConfirm={() => {

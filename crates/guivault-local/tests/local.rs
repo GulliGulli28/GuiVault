@@ -771,6 +771,10 @@ fn rpc_speaks_the_http_json() {
     let v = client.personal;
     let id = Uuid::new_v4();
 
+    let health = call(&store, "health", &json!({})).unwrap();
+    assert_eq!(health["max_attachment_bytes"], 100 * 1024 * 1024);
+    assert_eq!(health["send_max_days"], 0);
+    assert_eq!(health["health_lookups"], false);
     let sync = call(&store, "sync", &json!({})).unwrap();
     assert_eq!(sync["user"]["id"], store.id().unwrap().to_string());
     assert_eq!(sync["vaults"][0]["role"], "owner");

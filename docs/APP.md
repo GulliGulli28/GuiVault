@@ -1,8 +1,10 @@
 # L'application GuiVault (Windows, puis Android)
 
-**État : étapes 1 à 3 faites — le coffre local (`crates/guivault-local`), son
-transport côté interface (`web/src/lib/localHost.ts`), et l'app Windows
-(`app-tauri/`, `web/app/`). Reste l'interface en mode local (étape 4).** Ce document fixe les choix ; il deviendra la doc de l'app comme
+**État : étapes 1 à 4 faites — le coffre local (`crates/guivault-local`), son
+transport côté interface (`web/src/lib/localHost.ts`), l'app Windows
+(`app-tauri/`, `web/app/`) et l'interface en mode local, avec ses tests de
+bout en bout dans la vraie fenêtre. Reste la CI Windows et les installeurs
+(étape 5).** Ce document fixe les choix ; il deviendra la doc de l'app comme
 `EXTENSION.md` l'est pour l'extension.
 
 Une application installée qui, au choix :
@@ -113,7 +115,19 @@ ce qui a un sens sans serveur :
 Le reste répond `ApiError(501, "local_unsupported")`, et l'interface
 demande `supports("members")` (etc.) pour ne pas proposer ces pages : la
 liste des capacités, c'est la liste des méthodes du transport, rien à tenir
-à jour à part.
+à jour à part. Ce que l'interface masque ainsi : Invitations et Liens de
+partage (barre latérale), « Partager par lien » (fiche, pièces jointes),
+membres, invitations, journal et rotation (réglages d'un vault), Sessions et
+Accès d'urgence (catégories des paramètres), second facteur, passkeys,
+empreinte, suppression du compte. La copie hors ligne n'a pas de sens pour
+un coffre déjà sur l'appareil (`session.local`). Le coffre se nomme par son
+dossier (`coffreName`) là où le web montre l'e-mail, et « Fermer le coffre »
+remplace « Se déconnecter ».
+
+Le coffre local répond aussi à `health` (une `HealthResponse`, comme le
+serveur) : l'interface y lit la taille maximale des pièces jointes
+(`Options::max_attachment_bytes`), et qu'il n'y a ni liens, ni relais du
+rapport de santé, ni passkeys.
 
 **Le contrat avec l'hôte** : une opération par méthode d'`api`, avec les
 mêmes corps JSON que l'API HTTP (base64 compris) — `guivault_local::rpc::call(vault,
@@ -190,6 +204,41 @@ Sans `tauri/custom-protocol`, le binaire charge `devUrl` au lieu de
 `dist-app`. Les installeurs (MSI/NSIS) viendront avec l'étape 5
 (`tauri build` sur un runner Windows).
 
+## Tests de bout en bout
+
+`web/app/e2e/run.mjs` pilote **le vrai binaire** par WebDriver
+(`tauri-driver`, comme Guiterm) : de vrais `invoke`, un vrai coffre écrit
+par `guivault-local` dans un dossier temporaire, et des vérifications sur le
+disque (rien en clair dans `coffre.json`). Scénarios : l'accueil, créer un
+coffre, ce que le mode local masque, créer une note, fermer et rouvrir (coffres
+récents, mauvais mot de passe), une erreur de l'hôte (`local_exists`), un
+serveur qui ne répond pas. Les boîtes de dialogue natives ne se pilotent pas
+par WebDriver : le script pose le chemin dans `window.__GUIVAULT_E2E_PATH__`
+(`web/app/src/dialogs.ts`). Un échec laisse une capture et le texte visible
+(`web/app/e2e/.output/`, ignoré par git).
+
+```bash
+cd app-tauri && cargo build && cd ../web && npm run test:app     # Linux, WebKitGTK (WSLg) ; en CI sous Xvfb
+```
+
+Sous Windows (WebView2 — ce que lancent les utilisateurs), après le build
+release ci-dessus :
+
+```powershell
+$env:CARGO_TARGET_DIR = "$env:USERPROFILE\guivault-app-target-windows"
+$env:EDGEDRIVER_PATH = "$env:USERPROFILE\edgedriver-155\msedgedriver.exe"
+Set-Location "\\wsl.localhost\Ubuntu-24.04\home\glorin\GuiVault\web"
+node app\e2e\run.mjs
+```
+
+`msedgedriver` doit avoir **la même version majeure que le runtime
+WebView2** (sinon : « only supports Microsoft Edge version N ») : le prendre
+sur https://msedgedriver.microsoft.com/<version>/edgedriver_win64.zip quand
+WebView2 se met à jour. `E2E_DRIVER_LOG=fichier` garde ce que disent
+`tauri-driver` et le pilote natif. Le script tue tout l'arbre de processus
+en partant : un WebKitWebDriver orphelin garderait le port 4445, et sous WSL
+ce port bloque aussi le Windows d'à côté (relayé par `wslrelay.exe`).
+
 ## Étapes, dans l'ordre
 
 1. ~~**`crates/guivault-local`**~~ — fait : format, écritures sous verrou,
@@ -212,7 +261,9 @@ Sans `tauri/custom-protocol`, le binaire charge `devUrl` au lieu de
    `rpc::call`), l'accueil `web/app/src/AppWelcome.tsx` (serveur, ouvrir,
    créer, coffres récents), `App` réutilisé tel quel (`Welcome` à la place
    de `LoginScreen`). Voir « Construire et lancer ».
-4. **Interface en mode local** : pages masquées selon les capacités, libellés.
+4. ~~**Interface en mode local**~~ — fait : voir plus haut ce qui est
+   masqué ; `health` côté coffre ; E2E dans la vraie fenêtre (7 scénarios,
+   WebKitGTK et WebView2) et job `app` du CI.
 5. **CI** : job Windows (construction, puis installeur sur tag).
 6. Plus tard : Android ; « Pousser vers un serveur » ; `gv` sur un coffre
    local ; Guiterm sur un coffre local.

@@ -183,6 +183,16 @@ describe("une session sur un coffre local", () => {
     expect(items[0].ok && items[0].payload.kind === "note" && items[0].payload.note.name).toBe("Code de la porte");
   }, 60_000);
 
+  it("rend lisibles les erreurs de l'hôte à la création et à l'ouverture", async () => {
+    const { host } = memoryHost();
+    await expect(openLocal(host, "/tmp/absent", "pw")).rejects.toThrowError("aucun coffre");
+    const refusing: LocalHost = { ...host, create: async () => { throw { status: 409, code: "local_exists", message: "il y a déjà un coffre dans /tmp/c" }; } };
+    const err = await createLocal(refusing, "/tmp/c", "pw").catch((e) => e);
+    expect(err).toBeInstanceOf(ApiError);
+    expect([err.code, err.message]).toEqual(["local_exists", "il y a déjà un coffre dans /tmp/c"]);
+    expect(isHttpTransport()).toBe(true);
+  }, 60_000);
+
   it("refuse un mauvais mot de passe, referme le coffre et rend api au serveur", async () => {
     const { host, closes } = memoryHost();
     await createLocal(host, "/tmp/c", "le bon");

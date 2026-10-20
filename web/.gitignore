@@ -3,5 +3,6 @@ dist
 *.tsbuildinfo
 dist-extension
 dist-app
+app/e2e/.output
 test-results
 playwright-report

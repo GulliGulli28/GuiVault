@@ -29,7 +29,7 @@ export interface NewCoffre {
 }
 
 export type LocalOp =
-  | "account" | "changePassword" | "me" | "sync" | "settings" | "putSettings"
+  | "health" | "account" | "changePassword" | "me" | "sync" | "settings" | "putSettings"
   | "vault" | "createVault" | "renameVault" | "deleteVault"
   | "items" | "putItem" | "deleteItem" | "manifest" | "putManifest"
   | "itemVersions" | "vaultVersions" | "trash" | "purgeTrashItem" | "emptyTrash"
@@ -64,6 +64,9 @@ export function localTransport(host: LocalHost): Partial<Transport> {
     }
   };
   return {
+    // Ce que le coffre offre (`HealthResponse`) : la taille des pièces
+    // jointes, et ni liens, ni relais du rapport de santé, ni passkeys.
+    health: () => call("health"),
     me: () => call("me"),
     sync: () => call("sync"),
     settings: () => call("settings"),
@@ -96,6 +99,31 @@ export function localTransport(host: LocalHost): Partial<Transport> {
     deleteAttachment: (vault, id) => call("deleteAttachment", { vault, id }),
     moveAttachment: (vault, id, req) => call("moveAttachment", { vault, id, req }),
   };
+}
+
+/** Le nom d'un coffre : son dossier, sans `.guivault`, quel que soit le
+ * séparateur (Windows ou non). */
+export function coffreName(path: string): string {
+  const name = path.replace(/[\\/]+$/, "").split(/[\\/]/).pop() ?? path;
+  return name.replace(/\.guivault$/i, "") || path;
+}
+
+/** Créer, ouvrir : les erreurs de l'hôte (`local_exists`,
+ * `local_not_found`…) redeviennent des `ApiError`, avec leur message. */
+export async function localCreate(host: LocalHost, path: string, coffre: NewCoffre): Promise<void> {
+  try {
+    await host.create(path, coffre);
+  } catch (e) {
+    throw toApiError(e);
+  }
+}
+
+export async function localOpen(host: LocalHost, path: string): Promise<void> {
+  try {
+    await host.open(path);
+  } catch (e) {
+    throw toApiError(e);
+  }
 }
 
 /** Les opérations propres au local (pas des routes du serveur). */

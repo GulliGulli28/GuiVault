@@ -46,8 +46,4 @@ export function rememberServer(url: string) {
   }
 }
 
-/** Le nom du dossier, quel que soit le séparateur (Windows ou non). */
-export function coffreName(path: string): string {
-  const name = path.replace(/[\\/]+$/, "").split(/[\\/]/).pop() ?? path;
-  return name.replace(/\.guivault$/i, "") || path;
-}
+export { coffreName } from "../../src/lib/localHost";

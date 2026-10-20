@@ -1,10 +1,10 @@
 import { useState, type FormEvent } from "react";
-import { open, save } from "@tauri-apps/plugin-dialog";
 import { api, errorMessage, setBaseUrl } from "../../src/lib/api";
 import { createLocal, openLocal, type SessionState } from "../../src/lib/session";
 import { LoginScreen } from "../../src/components/LoginScreen";
 import { Logo } from "../../src/components/Logo";
 import { PasswordInput } from "../../src/components/ui";
+import { pickCoffre, pickNewCoffre } from "./dialogs";
 import { tauriHost } from "./tauriHost";
 import { coffreName, forgetCoffre, lastServer, recentCoffres, rememberCoffre, rememberServer } from "./recents";
 
@@ -30,12 +30,12 @@ export function AppWelcome({ onSession }: { onSession: (s: SessionState) => void
 
   const pickExisting = async () => {
     setError(null);
-    const path = await open({ directory: true, title: "Ouvrir un coffre local" });
-    if (typeof path === "string") setStep({ kind: "open", path });
+    const path = await pickCoffre();
+    if (path) setStep({ kind: "open", path });
   };
   const pickNew = async () => {
     setError(null);
-    const path = await save({ title: "Créer un coffre local", defaultPath: "Mon coffre.guivault" });
+    const path = await pickNewCoffre();
     if (path) setStep({ kind: "create", path });
   };
 

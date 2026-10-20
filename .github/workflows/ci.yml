@@ -76,6 +76,55 @@ jobs:
           path: web/test-results
           retention-days: 7
 
+  # L'application (`app-tauri`, `docs/APP.md`) : son workspace Cargo à part,
+  # l'interface de l'app, puis le vrai binaire piloté par WebDriver
+  # (`web/app/e2e/run.mjs`) — de vrais `invoke` vers un vrai coffre sur le
+  # disque. Linux et WebKitGTK sous Xvfb : rien de ce qui est propre à
+  # WebView2 (ce que lancent les utilisateurs Windows) ; ça, c'est le passage
+  # local sous Windows qui le couvre (`docs/APP.md`).
+  app:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: app-tauri -> target
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      # Compiler Tauri (`-dev`), le pilote natif que tauri-driver commande
+      # (`webkit2gtk-driver` : /usr/bin/WebKitWebDriver), un écran (`xvfb`).
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev librsvg2-dev patchelf webkit2gtk-driver xvfb
+      - id: tauri-driver-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/tauri-driver
+          key: tauri-driver-2.0.6-${{ runner.os }}
+      - if: steps.tauri-driver-cache.outputs.cache-hit != 'true'
+        run: cargo install tauri-driver --version 2.0.6 --locked
+      - run: npm ci --no-audit --no-fund
+        working-directory: web
+      - run: npm run build:app
+        working-directory: web
+      - run: cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo build
+        working-directory: app-tauri
+      # Profondeur 24 bits explicite : à 8, WebKit rend mal ou pas du tout.
+      - run: xvfb-run -a -s "-screen 0 1920x1080x24" npm run test:app
+        working-directory: web
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-e2e
+          path: web/app/e2e/.output
+          retention-days: 7
+
   docker:
     runs-on: ubuntu-latest
     steps:

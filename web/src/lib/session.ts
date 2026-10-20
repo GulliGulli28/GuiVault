@@ -7,7 +7,7 @@ import { fromBase64, toBase64, utf8, uuid, randomBytes } from "./bytes";
 import * as c from "./crypto";
 import { fingerprint as fingerprintOf, type UnlockedAccount } from "./crypto";
 import { pinKdf, requireKdfNotDowngraded } from "./kdfPins";
-import { localAccount, localChangePassword, localTransport, type LocalHost } from "./localHost";
+import { localAccount, localChangePassword, localCreate, localOpen, localTransport, type LocalHost } from "./localHost";
 import { fingerprintTrust, requirePinned } from "./pins";
 import { acceptRollback as acceptRollbackRevision, observeRevisions, type VaultRollback } from "./vaultRevisions";
 import { canWrite, type EmergencyGrant, type EmergencyOverview, type Invitation, type Item, type ItemsPage, type LoginResponse, type ManifestWrite, type Payload, type Role, type UserProfile, type Vault, type VaultManifest, type VaultMember } from "./types";
@@ -239,7 +239,7 @@ export async function createLocal(host: LocalHost, path: string, password: strin
     protected_user_key: b64(material.protectedUserKey),
     protected_private_key: b64(material.protectedPrivateKey),
   };
-  await host.create(path, {
+  await localCreate(host, path, {
     account: { ...blobs, public_key: b64(material.publicKey) },
     personal: {
       id: vaultId,
@@ -255,7 +255,7 @@ export async function createLocal(host: LocalHost, path: string, password: strin
  * dérivation que la connexion (plancher Argon2id compris), sur le compte
  * enveloppé que garde le dossier. */
 export async function openLocal(host: LocalHost, path: string, password: string): Promise<SessionState> {
-  await host.open(path);
+  await localOpen(host, path);
   try {
     const a = await localAccount(host);
     const master = await c.deriveMasterKey(password, unb64(a.kdf_salt), a.kdf);

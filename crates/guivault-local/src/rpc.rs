@@ -8,8 +8,9 @@
 //! un test.
 use crate::{Error, LocalVault, PasswordChange, Result};
 use guivault_protocol::{
-    CreateAttachmentRequest, CreateVaultRequest, DeleteItemRequest, KdfParams, MoveAttachmentRequest, PutItemRequest,
-    PutManifestRequest, PutUserSettingsRequest, RenameVaultRequest, SyncResponse, b64,
+    CreateAttachmentRequest, CreateVaultRequest, DeleteItemRequest, HealthResponse, KdfParams, MoveAttachmentRequest,
+    PROTOCOL_VERSION, PutItemRequest, PutManifestRequest, PutUserSettingsRequest, RegistrationMode, RenameVaultRequest,
+    SyncResponse, b64,
 };
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -18,6 +19,7 @@ use uuid::Uuid;
 
 /// Les opérations, dans l'ordre de `ops.json`.
 pub const OPS: &[&str] = &[
+    "health",
     "account",
     "changePassword",
     "me",
@@ -79,6 +81,19 @@ pub fn call(vault: &LocalVault, op: &str, args: &Value) -> Result<Value> {
     let v = || arg::<Uuid>(args, "vault");
     let id = || arg::<Uuid>(args, "id");
     match op {
+        // Ce que le coffre offre, comme `GET /health` : l'interface y lit la
+        // taille des pièces jointes, et que les liens, les relais du rapport
+        // de santé et les passkeys n'existent pas ici.
+        "health" => json(HealthResponse {
+            status: "ok".into(),
+            protocol_version: PROTOCOL_VERSION,
+            server_version: format!("coffre local {}", env!("CARGO_PKG_VERSION")),
+            registration: RegistrationMode::Closed,
+            send_max_days: 0,
+            health_lookups: false,
+            max_attachment_bytes: vault.options().max_attachment_bytes,
+            passkeys: false,
+        }),
         "account" => json(vault.account()?),
         "changePassword" => {
             let a: ChangePasswordArgs = arg(args, "req")?;

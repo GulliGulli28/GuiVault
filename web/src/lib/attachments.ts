@@ -4,20 +4,26 @@
  * serveur ne reçoit que des morceaux chiffrés, et ne sait ni leur nom ni leur
  * type. Un fichier s'envoie en entier avant d'être rattaché à l'item ; si
  * l'enregistrement de l'item échoue, il est effacé. */
-import { api, ApiError } from "./api";
+import { api, ApiError, baseUrl, isHttpTransport } from "./api";
 import { fromBase64, randomBytes, toBase64, uuid } from "./bytes";
 import * as c from "./crypto";
 import { decodeItem, payloadEntity, putPayload, RevisionConflict, type DecodedItem, type VaultView } from "./session";
 import type { FileAttachment, Payload } from "./types";
 
-/** La taille maximale annoncée par le serveur (chiffrée) ; `0` : désactivées. */
-let limit: Promise<number> | null = null;
+/** La taille maximale annoncée par le serveur — ou le coffre local —
+ * (chiffrée) ; `0` : désactivées. Retenue par transport : passer d'un serveur
+ * à un coffre local ne doit pas garder la limite de l'autre. */
+let limit: { key: string; value: Promise<number> } | null = null;
 export function attachmentLimit(): Promise<number> {
-  limit ??= api.health().then((h) => h.max_attachment_bytes ?? 0).catch(() => {
-    limit = null;
-    return 0;
-  });
-  return limit;
+  const key = isHttpTransport() ? baseUrl() : "local";
+  if (limit?.key !== key) {
+    const value = api.health().then((h) => h.max_attachment_bytes ?? 0).catch(() => {
+      if (limit?.key === key) limit = null;
+      return 0;
+    });
+    limit = { key, value };
+  }
+  return limit.value;
 }
 
 export function attachmentsOf(p: Payload): FileAttachment[] {

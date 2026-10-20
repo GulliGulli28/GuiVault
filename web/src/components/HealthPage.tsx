@@ -22,6 +22,7 @@ export function HealthPage({ ctx }: { ctx: PageContext }) {
   const slow = useDelayed(entries === null);
   const vaultsKey = session.vaults.map((v) => `${v.id}:${v.revision}`).join(",");
   const offline = !!session.offline;
+  const local = !!session.local;
 
   useEffect(() => {
     let cancelled = false;
@@ -103,7 +104,7 @@ export function HealthPage({ ctx }: { ctx: PageContext }) {
 
             <Section title="Fuites connues (Have I Been Pwned)" count={leaked?.length ?? null}>
               {lookups === false ? (
-                <p className="help-text">{offline ? "Hors ligne : la recherche de fuites passe par le serveur." : "Désactivée sur ce serveur (GUIVAULT_HEALTH_LOOKUPS=false)."}</p>
+                <p className="help-text">{local ? "Coffre local : la recherche de fuites passe par un serveur GuiVault, qui la relaie sans voir vos mots de passe." : offline ? "Hors ligne : la recherche de fuites passe par le serveur." : "Désactivée sur ce serveur (GUIVAULT_HEALTH_LOOKUPS=false)."}</p>
               ) : leaked === null ? (
                 <div className="flex flex-wrap items-center gap-2">
                   <button onClick={() => void runPwned()} disabled={progress !== null || lookups === null || report.secrets.length === 0} className="btn btn-secondary btn-sm">
@@ -133,7 +134,7 @@ export function HealthPage({ ctx }: { ctx: PageContext }) {
 
             <Section title="Deux facteurs possibles, pas de code enregistré" count={report.missingTotp?.length ?? null}>
               {lookups === false ? (
-                <p className="help-text">La liste des sites qui acceptent un code TOTP (2fa.directory) est relayée par le serveur : {offline ? "hors ligne" : "désactivée ici"}.</p>
+                <p className="help-text">La liste des sites qui acceptent un code TOTP (2fa.directory) est relayée par le serveur : {local ? "pas de serveur pour un coffre local" : offline ? "hors ligne" : "désactivée ici"}.</p>
               ) : report.missingTotp === null ? (
                 <Loading label="Liste des sites…" />
               ) : report.missingTotp.length === 0 ? <Empty /> : report.missingTotp.map((m, i) => (

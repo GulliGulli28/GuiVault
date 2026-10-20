@@ -6,7 +6,7 @@
  * fichiers ne sont pas dans la copie. */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { attachFile, attachmentLimit, attachmentsOf, downloadAttachment, formatSize, removeAttachment, saveBlob } from "../lib/attachments";
-import { errorMessage } from "../lib/api";
+import { errorMessage, supports } from "../lib/api";
 import { attachmentSealedSize } from "../lib/crypto";
 import type { DecodedItem, SessionState, VaultView } from "../lib/session";
 import type { FileAttachment } from "../lib/types";
@@ -137,7 +137,7 @@ export function AttachmentsPanel({ vault, item, writable, offline = false, sessi
               <IconPaperclip size={13} className="shrink-0 text-[var(--c-text-muted)]" />
               <span className="min-w-0 flex-1 truncate text-[var(--c-text)]" title={a.name}>{a.name}</span>
               <span className="shrink-0 text-[11px] text-[var(--c-text-faint)]">{formatSize(a.size)}</span>
-              {session && !offline && (
+              {session && !offline && supports("createSend") && (
                 <button type="button" onClick={() => void share(a)} disabled={busy !== null} className="btn btn-ghost btn-sm btn-icon" title="Partager par lien : une copie chiffrée, qui expire" aria-label={`Partager ${a.name} par lien`}>
                   <IconLink size={12} />
                 </button>

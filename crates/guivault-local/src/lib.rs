@@ -172,6 +172,10 @@ impl LocalVault {
         &self.dir
     }
 
+    pub fn options(&self) -> Options {
+        self.options
+    }
+
     /// L'identifiant du coffre, fixé à sa création.
     pub fn id(&self) -> Result<Uuid> {
         self.read(|c| Ok(c.id))

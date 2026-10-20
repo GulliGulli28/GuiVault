@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import type { PageContext } from "../App";
 import { navigate, routeHash, type Route } from "../lib/route";
 import { createVault } from "../lib/session";
-import { errorMessage } from "../lib/api";
+import { errorMessage, supports } from "../lib/api";
+import { coffreName } from "../lib/localHost";
 import { ROLE_HINTS, ROLE_LABELS } from "../lib/types";
 import { IconDice, IconIdentity, IconLifebuoy, IconLink, IconPulse, IconShieldClock } from "./secret-icons";
 import { IconBell, IconDatabase, IconPlus, IconVault, IconSearch } from "./ui-icons";
@@ -15,6 +16,8 @@ import { NARROW, TOUCH, useMediaQuery } from "../hooks/useMediaQuery";
  * marqueur d'accent sur l'élément actif. */
 export function Sidebar({ ctx, route, onLogout, onSearch, width }: { ctx: PageContext; route: Route; onLogout: () => void; onSearch: () => void; width: number }) {
   const { session } = ctx;
+  // Un coffre local (l'app) : ni invitations ni liens, pas d'e-mail — son nom.
+  const local = session.local;
   const [creating, setCreating] = useState(false);
   // Étroit : le tiroir est ouvert pour une page ; en changer (lien, palette,
   // retour arrière) le referme sans rien d'autre à faire.
@@ -66,7 +69,7 @@ export function Sidebar({ ctx, route, onLogout, onSearch, width }: { ctx: PageCo
       <div className="sidebar-scroll -mx-1 min-h-0 flex-1 overflow-y-auto px-1">
         <div className="flex items-center justify-between px-2 pb-1 pt-1">
           <span className="eyebrow">Vaults</span>
-          <button onClick={() => setCreating(true)} className="btn btn-ghost btn-sm btn-icon" title="Nouveau vault partagé" aria-label="Nouveau vault partagé"><IconPlus size={12} /></button>
+          <button onClick={() => setCreating(true)} className="btn btn-ghost btn-sm btn-icon" title={local ? "Nouveau vault" : "Nouveau vault partagé"} aria-label={local ? "Nouveau vault" : "Nouveau vault partagé"}><IconPlus size={12} /></button>
         </div>
         {session.vaults.map((v) => (
           <a
@@ -107,7 +110,7 @@ export function Sidebar({ ctx, route, onLogout, onSearch, width }: { ctx: PageCo
           </>
         )}
 
-        <a
+        {supports("myInvitations") && <a
           href={routeHash({ page: "invitations" })}
           onClick={(e) => { e.preventDefault(); go({ page: "invitations" }); }}
           data-active={route.page === "invitations" ? "true" : undefined}
@@ -116,7 +119,7 @@ export function Sidebar({ ctx, route, onLogout, onSearch, width }: { ctx: PageCo
           <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[var(--c-bg3)] text-[var(--c-text-secondary)]"><IconBell size={12} /></span>
           <span className="min-w-0 flex-1 truncate text-[12.5px] text-[var(--c-text)]">Invitations</span>
           {session.invitations.length > 0 && <span className="tag tag-accent">{session.invitations.length}</span>}
-        </a>
+        </a>}
         <a
           href={routeHash({ page: "generator" })}
           onClick={(e) => { e.preventDefault(); go({ page: "generator" }); }}
@@ -135,7 +138,7 @@ export function Sidebar({ ctx, route, onLogout, onSearch, width }: { ctx: PageCo
           <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[var(--c-bg3)] text-[var(--c-text-secondary)]"><IconShieldClock size={12} /></span>
           <span className="min-w-0 flex-1 truncate text-[12.5px] text-[var(--c-text)]">Authentificateur</span>
         </a>
-        <a
+        {supports("sends") && <a
           href={routeHash({ page: "sends" })}
           onClick={(e) => { e.preventDefault(); go({ page: "sends" }); }}
           data-active={route.page === "sends" ? "true" : undefined}
@@ -143,7 +146,7 @@ export function Sidebar({ ctx, route, onLogout, onSearch, width }: { ctx: PageCo
         >
           <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[var(--c-bg3)] text-[var(--c-text-secondary)]"><IconLink size={12} /></span>
           <span className="min-w-0 flex-1 truncate text-[12.5px] text-[var(--c-text)]">Liens de partage</span>
-        </a>
+        </a>}
         <a
           href={routeHash({ page: "health" })}
           onClick={(e) => { e.preventDefault(); go({ page: "health" }); }}
@@ -175,11 +178,11 @@ export function Sidebar({ ctx, route, onLogout, onSearch, width }: { ctx: PageCo
         >
           <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[var(--c-bg3)] text-[var(--c-text-secondary)]"><IconIdentity size={12} /></span>
           <span className="flex min-w-0 flex-1 flex-col leading-tight">
-            <span className="truncate text-[12.5px] text-[var(--c-text)]" title={session.user.email}>{session.user.email}</span>
-            <span className="truncate text-[10.5px] text-[var(--c-text-muted)]">Compte et paramètres</span>
+            <span className="truncate text-[12.5px] text-[var(--c-text)]" title={local ? local.path : session.user.email}>{local ? coffreName(local.path) : session.user.email}</span>
+            <span className="truncate text-[10.5px] text-[var(--c-text-muted)]">{local ? "Coffre local et paramètres" : "Compte et paramètres"}</span>
           </span>
         </a>
-        <button onClick={onLogout} className="btn btn-ghost btn-sm mt-1 w-full justify-start">Se déconnecter</button>
+        <button onClick={onLogout} className="btn btn-ghost btn-sm mt-1 w-full justify-start">{local ? "Fermer le coffre" : "Se déconnecter"}</button>
       </div>
     </div>
   );
@@ -209,6 +212,7 @@ export function Sidebar({ ctx, route, onLogout, onSearch, width }: { ctx: PageCo
 
       {creating && (
         <CreateVaultDialog
+          local={!!local}
           onClose={() => setCreating(false)}
           onCreate={async (name) => {
             try {
@@ -227,11 +231,11 @@ export function Sidebar({ ctx, route, onLogout, onSearch, width }: { ctx: PageCo
   );
 }
 
-function CreateVaultDialog({ onClose, onCreate }: { onClose: () => void; onCreate: (name: string) => Promise<void> }) {
+function CreateVaultDialog({ local, onClose, onCreate }: { local: boolean; onClose: () => void; onCreate: (name: string) => Promise<void> }) {
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   return (
-    <Modal title="Nouveau vault partagé" onClose={onClose}>
+    <Modal title={local ? "Nouveau vault" : "Nouveau vault partagé"} onClose={onClose}>
       <form
         onSubmit={async (e) => {
           e.preventDefault();
@@ -244,8 +248,8 @@ function CreateVaultDialog({ onClose, onCreate }: { onClose: () => void; onCreat
       >
         <label className="block">
           <span className="field-label">Nom</span>
-          <input value={name} onChange={(e) => setName(e.target.value)} autoFocus placeholder="Équipe réseau" className="input" />
-          <span className="help-text mt-1 block">Chiffré comme le reste : le serveur ne le lit pas. Vous en êtes propriétaire ; invitez ensuite des membres depuis ses réglages.</span>
+          <input value={name} onChange={(e) => setName(e.target.value)} autoFocus placeholder={local ? "Travail" : "Équipe réseau"} className="input" />
+          <span className="help-text mt-1 block">{local ? "Chiffré comme le reste, sous sa propre clé : un vault de plus pour ranger, dans ce coffre." : "Chiffré comme le reste : le serveur ne le lit pas. Vous en êtes propriétaire ; invitez ensuite des membres depuis ses réglages."}</span>
         </label>
         <div className="flex justify-end gap-2">
           <button type="button" onClick={onClose} className="btn btn-ghost">Annuler</button>

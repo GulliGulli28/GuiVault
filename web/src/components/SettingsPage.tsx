@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type ComponentType, type FormEvent } from "react";
 import type { PageContext } from "../App";
-import { api, ApiError, errorMessage } from "../lib/api";
+import { api, ApiError, errorMessage, supports } from "../lib/api";
+import { coffreName } from "../lib/localHost";
 import { navigate, routeHash, type SettingsSection } from "../lib/route";
 import { LOCK_CHOICES, loadLockMinutes, saveLockMinutes } from "../lib/persist";
 import { CLEAR_CHOICES, loadClearSeconds, saveClearSeconds } from "../lib/clipboard";
@@ -43,27 +44,32 @@ export function SettingsPage({ ctx, section }: { ctx: PageContext; section: Sett
   const [revoke, setRevoke] = useState<Session | null>(null);
   const [lockMinutes, setLockMinutes] = useState(loadLockMinutes);
 
+  // Un coffre local (l'app) n'a ni sessions, ni second facteur, ni accès
+  // d'urgence : on ne les demande pas, et leurs pages n'apparaissent pas.
   const reload = () => {
-    api.sessions().then(setSessions).catch((e) => ctx.error(errorMessage(e)));
-    api.totpStatus().then((s) => setTotp(s.enabled)).catch(() => setTotp(null));
+    if (supports("sessions")) api.sessions().then(setSessions).catch((e) => ctx.error(errorMessage(e)));
+    if (supports("totpStatus")) api.totpStatus().then((s) => setTotp(s.enabled)).catch(() => setTotp(null));
   };
   // Chargement initial seulement ; `ctx` change à chaque notification.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(reload, []);
 
-  const current = CATEGORIES.find((c) => c.key === section) ?? CATEGORIES[0];
+  const categories = CATEGORIES.filter((c) => (c.key !== "urgence" || supports("emergency")) && (c.key !== "sessions" || supports("sessions")));
+  const current = categories.find((c) => c.key === section) ?? categories[0];
+  const local = session.local;
+  const who = local ? coffreName(local.path) : session.user.email;
 
   return (
     <div className="flex h-full min-h-0 flex-col">
       <header className="flex shrink-0 items-center gap-2 border-b border-[var(--c-border)] px-4 py-2.5 max-md:pl-14">
         <h1 className="text-[14px] font-semibold text-[var(--c-text)]">Paramètres</h1>
-        <span className="text-[11px] text-[var(--c-text-faint)]">{session.user.email}</span>
+        <span className="text-[11px] text-[var(--c-text-faint)]">{who}</span>
       </header>
       <div className="flex min-h-0 flex-1 max-md:flex-col">
         {/* Les catégories, avec leur nom : en colonne à gauche, en rangée
             au-dessus quand la fenêtre est étroite. */}
         <nav className="flex shrink-0 gap-px border-[var(--c-border)] p-2.5 max-md:overflow-x-auto max-md:border-b md:w-[10rem] md:flex-col md:border-r">
-          {CATEGORIES.map((c) => {
+          {categories.map((c) => {
             const active = current.key === c.key;
             return (
               <a
@@ -95,14 +101,20 @@ export function SettingsPage({ ctx, section }: { ctx: PageContext; section: Sett
             <>
               <section className="max-w-2xl space-y-1.5">
                 <Eyebrow>Identité</Eyebrow>
-                <p className="text-[13px] text-[var(--c-text)]">{session.user.email} <span className="text-[11px] text-[var(--c-text-faint)]">· compte créé le {formatWhen(session.user.created_at)}</span></p>
-                <div className="card space-y-1 p-3">
+                <p className="text-[13px] text-[var(--c-text)]">{local ? `Coffre local « ${who} »` : who} <span className="text-[11px] text-[var(--c-text-faint)]">· {local ? "créé" : "compte créé"} le {formatWhen(session.user.created_at)}</span></p>
+                {local && (
+                  <>
+                    <p className="break-all font-mono text-[11px] text-[var(--c-text-muted)]">{local.path}</p>
+                    <p className="help-text">Un dossier sur cet appareil : sauvegardez-le comme vos autres fichiers. Sans le mot de passe maître, son contenu est illisible.</p>
+                  </>
+                )}
+                {supports("members") && <div className="card space-y-1 p-3">
                   <p className="text-[11.5px] font-medium text-[var(--c-text-secondary)]">Votre empreinte</p>
                   <Fingerprint value={session.fingerprint} />
                   <p className="help-text">Communiquez-la hors bande (de vive voix, messagerie interne) à qui veut partager un vault avec vous : c'est ce qui lui permet de vérifier que la clé publique que le serveur lui montre est bien la vôtre.</p>
-                </div>
+                </div>}
               </section>
-              {!session.offline && (
+              {!session.offline && supports("deleteAccount") && (
                 <section className="max-w-2xl space-y-1.5">
                   <Eyebrow>Supprimer le compte</Eyebrow>
                   <div className="card flex flex-wrap items-center gap-2 p-3">
@@ -121,18 +133,18 @@ export function SettingsPage({ ctx, section }: { ctx: PageContext; section: Sett
                 <div className="flex flex-wrap items-center gap-2 p-3">
                   <div className="min-w-0 flex-1">
                     <p className="text-[12.5px] text-[var(--c-text)]">Mot de passe maître</p>
-                    <p className="help-text">Seule la clé de compte est ré-enveloppée ; vos autres sessions sont révoquées.</p>
+                    <p className="help-text">{local ? "Seule la clé du coffre est ré-enveloppée : rien d'autre n'est re-chiffré." : "Seule la clé de compte est ré-enveloppée ; vos autres sessions sont révoquées."}</p>
                   </div>
                   <button onClick={() => setDialog("password")} className="btn btn-secondary btn-sm">Changer</button>
                 </div>
-                <div className="flex flex-wrap items-center gap-2 p-3">
+                {supports("totpStatus") && <div className="flex flex-wrap items-center gap-2 p-3">
                   <div className="min-w-0 flex-1">
                     <p className="text-[12.5px] text-[var(--c-text)]">Second facteur (TOTP) {totp === null ? "" : <span className={`tag ml-1 ${totp ? "tag-accent" : ""}`}>{totp ? "activé" : "désactivé"}</span>}</p>
                     <p className="help-text">Un code de votre application d'authentification à chaque connexion, en plus du mot de passe.</p>
                   </div>
                   {totp === false && <button onClick={() => setDialog("totp-setup")} className="btn btn-secondary btn-sm">Activer</button>}
                   {totp === true && <button onClick={() => setDialog("totp-disable")} className="btn btn-danger btn-sm">Désactiver</button>}
-                </div>
+                </div>}
                 <div className="flex flex-wrap items-center gap-2 p-3">
                   <div className="min-w-0 flex-1">
                     <label htmlFor="lock-minutes" className="text-[12.5px] text-[var(--c-text)]">Verrouiller après</label>
@@ -143,11 +155,11 @@ export function SettingsPage({ ctx, section }: { ctx: PageContext; section: Sett
                   </select>
                 </div>
                 <ClipboardSetting />
-                <OfflineSetting session={session} notify={ctx.notify} error={ctx.error} />
+                {!local && <OfflineSetting session={session} notify={ctx.notify} error={ctx.error} />}
               </div>
             </section>
           )}
-          {current.key === "securite" && <PasskeySettings ctx={ctx} />}
+          {current.key === "securite" && supports("passkeys") && <PasskeySettings ctx={ctx} />}
 
           {current.key === "urgence" && <EmergencySettings ctx={ctx} />}
 
@@ -288,7 +300,7 @@ function PasswordDialog({ ctx, onClose }: { ctx: PageContext; onClose: () => voi
     setError(null);
     try {
       await changePassword(ctx.session, current, next);
-      ctx.notify("Mot de passe maître changé. Vos autres sessions ont été révoquées.");
+      ctx.notify(ctx.session.local ? "Mot de passe maître changé." : "Mot de passe maître changé. Vos autres sessions ont été révoquées.");
       onClose();
     } catch (err) {
       setError(errorMessage(err));
