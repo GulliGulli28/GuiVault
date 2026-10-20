@@ -824,3 +824,112 @@ fn rpc_speaks_the_http_json() {
     let bad = call(&store, "items", &json!({ "vault": "pas un uuid" })).unwrap_err();
     assert_eq!((bad.status, bad.code), (400, "invalid_request"));
 }
+
+// ─── Sauvegardes ────────────────────────────────────────────────────────────
+
+#[test]
+fn a_backup_before_writing_at_most_once_per_interval() {
+    let tmp = TempDir::new();
+    let (store, client) = new_coffre(&tmp.coffre());
+    let v = client.personal;
+    let first = Uuid::new_v4();
+    client.put(&store, v, first, "un", None).unwrap();
+    // Le coffre tel qu'il était avant cette première écriture : sans l'item.
+    let list = guivault_local::backups(&tmp.coffre()).unwrap();
+    assert_eq!(list.len(), 1);
+    let saved = std::fs::read_to_string(tmp.coffre().join("backups").join(&list[0].name)).unwrap();
+    assert!(!saved.contains(&first.to_string()));
+    // D'autres écritures dans l'heure : pas d'autre sauvegarde.
+    for n in 0..3 {
+        client.put(&store, v, Uuid::new_v4(), &n.to_string(), None).unwrap();
+    }
+    assert_eq!(guivault_local::backups(&tmp.coffre()).unwrap().len(), 1);
+}
+
+#[test]
+fn only_the_most_recent_backups_are_kept() {
+    let tmp = TempDir::new();
+    let options = Options {
+        backups: 3,
+        backup_interval: std::time::Duration::ZERO,
+        ..Options::default()
+    };
+    let (store, client) = new_coffre_with(&tmp.coffre(), options);
+    for n in 0..6 {
+        client
+            .put(&store, client.personal, Uuid::new_v4(), &n.to_string(), None)
+            .unwrap();
+    }
+    let list = guivault_local::backups(&tmp.coffre()).unwrap();
+    assert_eq!(list.len(), 3);
+    assert!(
+        list.windows(2).all(|w| w[0].taken_at >= w[1].taken_at),
+        "la plus récente d'abord"
+    );
+}
+
+#[test]
+fn a_backup_becomes_a_new_coffre_even_when_the_original_is_corrupt() {
+    let tmp = TempDir::new();
+    let (store, client) = new_coffre(&tmp.coffre());
+    let v = client.personal;
+    let item = Uuid::new_v4();
+    client.put(&store, v, item, "avant", None).unwrap();
+    // Une écriture de plus pour que la sauvegarde contienne l'item.
+    let options = Options {
+        backup_interval: std::time::Duration::ZERO,
+        ..Options::default()
+    };
+    let store = LocalVault::open_with(tmp.coffre(), options).unwrap();
+    client.put(&store, v, Uuid::new_v4(), "après", None).unwrap();
+    let id = store.id().unwrap();
+    // Une pièce jointe, pour la voir suivre.
+    std::fs::create_dir_all(tmp.coffre().join("attachments").join(v.to_string()).join("a")).unwrap();
+    std::fs::write(
+        tmp.coffre()
+            .join("attachments")
+            .join(v.to_string())
+            .join("a")
+            .join("0.bin"),
+        b"x",
+    )
+    .unwrap();
+
+    std::fs::write(tmp.coffre().join("coffre.json"), b"{ abime").unwrap();
+    assert_eq!(LocalVault::open(tmp.coffre()).unwrap_err().code, "local_corrupt");
+    let newest = guivault_local::backups(&tmp.coffre()).unwrap()[0].name.clone();
+
+    let dest = tmp.0.join("Restauré.guivault");
+    guivault_local::restore_backup(&tmp.coffre(), &newest, &dest).unwrap();
+    let restored = LocalVault::open(&dest).unwrap();
+    assert_ne!(restored.id().unwrap(), id, "nouvel identifiant");
+    let page = restored.items(v, None).unwrap();
+    assert!(page.items.iter().any(|i| i.id == item));
+    assert_eq!(
+        client.open(v, item, "note", &restored.item(v, item).unwrap().ciphertext),
+        "avant"
+    );
+    assert!(
+        dest.join("attachments")
+            .join(v.to_string())
+            .join("a")
+            .join("0.bin")
+            .exists()
+    );
+
+    // Jamais par-dessus un coffre, jamais un nom qui sort du dossier.
+    assert_eq!(
+        guivault_local::restore_backup(&tmp.coffre(), &newest, &dest)
+            .unwrap_err()
+            .code,
+        "local_exists"
+    );
+    let bad = guivault_local::restore_backup(&tmp.coffre(), "../coffre.json", &tmp.0.join("x")).unwrap_err();
+    assert_eq!(bad.code, "invalid_backup");
+    assert_eq!(
+        guivault_local::restore_backup(&tmp.coffre(), "coffre-20000101-000000.json", &tmp.0.join("y"))
+            .unwrap_err()
+            .code,
+        "not_found"
+    );
+}

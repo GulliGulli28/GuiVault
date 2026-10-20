@@ -20,8 +20,10 @@ import { AuditList } from "./VaultSettings";
 import { IconIdentity, IconLifebuoy } from "./secret-icons";
 import { EmergencySettings } from "./EmergencySettings";
 import { AutoTypeSettings } from "./AutoType";
-import { autoTypeBridge } from "../lib/platform";
-import { IconKeyboard, IconMonitor, IconPalette, IconShield, IconTrash } from "./ui-icons";
+import { AppSettings } from "./AppSettings";
+import { LocalBackups } from "./LocalBackups";
+import { autoTypeBridge, backupBridge, systemBridge } from "../lib/platform";
+import { IconKeyboard, IconMonitor, IconPalette, IconSettings, IconShield, IconTrash } from "./ui-icons";
 import { CopyButton, Eyebrow, Fingerprint, formatWhen, Modal, PasswordInput } from "./ui";
 
 /** Les catégories, avec leur nom — la colonne de gauche du panneau
@@ -31,6 +33,7 @@ const CATEGORIES: { key: SettingsSection; label: string; Icon: ComponentType<{ s
   { key: "compte", label: "Compte", Icon: IconIdentity },
   { key: "securite", label: "Sécurité", Icon: IconShield },
   { key: "saisie", label: "Saisie automatique", Icon: IconKeyboard },
+  { key: "application", label: "Application", Icon: IconSettings },
   { key: "urgence", label: "Accès d'urgence", Icon: IconLifebuoy },
   { key: "sessions", label: "Sessions", Icon: IconMonitor },
 ];
@@ -57,7 +60,7 @@ export function SettingsPage({ ctx, section }: { ctx: PageContext; section: Sett
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(reload, []);
 
-  const categories = CATEGORIES.filter((c) => (c.key !== "urgence" || supports("emergency")) && (c.key !== "sessions" || supports("sessions")) && (c.key !== "saisie" || !!autoTypeBridge()));
+  const categories = CATEGORIES.filter((c) => (c.key !== "urgence" || supports("emergency")) && (c.key !== "sessions" || supports("sessions")) && (c.key !== "saisie" || !!autoTypeBridge()) && (c.key !== "application" || !!systemBridge()));
   const current = categories.find((c) => c.key === section) ?? categories[0];
   const local = session.local;
   const who = local ? coffreName(local.path) : session.user.email;
@@ -117,6 +120,12 @@ export function SettingsPage({ ctx, section }: { ctx: PageContext; section: Sett
                   <p className="help-text">Communiquez-la hors bande (de vive voix, messagerie interne) à qui veut partager un vault avec vous : c'est ce qui lui permet de vérifier que la clé publique que le serveur lui montre est bien la vôtre.</p>
                 </div>}
               </section>
+              {local && backupBridge() && (
+                <section className="max-w-2xl space-y-1.5">
+                  <Eyebrow>Sauvegardes</Eyebrow>
+                  <LocalBackups path={local.path} onError={ctx.error} onRestored={(dest) => ctx.notify(`Copie créée : ${dest}. Elle est dans les coffres récents — fermez ce coffre pour l'ouvrir.`)} />
+                </section>
+              )}
               {!session.offline && supports("deleteAccount") && (
                 <section className="max-w-2xl space-y-1.5">
                   <Eyebrow>Supprimer le compte</Eyebrow>
@@ -165,6 +174,8 @@ export function SettingsPage({ ctx, section }: { ctx: PageContext; section: Sett
           {current.key === "securite" && supports("passkeys") && <PasskeySettings ctx={ctx} />}
 
           {current.key === "saisie" && <AutoTypeSettings notify={ctx.notify} />}
+
+          {current.key === "application" && <AppSettings error={ctx.error} />}
 
           {current.key === "urgence" && <EmergencySettings ctx={ctx} />}
 

@@ -22,11 +22,15 @@ path = "src/main.rs"
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["tray-icon"] }
 tauri-plugin-dialog = "2"
 # La saisie automatique (`src/autotype.rs`) : le raccourci global, le texte
 # effacé de la mémoire une fois tapé.
 tauri-plugin-global-shortcut = "2"
+# La zone de notification (`src/tray.rs`) : une seule instance (relancer
+# ramène la fenêtre), démarrer avec la session.
+tauri-plugin-single-instance = "2"
+tauri-plugin-autostart = "2"
 serde = { version = "1", features = ["derive"] }
 zeroize = "1"
 guivault-local = { path = "../crates/guivault-local" }
@@ -38,7 +42,17 @@ time = "=0.3.47"
 # Taper dans une autre fenêtre (`SendInput`), savoir laquelle est au premier
 # plan : l'API Win32, déjà dans l'arbre de Tauri.
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_UI_Input_KeyboardAndMouse"] }
+windows-sys = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_System_DataExchange",
+    "Win32_System_Memory",
+    "Win32_System_Ole",
+    "Win32_System_RemoteDesktop",
+    "Win32_System_SystemInformation",
+    "Win32_UI_Shell",
+] }
 
 [profile.release]
 lto = "thin"

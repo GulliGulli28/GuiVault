@@ -9,15 +9,20 @@ import { installPreferences } from "../../src/lib/preferences";
 import { setDeviceLabel } from "../../src/lib/session";
 import { AppWelcome } from "./AppWelcome";
 import { installAutoType } from "./autotypeBridge";
+import { installClipboard } from "./clipboardBridge";
+import { installSystem } from "./systemBridge";
+import { installBackups } from "./backupBridge";
 
 // Comme l'interface web (`src/main.tsx`), sans le service worker : l'app
 // embarque déjà son interface.
 installPreferences();
 setDeviceLabel("Application GuiVault");
 
-// La saisie automatique d'abord (quelques millisecondes) : les composants
-// regardent au rendu si elle existe.
-void installAutoType().finally(() => {
+// Ce que l'application ajoute (saisie automatique, presse-papiers natif)
+// d'abord — quelques millisecondes : les composants regardent au rendu si
+// c'est là.
+installBackups();
+void Promise.allSettled([installAutoType(), installClipboard(), installSystem()]).finally(() => {
   ReactDOM.createRoot(document.getElementById("root")!).render(
     <React.StrictMode>
       <App Welcome={AppWelcome} />

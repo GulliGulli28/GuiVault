@@ -20,13 +20,16 @@
 //! Mon coffre.guivault/
 //!   coffre.json                       tout, sauf les pièces jointes
 //!   attachments/<vault>/<id>/<n>.bin  morceaux chiffrés
+//!   backups/coffre-<date>.json        sauvegardes (`backup.rs`)
 //!   .lock                             verrou partagé (lire) / exclusif (écrire)
 //! ```
+mod backup;
 mod error;
 mod format;
 pub mod rpc;
 mod validate;
 
+pub use backup::{BackupInfo, backups, restore_backup};
 pub use error::{Error, Result};
 pub use format::{FILE_NAME, FORMAT, LocalAccount};
 
@@ -53,6 +56,10 @@ pub struct Options {
     pub trash_days: u32,
     pub max_item_bytes: usize,
     pub max_attachment_bytes: u64,
+    /// Sauvegardes de `coffre.json` gardées (`backup.rs`) ; 0 : aucune.
+    pub backups: usize,
+    /// Une sauvegarde avant une écriture si la dernière est plus vieille.
+    pub backup_interval: std::time::Duration,
 }
 
 impl Default for Options {
@@ -62,6 +69,8 @@ impl Default for Options {
             trash_days: 30,
             max_item_bytes: 1024 * 1024,
             max_attachment_bytes: 100 * 1024 * 1024,
+            backups: 10,
+            backup_interval: std::time::Duration::from_secs(3600),
         }
     }
 }
@@ -718,6 +727,8 @@ impl LocalVault {
         let mut fx = Effects::default();
         let res = f(&mut coffre, &mut fx, now).and_then(|out| {
             prune(&mut coffre, &self.dir, &mut fx, now, self.options);
+            // Le coffre tel qu'il était, avant de le réécrire.
+            backup::maybe_backup(&self.dir, now, self.options.backup_interval, self.options.backups);
             format::save(&self.dir, &coffre)?;
             Ok(out)
         });

@@ -153,20 +153,30 @@ export function loadWebSession(): { state: SessionState; tokens: TokenPair } | "
   return { state: deserializeSession(s), tokens: s.tokens };
 }
 
-/** Marque une activité : appelé à chaque geste, sans écrire plus d'une fois
- * toutes les dix secondes. */
+/** Le dernier geste, en mémoire : ce que mesure le délai pendant que la
+ * page est ouverte — pour **toute** session, y compris celles qui ne sont
+ * pas gardées ici (un coffre local de l'application n'a pas de jetons à
+ * garder : sans ça, il ne se verrouillait jamais). */
+let lastActivity = Date.now();
+/** Marque une activité : appelé à chaque geste ; l'écriture de la session
+ * gardée, pas plus d'une fois toutes les dix secondes. */
 let lastTouch = 0;
-export function touchWebSession(): void {
-  const now = Date.now();
+export function touchWebSession(now = Date.now()): void {
+  lastActivity = now;
   if (now - lastTouch < 10_000) return;
   lastTouch = now;
   const s = read();
   if (s) write({ ...s, lastActivity: now });
 }
 
+/** Depuis combien de temps rien ne s'est passé ici. */
+export function idleMs(now = Date.now()): number {
+  return now - Math.max(lastActivity, read()?.lastActivity ?? 0);
+}
+
 /** Le délai est-il dépassé pour la session en cours ? À demander
- * périodiquement pendant que l'onglet est ouvert. */
-export function webSessionIdle(): boolean {
-  const s = read();
-  return s ? webSessionExpired(s) : false;
+ * périodiquement pendant que la page est ouverte. */
+export function webSessionIdle(now = Date.now()): boolean {
+  const minutes = loadLockMinutes();
+  return minutes > 0 && idleMs(now) > minutes * 60_000;
 }

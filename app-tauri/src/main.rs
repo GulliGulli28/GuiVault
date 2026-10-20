@@ -9,6 +9,9 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod autotype;
+mod clipboard;
+mod system;
+mod tray;
 
 use guivault_local::{LocalVault, NewCoffre};
 use serde_json::Value;
@@ -64,6 +67,22 @@ async fn local_open(state: State<'_, Coffre>, path: String) -> Result<(), Value>
     let vault = blocking(move || LocalVault::open(path).map_err(error)).await?;
     state.set(Some(vault));
     Ok(())
+}
+
+/// Les sauvegardes d'un coffre (`guivault_local::backups`) — sans
+/// l'ouvrir : c'est aussi le recours d'un coffre devenu illisible.
+#[tauri::command]
+async fn local_backups(path: String) -> Result<Vec<guivault_local::BackupInfo>, Value> {
+    blocking(move || guivault_local::backups(std::path::Path::new(&path)).map_err(error)).await
+}
+
+/// Une sauvegarde devient un nouveau coffre dans `dest` ; rien n'est écrasé.
+#[tauri::command]
+async fn local_restore_backup(path: String, name: String, dest: String) -> Result<(), Value> {
+    blocking(move || {
+        guivault_local::restore_backup(std::path::Path::new(&path), &name, std::path::Path::new(&dest)).map_err(error)
+    })
+    .await
 }
 
 #[tauri::command]
@@ -179,22 +198,126 @@ fn autotype_self_target(window: WebviewWindow) -> Option<String> {
     own_handle(&window).map(|h| h.to_string())
 }
 
+// ─── Presse-papiers (`src/clipboard.rs`) ────────────────────────────────────
+
+#[tauri::command]
+fn clipboard_native() -> bool {
+    cfg!(windows)
+}
+
+/// Copie un secret hors de l'historique Windows et du presse-papiers cloud,
+/// et l'efface à l'échéance s'il est encore là.
+#[tauri::command]
+async fn clipboard_copy_secret(window: WebviewWindow, mut text: String, clear_after_ms: u64) -> Result<(), String> {
+    let owner = own_handle(&window).unwrap_or(0);
+    tauri::async_runtime::spawn_blocking(move || {
+        let r = clipboard::copy_secret(owner, &text, clear_after_ms);
+        zeroize::Zeroize::zeroize(&mut text);
+        r
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+// ─── Système (`src/system.rs`) ───────────────────────────────────────────────
+
+/// L'inactivité de tout l'ordinateur, en millisecondes ; `null` hors Windows.
+#[tauri::command]
+fn system_idle_ms() -> Option<u64> {
+    system::idle_ms()
+}
+
+// ─── Zone de notification (`src/tray.rs`) ────────────────────────────────────
+
+/// Démarré par la session (démarrage automatique) : directement dans la zone
+/// de notification, sans fenêtre.
+const START_MINIMIZED: &str = "--minimized";
+
+#[tauri::command]
+fn app_tray_available() -> bool {
+    tray::available()
+}
+
+#[tauri::command]
+fn app_set_close_to_tray(state: State<'_, tray::CloseToTray>, enabled: bool) {
+    state.0.store(enabled, std::sync::atomic::Ordering::Relaxed);
+}
+
+/// Démarrer avec la session : `enabled` le pose ou le retire ; rend l'état.
+#[tauri::command]
+fn app_autostart(app: AppHandle, enabled: Option<bool>) -> Result<bool, String> {
+    use tauri_plugin_autostart::ManagerExt;
+    let launcher = app.autolaunch();
+    match enabled {
+        Some(true) => launcher.enable().map_err(|e| e.to_string())?,
+        Some(false) => launcher.disable().map_err(|e| e.to_string())?,
+        None => {}
+    }
+    launcher.is_enabled().map_err(|e| e.to_string())
+}
+
 fn main() {
     tauri::Builder::default()
+        // En premier : une seconde instance ne fait que ramener la fenêtre
+        // de la première, et s'arrête.
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            tray::show_main(app)
+        }))
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            Some(vec![START_MINIMIZED]),
+        ))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .manage(Coffre::default())
         .manage(Hotkey::default())
+        .manage(tray::CloseToTray::default())
         .invoke_handler(tauri::generate_handler![
             local_create,
             local_open,
             local_close,
             local_call,
+            local_backups,
+            local_restore_backup,
             autotype_available,
             autotype_set_hotkey,
             autotype_type,
-            autotype_self_target
+            autotype_self_target,
+            clipboard_native,
+            clipboard_copy_secret,
+            system_idle_ms,
+            app_tray_available,
+            app_set_close_to_tray,
+            app_autostart
         ])
+        .setup(|app| {
+            if let Err(e) = tray::install(app.handle()) {
+                eprintln!("zone de notification indisponible : {e}");
+            }
+            if let Some(w) = app.get_webview_window("main") {
+                system::watch(app.handle(), &w);
+                // La fenêtre part cachée (`tauri.conf.json`) : montrée ici,
+                // sauf au démarrage de session.
+                if !std::env::args().any(|a| a == START_MINIMIZED) || !tray::available() {
+                    let _ = w.show();
+                }
+            }
+            Ok(())
+        })
+        .on_window_event(|window, event| {
+            // Fermer la fenêtre la range dans la zone de notification, si on
+            // l'a voulu et qu'il y en a une ; l'interface le sait (« zone »)
+            // pour verrouiller si on l'a demandé à la réduction.
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event
+                && window.label() == "main"
+                && tray::available()
+                && window.state::<tray::CloseToTray>().get()
+            {
+                api.prevent_close();
+                let _ = window.hide();
+                let _ = window.emit_to("main", system::LOCK_EVENT, "zone");
+            }
+        })
         .run(tauri::generate_context!())
         .expect("échec du lancement de GuiVault");
 }

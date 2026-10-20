@@ -10,6 +10,7 @@ import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { loadAutoTypeSettings } from "../../src/lib/autotype";
 import { setAutoTypeBridge, type AutoTypeBridge, type AutoTypeRequest } from "../../src/lib/platform";
+import { duringAutoType } from "./windowFlags";
 
 const PENDING_MAX_MS = 2 * 60_000;
 
@@ -27,7 +28,7 @@ export async function installAutoType(): Promise<void> {
   let pending: { request: AutoTypeRequest; at: number } | null = null;
 
   const bridge: AutoTypeBridge = {
-    type: (actions, target) => invoke<void>("autotype_type", { actions, target: target ?? null }).catch((e) => { throw toError(e); }),
+    type: (actions, target) => duringAutoType(() => invoke<void>("autotype_type", { actions, target: target ?? null })).catch((e) => { throw toError(e); }),
     setHotkey: (accelerator) => invoke<void>("autotype_set_hotkey", { accelerator }).catch((e) => { throw toError(e); }),
     onRequest(handler) {
       handlers.add(handler);

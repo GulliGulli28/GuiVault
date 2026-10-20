@@ -9,6 +9,7 @@
     "dialog:allow-save",
     "core:window:allow-unminimize",
     "core:window:allow-show",
-    "core:window:allow-set-focus"
+    "core:window:allow-set-focus",
+    "core:window:allow-is-minimized"
   ]
 }

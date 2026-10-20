@@ -151,6 +151,13 @@ il ne déchiffre rien : la user key reste sous la clé que seule la PRF donne).
     (raccourci global, bouton de la fiche, section du formulaire,
     Paramètres › Saisie automatique). Sans pont (web, extension, Linux),
     rien n'en est montré. `Login.autoType` est dans `guivault-items`.
+    Même schéma pour le reste de ce que seule l'application sait faire
+    (`docs/APP.md`, « Le poste ») : presse-papiers natif (`clipboardBridge`,
+    `app-tauri/src/clipboard.rs`), verrouillage par le système et zone de
+    notification (`systemBridge`, `system.rs`, `tray.rs`, réglages
+    `lib/appSettings.ts` / `components/AppSettings.tsx`), sauvegardes du
+    coffre local (`backupBridge`, `components/LocalBackups.tsx`,
+    `crates/guivault-local/src/backup.rs`).
   - `lib/accountPasskeys.ts` — se connecter avec une passkey (PRF de
     WebAuthn, `docs/PASSKEYS.md`) ; `components/PasskeySettings.tsx`
     (Paramètres › Sécurité) et le bouton de `LoginScreen`. À ne pas

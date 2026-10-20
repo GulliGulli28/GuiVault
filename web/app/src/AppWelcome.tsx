@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
-import { api, errorMessage, setBaseUrl } from "../../src/lib/api";
+import { api, ApiError, errorMessage, setBaseUrl } from "../../src/lib/api";
+import { LocalBackups } from "../../src/components/LocalBackups";
 import { createLocal, openLocal, type SessionState } from "../../src/lib/session";
 import { LoginScreen } from "../../src/components/LoginScreen";
 import { Logo } from "../../src/components/Logo";
@@ -92,7 +93,7 @@ export function AppWelcome({ onSession }: { onSession: (s: SessionState) => void
         )}
 
         {step.kind === "server" && <ServerForm onBack={home} onReady={() => setStep({ kind: "login" })} />}
-        {step.kind === "open" && <UnlockForm path={step.path} onBack={home} onSession={onSession} />}
+        {step.kind === "open" && <UnlockForm key={step.path} path={step.path} onBack={home} onSession={onSession} onOpenCopy={(dest) => setStep({ kind: "open", path: dest })} />}
         {step.kind === "create" && <CreateForm path={step.path} onBack={home} onSession={onSession} />}
       </div>
     </div>
@@ -136,10 +137,12 @@ function ServerForm({ onBack, onReady }: { onBack: () => void; onReady: () => vo
   );
 }
 
-function UnlockForm({ path, onBack, onSession }: { path: string; onBack: () => void; onSession: (s: SessionState) => void }) {
+function UnlockForm({ path, onBack, onSession, onOpenCopy }: { path: string; onBack: () => void; onSession: (s: SessionState) => void; onOpenCopy: (dest: string) => void }) {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Un coffre illisible : ses sauvegardes sont le recours.
+  const [corrupt, setCorrupt] = useState(false);
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setBusy(true);
@@ -149,6 +152,7 @@ function UnlockForm({ path, onBack, onSession }: { path: string; onBack: () => v
       rememberCoffre(path);
       onSession(s);
     } catch (err) {
+      setCorrupt(err instanceof ApiError && err.code === "local_corrupt");
       setError(errorMessage(err));
       setBusy(false);
     }
@@ -164,6 +168,12 @@ function UnlockForm({ path, onBack, onSession }: { path: string; onBack: () => v
         <PasswordInput value={password} onChange={setPassword} autoComplete="current-password" autoFocus />
       </label>
       {error && <p className="callout callout-danger">{error}</p>}
+      {corrupt && (
+        <div className="space-y-1.5">
+          <p className="text-[12.5px] text-[var(--c-text)]">Ce coffre ne se lit plus. Ses sauvegardes :</p>
+          <LocalBackups path={path} onError={setError} onRestored={onOpenCopy} />
+        </div>
+      )}
       <div className="flex justify-between gap-2">
         <button type="button" onClick={onBack} className="btn btn-ghost">Retour</button>
         <button type="submit" disabled={!password || busy} className="btn btn-primary">{busy ? "Déverrouillage…" : "Déverrouiller"}</button>

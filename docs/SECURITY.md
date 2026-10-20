@@ -227,6 +227,16 @@ correspondent, et la possibilité de désactiver la saisie automatique par
 identifiant. Pas encore d'« obfuscation à deux canaux » (KeePass : une
 partie par le presse-papiers).
 
+**Presse-papiers de l'application** (Windows) : exclu de l'historique et
+du presse-papiers cloud de Windows, effacé par l'application au délai réglé
+s'il n'a pas changé. Ce qu'une autre application lit pendant ce délai, elle
+le lit — comme partout.
+
+**Sauvegardes du coffre local** : des copies de `coffre.json`, chiffrées
+comme lui, et ouvrables avec le mot de passe maître **de leur date** —
+changer de mot de passe ne protège pas les sauvegardes d'avant d'un
+mot de passe déjà compromis ; les effacer (dossier `backups/`) le fait.
+
 ## Déploiement
 
 - **TLS obligatoire** devant le serveur. Sans TLS, les jetons et la clé

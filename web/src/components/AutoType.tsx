@@ -13,6 +13,7 @@ import { errorMessage } from "../lib/api";
 import { DEFAULT_SEQUENCE, loadAutoTypeSettings, matchWindow, resolveSequence, saveAutoTypeSettings, sequenceError, sequenceOf, type AutoTypeMatch } from "../lib/autotype";
 import { autoTypeBridge, type AutoTypeRequest } from "../lib/platform";
 import { loadItems, type VaultView } from "../lib/session";
+import { touchWebSession } from "../lib/persist";
 import type { AutoType, Login } from "../lib/types";
 import { Eyebrow, Field, Modal } from "./ui";
 import { IconClose, IconPlus } from "./ui-icons";
@@ -64,6 +65,9 @@ export function AutoTypeHost({ ctx }: { ctx: PageContext }) {
     const bridge = autoTypeBridge();
     if (!bridge) return;
     return bridge.onRequest((request) => {
+      // Se servir du raccourci, c'est se servir de GuiVault : le délai
+      // d'inactivité repart.
+      touchWebSession();
       void (async () => {
         const { session, error } = ctxRef.current;
         const all = await allLogins(session.vaults, error);

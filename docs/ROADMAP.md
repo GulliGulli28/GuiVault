@@ -9,7 +9,7 @@ l'auto-hébergement sans fonctions « premium »).
 Chaque piste respecte la règle n°1 (`CLAUDE.md`) : le serveur ne garde que
 des blobs qu'il ne sait pas lire. Cocher au fur et à mesure.
 
-## État (29 septembre 2026)
+## État (20 octobre 2026)
 
 **Fait** : tout le §0 sauf le manifeste authentifié (plancher et
 paramètres Argon2id épinglés, retour en arrière détecté, enveloppes
@@ -31,6 +31,12 @@ confortable :
 2. ~~**Conflits (409)**~~ (§4) : fait — fusion champ par champ. L'exploitation
    (§5) et le mobile sont faits aussi ; la suite est à choisir parmi les
    cases encore vides ci-dessous.
+3. **Application** (§6, 20 octobre 2026) : l'app Windows (coffre local ou
+   serveur, installeurs, saisie automatique) est faite, et le poste avec —
+   presse-papiers hors de l'historique Windows, verrouillage avec la
+   session, sauvegardes du coffre local, zone de notification. Ensuite :
+   l'import KDBX, puis l'extension reliée à l'application. Android en
+   dernier, ou sur demande.
 
 ## 0. Sécurité face à un serveur malveillant
 
@@ -262,6 +268,81 @@ paramètres ou formats anciens.
   le journal d'audit perd les IP du compte. Web : Paramètres › Compte, qui
   oublie aussi ce que l'appareil retenait (copie hors ligne, paramètres
   Argon2id, révisions).
+
+## 6. Application (Windows, puis Android)
+
+Le client installé ([`APP.md`](APP.md)) : un coffre local ou un serveur.
+Pistes tirées de ce que font KeePass 2, KeePassXC, 1Password et Bitwarden et
+que GuiVault ne fait pas encore (octobre 2026). Effort : S petit, M moyen,
+L gros.
+
+**Fait**
+
+- [x] **Coffre local** (`crates/guivault-local`) : ce que garderait le
+  serveur, dans un dossier, sans clé ; transport côté interface
+  (`lib/localHost.ts`).
+- [x] **Application Windows** (`app-tauri/`, `web/app/`) : accueil serveur ou
+  coffre local, interface sans ce qui demande un serveur, E2E dans la vraie
+  fenêtre (WebKitGTK et WebView2, CI), installeurs MSI et NSIS
+  (`app-release.yml`).
+- [x] **Saisie automatique à la KeePass** (Windows) : raccourci global,
+  bouton de la fiche, séquences et fenêtres associées par identifiant
+  (`lib/autotype.ts`, `app-tauri/src/autotype.rs`).
+
+**Le poste** — faits le 20 octobre 2026 (`docs/APP.md`, « Le poste » ; E2E dans WebKitGTK et WebView2)
+
+- [x] **Presse-papiers hors de l'historique Windows** (S, comme KeePass) :
+  ce que l'app copie ne va ni dans Win+V ni dans le presse-papiers cloud.
+- [x] **Verrouiller avec la session** (S–M, KeePass/KeePassXC) : au
+  verrouillage de la session Windows, à la mise en veille, à la réduction
+  (réglable) ; l'inactivité au choix dans GuiVault (le plus sûr) ou sur tout
+  l'ordinateur (confort avec la saisie automatique) — et le délai vaut
+  enfin pour un coffre local.
+- [x] **Sauvegardes automatiques du coffre local** (S, KeePass) : N copies
+  datées de `coffre.json`, prises avant les écritures.
+- [x] **Zone de notification** (S–M, KeePass/KeePassXC) : icône, réduire au
+  lieu de quitter, démarrer avec Windows, une seule instance — l'app tourne
+  en fond pour le raccourci global.
+
+**Ensuite** (ordre proposé)
+
+- [ ] **Import KDBX** (M–L) : KeePass 2 / KeePassXC directement, pièces
+  jointes et historique compris — la porte d'entrée de leurs utilisateurs
+  (aujourd'hui : leur CSV, avec pertes).
+- [ ] **Extension ↔ application** (L, KeePassXC-Browser) : native messaging,
+  remplir depuis un coffre local — sans ça l'extension ne sert qu'avec un
+  serveur.
+- [ ] **Déverrouillage rapide Windows Hello** (M, KeePassXC, Bitwarden) : la
+  user key enveloppée sous une clé liée au TPM ; conception crypto à part.
+- [ ] **Agent SSH Windows** (M, KeePassXC, KeeAgent) : les clés du coffre
+  dans l'agent OpenSSH tant que le coffre est ouvert — l'agent de Guiterm
+  est réutilisable.
+- [ ] **Pousser un coffre local vers un serveur**, et l'inverse (M) : mêmes
+  ids, mêmes enveloppes (`APP.md`).
+- [ ] **Synchroniser deux coffres locaux** (L, « Synchroniser » de KeePass) :
+  un dossier sur Nextcloud ou Syncthing, fusion par révisions et manifeste.
+- [ ] **Fichier clé** (M, KeePass) : un coffre local qui s'ouvre avec le mot
+  de passe **et** un fichier — nouvelle enveloppe, nouveau `format`.
+- [ ] **Saisie automatique, suite** (M) : obfuscation à deux canaux,
+  `{PICKCHARS}` (« caractères 3, 5 et 8 » des banques), Linux (X11).
+- [ ] **Mises à jour automatiques signées** et signature de code (M, comme
+  Guiterm) — SmartScreen avertit tant que les installeurs ne sont pas signés.
+- [ ] **Plusieurs coffres ouverts à la fois** (L) : local et compte côte à
+  côte, transfert entre eux (les « emplacements » de Guiterm).
+- [ ] **Références entre champs** `{REF:…}` (M, KeePass).
+- [ ] **Feuille de secours imprimable** (S, Emergency Kit de 1Password) :
+  emplacement du coffre, serveur, empreinte, une case pour le mot de passe.
+- [ ] **Modèles d'éléments**, types personnalisés (M).
+- [ ] **Mode portable** (S–M, KeePass) : sur une clé USB.
+- [ ] **Fuites sans serveur** (S) : depuis l'app, k-anonymat direct, en
+  option, pour un coffre local.
+
+**Android** — en dernier, ou quand ce sera demandé
+
+- [ ] L'application Android (même projet Tauri, une cible de plus ;
+  identifiant `dev.guivault.client`).
+- [ ] **Service de remplissage Android** (L, KeePassDX, Bitwarden) et
+  déverrouillage biométrique — sans eux, l'app Android n'a pas d'intérêt.
 
 ## Sources
 

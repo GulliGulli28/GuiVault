@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType }
 import { currentTokens, setSessionLostHandler, setTokens, setTokensChangedHandler, subscribeEvents } from "./lib/api";
 import { pullSettings, startSettingsSync, stopSettingsSync } from "./lib/syncedSettings";
 import "./lib/settingsSections";
-import { clearWebSession, loadWebSession, saveWebSession, saveWebTokens, touchWebSession, webSessionIdle } from "./lib/persist";
+import { clearWebSession, loadLockMinutes, loadWebSession, saveWebSession, saveWebTokens, touchWebSession, webSessionIdle } from "./lib/persist";
+import { loadAppLock, LOCK_MESSAGES } from "./lib/appSettings";
 import { navigate, useRoute } from "./lib/route";
 import { acceptRollback, closeLocal, logout, refresh, wipe, type SessionState } from "./lib/session";
 import { refreshOfflineCopy } from "./lib/offline";
@@ -24,7 +25,7 @@ import { SendsPage } from "./components/SendsPage";
 import { AdminPage } from "./components/AdminPage";
 import { HealthPage } from "./components/HealthPage";
 import { AutoTypeHost } from "./components/AutoType";
-import { autoTypeBridge } from "./lib/platform";
+import { autoTypeBridge, systemBridge } from "./lib/platform";
 import { Toasts, useToasts } from "./components/ui";
 import { PaneHandle, usePersistedPane } from "./hooks/usePersistedPane";
 
@@ -105,20 +106,36 @@ export default function App({ Welcome = LoginScreen }: { Welcome?: ComponentType
     setTokensChangedHandler((t) => { if (t) saveWebTokens(t); });
     return () => setTokensChangedHandler(null);
   }, []);
+  // Verrouiller : effacer la session d'ici (et fermer un coffre local), le
+  // dire. Le même geste pour l'inactivité et pour ce que dit le système.
+  const lockNow = useCallback((message: string) => {
+    const s = sessionRef.current;
+    if (!s) return;
+    clearWebSession();
+    if (s.local) void closeLocal();
+    wipe(s);
+    setSession(null);
+    navigate({ page: "home" });
+    error(message);
+  }, [error]);
+
   useEffect(() => {
     if (!session) return;
     const touch = () => touchWebSession();
     const events = ["pointerdown", "keydown", "wheel", "touchstart"] as const;
     events.forEach((ev) => window.addEventListener(ev, touch, { passive: true }));
     const timer = setInterval(() => {
-      if (webSessionIdle() && sessionRef.current) {
-        clearWebSession();
-        if (sessionRef.current.local) void closeLocal();
-        wipe(sessionRef.current);
-        setSession(null);
-        navigate({ page: "home" });
-        error("Verrouillé après inactivité : reconnectez-vous.");
-      }
+      void (async () => {
+        let idle = webSessionIdle();
+        // L'application peut compter l'inactivité sur tout l'ordinateur.
+        const sys = systemBridge();
+        const minutes = loadLockMinutes();
+        if (sys && minutes > 0 && loadAppLock().idleScope === "system") {
+          const ms = await sys.idleMs();
+          if (ms !== null) idle = ms > minutes * 60_000;
+        }
+        if (idle && sessionRef.current) lockNow("Verrouillé après inactivité : reconnectez-vous.");
+      })();
     }, 15_000);
     return () => {
       events.forEach((ev) => window.removeEventListener(ev, touch));
@@ -126,7 +143,15 @@ export default function App({ Welcome = LoginScreen }: { Welcome?: ComponentType
     };
     // `session` identity only matters for connect/disconnect.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session !== null, error]);
+  }, [session !== null, lockNow]);
+
+  // Le système demande de verrouiller (session Windows, veille, réduction).
+  useEffect(() => {
+    const sys = systemBridge();
+    if (!session || !sys) return;
+    return sys.onLock((reason) => lockNow(LOCK_MESSAGES[reason]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session !== null, lockNow]);
 
   // Les réglages synchronisés : relus à la connexion, envoyés quand ils
   // changent ici (`syncedSettings.ts`).

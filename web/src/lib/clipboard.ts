@@ -18,9 +18,14 @@
  *   minuteries avec : il confie l'effacement au service worker
  *   (`setClearScheduler`), qui, lui, a le droit de lire le presse-papiers.
  *
+ * - l'**application** (Windows) passe par son presse-papiers natif
+ *   (`platform.ts`, `app-tauri/src/clipboard.rs`) : hors de l'historique
+ *   (Win+V) et du cloud, effacé par elle à l'échéance s'il n'a pas changé.
+ *
  * Le délai est un réglage qui suit le compte (section `clipboard`). */
 import { sha256 } from "@noble/hashes/sha2.js";
 import { toHex, utf8 } from "./bytes";
+import { clipboardBridge } from "./platform";
 import { settingsChanged } from "./syncedSettings";
 
 export const CLIPBOARD_KEY = "guivault.clipboard";
@@ -69,8 +74,21 @@ export function setClearScheduler(s: ClearScheduler) {
   scheduler = s;
 }
 
-/** Copie, et programme l'effacement selon le réglage. */
+/** Copie, et programme l'effacement selon le réglage. Dans l'application
+ * (Windows), par le presse-papiers natif : hors de l'historique Windows, et
+ * effacé par l'application elle-même. */
 export async function copyText(value: string): Promise<boolean> {
+  const native = clipboardBridge();
+  if (native) {
+    try {
+      await native.copySecret(value, value === "" ? 0 : loadClearSeconds() * 1000);
+      return true;
+    } catch {
+      // Pas de repli sur le presse-papiers du navigateur : il irait, lui,
+      // dans l'historique Windows.
+      return false;
+    }
+  }
   try {
     await navigator.clipboard.writeText(value);
   } catch {

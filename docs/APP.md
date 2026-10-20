@@ -264,6 +264,46 @@ taper sur ce système — sous Linux et Android, rien n'en est montré. Les
 garde-fous (modificateurs relâchés, focus vérifié avant chaque caractère,
 texte effacé) sont dans `docs/SECURITY.md`. Linux (X11) : à faire.
 
+## Le poste : presse-papiers, verrouillage, sauvegardes, zone de notification
+
+Ce que seule l'application sait faire passe par des ponts que l'interface
+commune lit sans rien importer de Tauri (`web/src/lib/platform.ts`, posés par
+`web/app/src/*Bridge.ts`) ; leurs réglages sont sur l'appareil
+(`lib/appSettings.ts`, Paramètres › Application).
+
+- **Presse-papiers** (Windows, `app-tauri/src/clipboard.rs`) : ce que l'app
+  copie part avec les formats qui l'excluent de l'historique (Win+V) et du
+  presse-papiers cloud, comme KeePass ; l'effacement au délai réglé est fait
+  par l'application, **seulement si personne n'a copié autre chose depuis**
+  (numéro de séquence du presse-papiers — sans relire le secret, sans focus).
+  Pas de repli sur le presse-papiers du navigateur s'il échoue.
+- **Verrouillage** (`app-tauri/src/system.rs`) : à la session Windows
+  verrouillée (Win+L) et à la mise en veille (par défaut) ; à la réduction
+  ou au passage dans la zone de notification (au choix — pas quand la saisie
+  automatique réduit la fenêtre) ; depuis le menu de l'icône. « Verrouiller
+  après » compte l'inactivité dans GuiVault (par défaut, le plus sûr) ou sur
+  tout l'ordinateur (pour qui tape avec le raccourci global depuis
+  d'autres fenêtres). Le délai vaut aussi pour un coffre local, qui avant
+  ne se verrouillait jamais (le dernier geste n'était lu que dans la
+  session gardée de l'onglet).
+- **Sauvegardes du coffre local** (`crates/guivault-local/src/backup.rs`) :
+  avant une écriture, si la dernière a plus d'une heure, `coffre.json` est
+  copié dans `backups/` ; les dix plus récentes sont gardées. Restaurer
+  **n'écrase rien** : la sauvegarde devient un nouveau coffre à côté, avec
+  un nouvel identifiant (sinon il hériterait des révisions retenues pour
+  l'original, et signalerait un retour en arrière). Paramètres › Compte, et
+  à l'accueil quand un coffre ne s'ouvre plus (`local_corrupt`). Les pièces
+  jointes ne sont pas dans les sauvegardes : la copie reprend le dossier
+  `attachments/` tel qu'il est.
+- **Zone de notification** (Windows, `app-tauri/src/tray.rs`) : une icône
+  (ouvrir, verrouiller, quitter) ; fermer la fenêtre l'y range (réglable) —
+  le raccourci de saisie automatique reste actif ; démarrer avec Windows
+  (`--minimized` : directement dans la zone) ; **une seule instance**
+  (relancer ramène la fenêtre ; le runner E2E refuse de démarrer si
+  GuiVault est déjà ouvert). Sous Linux, pas d'icône — il y faut une
+  bibliothèque d'indicateurs souvent absente — et fermer quitte. La fenêtre
+  part cachée (`tauri.conf.json`) et `setup` la montre.
+
 ## Tests de bout en bout
 
 `web/app/e2e/run.mjs` pilote **le vrai binaire** par WebDriver

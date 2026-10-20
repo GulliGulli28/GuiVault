@@ -79,6 +79,16 @@ async function waitHttp(url, timeoutMs) {
   }
 }
 
+/** Lance Windows PowerShell **sans** le `PSModulePath` hérité : lancé depuis
+ * PowerShell 7 (l'étape d'un runner GitHub), il pointerait vers les modules
+ * de la 7, que la 5.1 ne sait pas charger — `Get-AuthenticodeSignature`
+ * ne répondait alors rien, et le pilote téléchargé était refusé. */
+function powershell(command) {
+  const env = { ...process.env };
+  delete env.PSModulePath;
+  return spawnSync("powershell.exe", ["-NoProfile", "-STA", "-Command", command], { encoding: "utf8", env });
+}
+
 /** La version du runtime WebView2 installé (celle d'Edge à défaut : même
  * numéro de version, même moteur). */
 function webview2Version() {
@@ -112,12 +122,13 @@ async function edgeDriver() {
   await mkdir(dir, { recursive: true });
   const zip = path.join(dir, "edgedriver_win64.zip");
   await writeFile(zip, Buffer.from(await res.arrayBuffer()));
-  const ps = (cmd) => spawnSync("powershell.exe", ["-NoProfile", "-Command", cmd], { encoding: "utf8" });
-  ps(`Expand-Archive -Force -LiteralPath '${zip}' -DestinationPath '${dir}'; Remove-Item -LiteralPath '${zip}'`);
-  const sig = ps(`$s = Get-AuthenticodeSignature -LiteralPath '${exe}'; "$($s.Status)|$($s.SignerCertificate.Subject)"`).stdout.trim();
+  const unzip = powershell(`Expand-Archive -Force -LiteralPath '${zip}' -DestinationPath '${dir}'; Remove-Item -LiteralPath '${zip}'`);
+  const check = powershell(`$s = Get-AuthenticodeSignature -LiteralPath '${exe}'; "$($s.Status)|$($s.SignerCertificate.Subject)"`);
+  const sig = (check.stdout ?? "").trim();
   if (!/^Valid\|.*O=Microsoft Corporation/.test(sig)) {
     await rm(dir, { recursive: true, force: true });
-    throw new Error(`msedgedriver téléchargé, signature refusée (${sig || "illisible"}) : effacé`);
+    const why = [unzip.stderr, check.stderr].map((e) => (e ?? "").trim()).filter(Boolean).join(" / ").slice(0, 400);
+    throw new Error(`msedgedriver téléchargé, signature refusée (${sig || "illisible"}${why ? ` — ${why}` : ""}) : effacé`);
   }
   return exe;
 }
@@ -166,6 +177,15 @@ async function fillPasswords(browser, ...values) {
 
 /** Le texte visible, par `innerText` (calculé par la page, CSS compris) :
  * le `getText()` de WebKitWebDriver saute le texte des liens `<a>`. */
+/** Vide un champ **comme un utilisateur** (tout sélectionner, effacer) :
+ * `clearValue()` ne déclenche pas le `onChange` de React, et le filtre de la
+ * liste gardait son texte. */
+async function clearField(browser, el) {
+  await el.click();
+  await browser.keys(["Control", "a"]);
+  await browser.keys("Backspace");
+}
+
 async function bodyText(browser) {
   return browser.execute(() => document.body.innerText);
 }
@@ -317,12 +337,102 @@ scenario("saisie automatique : fiche, réglages, frappe réelle (Windows)", asyn
   assert(typeof self === "string", "pas de handle pour la fenêtre de GuiVault");
   const r = await invoke(b, "autotype_type", { actions: [{ kind: "text", text: "saisie-é€x" }, { kind: "key", key: "Backspace" }], target: self });
   if (!r.ok && ["autotype_focus_lost", "autotype_modifiers"].includes(r.error?.code)) {
-    await filter.clearValue();
+    await clearField(b, filter);
     return `ignoré pour la frappe : ${r.error.message} (la fenêtre de test n'avait pas le premier plan)`;
   }
   assert(r.ok, `la saisie a échoué : ${JSON.stringify(r.error)}`);
   await b.waitUntil(async () => (await filter.getValue()) === "saisie-é€", { timeout: 5000, timeoutMsg: "le champ ne contient pas le texte tapé" });
-  await filter.clearValue();
+  await clearField(b, filter);
+  await b.waitUntil(async () => (await filter.getValue()) === "", { timeout: 5000, timeoutMsg: "le filtre ne s'est pas vidé" });
+});
+
+/** Le presse-papiers de Windows, lu et écrit de l'extérieur de l'app. */
+/** PowerShell 5.1 écrit sa sortie dans la page de code de la console : un
+ * « é » relu côté node n'en est plus un. Sortie forcée en UTF-8, et le texte
+ * à poser passé en base64 — sinon le presse-papiers de la personne qui lance
+ * les tests, remis en fin de scénario, revenait abîmé. */
+function ps(command) {
+  return (powershell(`[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; ${command}`).stdout ?? "").replace(/\r?\n$/, "");
+}
+const clipboardText = () => ps("$t = Get-Clipboard -Raw; if ($t) { [Console]::Out.Write($t) }");
+const clipboardFormats = () => ps("Add-Type -AssemblyName System.Windows.Forms; $d = [System.Windows.Forms.Clipboard]::GetDataObject(); if ($d) { $d.GetFormats() -join ',' }").split(",");
+const setClipboard = (t) =>
+  ps(t ? `Set-Clipboard -Value ([System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${Buffer.from(t, "utf8").toString("base64")}')))` : "Set-Clipboard -Value $null");
+
+scenario("presse-papiers : hors de l'historique Windows, effacé à l'échéance (Windows)", async (b) => {
+  if (!isWindows) return "ignoré : presse-papiers natif sous Windows seulement";
+  assert((await invoke(b, "clipboard_native")).value === true, "l'application n'offre pas son presse-papiers natif sous Windows");
+  const saved = clipboardText();
+  try {
+    // Par l'interface : « Copier » à côté du mot de passe de la fiche.
+    await (await b.$("//*[normalize-space(text())='Banque en ligne']")).click();
+    await (await b.$("//button[@aria-label='Révéler']/following-sibling::button[@aria-label='Copier']")).click();
+    await b.waitUntil(async () => clipboardText() === "s3cret!", { timeout: 5000, timeoutMsg: "le mot de passe n'est pas dans le presse-papiers" });
+    const formats = clipboardFormats();
+    for (const f of ["ExcludeClipboardContentFromMonitorProcessing", "CanIncludeInClipboardHistory", "CanUploadToCloudClipboard"]) {
+      assert(formats.includes(f), `format ${f} absent : le mot de passe irait dans l'historique Windows (formats : ${formats.join(", ")})`);
+    }
+    // Effacé à l'échéance…
+    const once = await invoke(b, "clipboard_copy_secret", { text: "e2e-efface", clearAfterMs: 1200 });
+    assert(once.ok, `copie refusée : ${JSON.stringify(once.error)}`);
+    assert(clipboardText() === "e2e-efface", "la copie n'est pas arrivée");
+    await new Promise((r) => setTimeout(r, 2500));
+    assert(clipboardText() === "", "le presse-papiers n'a pas été effacé à l'échéance");
+    // … mais pas si quelqu'un a copié autre chose entre-temps.
+    await invoke(b, "clipboard_copy_secret", { text: "e2e-remplace", clearAfterMs: 1200 });
+    setClipboard("copié par quelqu'un d'autre");
+    await new Promise((r) => setTimeout(r, 2500));
+    const after = clipboardText();
+    assert(after === "copié par quelqu'un d'autre", `le presse-papiers ne contient plus la copie faite entre-temps : ${JSON.stringify(after)}`);
+  } finally {
+    setClipboard(saved);
+  }
+});
+
+async function unlockFromRecents(b) {
+  await (await b.$(`//button[.//span[normalize-space()='Mon coffre']]`)).click();
+  await fillPasswords(b, PASSWORD);
+  await click(b, "Déverrouiller");
+  await b.waitUntil(async () => (await sidebarText(b)).includes("Personnel"), { timeout: 60_000, timeoutMsg: "le coffre ne s'est pas rouvert" });
+}
+
+scenario("verrouillage : le signal du système verrouille, réglages Application", async (b) => {
+  await openSettings(b, "Application");
+  await waitText(b, "Quand la fenêtre est réduite");
+  if (isWindows) {
+    // Sans casse : les intitulés de section sont en capitales par CSS.
+    const text = (await bodyText(b)).toLowerCase();
+    for (const want of ["Zone de notification", "Fermer la fenêtre la range dans la zone de notification", "Démarrer avec Windows", "Quand la session Windows se verrouille"]) {
+      assert(text.includes(want.toLowerCase()), `« ${want} » manque dans Paramètres › Application`);
+    }
+    // L'état du démarrage automatique se lit — on ne le change pas : ce
+    // serait écrire dans le registre de la personne qui lance les tests.
+    const auto = await invoke(b, "app_autostart", { enabled: null });
+    assert(auto.ok && typeof auto.value === "boolean", `démarrage automatique illisible : ${JSON.stringify(auto.error)}`);
+  }
+  await shot(b, "5-application");
+  // Ce que `system.rs` envoie quand la session Windows se verrouille (Win+L
+  // ne se presse pas dans un test : il verrouillerait la vraie session).
+  await invoke(b, "plugin:event|emit", { event: "system-lock", payload: "session" });
+  await waitText(b, "Verrouillé : la session Windows a été verrouillée.");
+  await button(b, "Créer un coffre local");
+  await unlockFromRecents(b);
+});
+
+scenario("sauvegardes : prises avant d'écrire, une copie s'ouvre à part", async (b) => {
+  await openSettings(b);
+  await waitText(b, "au plus une par heure");
+  const copy = path.join(scratch, "Copie.guivault");
+  const open = await b.$("//button[normalize-space()='Ouvrir une copie…']");
+  await open.waitForClickable({ timeout: 10_000, timeoutMsg: "aucune sauvegarde listée alors que le coffre a été modifié" });
+  await b.execute((p) => { window.__GUIVAULT_E2E_PATH__ = p; }, copy);
+  await open.click();
+  await waitText(b, "Copie créée");
+  const original = coffreOnDisk(coffre).json;
+  const restored = coffreOnDisk(copy).json;
+  assert(restored.format === 1 && restored.vaults[0].id === original.vaults[0].id, "la copie n'est pas le même coffre");
+  assert(restored.id !== original.id, "la copie garde l'identifiant de l'original");
+  await (await b.$("//a[.//span[normalize-space()='Personnel']]")).click();
 });
 
 scenario("fermer puis rouvrir : coffres récents, mauvais mot de passe refusé", async (b) => {
@@ -367,6 +477,15 @@ async function main() {
     console.error(`Binaire introuvable : ${appBinary}`);
     console.error(profile === "release" ? "Construire : cd app-tauri && cargo build --release --features tauri/custom-protocol" : "Construire : cd app-tauri && cargo build");
     process.exit(1);
+  }
+  // Une seule instance (`tauri-plugin-single-instance`) : celle du test
+  // s'effacerait devant une GuiVault déjà ouverte — et la piloterait.
+  if (isWindows) {
+    const running = spawnSync("tasklist", ["/FI", "IMAGENAME eq guivault-app.exe", "/NH"], { encoding: "utf8" }).stdout ?? "";
+    if (running.toLowerCase().includes("guivault-app.exe")) {
+      console.error("ÉCHEC : GuiVault est déjà ouvert (fenêtre ou zone de notification) — le quitter avant les tests.");
+      process.exit(1);
+    }
   }
   let native;
   try {

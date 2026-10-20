@@ -32,3 +32,10 @@ export async function pickNewCoffre(): Promise<string | null> {
   if (forced) return forced;
   return save({ title: "Créer un coffre local", defaultPath: "Mon coffre.guivault" });
 }
+
+/** Où ranger la copie restaurée d'une sauvegarde (`backupBridge.ts`). */
+export async function pickRestoreDest(defaultPath: string): Promise<string | null> {
+  const forced = e2ePath();
+  if (forced) return forced;
+  return save({ title: "Ranger la copie restaurée", defaultPath });
+}
