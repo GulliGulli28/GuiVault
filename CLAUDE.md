@@ -50,7 +50,9 @@ il ne déchiffre rien : la user key reste sous la clé que seule la PRF donne).
   vaut comme au serveur. Tout dans un `coffre.json` réécrit atomiquement
   sous `.lock`, pièces jointes à côté. **Une règle qui change dans
   `routes/items.rs`, `history.rs`, `attachments.rs` ou `validate.rs` change
-  ici aussi.**
+  ici aussi.** `rpc.rs` : ce que l'interface de l'app lui envoie (une
+  opération par méthode d'`api`, mêmes corps JSON que HTTP) ; la liste est
+  dans `ops.json`, vérifiée par `tests/local.rs` et `web/src/lib/localHost.test.ts`.
 - `crates/guivault-server` — `routes/` (une route par domaine), `db.rs`
   (lignes et requêtes partagées), `auth.rs` (extracteur `AuthUser`,
   jetons), `sessions.rs`, `validate.rs` (tailles des blobs), `audit.rs`,
@@ -102,7 +104,14 @@ il ne déchiffre rien : la user key reste sous la clé que seule la PRF donne).
     (`chrome.storage.session`) et le web (`sessionStorage` : survit au
     rechargement, pas à l'onglet), avec le délai d'inactivité « Verrouiller
     après » (Paramètres › Sécurité, `localStorage`).
-  - `lib/api.ts` (HTTP, rafraîchissement des jetons, SSE via `fetch`),
+  - `lib/api.ts` (HTTP, rafraîchissement des jetons, SSE via `fetch`) —
+    `api` est une **façade** sur le transport actif (`setTransport`) ; une
+    méthode que le transport n'a pas répond `501 local_unsupported`, et
+    l'interface demande `supports(méthode)` avant de la proposer.
+    `lib/localHost.ts` : le transport du coffre local de l'app (hôte Tauri,
+    `docs/APP.md`), ouvert par `session.createLocal` / `openLocal` ;
+    une méthode ajoutée à `api` qui a un sens sans serveur s'ajoute là, à
+    `rpc.rs` et à `ops.json`.
     `lib/session.ts` (compte déverrouillé, vaults, items, partage),
     `lib/types.ts` (protocole en snake_case + entités Guiterm en camelCase,
     **même JSON que `termius_core::guivault::entity::Payload`** : un item

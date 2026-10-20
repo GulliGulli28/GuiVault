@@ -1,6 +1,7 @@
 # L'application GuiVault (Windows, puis Android)
 
-**État : le coffre local est écrit (`crates/guivault-local`, étape 1) ; l'app
+**État : le coffre local (`crates/guivault-local`) et son transport côté
+interface (`web/src/lib/localHost.ts`) sont écrits — étapes 1 et 2 ; l'app
 pas encore.** Ce document fixe les choix ; il deviendra la doc de l'app comme
 `EXTENSION.md` l'est pour l'extension.
 
@@ -95,9 +96,9 @@ fichier, pas d'item. Pour plusieurs appareils, le serveur existe.
 ### Côté interface : un transport à la place d'`api`
 
 29 fichiers de `web/src` importent `api`. On ne les touche pas : `api`
-devient une façade qui délègue au **transport actif** — HTTP (l'actuel) ou
-local (des commandes Tauri vers `guivault-local`). Le transport local
-implémente ce qui a un sens sans serveur :
+est une façade qui délègue au **transport actif** (`setTransport`) — HTTP
+par défaut, ou le transport local (`localTransport(hôte)`), qui implémente
+ce qui a un sens sans serveur :
 
 | Oui | Non (masqué dans l'interface) |
 |---|---|
@@ -110,7 +111,24 @@ implémente ce qui a un sens sans serveur :
 | import, export, générateur, TOTP, santé (sans les relais) | fuites (k-anonymat) et sites 2FA : relais du serveur |
 
 Le reste répond `ApiError(501, "local_unsupported")`, et l'interface
-consulte une liste de capacités du transport pour ne pas proposer ces pages.
+demande `supports("members")` (etc.) pour ne pas proposer ces pages : la
+liste des capacités, c'est la liste des méthodes du transport, rien à tenir
+à jour à part.
+
+**Le contrat avec l'hôte** : une opération par méthode d'`api`, avec les
+mêmes corps JSON que l'API HTTP (base64 compris) — `guivault_local::rpc::call(vault,
+op, args)` côté Rust, `LocalHost.call(op, args)` côté TS. La liste est dans
+`crates/guivault-local/ops.json`, vérifiée par les tests des deux côtés.
+Deux opérations n'ont pas d'équivalent HTTP : `account` (le compte
+enveloppé, pour déverrouiller) et `changePassword` (sans preuve de l'ancien
+mot de passe auprès de l'hôte : `session.ts` la vérifie en rouvrant la user
+key). Une commande Tauri n'a qu'à appeler `rpc::call` et rendre le
+résultat, ou `{ status, …Error::body() }`.
+
+Côté session : `createLocal(hôte, chemin, mot de passe)` et `openLocal(…)`
+dans `session.ts`, à côté de `login` et `openOffline` ; `closeLocal()` (ou
+`logout()`) rend `api` au serveur. `SessionState.local` dit qu'on est dans
+un coffre local.
 Le navigateur, lui, ne voit jamais de coffre local : c'est une fonction de
 l'app, la copie hors ligne du web (`offline.ts`) reste ce qu'elle est.
 
@@ -150,9 +168,12 @@ une conception. À décider après la v1 de l'app.
    `local_not_found`, `local_exists`, `local_format_unsupported`,
    `local_corrupt`, `local_io` ; `Error::body()` donne le JSON qu'aurait
    renvoyé le serveur.
-2. **Transport dans `web/src/lib`** : la façade `api`, le transport HTTP
-   (l'actuel, déplacé), les capacités ; un transport en mémoire pour les tests
-   de `session.ts`. Rien ne change pour le web ni l'extension.
+2. ~~**Transport dans `web/src/lib`**~~ — fait : la façade `api`
+   (`setTransport`, `supports`), `localHost.ts`, `rpc.rs` + `ops.json`,
+   `createLocal` / `openLocal` / `closeLocal`. `localHost.test.ts` : la
+   façade, les erreurs, le contrat, et une session créée, écrite, rouverte
+   (mauvais mot de passe, changement de mot de passe) avec un hôte en
+   mémoire. Rien ne change pour le web ni l'extension.
 3. **`app-tauri/` + `web/app/`**, Windows : commandes Tauri qui exposent
    `guivault-local` ; écran d'accueil « Se connecter à un serveur » /
    « Ouvrir un coffre local » / « Créer un coffre local » ; coffres récents.

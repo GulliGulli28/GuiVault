@@ -2,11 +2,12 @@
  * et les opérations qui combinent l'API et la cryptographie (l'équivalent de
  * `account.rs` + `sharing.rs` + la partie chiffrement de `sync.rs` dans
  * Guiterm). Tout vit en mémoire : recharger la page, c'est se reconnecter. */
-import { api, ApiError, setTokens } from "./api";
+import { api, ApiError, setTokens, setTransport, supports } from "./api";
 import { fromBase64, toBase64, utf8, uuid, randomBytes } from "./bytes";
 import * as c from "./crypto";
 import { fingerprint as fingerprintOf, type UnlockedAccount } from "./crypto";
 import { pinKdf, requireKdfNotDowngraded } from "./kdfPins";
+import { localAccount, localChangePassword, localTransport, type LocalHost } from "./localHost";
 import { fingerprintTrust, requirePinned } from "./pins";
 import { acceptRollback as acceptRollbackRevision, observeRevisions, type VaultRollback } from "./vaultRevisions";
 import { canWrite, type EmergencyGrant, type EmergencyOverview, type Invitation, type Item, type ItemsPage, type LoginResponse, type ManifestWrite, type Payload, type Role, type UserProfile, type Vault, type VaultManifest, type VaultMember } from "./types";
@@ -57,6 +58,9 @@ export interface SessionState {
   /** Session ouverte depuis la copie hors ligne : lecture seule, rien vers
    * le serveur. */
   offline?: { savedAt: string };
+  /** Session ouverte sur un coffre local de l'app (`localHost.ts`) : pas de
+   * serveur, `api` parle au dossier. */
+  local?: { path: string };
 }
 
 /** `prelogin` + `LoginResponse`, en base64 comme l'API. */
@@ -161,6 +165,7 @@ export async function register(email: string, password: string): Promise<Session
 }
 
 export async function logout() {
+  if (localHost) return closeLocal();
   try {
     await api.logout();
   } finally {
@@ -197,6 +202,7 @@ export async function deleteAccount(state: SessionState, password: string, totpC
 }
 
 export async function changePassword(state: SessionState, current: string, next: string) {
+  if (state.local && localHost) return changeLocalPassword(localHost, state, current, next);
   // La clé d'auth courante prouve qu'on connaît l'ancien mot de passe ; le
   // serveur la vérifie avant de remplacer quoi que ce soit.
   const pre = await api.prelogin(state.user.email);
@@ -212,6 +218,103 @@ export async function changePassword(state: SessionState, current: string, next:
   });
   pinKdf(state.user.email, rekey.kdf);
   if (state.blobs) state.blobs = { ...state.blobs, kdf: rekey.kdf, kdf_salt: b64(rekey.kdfSalt), protected_user_key: b64(rekey.protectedUserKey) };
+}
+
+// ─── Coffre local (app) ─────────────────────────────────────────────────────
+
+/** L'hôte du coffre local ouvert, s'il y en a un. */
+let localHost: LocalHost | null = null;
+
+/** Crée un coffre local dans `path` et l'ouvre : le même compte qu'à
+ * l'inscription (`createAccount`) moins la clé d'auth, et un vault
+ * personnel — tout chiffré ici, l'hôte ne garde que des blobs. */
+export async function createLocal(host: LocalHost, path: string, password: string): Promise<SessionState> {
+  const { material, account } = await c.createAccount(password);
+  material.authKey.fill(0);
+  const vaultId = uuid();
+  const vaultKey = randomBytes(c.KEY_LEN);
+  const blobs: AccountBlobs = {
+    kdf: material.kdf,
+    kdf_salt: b64(material.kdfSalt),
+    protected_user_key: b64(material.protectedUserKey),
+    protected_private_key: b64(material.protectedPrivateKey),
+  };
+  await host.create(path, {
+    account: { ...blobs, public_key: b64(material.publicKey) },
+    personal: {
+      id: vaultId,
+      name_enc: b64(c.sealVaultName(vaultKey, vaultId, "Personnel")),
+      wrapped_vault_key: b64(c.wrapVaultKey(account.keypair, material.publicKey, vaultId, vaultKey)),
+    },
+  });
+  vaultKey.fill(0);
+  return startLocal(host, path, account, blobs);
+}
+
+/** Ouvre le coffre local de `path` avec le mot de passe maître : la même
+ * dérivation que la connexion (plancher Argon2id compris), sur le compte
+ * enveloppé que garde le dossier. */
+export async function openLocal(host: LocalHost, path: string, password: string): Promise<SessionState> {
+  await host.open(path);
+  try {
+    const a = await localAccount(host);
+    const master = await c.deriveMasterKey(password, unb64(a.kdf_salt), a.kdf);
+    master.authKey.fill(0);
+    let account: UnlockedAccount;
+    try {
+      account = c.unlockAccount(master.stretchedKey, unb64(a.protected_user_key), unb64(a.protected_private_key));
+    } catch {
+      throw new Error("Mot de passe maître incorrect.");
+    } finally {
+      master.stretchedKey.fill(0);
+    }
+    const blobs: AccountBlobs = { kdf: a.kdf, kdf_salt: a.kdf_salt, protected_user_key: a.protected_user_key, protected_private_key: a.protected_private_key };
+    return await startLocal(host, path, account, blobs);
+  } catch (e) {
+    await host.close().catch(() => {});
+    throw e;
+  }
+}
+
+async function startLocal(host: LocalHost, path: string, account: UnlockedAccount, blobs: AccountBlobs): Promise<SessionState> {
+  setTransport(localTransport(host));
+  localHost = host;
+  try {
+    const state = await openSession(await api.me(), account, blobs);
+    state.local = { path };
+    return state;
+  } catch (e) {
+    await closeLocal().catch(() => {});
+    throw e;
+  }
+}
+
+/** Ferme le coffre local et rend `api` au serveur. */
+export async function closeLocal(): Promise<void> {
+  const host = localHost;
+  localHost = null;
+  setTransport(null);
+  await host?.close();
+}
+
+/** Comme face au serveur, l'ancien mot de passe est exigé — ici vérifié en
+ * rouvrant la user key, faute de serveur à qui le prouver. */
+async function changeLocalPassword(host: LocalHost, state: SessionState, current: string, next: string) {
+  const a = await localAccount(host);
+  const old = await c.deriveMasterKey(current, unb64(a.kdf_salt), a.kdf);
+  old.authKey.fill(0);
+  try {
+    c.unlockAccount(old.stretchedKey, unb64(a.protected_user_key), unb64(a.protected_private_key));
+  } catch {
+    throw new Error("Mot de passe actuel incorrect.");
+  } finally {
+    old.stretchedKey.fill(0);
+  }
+  const rekey = await c.rekeyAccount(state.account, next);
+  rekey.authKey.fill(0);
+  const req = { kdf: rekey.kdf, kdf_salt: b64(rekey.kdfSalt), protected_user_key: b64(rekey.protectedUserKey) };
+  await localChangePassword(host, req);
+  if (state.blobs) state.blobs = { ...state.blobs, ...req };
 }
 
 // ─── Vaults ─────────────────────────────────────────────────────────────────
@@ -267,6 +370,11 @@ export async function refresh(state: SessionState): Promise<string[]> {
  * clé publique épinglée ici quand on a accepté —, sinon le serveur pourrait
  * nous glisser un vault à lui sous le nom d'un proche. */
 async function refreshEmergency(state: SessionState): Promise<string[]> {
+  // Un coffre local n'a pas d'accès d'urgence.
+  if (!supports("emergency")) {
+    state.emergency = null;
+    return [];
+  }
   let overview: EmergencyOverview;
   try {
     overview = await api.emergency();

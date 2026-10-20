@@ -736,3 +736,87 @@ fn expired_trash_and_orphan_attachments_are_pruned_on_write() {
     assert!(!dir.join(att.to_string()).exists());
     assert!(!dir.join(stale.to_string()).exists());
 }
+
+// ─── rpc : ce que l'interface de l'app envoie ───────────────────────────────
+
+#[test]
+fn rpc_ops_match_the_shared_list() {
+    let shared: Vec<String> = serde_json::from_str(include_str!("../ops.json")).unwrap();
+    assert_eq!(shared, guivault_local::rpc::OPS);
+
+    // Chaque opération est aiguillée : sans arguments, elle se plaint de ses
+    // arguments ou répond, jamais « inconnue ».
+    let tmp = TempDir::new();
+    let (store, _) = new_coffre(&tmp.coffre());
+    for op in guivault_local::rpc::OPS {
+        if let Err(e) = guivault_local::rpc::call(&store, op, &serde_json::json!({})) {
+            assert_ne!(e.code, "local_unsupported", "{op}");
+        }
+    }
+    let err = guivault_local::rpc::call(&store, "members", &serde_json::json!({})).unwrap_err();
+    assert_eq!((err.status, err.code), (501, "local_unsupported"));
+}
+
+/// Les mêmes corps JSON que l'API HTTP, base64 compris : ceux que produit
+/// `web/src/lib/session.ts`.
+#[test]
+fn rpc_speaks_the_http_json() {
+    use base64::Engine;
+    use base64::engine::general_purpose::STANDARD as B64;
+    use guivault_local::rpc::call;
+    use serde_json::json;
+
+    let tmp = TempDir::new();
+    let (store, client) = new_coffre(&tmp.coffre());
+    let v = client.personal;
+    let id = Uuid::new_v4();
+
+    let sync = call(&store, "sync", &json!({})).unwrap();
+    assert_eq!(sync["user"]["id"], store.id().unwrap().to_string());
+    assert_eq!(sync["vaults"][0]["role"], "owner");
+    assert_eq!(sync["invitations"], json!([]));
+    let account = call(&store, "account", &json!({})).unwrap();
+    assert_eq!(account["kdf"]["m_cost"], 65536);
+    assert!(account["protected_user_key"].is_string());
+
+    let ct = B64.encode(client.seal(v, id, "note", "par le JSON"));
+    let req = json!({ "vault": v, "id": id, "req": { "item_type": "note", "ciphertext": ct } });
+    let item = call(&store, "putItem", &req).unwrap();
+    assert_eq!(item["revision"], 1);
+    assert_eq!(item["ciphertext"], ct);
+    let err = call(&store, "putItem", &req).unwrap_err();
+    assert_eq!(err.code, "revision_mismatch");
+    assert_eq!(err.body()["current"]["id"], id.to_string());
+
+    let page = call(&store, "items", &json!({ "vault": v })).unwrap();
+    assert_eq!(page["items"][0]["id"], id.to_string());
+    assert_eq!(page["revision"], 1);
+    assert!(page.get("manifest").is_none());
+    let since = call(&store, "items", &json!({ "vault": v, "since": 1 })).unwrap();
+    assert_eq!(since["items"], json!([]));
+
+    call(&store, "deleteItem", &json!({ "vault": v, "id": id })).unwrap();
+    assert_eq!(
+        call(&store, "trash", &json!({ "vault": v })).unwrap()[0]["item_id"],
+        id.to_string()
+    );
+
+    // Les octets d'une pièce jointe voyagent en base64.
+    let item2 = Uuid::new_v4();
+    client.put(&store, v, item2, "x", None).unwrap();
+    let att = Uuid::new_v4();
+    let chunks = seal_attachment(&SymmetricKey::random(), &att.to_string(), b"fichier").unwrap();
+    let create = json!({ "vault": v, "req": { "id": att, "item_id": item2, "size": chunks[0].len(), "chunks": 1 } });
+    call(&store, "createAttachment", &create).unwrap();
+    let put = json!({ "vault": v, "id": att, "index": 0, "bytes": B64.encode(&chunks[0]) });
+    call(&store, "putAttachmentChunk", &put).unwrap();
+    assert_eq!(
+        call(&store, "completeAttachment", &json!({ "vault": v, "id": att })).unwrap()["complete"],
+        true
+    );
+    let got = call(&store, "attachmentChunk", &json!({ "vault": v, "id": att, "index": 0 })).unwrap();
+    assert_eq!(B64.decode(got.as_str().unwrap()).unwrap(), chunks[0]);
+
+    let bad = call(&store, "items", &json!({ "vault": "pas un uuid" })).unwrap_err();
+    assert_eq!((bad.status, bad.code), (400, "invalid_request"));
+}

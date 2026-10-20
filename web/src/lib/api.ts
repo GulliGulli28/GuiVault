@@ -174,7 +174,8 @@ async function authedBytes(method: string, path: string, body?: Uint8Array): Pro
 
 const q = (s: string) => encodeURIComponent(s);
 
-export const api = {
+/** Le transport HTTP : une méthode par route du serveur. */
+const httpApi = {
   health: () => raw<HealthResponse>("GET", "/health", undefined, false),
 
   // ── Authentification ──
@@ -319,10 +320,51 @@ export const api = {
   emergencyItems: (id: string, vault: string) => authed<ItemsPage>("GET", `/emergency/${id}/vaults/${vault}/items`),
 };
 
+/** Ce qu'offre un transport : les méthodes du transport HTTP. Le coffre
+ * local de l'app (`localHost.ts`) n'en implémente qu'une partie. */
+export type Transport = typeof httpApi;
+export type TransportMethod = keyof Transport;
+
+let active: Partial<Transport> = httpApi;
+
+/** Change de transport : celui qu'on donne (le coffre local de l'app), ou
+ * `null` pour revenir au serveur. */
+export function setTransport(t: Partial<Transport> | null) {
+  active = t ?? httpApi;
+}
+
+/** Le transport actif sait-il faire ça ? L'interface s'en sert pour ne pas
+ * proposer ce qu'un coffre local n'a pas (partage, liens, sessions…). */
+export function supports(method: TransportMethod): boolean {
+  return typeof active[method] === "function";
+}
+
+/** Le serveur, plutôt qu'un coffre local. */
+export function isHttpTransport(): boolean {
+  return active === httpApi;
+}
+
+/** L'API : délègue chaque appel au transport actif. Une méthode qu'il n'a
+ * pas répond `501 local_unsupported` — les 29 modules qui importent `api`
+ * n'ont pas à savoir d'où viennent les données. */
+export const api = Object.fromEntries(
+  (Object.keys(httpApi) as TransportMethod[]).map((name) => [
+    name,
+    (...args: unknown[]) => {
+      const f = active[name] as ((...a: unknown[]) => unknown) | undefined;
+      if (!f) return Promise.reject(new ApiError(501, "local_unsupported", "Pas disponible dans un coffre local."));
+      return f(...args);
+    },
+  ]),
+) as Transport;
+
 /** Le flux d'événements. `EventSource` ne sait pas envoyer d'en-tête
  * `Authorization`, d'où un `fetch` en streaming et un découpage SSE à la
  * main. Se reconnecte tout seul ; `stop()` pour arrêter. */
 export function subscribeEvents(onEvent: (e: ServerEvent) => void): { stop: () => void } {
+  // Un coffre local n'a qu'un écrivain à la fois dans cette fenêtre : rien à
+  // écouter.
+  if (!isHttpTransport()) return { stop: () => {} };
   const ctrl = new AbortController();
   let stopped = false;
 

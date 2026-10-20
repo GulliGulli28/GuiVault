@@ -24,6 +24,7 @@
 //! ```
 mod error;
 mod format;
+pub mod rpc;
 mod validate;
 
 pub use error::{Error, Result};
@@ -35,7 +36,7 @@ use guivault_crypto::{ATTACHMENT_CHUNK, ATTACHMENT_CHUNK_OVERHEAD, RekeyMaterial
 use guivault_protocol::{
     Attachment, CreateAttachmentRequest, CreateVaultRequest, DeleteItemRequest, Item, ItemVersion, ItemsPage,
     KdfParams, ManifestWrite, MoveAttachmentRequest, PutItemRequest, PutManifestRequest, PutUserSettingsRequest,
-    RenameVaultRequest, TrashedItem, UserSettings, Vault, VaultKind, VaultManifest,
+    RenameVaultRequest, TrashedItem, UserProfile, UserSettings, Vault, VaultKind, VaultManifest,
 };
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -174,6 +175,21 @@ impl LocalVault {
     /// L'identifiant du coffre, fixé à sa création.
     pub fn id(&self) -> Result<Uuid> {
         self.read(|c| Ok(c.id))
+    }
+
+    /// Le « compte » tel que l'interface l'attend de `/users/me` : l'id du
+    /// coffre, sa clé publique, sa date de création. Pas d'e-mail — un coffre
+    /// local n'en a pas.
+    pub fn profile(&self) -> Result<UserProfile> {
+        self.read(|c| {
+            Ok(UserProfile {
+                id: c.id,
+                email: String::new(),
+                public_key: c.account.public_key.clone(),
+                created_at: c.created_at,
+                is_admin: false,
+            })
+        })
     }
 
     /// De quoi déverrouiller : paramètres Argon2id, sel, enveloppes. Le client
