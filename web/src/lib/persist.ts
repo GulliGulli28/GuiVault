@@ -31,6 +31,9 @@ export interface StoredSession {
   blobs?: AccountBlobs;
   /** Session ouverte depuis la copie hors ligne (extension). */
   offline?: { savedAt: string };
+  /** Session ouverte sur un coffre local de l'application (extension, par
+   * son hôte natif) : pas de jetons, le chemin du coffre. */
+  local?: { path: string };
 }
 
 export function serializeSession(state: SessionState, tokens: TokenPair): StoredSession {
@@ -41,6 +44,7 @@ export function serializeSession(state: SessionState, tokens: TokenPair): Stored
     vaults: state.vaults.map((v) => ({ id: v.id, kind: v.kind, role: v.role, name: v.name, key: toBase64(v.key), keyFrom: v.keyFrom, revision: v.revision, updatedAt: v.updatedAt })),
     blobs: state.blobs,
     offline: state.offline,
+    local: state.local,
   };
 }
 
@@ -62,6 +66,7 @@ export function deserializeSession(s: StoredSession): SessionState {
     rollbacks: [],
     blobs: s.blobs,
     offline: s.offline,
+    local: s.local,
   };
 }
 

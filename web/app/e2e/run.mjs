@@ -359,6 +359,18 @@ function ps(command) {
 }
 const clipboardText = () => ps("$t = Get-Clipboard -Raw; if ($t) { [Console]::Out.Write($t) }");
 const clipboardFormats = () => ps("Add-Type -AssemblyName System.Windows.Forms; $d = [System.Windows.Forms.Clipboard]::GetDataObject(); if ($d) { $d.GetFormats() -join ',' }").split(",");
+/** Le presse-papiers est partagé : une autre application peut le tenir un
+ * instant, et une lecture le voir à moitié. On relit jusqu'à `want`, et
+ * l'échec dit ce qui a été lu. */
+async function waitClipboard(want, message, timeout = 4000) {
+  const deadline = Date.now() + timeout;
+  let seen = clipboardText();
+  while (seen !== want && Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 200));
+    seen = clipboardText();
+  }
+  assert(seen === want, `${message} (lu : ${JSON.stringify(seen)})`);
+}
 const setClipboard = (t) =>
   ps(t ? `Set-Clipboard -Value ([System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${Buffer.from(t, "utf8").toString("base64")}')))` : "Set-Clipboard -Value $null");
 
@@ -370,7 +382,7 @@ scenario("presse-papiers : hors de l'historique Windows, effacé à l'échéance
     // Par l'interface : « Copier » à côté du mot de passe de la fiche.
     await (await b.$("//*[normalize-space(text())='Banque en ligne']")).click();
     await (await b.$("//button[@aria-label='Révéler']/following-sibling::button[@aria-label='Copier']")).click();
-    await b.waitUntil(async () => clipboardText() === "s3cret!", { timeout: 5000, timeoutMsg: "le mot de passe n'est pas dans le presse-papiers" });
+    await waitClipboard("s3cret!", "le mot de passe n'est pas dans le presse-papiers", 5000);
     const formats = clipboardFormats();
     for (const f of ["ExcludeClipboardContentFromMonitorProcessing", "CanIncludeInClipboardHistory", "CanUploadToCloudClipboard"]) {
       assert(formats.includes(f), `format ${f} absent : le mot de passe irait dans l'historique Windows (formats : ${formats.join(", ")})`);
@@ -378,13 +390,14 @@ scenario("presse-papiers : hors de l'historique Windows, effacé à l'échéance
     // Effacé à l'échéance…
     const once = await invoke(b, "clipboard_copy_secret", { text: "e2e-efface", clearAfterMs: 1200 });
     assert(once.ok, `copie refusée : ${JSON.stringify(once.error)}`);
-    assert(clipboardText() === "e2e-efface", "la copie n'est pas arrivée");
-    await new Promise((r) => setTimeout(r, 2500));
-    assert(clipboardText() === "", "le presse-papiers n'a pas été effacé à l'échéance");
+    await waitClipboard("e2e-efface", "la copie n'est pas arrivée");
+    await waitClipboard("", "le presse-papiers n'a pas été effacé à l'échéance");
     // … mais pas si quelqu'un a copié autre chose entre-temps.
-    await invoke(b, "clipboard_copy_secret", { text: "e2e-remplace", clearAfterMs: 1200 });
+    await invoke(b, "clipboard_copy_secret", { text: "e2e-remplace", clearAfterMs: 3000 });
     setClipboard("copié par quelqu'un d'autre");
-    await new Promise((r) => setTimeout(r, 2500));
+    await waitClipboard("copié par quelqu'un d'autre", "la copie « d'un autre » n'est pas arrivée");
+    // Au-delà de l'échéance (3 s) : notre copie n'y est plus, rien n'est effacé.
+    await new Promise((r) => setTimeout(r, 3500));
     const after = clipboardText();
     assert(after === "copié par quelqu'un d'autre", `le presse-papiers ne contient plus la copie faite entre-temps : ${JSON.stringify(after)}`);
   } finally {
@@ -402,6 +415,12 @@ async function unlockFromRecents(b) {
 scenario("verrouillage : le signal du système verrouille, réglages Application", async (b) => {
   await openSettings(b, "Application");
   await waitText(b, "Quand la fenêtre est réduite");
+  // L'extension de navigateur : l'état se lit, on ne l'active pas (ce
+  // serait écrire dans le registre ou le profil de navigateur de qui lance
+  // les tests).
+  await waitText(b, "Permettre à l'extension GuiVault d'ouvrir les coffres locaux");
+  const linked = await invoke(b, "app_browser_integration", { enabled: null });
+  assert(linked.ok && typeof linked.value === "boolean", `état de l'extension illisible : ${JSON.stringify(linked.error)}`);
   if (isWindows) {
     // Sans casse : les intitulés de section sont en capitales par CSS.
     const text = (await bodyText(b)).toLowerCase();

@@ -34,8 +34,8 @@ confortable :
 3. **Application** (§6, 20 octobre 2026) : l'app Windows (coffre local ou
    serveur, installeurs, saisie automatique) est faite, et le poste avec —
    presse-papiers hors de l'historique Windows, verrouillage avec la
-   session, sauvegardes du coffre local, zone de notification — et l'import
-   KDBX. Ensuite : l'extension reliée à l'application. Android en
+   session, sauvegardes du coffre local, zone de notification — l'import
+   KDBX et l'extension reliée à l'application. Ensuite : Windows Hello. Android en
    dernier, ou sur demande.
 
 ## 0. Sécurité face à un serveur malveillant
@@ -311,9 +311,12 @@ L gros.
   automatique compris — `lib/kdbx.ts`, détail dans
   [`ITEMS.md`](ITEMS.md) ; testé contre de vraies bases KeePass, et dans la
   vraie fenêtre (E2E).
-- [ ] **Extension ↔ application** (L, KeePassXC-Browser) : native messaging,
-  remplir depuis un coffre local — sans ça l'extension ne sert qu'avec un
-  serveur.
+- [x] **Extension ↔ application** (L) : l'extension ouvre un coffre local
+  par l'hôte natif de l'app — qui ne lui sert que du chiffré, elle
+  déchiffre avec le mot de passe maître (plus simple et plus sûr que
+  l'association de KeePassXC-Browser, qui remet des secrets en clair).
+  [`EXTENSION.md`](EXTENSION.md), « Coffre local » ; E2E de bout en bout
+  dans Chromium (`e2e/native.spec.ts`).
 - [ ] **Déverrouillage rapide Windows Hello** (M, KeePassXC, Bitwarden) : la
   user key enveloppée sous une clé liée au TPM ; conception crypto à part.
 - [ ] **Agent SSH Windows** (M, KeePassXC, KeeAgent) : les clés du coffre

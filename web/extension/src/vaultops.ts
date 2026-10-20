@@ -2,7 +2,7 @@
  * enregistrer ou supprimer un identifiant, et tenir le cache d'items à
  * jour pour que la liste, le badge et les boutons dans les pages suivent
  * sans re-télécharger. */
-import { setBaseUrl } from "../../src/lib/api";
+import { applyBackend } from "./backend";
 import { deleteItem as deleteVaultItem, IntegrityError, loadItems, payloadEntity, putPayload, RevisionConflict, type DecodedItem, type SessionState, type VaultView } from "../../src/lib/session";
 import type { Login, Payload } from "../../src/lib/types";
 import { loadItemsCache, loadSession, loadSettings, saveItemsCache } from "./store";
@@ -10,7 +10,7 @@ import { loadItemsCache, loadSession, loadSettings, saveItemsCache } from "./sto
 async function session(): Promise<SessionState> {
   const s = await loadSession();
   if (!s) throw new Error("Coffre verrouillé.");
-  setBaseUrl((await loadSettings()).serverUrl);
+  applyBackend(s.state, await loadSettings());
   return s.state;
 }
 

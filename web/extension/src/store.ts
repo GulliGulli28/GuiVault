@@ -28,9 +28,13 @@ export interface Settings {
    * ligne : `regex` (comparée au nom, à l'id, au libellé… du champ) ou
    * `regex d'URL => regex de champ`. */
   otpPatterns: string;
+  /** Un serveur, ou un coffre local de l'application GuiVault par son hôte
+   * natif (`nativeHost.ts`) — et lequel. */
+  mode: "server" | "local";
+  localPath: string;
 }
 
-export const DEFAULT_SETTINGS: Settings = { serverUrl: "", email: "", lockMinutes: 15, inlineAutofill: true, autoTotp: true, otpPatterns: "" };
+export const DEFAULT_SETTINGS: Settings = { serverUrl: "", email: "", lockMinutes: 15, inlineAutofill: true, autoTotp: true, otpPatterns: "", mode: "server", localPath: "" };
 
 export interface OtpRule {
   url: RegExp | null;

@@ -151,6 +151,42 @@ maître et le délai de verrouillage.
   `chrome.storage.session` (un brouillon peut contenir un secret), effacé
   au verrouillage.
 
+## Coffre local (application)
+
+À la connexion, « Serveur » ou **« Coffre local »** : un coffre de
+l'application GuiVault ([`APP.md`](APP.md)) de cet ordinateur, sans serveur.
+Il faut l'avoir permis dans l'app (Paramètres › Application › « Extension
+de navigateur », désactivé par défaut) ; l'app n'a pas besoin d'être
+ouverte.
+
+- **L'hôte natif** est l'exécutable de l'application, lancé par le
+  navigateur sans fenêtre (`app-tauri/src/native_host.rs`), nommé
+  `dev.guivault.client`. Il sert **les mêmes blobs** que l'app sert à son
+  interface (`guivault_local::rpc`) : l'extension déchiffre elle-même, avec
+  le mot de passe maître tapé dans le popup, exactement comme face à un
+  serveur — `localTransport` (`web/src/lib/localHost.ts`) sur un canal
+  `connectNative` (`extension/src/nativeHost.ts`), choisi par
+  `extension/src/backend.ts` partout où la session revient (popup, service
+  worker). La session retient `local: { path }` au lieu de jetons.
+- **Inscription** (`app-tauri/src/browser.rs`) : un manifeste par famille de
+  navigateurs, origines autorisées = cette extension seulement
+  (`chrome-extension://dpfgcnelnadjmggpdchgekenoebmljpc/`, d'où la `key`
+  du manifeste de l'extension ; Firefox : `guivault@guiterm.app`). Windows :
+  clés de registre (HKCU) de Chrome, Edge, Chromium, Brave et Firefox ;
+  Linux : le dossier `NativeMessagingHosts` de chaque navigateur installé.
+  Une publication sur le Chrome Web Store donnerait un autre identifiant, à
+  ajouter aux origines autorisées.
+- **Ce que l'hôte ouvre** : seulement les coffres déjà ouverts dans l'app
+  (`coffres.json` de son dossier de configuration, tenu par l'app) — une
+  extension compromise ne lui ferait pas sonder un dossier quelconque.
+- **Le protocole du navigateur** limite un message de l'hôte à 1 Mo : chaque
+  réponse arrive en parties `{ id, part, of, data }`, recollées par
+  l'extension. Démarrer l'hôte coûte plus d'une seconde (Windows) : un canal
+  durable, pas un processus par requête.
+- Sous Windows, Chrome lance l'hôte par `cmd.exe /d /c` : vérifié avec
+  l'exécutable de l'app (sous-système graphique), qui reçoit bien ses flux
+  et dont `cmd` attend la fin.
+
 ## Comment c'est fait
 
 | Morceau | Rôle |
@@ -204,7 +240,9 @@ actif, pour le badge et le raccourci), `clipboardRead` et `clipboardWrite`
 le vider — comme Bitwarden), `offscreen` (Chrome : le document qui le fait
 pour le service worker), et un script sur `http://*/*`,
 `https://*/*` (tous les cadres) pour proposer le remplissage dans les champs
-de mot de passe — le même périmètre que Bitwarden, pour la même raison. Le
+de mot de passe — le même périmètre que Bitwarden, pour la même raison.
+`nativeMessaging` : parler à l'hôte natif de l'application, pour un coffre
+local (ci-dessus) — il ne transmet que du chiffré. Le
 script ne lit rien de la page : il cherche des `<input type=password>`,
 demande au service worker s'il y a des identifiants pour l'URL de son cadre
 (des noms, pas de mot de passe), et ne reçoit le mot de passe d'un compte
@@ -260,6 +298,15 @@ c'est bien celui qu'il a rempli dans *cet* onglet.
 - Firefox n'a pas été testé en vrai (Chromium seulement, via Playwright).
 
 ## Tester
+
+`e2e/native.spec.ts` joue le coffre local de bout en bout : un vrai coffre
+(`cargo run -p guivault-local --example make_coffre`), le vrai binaire de
+l'app en hôte natif (déclaré dans le profil jetable de Chromium,
+`NativeMessagingHosts/`), le popup qui l'ouvre avec le mot de passe puis
+remplit une page. Linux seulement, et seulement si `app-tauri` est construit
+(`cd app-tauri && cargo build`) ; ignoré sinon — le job `app` du CI le
+joue.
+
 
 **Le corpus** (`web/extension/e2e/`, dans le CI) : l'extension construite
 chargée dans un vrai Chromium (Playwright, sans tête), face à des pages de

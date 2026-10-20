@@ -11,10 +11,15 @@ export function AppSettings({ error }: { error: (m: string) => void }) {
   const [lock, setLock] = useState(loadAppLock);
   const [tray, setTray] = useState(loadAppTray);
   const [autostart, setAutostart] = useState<boolean | null>(null);
+  const [browser, setBrowser] = useState<boolean | null>(null);
   const system = systemBridge();
   useEffect(() => {
     if (system?.tray) system.autostart().then(setAutostart).catch(() => setAutostart(null));
+    system?.browserIntegration().then(setBrowser).catch(() => setBrowser(null));
   }, [system]);
+  const toggleBrowser = (enabled: boolean) => {
+    system?.browserIntegration(enabled).then(setBrowser).catch((e) => error(`Extension de navigateur : ${errorMessage(e)}`));
+  };
 
   const toggleAutostart = (enabled: boolean) => {
     system?.autostart(enabled).then(setAutostart).catch((e) => error(`Démarrer avec Windows : ${errorMessage(e)}`));
@@ -49,6 +54,17 @@ export function AppSettings({ error }: { error: (m: string) => void }) {
           <p className="help-text">Rangé là, GuiVault garde le raccourci de saisie automatique ; son icône le rouvre, le verrouille ou le quitte. Relancer GuiVault ramène la fenêtre déjà ouverte.</p>
         </section>
       )}
+
+      <section className="max-w-2xl space-y-1.5">
+        <Eyebrow>Extension de navigateur</Eyebrow>
+        <div className="card p-3">
+          <label className="flex items-start gap-2">
+            <input type="checkbox" checked={browser === true} disabled={browser === null} onChange={(e) => toggleBrowser(e.target.checked)} className="mt-0.5" />
+            <span className="min-w-0 flex-1 text-[12.5px] text-[var(--c-text)]">Permettre à l'extension GuiVault d'ouvrir les coffres locaux de cet ordinateur</span>
+          </label>
+        </div>
+        <p className="help-text">L'extension (Chrome, Edge, Brave, Firefox) propose alors « Coffre local » : elle déchiffre elle-même, avec votre mot de passe maître ; l'application ne lui transmet que du chiffré, et seulement des coffres déjà ouverts ici. Cette application n'a pas besoin d'être ouverte.</p>
+      </section>
 
       <section className="max-w-2xl space-y-1.5">
         <Eyebrow>Verrouillage</Eyebrow>

@@ -3,24 +3,84 @@
   "name": "GuiVault",
   "description": "Vos identifiants GuiVault dans le navigateur : copier, remplir, codes TOTP, générateur. Chiffrement de bout en bout.",
   "version": "0.1.0",
-  "icons": { "16": "icons/icon16.png", "32": "icons/icon32.png", "48": "icons/icon48.png", "128": "icons/icon128.png" },
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAmDmJ/pTERoGUGt4usR1SwtDUG41dDkJSMACFx9srLIavv4f2J5Vd+vJhPo3jLYwMfVqpH0VwY6bDyZ0RMhBj+ws8U1CPk2WCe4LTnTGzr0Lk9+ywigiUnhCvGWV0qMfxI0uO/UgO8hlG2CixSA0sDQsZGM1+6uBlOjht4RZCdV64Knywm5jFu21VIeUNIRrSJsGFBui72BsyXpho1pZdAaE/4rW9jt9REMABYRPYCD+h5sCBXu0ivCPpDemfzjzyEWqzI/GxFQl9iPp1hVQuZY+yxot5gLShMMnLLsr4kh7DCpB1HmvpYCJLNrMsAHjXUTYocwiUE10kohEVO5TaHwIDAQAB",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
   "action": {
     "default_popup": "popup.html",
     "default_title": "GuiVault",
-    "default_icon": { "16": "icons/icon16.png", "32": "icons/icon32.png" }
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png"
+    }
   },
-  "background": { "service_worker": "background.js", "type": "module", "scripts": ["background.js"] },
-  "permissions": ["storage", "alarms", "activeTab", "scripting", "tabs", "clipboardRead", "clipboardWrite", "offscreen"],
-  "host_permissions": ["http://*/*", "https://*/*"],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module",
+    "scripts": [
+      "background.js"
+    ]
+  },
+  "permissions": [
+    "storage",
+    "alarms",
+    "activeTab",
+    "scripting",
+    "tabs",
+    "clipboardRead",
+    "clipboardWrite",
+    "offscreen",
+    "nativeMessaging"
+  ],
+  "host_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ],
   "content_scripts": [
-    { "matches": ["http://*/*", "https://*/*"], "js": ["webauthn.js"], "run_at": "document_start", "all_frames": true, "world": "MAIN" },
-    { "matches": ["http://*/*", "https://*/*"], "js": ["content.js"], "run_at": "document_start", "all_frames": true }
+    {
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ],
+      "js": [
+        "webauthn.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": true,
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": true
+    }
   ],
   "commands": {
-    "autofill": { "suggested_key": { "default": "Ctrl+Shift+L", "mac": "Command+Shift+L" }, "description": "Remplir l'identifiant de la page" }
+    "autofill": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+L",
+        "mac": "Command+Shift+L"
+      },
+      "description": "Remplir l'identifiant de la page"
+    }
   },
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src https: http:"
   },
-  "browser_specific_settings": { "gecko": { "id": "guivault@guiterm.app", "strict_min_version": "115.0" } }
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "guivault@guiterm.app",
+      "strict_min_version": "115.0"
+    }
+  }
 }

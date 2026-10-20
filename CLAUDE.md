@@ -185,6 +185,10 @@ il ne déchiffre rien : la user key reste sous la clé que seule la PRF donne).
     `lib/importers.ts` / `lib/exporters.ts` (formats dans `docs/ITEMS.md`).
   - `extension/` — l'extension de navigateur (MV3), même `node_modules`,
     importe `../../src/lib/*` et quelques composants. `docs/EXTENSION.md`.
+    Coffre local : `nativeHost.ts` (canal vers l'hôte natif de l'app,
+    `app-tauri/src/native_host.rs`) + `backend.ts` (serveur ou coffre local,
+    à appeler partout où la session revient) ; inscription de l'hôte :
+    `app-tauri/src/browser.rs` ; test : `e2e/native.spec.ts`.
     Le script de page (`content.ts`) voit la page par `dom.ts` (shadow
     roots, y compris fermées) ; ce qui décide pour un cadre — son URL à lui,
     jamais celle de l'onglet sans confirmation — est dans `frames.ts`.

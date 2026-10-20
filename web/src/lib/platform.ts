@@ -59,6 +59,10 @@ export interface SystemBridge {
   /** Démarrer avec la session (dans la zone de notification) : `enabled` le
    * pose ou le retire ; rend l'état. */
   autostart(enabled?: boolean): Promise<boolean>;
+  /** Relier l'extension de navigateur aux coffres locaux (inscrire l'hôte
+   * natif auprès des navigateurs) : `enabled` le pose ou le retire ; rend
+   * l'état. */
+  browserIntegration(enabled?: boolean): Promise<boolean>;
   /** Appelé quand il faut verrouiller (selon les réglages de
    * `appSettings.ts`, déjà appliqués) ; rend de quoi se désabonner. */
   onLock(handler: (reason: LockReason) => void): () => void;

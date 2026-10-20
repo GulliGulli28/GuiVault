@@ -237,6 +237,17 @@ comme lui, et ouvrables avec le mot de passe maître **de leur date** —
 changer de mot de passe ne protège pas les sauvegardes d'avant d'un
 mot de passe déjà compromis ; les effacer (dossier `backups/`) le fait.
 
+**Extension sur un coffre local** (`docs/EXTENSION.md`, « Coffre local ») :
+l'hôte natif ne sert que des blobs ; l'extension déchiffre avec le mot de
+passe maître. Le navigateur ne lance l'hôte que pour cette extension
+(origines du manifeste). Un processus local qui atteindrait l'hôte
+n'obtiendrait que ce qu'il lit déjà dans le dossier du coffre, et
+pourrait y écrire comme il le peut déjà sur le fichier — avec le même
+utilisateur, le dossier n'est pas une frontière ; le manifeste de vault
+détecte un item rejoué ou retenu. L'hôte n'ouvre que les coffres déjà
+ouverts dans l'application. L'inscription est un choix explicite, désactivé
+par défaut.
+
 ## Déploiement
 
 - **TLS obligatoire** devant le serveur. Sans TLS, les jetons et la clé

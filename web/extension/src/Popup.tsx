@@ -3,7 +3,9 @@ import { api, ApiError, errorMessage, setBaseUrl, setSessionLostHandler, setToke
 import { filterEntities, indexItems, toEntities } from "../../src/lib/entities";
 import { buildVaultTree } from "../../src/lib/vaultTree";
 import { describeSecret, isSecret } from "../../src/lib/items";
-import { openOffline, acceptIntegrity, acceptRollback, loadItems, login, payloadEntity, payloadName, refresh, setDeviceLabel, type DecodedItem, type SessionState, type VaultView } from "../../src/lib/session";
+import { openOffline, acceptIntegrity, acceptRollback, closeLocal, loadItems, login, openLocal, payloadEntity, payloadName, refresh, setDeviceLabel, type DecodedItem, type SessionState, type VaultView } from "../../src/lib/session";
+import { applyBackend } from "./backend";
+import { coffreLabel, knownCoffres, nativeCoffre } from "./nativeHost";
 import { loginMatches } from "../../src/lib/urimatch";
 import { canWrite, KIND_LABELS, KIND_LABELS_PLURAL, type CustomIcon, type GuiVaultEntity, type ItemKind, type Login, type Payload, type TokenPair } from "../../src/lib/types";
 import { GeneratorPanel } from "../../src/components/GeneratorPanel";
@@ -217,6 +219,8 @@ export function Popup() {
         setScreen({ kind: "login", reason: await lockReason() });
         return;
       }
+      // Le serveur, ou le coffre local par l'hôte natif.
+      applyBackend(restored.state, s);
       const cached = await loadItemsCache();
       setCache(cached);
       // Rouvrir là où l'on était : un formulaire commencé toujours, le reste
@@ -325,6 +329,8 @@ export function Popup() {
 
   const doLock = async () => {
     await lock("manual");
+    // Un coffre local : `api` revient au serveur.
+    await closeLocal();
     go({ kind: "list" });
     setScreen({ kind: "login", reason: "manual" });
   };
@@ -379,7 +385,7 @@ export function Popup() {
           {screen.kind === "vault" && (
             <>
               <button onClick={() => void sync(screen.state, cache)} className="btn btn-ghost btn-sm btn-icon" title="Rafraîchir" aria-label="Rafraîchir"><IconRefresh size={12} className={refreshing ? "animate-spin" : ""} /></button>
-              <a href={settings.serverUrl} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-sm btn-icon" title="Ouvrir le coffre (interface web)" aria-label="Ouvrir le coffre"><IconExternal size={12} /></a>
+              {!screen.state.local && <a href={settings.serverUrl} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-sm btn-icon" title="Ouvrir le coffre (interface web)" aria-label="Ouvrir le coffre"><IconExternal size={12} /></a>}
               <button onClick={() => go(view.kind === "settings" ? { kind: "list" } : { kind: "settings" })} className={`btn btn-sm btn-icon ${view.kind === "settings" ? "btn-toggled" : "btn-ghost"}`} title="Réglages" aria-label="Réglages" aria-pressed={view.kind === "settings"}><IconSettings size={12} /></button>
               <button onClick={() => void doLock()} className="btn btn-ghost btn-sm btn-icon" title="Verrouiller" aria-label="Verrouiller"><IconLock size={12} /></button>
             </>
@@ -405,7 +411,7 @@ export function Popup() {
       })}
 
       {screen.kind === "login" ? (
-        <LoginView
+        <LoginChooser
           settings={settings}
           reason={screen.reason}
           onSettings={(s) => { setSettings(s); void saveSettings(s); }}
@@ -926,6 +932,94 @@ function LoginView({ settings, reason, onSettings, onSession }: { settings: Sett
       <div className="flex items-center justify-between gap-2">
         <span className="help-text">{offlineCopy ? "Déchiffré ici ; copie chiffrée gardée." : "Déchiffré ici, jamais sur disque."}</span>
         <button type="submit" disabled={!serverUrl.trim() || !email.trim() || !password || busy !== null} className="btn btn-primary btn-sm">{busy ?? "Déverrouiller"}</button>
+      </div>
+    </form>
+  );
+}
+
+/** Serveur ou coffre local : le choix, retenu dans les réglages. */
+function LoginChooser(props: { settings: Settings; reason: LockReason | null; onSettings: (s: Settings) => void; onSession: (state: SessionState, tokens: TokenPair) => Promise<void> }) {
+  const mode = props.settings.mode ?? "server";
+  const setMode = (m: Settings["mode"]) => props.onSettings({ ...props.settings, mode: m });
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="px-3 pt-3">
+        <div className="segmented w-full" role="tablist" aria-label="Ouvrir">
+          <button type="button" role="tab" aria-selected={mode === "server"} data-active={mode === "server"} onClick={() => setMode("server")} className="flex-1">Serveur</button>
+          <button type="button" role="tab" aria-selected={mode === "local"} data-active={mode === "local"} onClick={() => setMode("local")} className="flex-1">Coffre local</button>
+        </div>
+      </div>
+      {mode === "local" ? <LocalLoginView {...props} /> : <LoginView {...props} />}
+    </div>
+  );
+}
+
+/** Un coffre local de l'application GuiVault, par son hôte natif : ceux que
+ * l'app a ouverts sur cet ordinateur, et le mot de passe maître — déchiffré
+ * ici, comme face à un serveur. */
+function LocalLoginView({ settings, reason, onSettings, onSession }: { settings: Settings; reason: LockReason | null; onSettings: (s: Settings) => void; onSession: (state: SessionState, tokens: TokenPair) => Promise<void> }) {
+  const [coffres, setCoffres] = useState<string[] | null>(null);
+  const [path, setPath] = useState(settings.localPath);
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    knownCoffres()
+      .then((list) => {
+        setCoffres(list);
+        setPath((p) => (list.includes(p) ? p : list[0] ?? ""));
+      })
+      .catch((e) => { setCoffres([]); setError(errorMessage(e)); });
+  }, []);
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!path) return;
+    setError(null);
+    setBusy("Dérivation de la clé…");
+    try {
+      const state = await openLocal(nativeCoffre(path), path, password);
+      onSettings({ ...settings, mode: "local", localPath: path });
+      // Pas de jetons : un coffre local n'a pas de serveur.
+      await onSession(state, { access_token: "", refresh_token: "", access_expires_in: 0 });
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <form onSubmit={submit} className="space-y-3 p-3">
+      {reason === "timeout" && <p className="callout">Verrouillé après inactivité.</p>}
+      {coffres === null ? (
+        <p className="help-text">Recherche des coffres de l'application…</p>
+      ) : coffres.length > 0 ? (
+        <div role="radiogroup" aria-label="Coffre" className="space-y-1">
+          <span className="field-label">Coffre</span>
+          {coffres.map((p) => (
+            <label key={p} className="list-row flex cursor-pointer items-center gap-2 py-1">
+              <input type="radio" name="coffre" checked={path === p} onChange={() => setPath(p)} />
+              <span className="flex min-w-0 flex-1 flex-col leading-tight">
+                <span className="truncate text-[12.5px]">{coffreLabel(p)}</span>
+                <span className="truncate font-mono text-[10.5px] text-[var(--c-text-faint)]" title={p}>{p}</span>
+              </span>
+            </label>
+          ))}
+        </div>
+      ) : !error ? (
+        <p className="callout">Aucun coffre : ouvrez ou créez d'abord un coffre local dans l'application GuiVault.</p>
+      ) : null}
+      {coffres && coffres.length > 0 && (
+        <label className="block">
+          <span className="field-label">Mot de passe maître</span>
+          <PasswordInput value={password} onChange={setPassword} autoFocus autoComplete="current-password" />
+        </label>
+      )}
+      {error && <p className="callout callout-danger">{error}</p>}
+      <div className="flex items-center justify-between gap-2">
+        <span className="help-text">Déchiffré ici ; l'application ne transmet que du chiffré.</span>
+        <button type="submit" disabled={!path || !password || busy !== null} className="btn btn-primary btn-sm">{busy ?? "Déverrouiller"}</button>
       </div>
     </form>
   );

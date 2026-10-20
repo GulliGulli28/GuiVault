@@ -9,7 +9,9 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod autotype;
+mod browser;
 mod clipboard;
+mod native_host;
 mod system;
 mod tray;
 
@@ -57,14 +59,18 @@ async fn blocking<T: Send + 'static>(f: impl FnOnce() -> Result<T, Value> + Send
 async fn local_create(state: State<'_, Coffre>, path: String, coffre: Value) -> Result<(), Value> {
     let new: NewCoffre = serde_json::from_value(coffre)
         .map_err(|e| error(guivault_local::Error::bad_request("invalid_request", e.to_string())))?;
+    let known = path.clone();
     let vault = blocking(move || LocalVault::create(path, new).map_err(error)).await?;
+    native_host::remember(&known);
     state.set(Some(vault));
     Ok(())
 }
 
 #[tauri::command]
 async fn local_open(state: State<'_, Coffre>, path: String) -> Result<(), Value> {
+    let known = path.clone();
     let vault = blocking(move || LocalVault::open(path).map_err(error)).await?;
+    native_host::remember(&known);
     state.set(Some(vault));
     Ok(())
 }
@@ -256,7 +262,27 @@ fn app_autostart(app: AppHandle, enabled: Option<bool>) -> Result<bool, String> 
     launcher.is_enabled().map_err(|e| e.to_string())
 }
 
+// ─── Extension de navigateur (`src/native_host.rs`, `src/browser.rs`) ────────
+
+/// Inscrire l'hôte natif auprès des navigateurs (`enabled`), ou l'en
+/// retirer ; rend l'état.
+#[tauri::command]
+fn app_browser_integration(enabled: Option<bool>) -> Result<bool, String> {
+    match enabled {
+        Some(true) => browser::enable()?,
+        Some(false) => browser::disable()?,
+        None => {}
+    }
+    Ok(browser::enabled())
+}
+
 fn main() {
+    // Lancé par un navigateur : l'hôte natif de l'extension, sans fenêtre ni
+    // Tauri — et sans passer par l'instance unique.
+    if native_host::invoked(&std::env::args().collect::<Vec<_>>()) {
+        native_host::run();
+        return;
+    }
     tauri::Builder::default()
         // En premier : une seconde instance ne fait que ramener la fenêtre
         // de la première, et s'arrête.
@@ -288,7 +314,8 @@ fn main() {
             system_idle_ms,
             app_tray_available,
             app_set_close_to_tray,
-            app_autostart
+            app_autostart,
+            app_browser_integration
         ])
         .setup(|app| {
             if let Err(e) = tray::install(app.handle()) {

@@ -1,0 +1,8 @@
+<!doctype html><meta charset="utf-8"><title>Banque — connexion</title><script src="/kit.js"></script>
+<h1>Connexion</h1>
+<form onsubmit="event.preventDefault()">
+  <label>Identifiant <input id="user" name="login" type="text" autocomplete="username"></label>
+  <label>Mot de passe <input id="pass" name="password" type="password" autocomplete="current-password"></label>
+  <button>Se connecter</button>
+</form>
+<script>field("username", user); field("password", pass);</script>

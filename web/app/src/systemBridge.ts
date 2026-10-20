@@ -36,6 +36,7 @@ export async function installSystem(): Promise<void> {
     tray,
     setCloseToTray,
     autostart: (enabled) => invoke<boolean>("app_autostart", { enabled: enabled ?? null }),
+    browserIntegration: (enabled) => invoke<boolean>("app_browser_integration", { enabled: enabled ?? null }),
     onLock(handler) {
       handlers.add(handler);
       return () => void handlers.delete(handler);
