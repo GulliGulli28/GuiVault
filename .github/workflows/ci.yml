@@ -158,6 +158,32 @@ jobs:
       # c'est ici seulement que clippy la voit.
       - run: cargo clippy --all-targets -- -D warnings && cargo build --release --features tauri/custom-protocol
         working-directory: app-tauri
+      # Diagnostic (20 octobre 2026) : la session WebDriver ne se créait pas
+      # (« DevToolsActivePort file doesn't exist »), l'app ne démarrant pas
+      # son WebView2. Le runtime WebView2 est-il seulement installé ? Une
+      # app Tauri n'embarque son installeur que dans les MSI/NSIS, pas dans
+      # le .exe nu. Il est installé ici s'il manque, puis le binaire est
+      # lancé seul : vit-il, ses processus WebView2, sa sortie d'erreur.
+      - name: WebView2 et premier lancement (diagnostic)
+        shell: pwsh
+        run: |
+          $wv2 = '{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}'; $edge = '{56EB18F8-B008-4CBD-B6D2-8C97FE7E9062}'
+          function Pv($k) { (Get-ItemProperty $k -ErrorAction SilentlyContinue).pv }
+          $runtime = @(Pv "HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\$wv2"; Pv "HKCU:\Software\Microsoft\EdgeUpdate\Clients\$wv2") | Where-Object { $_ -and $_ -ne '0.0.0.0' } | Select-Object -First 1
+          "WebView2 Runtime : $(if ($runtime) { $runtime } else { 'ABSENT' }) ; Edge : $(Pv "HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\$edge")"
+          if (-not $runtime) {
+            "Installation du runtime WebView2 (Evergreen, Microsoft)…"
+            Invoke-WebRequest -Uri 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' -OutFile "$env:RUNNER_TEMP\wv2.exe"
+            Start-Process "$env:RUNNER_TEMP\wv2.exe" -ArgumentList '/silent','/install' -Wait
+            "WebView2 Runtime après installation : $(Pv "HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\$wv2")"
+          }
+          $p = Start-Process "app-tauri\target\release\guivault-app.exe" -PassThru -RedirectStandardError "$env:RUNNER_TEMP\err.txt" -RedirectStandardOutput "$env:RUNNER_TEMP\out.txt"
+          Start-Sleep -Seconds 15
+          "guivault-app vivant après 15 s : $(-not $p.HasExited)$(if ($p.HasExited) { ' (code ' + $p.ExitCode + ')' })"
+          Get-Process guivault-app, msedgewebview2 -ErrorAction SilentlyContinue | Format-Table Name, Id, MainWindowTitle -AutoSize | Out-String
+          "--- sortie d'erreur :"; Get-Content "$env:RUNNER_TEMP\err.txt" -ErrorAction SilentlyContinue
+          Get-Process guivault-app, msedgewebview2 -ErrorAction SilentlyContinue | Stop-Process -Force
+          exit 0
       - run: node app/e2e/run.mjs
         working-directory: web
         env:

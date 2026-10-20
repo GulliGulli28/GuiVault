@@ -90,7 +90,9 @@ function powershell(command) {
 }
 
 /** La version du runtime WebView2 installé (celle d'Edge à défaut : même
- * numéro de version, même moteur). */
+ * numéro de version, même moteur — mais sans runtime WebView2, l'app ne
+ * démarre pas son webview, et le pilote attend en vain son
+ * `DevToolsActivePort` : d'où `source`, dit dans le journal). */
 function webview2Version() {
   const clients = ["{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}", "{56EB18F8-B008-4CBD-B6D2-8C97FE7E9062}"];
   const roots = ["HKLM\\SOFTWARE\\WOW6432Node\\Microsoft\\EdgeUpdate\\Clients", "HKCU\\Software\\Microsoft\\EdgeUpdate\\Clients"];
@@ -98,7 +100,7 @@ function webview2Version() {
     for (const root of roots) {
       const r = spawnSync("reg", ["query", `${root}\\${client}`, "/v", "pv"], { encoding: "utf8" });
       const m = /pv\s+REG_SZ\s+([\d.]+)/.exec(r.stdout ?? "");
-      if (m && m[1] !== "0.0.0.0") return m[1];
+      if (m && m[1] !== "0.0.0.0") return { version: m[1], source: client === clients[0] ? "WebView2" : "Edge — runtime WebView2 introuvable" };
     }
   }
   return null;
@@ -111,12 +113,13 @@ function webview2Version() {
  * est valide et au nom de Microsoft. `EDGEDRIVER_PATH` l'impose. */
 async function edgeDriver() {
   if (process.env.EDGEDRIVER_PATH) return process.env.EDGEDRIVER_PATH;
-  const version = webview2Version();
-  if (!version) throw new Error("runtime WebView2 introuvable (registre EdgeUpdate) : régler EDGEDRIVER_PATH");
+  const found = webview2Version();
+  if (!found) throw new Error("runtime WebView2 introuvable (registre EdgeUpdate) : régler EDGEDRIVER_PATH");
+  const { version, source } = found;
   const dir = path.join(os.homedir(), `edgedriver-${version}`);
   const exe = path.join(dir, "msedgedriver.exe");
   if (existsSync(exe)) return exe;
-  console.log(`msedgedriver ${version} (celle de WebView2) : téléchargement depuis Microsoft…`);
+  console.log(`msedgedriver ${version} (version lue : ${source}) : téléchargement depuis Microsoft…`);
   const res = await fetch(`https://msedgedriver.microsoft.com/${version}/edgedriver_win64.zip`);
   if (!res.ok) throw new Error(`msedgedriver ${version} : HTTP ${res.status}`);
   await mkdir(dir, { recursive: true });
