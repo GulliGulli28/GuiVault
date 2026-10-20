@@ -19,7 +19,7 @@
 // avec CARGO_TARGET_DIR réglé comme au build.
 import { spawn, spawnSync } from "node:child_process";
 import { createWriteStream, existsSync, readFileSync } from "node:fs";
-import { mkdir, rm } from "node:fs/promises";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
@@ -34,7 +34,8 @@ const outDir = path.join(webRoot, "app", "e2e", ".output");
 const profile = process.env.E2E_BUILD_PROFILE || (isWindows ? "release" : "debug");
 const targetDir = process.env.CARGO_TARGET_DIR || (isWindows ? path.join(os.homedir(), "guivault-app-target-windows") : path.join(repoRoot, "app-tauri", "target"));
 const appBinary = path.join(targetDir, profile, isWindows ? "guivault-app.exe" : "guivault-app");
-const nativeDriver = isWindows ? process.env.EDGEDRIVER_PATH || path.join(os.homedir(), "edgedriver", "msedgedriver.exe") : "/usr/bin/WebKitWebDriver";
+// Windows : voir `edgeDriver()` plus bas.
+const nativeDriver = isWindows ? null : "/usr/bin/WebKitWebDriver";
 const tauriDriver = (() => {
   const p = path.join(os.homedir(), ".cargo", "bin", isWindows ? "tauri-driver.exe" : "tauri-driver");
   return existsSync(p) ? p : "tauri-driver";
@@ -79,6 +80,49 @@ async function warmVite(timeoutMs) {
     if (Date.now() > deadline) throw new Error("Vite n'a jamais servi /src/main.tsx");
     await new Promise((r) => setTimeout(r, 500));
   }
+}
+
+/** La version du runtime WebView2 installé (celle d'Edge à défaut : même
+ * numéro de version, même moteur). */
+function webview2Version() {
+  const clients = ["{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}", "{56EB18F8-B008-4CBD-B6D2-8C97FE7E9062}"];
+  const roots = ["HKLM\\SOFTWARE\\WOW6432Node\\Microsoft\\EdgeUpdate\\Clients", "HKCU\\Software\\Microsoft\\EdgeUpdate\\Clients"];
+  for (const client of clients) {
+    for (const root of roots) {
+      const r = spawnSync("reg", ["query", `${root}\\${client}`, "/v", "pv"], { encoding: "utf8" });
+      const m = /pv\s+REG_SZ\s+([\d.]+)/.exec(r.stdout ?? "");
+      if (m && m[1] !== "0.0.0.0") return m[1];
+    }
+  }
+  return null;
+}
+
+/** Le `msedgedriver.exe` de **la même version** que le runtime WebView2 —
+ * sinon « only supports Microsoft Edge version N », et WebView2 se met à
+ * jour tout seul. Téléchargé une fois depuis Microsoft dans
+ * `~/edgedriver-<version>/`, et gardé seulement si sa signature Authenticode
+ * est valide et au nom de Microsoft. `EDGEDRIVER_PATH` l'impose. */
+async function edgeDriver() {
+  if (process.env.EDGEDRIVER_PATH) return process.env.EDGEDRIVER_PATH;
+  const version = webview2Version();
+  if (!version) throw new Error("runtime WebView2 introuvable (registre EdgeUpdate) : régler EDGEDRIVER_PATH");
+  const dir = path.join(os.homedir(), `edgedriver-${version}`);
+  const exe = path.join(dir, "msedgedriver.exe");
+  if (existsSync(exe)) return exe;
+  console.log(`msedgedriver ${version} (celle de WebView2) : téléchargement depuis Microsoft…`);
+  const res = await fetch(`https://msedgedriver.microsoft.com/${version}/edgedriver_win64.zip`);
+  if (!res.ok) throw new Error(`msedgedriver ${version} : HTTP ${res.status}`);
+  await mkdir(dir, { recursive: true });
+  const zip = path.join(dir, "edgedriver_win64.zip");
+  await writeFile(zip, Buffer.from(await res.arrayBuffer()));
+  const ps = (cmd) => spawnSync("powershell.exe", ["-NoProfile", "-Command", cmd], { encoding: "utf8" });
+  ps(`Expand-Archive -Force -LiteralPath '${zip}' -DestinationPath '${dir}'; Remove-Item -LiteralPath '${zip}'`);
+  const sig = ps(`$s = Get-AuthenticodeSignature -LiteralPath '${exe}'; "$($s.Status)|$($s.SignerCertificate.Subject)"`).stdout.trim();
+  if (!/^Valid\|.*O=Microsoft Corporation/.test(sig)) {
+    await rm(dir, { recursive: true, force: true });
+    throw new Error(`msedgedriver téléchargé, signature refusée (${sig || "illisible"}) : effacé`);
+  }
+  return exe;
 }
 
 /** Tue un processus **et ses enfants** : tauri-driver lance le pilote natif
@@ -255,6 +299,13 @@ async function main() {
     console.error(profile === "release" ? "Construire : cd app-tauri && cargo build --release --features tauri/custom-protocol" : "Construire : cd app-tauri && cargo build");
     process.exit(1);
   }
+  let native;
+  try {
+    native = nativeDriver ?? (await edgeDriver());
+  } catch (e) {
+    console.error("ÉCHEC :", e instanceof Error ? e.message : e);
+    process.exit(1);
+  }
   await mkdir(scratch, { recursive: true });
 
   let vite = null;
@@ -266,7 +317,7 @@ async function main() {
   // E2E_DRIVER_LOG=fichier : ce que disent tauri-driver et le pilote natif
   // (une session refusée ne dit rien d'autre que « capabilities »).
   const driverLog = process.env.E2E_DRIVER_LOG ? createWriteStream(process.env.E2E_DRIVER_LOG) : null;
-  const driver = spawn(tauriDriver, ["--native-driver", nativeDriver], { env, stdio: driverLog ? ["ignore", "pipe", "pipe"] : "ignore", detached: !isWindows });
+  const driver = spawn(tauriDriver, ["--native-driver", native], { env, stdio: driverLog ? ["ignore", "pipe", "pipe"] : "ignore", detached: !isWindows });
   if (driverLog) {
     driver.stdout.pipe(driverLog);
     driver.stderr.pipe(driverLog);

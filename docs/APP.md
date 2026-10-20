@@ -1,10 +1,10 @@
 # L'application GuiVault (Windows, puis Android)
 
-**État : étapes 1 à 4 faites — le coffre local (`crates/guivault-local`), son
+**État : étapes 1 à 5 faites — le coffre local (`crates/guivault-local`), son
 transport côté interface (`web/src/lib/localHost.ts`), l'app Windows
-(`app-tauri/`, `web/app/`) et l'interface en mode local, avec ses tests de
-bout en bout dans la vraie fenêtre. Reste la CI Windows et les installeurs
-(étape 5).** Ce document fixe les choix ; il deviendra la doc de l'app comme
+(`app-tauri/`, `web/app/`), l'interface en mode local avec ses tests de bout
+en bout, le CI Windows et les installeurs. Ensuite : Android, et la feuille
+de route de l'app (`ROADMAP.md`, § Application).** Ce document fixe les choix ; il deviendra la doc de l'app comme
 `EXTENSION.md` l'est pour l'extension.
 
 Une application installée qui, au choix :
@@ -201,8 +201,40 @@ Start-Process "$env:CARGO_TARGET_DIR\release\guivault-app.exe"
 ```
 
 Sans `tauri/custom-protocol`, le binaire charge `devUrl` au lieu de
-`dist-app`. Les installeurs (MSI/NSIS) viendront avec l'étape 5
-(`tauri build` sur un runner Windows).
+`dist-app`.
+
+Les hooks de `tauri.conf.json` (`beforeDevCommand`, `beforeBuildCommand`)
+tournent **depuis la racine du dépôt** (le parent de `app-tauri/`) : d'où
+`npm --prefix web …`.
+
+## Installeurs et releases
+
+`tauri build` (depuis `app-tauri/`) produit un **MSI** (WiX, en français) et
+un **installeur NSIS** (`*-setup.exe`, par utilisateur, sans droits
+d'administrateur), dans `target/release/bundle/{msi,nsis}/`. Identifiant :
+`dev.guivault.client` — il fixe le dossier de données de WebView2 (coffres
+récents) et, plus tard, le paquet Android : ne pas en changer.
+
+En CI (`.github/workflows/app-release.yml`) : un tag `app-v<version>` (la
+version de `tauri.conf.json`, vérifiée ; les tags `v*` sont ceux du serveur)
+construit les deux installeurs sur `windows-latest`, leurs sommes SHA-256 et
+une attestation de provenance, et les dépose dans un **brouillon** de
+release — publier reste un geste humain. Lancé à la main, il garde les
+installeurs comme artefact de l'exécution. Pas de signature de code :
+SmartScreen avertit à la première installation (même situation que
+Guiterm, voir son `RELEASING.md` pour les options).
+
+Localement sous Windows, avec une CLI Tauri native Windows (le `node_modules`
+de `web/` est celui de WSL) et le hook neutralisé, `web/dist-app` étant
+construit côté WSL :
+
+```powershell
+npm install --prefix "$env:USERPROFILE\guivault-tauri-cli" @tauri-apps/cli@2.12.3   # une fois
+Set-Content "$env:TEMP\guivault-nohook.json" '{"build":{"beforeBuildCommand":""}}'
+$env:CARGO_TARGET_DIR = "$env:USERPROFILE\guivault-app-target-windows"
+Set-Location "\\wsl.localhost\Ubuntu-24.04\home\glorin\GuiVault\app-tauri"
+node "$env:USERPROFILE\guivault-tauri-cli\node_modules\@tauri-apps\cli\tauri.js" build --config "$env:TEMP\guivault-nohook.json"
+```
 
 ## Tests de bout en bout
 
@@ -226,15 +258,16 @@ release ci-dessus :
 
 ```powershell
 $env:CARGO_TARGET_DIR = "$env:USERPROFILE\guivault-app-target-windows"
-$env:EDGEDRIVER_PATH = "$env:USERPROFILE\edgedriver-155\msedgedriver.exe"
 Set-Location "\\wsl.localhost\Ubuntu-24.04\home\glorin\GuiVault\web"
 node app\e2e\run.mjs
 ```
 
-`msedgedriver` doit avoir **la même version majeure que le runtime
-WebView2** (sinon : « only supports Microsoft Edge version N ») : le prendre
-sur https://msedgedriver.microsoft.com/<version>/edgedriver_win64.zip quand
-WebView2 se met à jour. `E2E_DRIVER_LOG=fichier` garde ce que disent
+`msedgedriver` doit avoir **la même version que le runtime WebView2**
+(sinon : « only supports Microsoft Edge version N »), qui se met à jour tout
+seul : le script lit sa version dans le registre et télécharge le pilote
+correspondant depuis Microsoft dans `~\edgedriver-<version>\`, gardé
+seulement si sa signature Authenticode est valide et au nom de Microsoft.
+`EDGEDRIVER_PATH` impose un pilote. `E2E_DRIVER_LOG=fichier` garde ce que disent
 `tauri-driver` et le pilote natif. Le script tue tout l'arbre de processus
 en partant : un WebKitWebDriver orphelin garderait le port 4445, et sous WSL
 ce port bloque aussi le Windows d'à côté (relayé par `wslrelay.exe`).
@@ -264,6 +297,8 @@ ce port bloque aussi le Windows d'à côté (relayé par `wslrelay.exe`).
 4. ~~**Interface en mode local**~~ — fait : voir plus haut ce qui est
    masqué ; `health` côté coffre ; E2E dans la vraie fenêtre (7 scénarios,
    WebKitGTK et WebView2) et job `app` du CI.
-5. **CI** : job Windows (construction, puis installeur sur tag).
+5. ~~**CI**~~ — fait : jobs `app` (Linux, WebKitGTK sous Xvfb) et
+   `app-windows` (release, E2E dans WebView2) de `ci.yml` ;
+   `app-release.yml` pour les installeurs.
 6. Plus tard : Android ; « Pousser vers un serveur » ; `gv` sur un coffre
    local ; Guiterm sur un coffre local.

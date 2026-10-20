@@ -1,0 +1,97 @@
+name: Application (release)
+
+# Les installeurs Windows de l'application (`docs/APP.md`) : MSI et NSIS,
+# publiés en **brouillon** de release sur un tag `app-v<version>` — les tags
+# `v*` sont ceux du serveur. Publier le brouillon reste un geste humain.
+#
+# Pas signés (pas de certificat de signature de code) : Windows SmartScreen
+# avertit à la première installation. Les sommes SHA-256 et l'attestation de
+# provenance (quel workflow, quel commit) accompagnent chaque installeur.
+on:
+  push:
+    tags:
+      - "app-v*"
+  workflow_dispatch:
+
+# Jamais annulé : une construction interrompue à mi-chemin publierait une
+# release à qui il manque un installeur.
+concurrency:
+  group: app-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: app-tauri -> target
+
+      # Un tag qui ne dit pas la version de `tauri.conf.json` donnerait des
+      # installeurs nommés d'une version sous une release d'une autre.
+      - name: Le tag est la version de l'app
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          v=$(node -p "require('./app-tauri/tauri.conf.json').version")
+          if [ "$GITHUB_REF_NAME" != "app-v$v" ]; then
+            echo "::error::le tag $GITHUB_REF_NAME ne correspond pas à la version $v de app-tauri/tauri.conf.json (attendu : app-v$v)"
+            exit 1
+          fi
+
+      - run: npm ci --no-audit --no-fund
+        working-directory: web
+
+      # `tauri build` lance lui-même `npm --prefix web run build:app` (depuis
+      # la racine du dépôt), compile en release avec `custom-protocol`, puis
+      # empaquette MSI (WiX) et NSIS.
+      - name: Installeurs
+        shell: bash
+        working-directory: app-tauri
+        run: ../web/node_modules/.bin/tauri build
+
+      - name: Sommes SHA-256
+        shell: bash
+        working-directory: app-tauri/target/release/bundle
+        run: sha256sum msi/*.msi nsis/*-setup.exe | tee SHA256SUMS.txt
+
+      - uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: |
+            app-tauri/target/release/bundle/msi/*.msi
+            app-tauri/target/release/bundle/nsis/*-setup.exe
+
+      - name: Brouillon de release
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          b=app-tauri/target/release/bundle
+          gh release create "$GITHUB_REF_NAME" --draft \
+            --title "GuiVault — application ${GITHUB_REF_NAME#app-v}" \
+            --notes "Installeurs Windows de l'application GuiVault (coffre local, ou connexion à un serveur GuiVault). Non signés : SmartScreen avertit à la première installation. Vérifier : SHA256SUMS.txt, ou \`gh attestation verify <fichier> -R ${{ github.repository }}\`." \
+            $b/msi/*.msi $b/nsis/*-setup.exe $b/SHA256SUMS.txt
+
+      # Sans tag (lancé à la main) : les installeurs restent téléchargeables
+      # depuis l'exécution.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: guivault-app-windows
+          path: |
+            app-tauri/target/release/bundle/msi/*.msi
+            app-tauri/target/release/bundle/nsis/*-setup.exe
+            app-tauri/target/release/bundle/SHA256SUMS.txt
+          retention-days: 14

@@ -125,6 +125,46 @@ jobs:
           path: web/app/e2e/.output
           retention-days: 7
 
+  # La même suite dans WebView2, ce que lancent les utilisateurs Windows :
+  # binaire release qui embarque `web/dist-app`. Le runner E2E prend lui-même
+  # le msedgedriver de la version de WebView2 du runner (signature vérifiée).
+  app-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: app-tauri -> target
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - id: tauri-driver-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/tauri-driver.exe
+          key: tauri-driver-2.0.6-${{ runner.os }}
+      - if: steps.tauri-driver-cache.outputs.cache-hit != 'true'
+        run: cargo install tauri-driver --version 2.0.6 --locked
+      - run: npm ci --no-audit --no-fund
+        working-directory: web
+      - run: npm run build:app
+        working-directory: web
+      - run: cargo build --release --features tauri/custom-protocol
+        working-directory: app-tauri
+      - run: node app/e2e/run.mjs
+        working-directory: web
+        env:
+          CARGO_TARGET_DIR: ${{ github.workspace }}\app-tauri\target
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-e2e-windows
+          path: web/app/e2e/.output
+          retention-days: 7
+
   docker:
     runs-on: ubuntu-latest
     steps:
