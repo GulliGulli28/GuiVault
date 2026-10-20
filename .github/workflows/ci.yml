@@ -158,13 +158,13 @@ jobs:
       # c'est ici seulement que clippy la voit.
       - run: cargo clippy --all-targets -- -D warnings && cargo build --release --features tauri/custom-protocol
         working-directory: app-tauri
-      # Diagnostic (20 octobre 2026) : la session WebDriver ne se créait pas
-      # (« DevToolsActivePort file doesn't exist »), l'app ne démarrant pas
-      # son WebView2. Le runtime WebView2 est-il seulement installé ? Une
-      # app Tauri n'embarque son installeur que dans les MSI/NSIS, pas dans
-      # le .exe nu. Il est installé ici s'il manque, puis le binaire est
-      # lancé seul : vit-il, ses processus WebView2, sa sortie d'erreur.
-      - name: WebView2 et premier lancement (diagnostic)
+      # Diagnostic en cours : la session WebDriver ne se crée pas
+      # (« DevToolsActivePort file doesn't exist »). Écarté le 20 octobre :
+      # le runtime WebView2 est là (154), et l'app lancée seule démarre
+      # (fenêtre, processus WebView2, rien sur stderr) — c'est sous
+      # msedgedriver seulement. D'où son journal détaillé (E2E_DRIVER_LOG,
+      # déposé avec les captures en cas d'échec).
+      - name: WebView2 (versions)
         shell: pwsh
         run: |
           $wv2 = '{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}'; $edge = '{56EB18F8-B008-4CBD-B6D2-8C97FE7E9062}'
@@ -177,17 +177,15 @@ jobs:
             Start-Process "$env:RUNNER_TEMP\wv2.exe" -ArgumentList '/silent','/install' -Wait
             "WebView2 Runtime après installation : $(Pv "HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\$wv2")"
           }
-          $p = Start-Process "app-tauri\target\release\guivault-app.exe" -PassThru -RedirectStandardError "$env:RUNNER_TEMP\err.txt" -RedirectStandardOutput "$env:RUNNER_TEMP\out.txt"
-          Start-Sleep -Seconds 15
-          "guivault-app vivant après 15 s : $(-not $p.HasExited)$(if ($p.HasExited) { ' (code ' + $p.ExitCode + ')' })"
-          Get-Process guivault-app, msedgewebview2 -ErrorAction SilentlyContinue | Format-Table Name, Id, MainWindowTitle -AutoSize | Out-String
-          "--- sortie d'erreur :"; Get-Content "$env:RUNNER_TEMP\err.txt" -ErrorAction SilentlyContinue
-          Get-Process guivault-app, msedgewebview2 -ErrorAction SilentlyContinue | Stop-Process -Force
           exit 0
-      - run: node app/e2e/run.mjs
+      - run: |
+          New-Item -ItemType Directory -Force app/e2e/.output | Out-Null
+          node app/e2e/run.mjs
+        shell: pwsh
         working-directory: web
         env:
           CARGO_TARGET_DIR: ${{ github.workspace }}\app-tauri\target
+          E2E_DRIVER_LOG: ${{ github.workspace }}\web\app\e2e\.output\driver.log
       - if: failure()
         uses: actions/upload-artifact@v4
         with:

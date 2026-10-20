@@ -438,6 +438,33 @@ scenario("sauvegardes : prises avant d'écrire, une copie s'ouvre à part", asyn
   await (await b.$("//a[.//span[normalize-space()='Personnel']]")).click();
 });
 
+scenario("import KeePass : une vraie base .kdbx, pièce jointe comprise", async (b) => {
+  // Écrite par KeePass 2.61 (`src/lib/fixtures/kdbx/make.ps1`) : le chemin
+  // navigateur de kdbxweb (WebCrypto) ne se prouve qu'ici, les tests unitaires
+  // tournent sous Node.
+  const kdbx = path.join(webRoot, "src", "lib", "fixtures", "kdbx", "keepass-argon2d.kdbx");
+  const before = coffreOnDisk(coffre).json.vaults[0].items.length;
+  await (await b.$('button[aria-label="Importer / exporter"]')).click();
+  await waitText(b, "KeePass et KeePassXC");
+  const input = await b.$('input[type="file"]');
+  // Masqué (sr-only) : `setValue` le viderait d'abord, ce que WebDriver
+  // refuse ; envoyer un chemin à un champ de fichier, lui, est permis.
+  await input.addValue(kdbx);
+  await waitText(b, "est une base KeePass");
+  await fillPasswords(b, "guivault-kdbx-test");
+  await click(b, "Déchiffrer");
+  await waitText(b, "KeePass (KDBX 4.0) : 4 élément(s)", 60_000);
+  await click(b, "Importer");
+  await waitText(b, "1 pièce(s) jointe(s)", 60_000);
+  const after = coffreOnDisk(coffre);
+  // 4 éléments et leurs dossiers (Internet, Banques).
+  assert(after.json.vaults[0].items.length >= before + 6, `import incomplet : ${after.json.vaults[0].items.length - before} écritures`);
+  assert(!after.raw.includes("gh-pass-2") && !after.raw.includes("contenu de la pièce jointe"), "un secret KeePass est en clair dans coffre.json");
+  assert(after.json.vaults[0].attachments.length === 1 && after.json.vaults[0].attachments[0].complete, "la pièce jointe KeePass n'est pas arrivée");
+  await (await b.$("//a[.//span[normalize-space()='Personnel']]")).click();
+  await waitText(b, "Wi-Fi maison");
+});
+
 scenario("fermer puis rouvrir : coffres récents, mauvais mot de passe refusé", async (b) => {
   await click(b, "Fermer le coffre");
   await button(b, "Créer un coffre local");
@@ -498,6 +525,14 @@ async function main() {
     process.exit(1);
   }
   await mkdir(scratch, { recursive: true });
+  // Windows, E2E_DRIVER_LOG : le journal détaillé de msedgedriver à côté
+  // (`<fichier>.msedgedriver.txt`). tauri-driver ne lui passe aucune
+  // option : un petit .cmd l'enveloppe et les ajoute.
+  if (isWindows && process.env.E2E_DRIVER_LOG) {
+    const wrapper = path.join(scratch, "msedgedriver-verbose.cmd");
+    await writeFile(wrapper, `@"${native}" %* --verbose --log-path="${process.env.E2E_DRIVER_LOG}.msedgedriver.txt"\r\n`);
+    native = wrapper;
+  }
 
   let vite = null;
   if (profile === "debug") {

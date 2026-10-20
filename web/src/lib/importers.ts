@@ -5,13 +5,13 @@
 import { fromBase64, uuid, utf8 } from "./bytes";
 import { parseCsv } from "./csv";
 import * as c from "./crypto";
-import { folderPathOf, importBitwardenJson, isBitwardenJson, NeedsPassword, type ImportResult, type ImportedItem } from "./bitwarden";
+import { folderPathOf, importBitwardenJson, isBitwardenJson, NeedsKeePassKey, NeedsPassword, type ImportResult, type ImportedFile, type ImportedItem } from "./bitwarden";
 import { emptyLogin, emptyNote } from "./items";
 import { withParent } from "./entities";
 import type { Group, Payload } from "./types";
 
-export { NeedsPassword };
-export type { ImportResult, ImportedItem };
+export { NeedsKeePassKey, NeedsPassword };
+export type { ImportResult, ImportedFile, ImportedItem };
 
 export const GUIVAULT_FORMAT = "guivault-export";
 export const GUIVAULT_ENCRYPTED_FORMAT = "guivault-export-encrypted";
@@ -34,7 +34,26 @@ export interface GuiVaultEncryptedExport {
   blob: string;
 }
 
-export async function importFile(text: string, password?: string): Promise<ImportResult> {
+/** Les deux premiers mots d'un fichier KDBX (KeePass), lus sans charger
+ * `kdbx.ts`. */
+function looksLikeKdbx(b: Uint8Array): boolean {
+  const sig = [0x03, 0xd9, 0xa2, 0x9a, 0x67, 0xfb, 0x4b, 0xb5];
+  return b.length >= 8 && sig.every((x, i) => b[i] === x);
+}
+
+/** Un fichier à importer : texte (JSON, CSV) ou octets (une base KeePass est
+ * binaire). `keyFile` : le fichier clé d'une base KeePass. */
+export async function importFile(input: string | Uint8Array, password?: string, keyFile?: Uint8Array): Promise<ImportResult> {
+  if (typeof input !== "string") {
+    if (looksLikeKdbx(input)) {
+      if (!password && !keyFile) throw new NeedsKeePassKey();
+      // Chargé à la demande : kdbxweb n'alourdit pas le reste.
+      const { importKdbx } = await import("./kdbx");
+      return importKdbx(input, password ?? "", keyFile);
+    }
+    input = new TextDecoder().decode(input);
+  }
+  const text = input;
   const trimmed = text.trimStart();
   if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
     let doc: unknown;

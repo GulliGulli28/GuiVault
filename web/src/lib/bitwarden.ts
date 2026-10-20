@@ -66,6 +66,14 @@ interface BwExport {
 export interface ImportedItem {
   payload: Payload;
   folderPath: string[];
+  /** Ses pièces jointes, en clair (KeePass) : envoyées chiffrées une fois
+   * l'élément écrit (`ToolsPage`). */
+  files?: ImportedFile[];
+}
+
+export interface ImportedFile {
+  name: string;
+  data: Uint8Array;
 }
 
 export interface ImportResult {
@@ -75,8 +83,15 @@ export interface ImportResult {
 }
 
 export class NeedsPassword extends Error {
+  constructor(message = "Cet export est protégé par un mot de passe.") {
+    super(message);
+  }
+}
+
+/** Une base KeePass : son mot de passe maître, et peut-être un fichier clé. */
+export class NeedsKeePassKey extends NeedsPassword {
   constructor() {
-    super("Cet export est protégé par un mot de passe.");
+    super("Base KeePass : son mot de passe maître (et son fichier clé s'il y en a un).");
   }
 }
 

@@ -88,6 +88,22 @@ protégé par mot de passe — PBKDF2 ou Argon2id, `EncString` type 2) et CSV,
 et les CSV de Chrome, Firefox, LastPass, KeePassXC ou tout CSV dont les
 colonnes se reconnaissent (`web/src/lib/importers.ts`).
 
+**Bases KeePass** (`.kdbx`, KDBX 3.1 et 4 — KeePass 2, KeePassXC, KeeWeb ;
+`web/src/lib/kdbx.ts`) : déchiffrées ici avec le mot de passe maître et le
+fichier clé éventuel (lecture par `kdbxweb`, Argon2 de `@noble/hashes`,
+plafonné à 2 Gio de mémoire). Chaque entrée devient un identifiant — ou une
+note si elle n'a que des notes — avec : utilisateur, mot de passe, adresse,
+notes, étiquettes ; champs personnalisés (protégés → masqués) ; TOTP
+(`TimeOtp-*` de KeePass 2.47+, `otp` de KeePassXC, `TOTP Seed`/`TOTP
+Settings` de l'ancien KeePassXC) ; historique des mots de passe ; saisie
+automatique (séquence, fenêtres associées, désactivée) ; expiration (en
+champ « Expiration (KeePass) ») ; pièces jointes (envoyées chiffrées après
+l'élément). Les groupes deviennent des dossiers ; la corbeille de la base
+n'est pas importée ; une référence `{REF:…}` est gardée telle quelle, avec un
+avertissement. Tests contre de vraies bases écrites par KeePass 2.61
+(`web/src/lib/fixtures/kdbx/`, régénérées par `make.ps1` : KeePassLib depuis
+PowerShell 5.1 — script en UTF-8 avec BOM).
+
 ## Intégrer à Guiterm
 
 Le jour où Guiterm affiche les secrets, dans l'ordre :

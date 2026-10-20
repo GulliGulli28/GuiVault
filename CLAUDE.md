@@ -179,6 +179,9 @@ il ne déchiffre rien : la user key reste sous la clé que seule la PRF donne).
     `lib/generator.ts` (+ `wordlist.ts`, liste EFF), `lib/sshkey.ts` (clés
     OpenSSH, testées contre `ssh-keygen`), `lib/totp.ts`, `lib/qr.ts`,
     `lib/csv.ts`, `lib/bitwarden.ts` (JSON en clair ou protégé, CSV),
+    `lib/kdbx.ts` (bases KeePass, chargé à la demande ; `kdbxweb`, dont
+    `@xmldom/xmldom` est forcé en version corrigée par `overrides` dans
+    `package.json` — fixtures réelles dans `lib/fixtures/kdbx/`),
     `lib/importers.ts` / `lib/exporters.ts` (formats dans `docs/ITEMS.md`).
   - `extension/` — l'extension de navigateur (MV3), même `node_modules`,
     importe `../../src/lib/*` et quelques composants. `docs/EXTENSION.md`.

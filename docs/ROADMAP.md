@@ -34,8 +34,8 @@ confortable :
 3. **Application** (§6, 20 octobre 2026) : l'app Windows (coffre local ou
    serveur, installeurs, saisie automatique) est faite, et le poste avec —
    presse-papiers hors de l'historique Windows, verrouillage avec la
-   session, sauvegardes du coffre local, zone de notification. Ensuite :
-   l'import KDBX, puis l'extension reliée à l'application. Android en
+   session, sauvegardes du coffre local, zone de notification — et l'import
+   KDBX. Ensuite : l'extension reliée à l'application. Android en
    dernier, ou sur demande.
 
 ## 0. Sécurité face à un serveur malveillant
@@ -306,9 +306,11 @@ L gros.
 
 **Ensuite** (ordre proposé)
 
-- [ ] **Import KDBX** (M–L) : KeePass 2 / KeePassXC directement, pièces
-  jointes et historique compris — la porte d'entrée de leurs utilisateurs
-  (aujourd'hui : leur CSV, avec pertes).
+- [x] **Import KDBX** (M–L) : KeePass 2 / KeePassXC directement (KDBX 3.1
+  et 4, fichier clé), pièces jointes, historique, TOTP et saisie
+  automatique compris — `lib/kdbx.ts`, détail dans
+  [`ITEMS.md`](ITEMS.md) ; testé contre de vraies bases KeePass, et dans la
+  vraie fenêtre (E2E).
 - [ ] **Extension ↔ application** (L, KeePassXC-Browser) : native messaging,
   remplir depuis un coffre local — sans ça l'extension ne sert qu'avec un
   serveur.
