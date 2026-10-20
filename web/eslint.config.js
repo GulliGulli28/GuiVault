@@ -6,7 +6,7 @@ import globals from "globals";
 export default tseslint.config(
   { ignores: ["dist"] },
   {
-    files: ["src/**/*.{ts,tsx}", "extension/src/**/*.{ts,tsx}"],
+    files: ["src/**/*.{ts,tsx}", "app/src/**/*.{ts,tsx}", "extension/src/**/*.{ts,tsx}"],
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     plugins: {
       "react-hooks": reactHooks,

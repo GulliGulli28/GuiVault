@@ -98,7 +98,8 @@ let running: Promise<OfflineCopy | null> | null = null;
 /** Met la copie à jour si elle existe (sinon ne fait rien) : les vaults, et
  * les items de ceux dont la révision a bougé. Une seule à la fois. */
 export function refreshOfflineCopy(state: SessionState): Promise<OfflineCopy | null> {
-  if (state.offline) return Promise.resolve(null);
+  // Un coffre local est déjà sur cet appareil.
+  if (state.offline || state.local) return Promise.resolve(null);
   const previous = running ?? Promise.resolve(null);
   const next = previous.catch(() => null).then(() => doRefresh(state));
   running = next.finally(() => {

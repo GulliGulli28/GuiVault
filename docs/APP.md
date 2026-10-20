@@ -1,8 +1,8 @@
 # L'application GuiVault (Windows, puis Android)
 
-**État : le coffre local (`crates/guivault-local`) et son transport côté
-interface (`web/src/lib/localHost.ts`) sont écrits — étapes 1 et 2 ; l'app
-pas encore.** Ce document fixe les choix ; il deviendra la doc de l'app comme
+**État : étapes 1 à 3 faites — le coffre local (`crates/guivault-local`), son
+transport côté interface (`web/src/lib/localHost.ts`), et l'app Windows
+(`app-tauri/`, `web/app/`). Reste l'interface en mode local (étape 4).** Ce document fixe les choix ; il deviendra la doc de l'app comme
 `EXTENSION.md` l'est pour l'extension.
 
 Une application installée qui, au choix :
@@ -157,6 +157,39 @@ items, prend un dossier au lieu d'une URL. C'est précisément parce que le
 coffre local garde le format du serveur que ce sera de la tuyauterie et pas
 une conception. À décider après la v1 de l'app.
 
+## Construire et lancer
+
+L'interface de l'app est `web/app/` : `src/main.tsx` monte `App` avec
+l'accueil `AppWelcome` (serveur ou coffre local) ; `tauriHost.ts` est
+l'hôte du coffre local (commandes Tauri) ; `recents.ts` les coffres récents
+et le dernier serveur (`localStorage`). Le mode serveur n'a pas besoin de
+Tauri : `setBaseUrl` puis l'écran de connexion du web, en HTTP — l'API a un
+CORS ouvert (`routes/mod.rs`), et la CSP de `tauri.conf.json` permet
+`https:` et `http://localhost`.
+
+```bash
+cd web && npm run build:app        # web/dist-app, que le binaire embarque
+cd web && npm run dev:app          # Vite sur :1431 (devUrl de tauri.conf.json)
+cd app-tauri && cargo build        # binaire de dev Linux (WebKitGTK, WSLg) : charge :1431
+cd app-tauri && cargo clippy --all-targets && cargo fmt --check
+```
+
+Le vrai binaire Windows (WebView2), depuis WSL — Rust natif est installé
+côté Windows ; npm reste côté WSL, un seul `node_modules` :
+
+```powershell
+$env:PATH += ";$env:USERPROFILE\.cargo\bin"
+$env:CARGO_TARGET_DIR = "$env:USERPROFILE\guivault-app-target-windows"   # NTFS, jamais le chemin UNC
+Get-Process guivault-app -ErrorAction SilentlyContinue | Stop-Process -Force
+Set-Location "\\wsl.localhost\Ubuntu-24.04\home\glorin\GuiVault\app-tauri"
+cargo build --release --features tauri/custom-protocol    # embarque web/dist-app
+Start-Process "$env:CARGO_TARGET_DIR\release\guivault-app.exe"
+```
+
+Sans `tauri/custom-protocol`, le binaire charge `devUrl` au lieu de
+`dist-app`. Les installeurs (MSI/NSIS) viendront avec l'étape 5
+(`tauri build` sur un runner Windows).
+
 ## Étapes, dans l'ordre
 
 1. ~~**`crates/guivault-local`**~~ — fait : format, écritures sous verrou,
@@ -174,9 +207,11 @@ une conception. À décider après la v1 de l'app.
    façade, les erreurs, le contrat, et une session créée, écrite, rouverte
    (mauvais mot de passe, changement de mot de passe) avec un hôte en
    mémoire. Rien ne change pour le web ni l'extension.
-3. **`app-tauri/` + `web/app/`**, Windows : commandes Tauri qui exposent
-   `guivault-local` ; écran d'accueil « Se connecter à un serveur » /
-   « Ouvrir un coffre local » / « Créer un coffre local » ; coffres récents.
+3. ~~**`app-tauri/` + `web/app/`**~~ — fait, Windows : quatre commandes
+   Tauri (`local_create`, `local_open`, `local_close`, `local_call` →
+   `rpc::call`), l'accueil `web/app/src/AppWelcome.tsx` (serveur, ouvrir,
+   créer, coffres récents), `App` réutilisé tel quel (`Welcome` à la place
+   de `LoginScreen`). Voir « Construire et lancer ».
 4. **Interface en mode local** : pages masquées selon les capacités, libellés.
 5. **CI** : job Windows (construction, puis installeur sur tag).
 6. Plus tard : Android ; « Pousser vers un serveur » ; `gv` sur un coffre

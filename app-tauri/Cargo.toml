@@ -1,0 +1,35 @@
+# L'application GuiVault (`docs/APP.md`) : Windows d'abord, Android ensuite.
+#
+# Workspace À PART, comme `rdp-sidecar` chez Guiterm : `cargo test` à la racine
+# du dépôt reste la boucle du serveur, sans tauri, wry ni NDK Android. Ce
+# crate ne dépend que de `guivault-local` (le coffre local, sans crypto) — la
+# crypto est celle de l'interface web, embarquée (`web/dist-app`).
+[workspace]
+
+[package]
+name = "guivault-app"
+description = "GuiVault : se connecter à un serveur GuiVault, ou ouvrir un coffre local."
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+repository = "https://github.com/GulliGulli28/GuiVault"
+
+[[bin]]
+name = "guivault-app"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+guivault-local = { path = "../crates/guivault-local" }
+serde_json = "1"
+# Même contrainte de résolution que chez Guiterm : cookie 0.18.1 (tiré par
+# tauri/wry) appelle une API de `time` que 0.3.48 a cassée. Jamais `use`ée.
+time = "=0.3.47"
+
+[profile.release]
+lto = "thin"
+strip = true

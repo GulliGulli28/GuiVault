@@ -27,6 +27,7 @@
   },
   "include": [
     "src",
+    "app/src",
     "extension/src",
     "extension/e2e"
   ],

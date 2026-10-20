@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType } from "react";
 import { currentTokens, setSessionLostHandler, setTokens, setTokensChangedHandler, subscribeEvents } from "./lib/api";
 import { pullSettings, startSettingsSync, stopSettingsSync } from "./lib/syncedSettings";
 import "./lib/settingsSections";
 import { clearWebSession, loadWebSession, saveWebSession, saveWebTokens, touchWebSession, webSessionIdle } from "./lib/persist";
 import { navigate, useRoute } from "./lib/route";
-import { acceptRollback, logout, refresh, wipe, type SessionState } from "./lib/session";
+import { acceptRollback, closeLocal, logout, refresh, wipe, type SessionState } from "./lib/session";
 import { refreshOfflineCopy } from "./lib/offline";
 import { LoginScreen } from "./components/LoginScreen";
 import { Sidebar } from "./components/Sidebar";
@@ -39,7 +39,10 @@ export interface PageContext {
   vaultTicks: Record<string, number>;
 }
 
-export default function App() {
+/** `Welcome` : l'écran sans session — la connexion au serveur qui sert la
+ * page, ou, dans l'application, l'accueil qui choisit un serveur ou un
+ * coffre local (`web/app`). */
+export default function App({ Welcome = LoginScreen }: { Welcome?: ComponentType<{ onSession: (s: SessionState) => void }> }) {
   // La session de l'onglet d'avant rechargement, si le délai d'inactivité
   // ne l'a pas effacée — sinon on repart de la connexion, en le disant.
   const restored = useRef(loadWebSession());
@@ -108,6 +111,7 @@ export default function App() {
     const timer = setInterval(() => {
       if (webSessionIdle() && sessionRef.current) {
         clearWebSession();
+        if (sessionRef.current.local) void closeLocal();
         wipe(sessionRef.current);
         setSession(null);
         navigate({ page: "home" });
@@ -207,7 +211,7 @@ export default function App() {
   if (!ctx) {
     return (
       <div className="h-full overflow-y-auto bg-[var(--c-bg)] text-[var(--c-text)]">
-        <LoginScreen onSession={(s) => { const t = currentTokens(); if (t) saveWebSession(s, t); setSession(s); navigate({ page: "home" }); if (!s.offline) void refreshOfflineCopy(s).catch(() => {}); }} />
+        <Welcome onSession={(s) => { const t = currentTokens(); if (t) saveWebSession(s, t); setSession(s); navigate({ page: "home" }); if (!s.offline) void refreshOfflineCopy(s).catch(() => {}); }} />
         <Toasts toasts={toasts} onDismiss={dismiss} />
       </div>
     );

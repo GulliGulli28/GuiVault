@@ -71,6 +71,13 @@ il ne déchiffre rien : la user key reste sous la clé que seule la PRF donne).
   `migrations/` (sqlx, embarquées, appliquées au démarrage), `web.rs`
   (sert `web/dist` embarqué par `include_dir!`, CSP stricte ; `build.rs`
   crée le dossier vide s'il manque pour que ça compile sans Node).
+- `app-tauri/` — l'application (Windows d'abord, `docs/APP.md`) : Tauri 2,
+  **workspace Cargo à part** (`cargo test` à la racine ne le construit pas),
+  quatre commandes qui passent le coffre local à `guivault_local::rpc`.
+  Son interface est `web/app/` (`AppWelcome` : serveur ou coffre local,
+  puis `App` tel quel), construite dans `web/dist-app` par `npm run build:app`.
+  Après un changement de comportement de l'app, construire et lancer le
+  vrai `.exe` Windows (recette dans `docs/APP.md`, « Construire et lancer »).
 - `web/` — l'interface web, Vite + React 19 + TypeScript + Tailwind 3,
   **même charte que Guiterm** (le tactile à part : `src/touch.css`, pour
   ne pas diverger ; `hooks/useMediaQuery.ts`) : `src/index.css` (jetons et primitives
@@ -198,6 +205,8 @@ cargo clippy --all-targets           # doit être vide
 cargo fmt --all --check              # le CI le bloque (max_width = 120)
 cd web && npm test && npm run lint && npm run build   # Node 20 via nvm (`source ~/.nvm/nvm.sh`)
 cd web && npm run build:ext                           # extension (dist-extension/, non embarquée)
+cd web && npm run build:app                           # interface de l'app (dist-app/, embarquée par app-tauri)
+cd app-tauri && cargo clippy --all-targets && cargo fmt --check   # l'app, workspace à part
 cd web && npm run test:ext                            # corpus de remplissage (Playwright, Chromium)
 docker build -f docker/Dockerfile -t guivault:dev .
 ```

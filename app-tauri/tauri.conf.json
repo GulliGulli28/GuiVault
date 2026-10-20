@@ -1,0 +1,43 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "GuiVault",
+  "identifier": "dev.guivault.app",
+  "version": "0.1.0",
+  "build": {
+    "beforeDevCommand": "npm --prefix ../web run dev:app",
+    "beforeBuildCommand": "npm --prefix ../web run build:app",
+    "devUrl": "http://localhost:1431",
+    "frontendDist": "../web/dist-app"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "GuiVault",
+        "width": 1200,
+        "height": 780,
+        "minWidth": 380,
+        "minHeight": 500,
+        "resizable": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost https: http://localhost:* http://127.0.0.1:*; object-src 'none'; base-uri 'self'; frame-src 'none'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "publisher": "GulliGulli28",
+    "copyright": "Copyright © 2026 GulliGulli28 — MIT",
+    "category": "Utility",
+    "shortDescription": "Coffre à secrets zero-knowledge, avec ou sans serveur",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.png",
+      "icons/icon.ico"
+    ]
+  }
+}

@@ -69,7 +69,7 @@ impl Default for Options {
 /// Ce que le client prépare pour créer un coffre : le compte
 /// (`create_account`, sans la clé d'auth) et le vault personnel (id, nom
 /// chiffré, clé enveloppée pour soi-même).
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Deserialize)]
 pub struct NewCoffre {
     pub account: LocalAccount,
     pub personal: CreateVaultRequest,
