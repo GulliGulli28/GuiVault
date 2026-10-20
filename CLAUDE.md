@@ -43,6 +43,14 @@ il ne déchiffre rien : la user key reste sous la clé que seule la PRF donne).
   sur le disque, `vault.rs` les champs lus génériquement dans le JSON des
   items) et `main.rs` (arguments à la main, invites sur le terminal). Son
   test `tests/cli.rs` lance un vrai serveur, comme `tests/api.rs`.
+- `crates/guivault-local` — le coffre local de l'app (`docs/APP.md`) : un
+  dossier qui garde **exactement ce que garde le serveur** (mêmes types
+  `guivault-protocol`, mêmes règles de révision, manifeste, corbeille,
+  historique, mêmes codes d'erreur), sans clé ni crypto — la règle n°1 y
+  vaut comme au serveur. Tout dans un `coffre.json` réécrit atomiquement
+  sous `.lock`, pièces jointes à côté. **Une règle qui change dans
+  `routes/items.rs`, `history.rs`, `attachments.rs` ou `validate.rs` change
+  ici aussi.**
 - `crates/guivault-server` — `routes/` (une route par domaine), `db.rs`
   (lignes et requêtes partagées), `auth.rs` (extracteur `AuthUser`,
   jetons), `sessions.rs`, `validate.rs` (tailles des blobs), `audit.rs`,
