@@ -1,11 +1,14 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "La fenêtre principale : choisir un dossier de coffre, rien d'autre.",
+  "description": "La fenêtre principale : choisir un dossier de coffre, et revenir au premier plan pour la saisie automatique.",
   "windows": ["main"],
   "permissions": [
     "core:default",
     "dialog:allow-open",
-    "dialog:allow-save"
+    "dialog:allow-save",
+    "core:window:allow-unminimize",
+    "core:window:allow-show",
+    "core:window:allow-set-focus"
   ]
 }

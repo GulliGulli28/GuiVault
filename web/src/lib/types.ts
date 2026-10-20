@@ -655,6 +655,29 @@ export interface Login extends SecretBase {
   totp: string | null;
   passkeys: Passkey[];
   passwordHistory: PasswordHistoryEntry[];
+  /** La saisie automatique de l'application (`lib/autotype.ts`), à la
+   * KeePass. Absente : réglages par défaut. */
+  autoType?: AutoType;
+}
+
+/** Comment l'application tape cet identifiant dans une autre fenêtre. */
+export interface AutoType {
+  /** Faux : jamais tapé, ni par le raccourci global, ni depuis la fiche. */
+  enabled?: boolean;
+  /** Sa séquence (`{USERNAME}{TAB}{PASSWORD}{ENTER}`…) ; absente : celle
+   * réglée dans l'application. */
+  sequence?: string;
+  /** Les fenêtres où le raccourci global le propose, en plus de celles dont
+   * le titre contient son nom : un motif (`*` = n'importe quoi, sans
+   * casse), et sa séquence pour cette fenêtre-là. */
+  windows?: AutoTypeWindow[];
+  [extra: string]: unknown;
+}
+
+export interface AutoTypeWindow {
+  title: string;
+  sequence?: string;
+  [extra: string]: unknown;
 }
 
 export interface Note extends SecretBase {

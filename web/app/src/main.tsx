@@ -8,14 +8,19 @@ import "@fontsource/jetbrains-mono/latin-ext-400.css";
 import { installPreferences } from "../../src/lib/preferences";
 import { setDeviceLabel } from "../../src/lib/session";
 import { AppWelcome } from "./AppWelcome";
+import { installAutoType } from "./autotypeBridge";
 
 // Comme l'interface web (`src/main.tsx`), sans le service worker : l'app
 // embarque déjà son interface.
 installPreferences();
 setDeviceLabel("Application GuiVault");
 
-ReactDOM.createRoot(document.getElementById("root")!).render(
-  <React.StrictMode>
-    <App Welcome={AppWelcome} />
-  </React.StrictMode>,
-);
+// La saisie automatique d'abord (quelques millisecondes) : les composants
+// regardent au rendu si elle existe.
+void installAutoType().finally(() => {
+  ReactDOM.createRoot(document.getElementById("root")!).render(
+    <React.StrictMode>
+      <App Welcome={AppWelcome} />
+    </React.StrictMode>,
+  );
+});

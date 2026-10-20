@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PageContext } from "../App";
 import { errorMessage, supports } from "../lib/api";
+import { autoTypeBridge } from "../lib/platform";
+import { performAutoType } from "./AutoType";
 import { filterEntities, indexItems, SORT_LABELS, toEntities, withParent, type SortMode } from "../lib/entities";
 import { plainShortcut } from "../lib/keyboard";
 import { uuid } from "../lib/bytes";
@@ -21,7 +23,7 @@ import { AttachmentsPanel } from "./AttachmentsPanel";
 import { IntegrityBanner } from "./IntegrityBanner";
 import { useMerge } from "./MergeDialog";
 import { ShortcutsHelp } from "./ShortcutsHelp";
-import { IconChevronDown, IconCopy, IconEdit, IconFolder, IconPlus, IconRefresh, IconSearch, IconSettings, IconTrash } from "./ui-icons";
+import { IconChevronDown, IconCopy, IconEdit, IconFolder, IconKeyboard, IconPlus, IconRefresh, IconSearch, IconSettings, IconTrash } from "./ui-icons";
 import { copyText, formatWhen, Loading, useDelayed } from "./ui";
 import { PaneHandle, usePersistedPane } from "../hooks/usePersistedPane";
 import { TOUCH, useMediaQuery } from "../hooks/useMediaQuery";
@@ -519,6 +521,12 @@ function VaultBody({ ctx, vault, itemId }: { ctx: PageContext; vault: VaultView;
                 {current.ok && (() => { const entity = entities.find((e) => e.id === current.id); return <span className="flex h-6 w-6 items-center justify-center rounded-md bg-[var(--c-bg3)] text-[var(--c-text-secondary)] [&>.host-icon]:h-[72%] [&>.host-icon]:w-[72%] [&>.host-icon>*]:h-full [&>.host-icon>*]:w-full">{entity ? <EntityIcon entity={entity} customIcons={index.icons} /> : null}</span>; })()}
                 <h2 className="min-w-0 truncate text-[13px] font-semibold text-[var(--c-text)]">{current.ok ? payloadName(current.payload) : "Élément illisible"}</h2>
                 <span className="text-[11px] text-[var(--c-text-faint)]" title={`Révision ${current.revision}`}>{current.ok ? KIND_LABELS[current.payload.kind] : current.itemType} · {formatWhen(current.updatedAt)}</span>
+                {current.ok && current.payload.kind === "login" && autoTypeBridge() && (() => {
+                  const login = current.payload.login;
+                  return (
+                    <button onClick={() => performAutoType(login).catch((e) => ctx.error(`Saisie automatique : ${errorMessage(e)}`))} disabled={login.autoType?.enabled === false} className="btn btn-ghost btn-sm btn-icon" title={login.autoType?.enabled === false ? "Saisie automatique désactivée pour cet identifiant" : "Saisie automatique : GuiVault se réduit et le tape dans la fenêtre d'avant"} aria-label="Saisie automatique"><IconKeyboard size={13} /></button>
+                  );
+                })()}
                 {!emergency && isSecretItem && supports("createSend") && (
                   <button onClick={() => setSharing(true)} className={`btn btn-ghost btn-sm btn-icon ${writable ? "" : "ml-auto"}`} title="Partager par lien : une copie chiffrée, qui expire" aria-label="Partager par lien"><IconLink size={13} /></button>
                 )}

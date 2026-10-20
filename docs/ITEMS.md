@@ -49,7 +49,7 @@ text|hidden|boolean }`).
 
 | `kind` | Champs propres |
 |---|---|
-| `login` | `username`, `password`, `uris[] { uri, match? }`, `totp` (URI `otpauth://` ou secret base32), `passkeys[]`, `passwordHistory[] { password, changedAt }` |
+| `login` | `username`, `password`, `uris[] { uri, match? }`, `totp` (URI `otpauth://` ou secret base32), `passkeys[]`, `passwordHistory[] { password, changedAt }`, `autoType? { enabled?, sequence?, windows?[] { title, sequence? } }` (saisie automatique de l'application, `lib/autotype.ts`) |
 | `note` | `content` |
 | `card` | `cardholderName`, `brand`, `number`, `expMonth`, `expYear`, `code` |
 | `identity` | `title`, `firstName`, `middleName`, `lastName`, `username`, `company`, `ssn`, `passportNumber`, `licenseNumber`, `email`, `phone`, `address1..3`, `city`, `state`, `postalCode`, `country` |

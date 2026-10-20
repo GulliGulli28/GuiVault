@@ -36,6 +36,13 @@ fn web_items_parse_and_roundtrip() {
     assert_eq!(login.password_history[0].password, "old");
     assert_eq!(login.base.fields.as_ref().unwrap()[0].r#type, FieldType::Hidden);
     assert_eq!(login.base.favorite, Some(true));
+    let auto_type = login.auto_type.as_ref().unwrap();
+    assert_eq!(
+        auto_type.sequence.as_deref(),
+        Some("{USERNAME}{TAB}{PASSWORD}{TAB}{TOTP}{ENTER}")
+    );
+    assert_eq!(auto_type.windows.as_ref().unwrap()[0].title, "*GitHub*Firefox");
+    assert_eq!(auto_type.enabled, None);
     let SecretItem::Note { note } = SecretItem::from_json(values[1].to_string().as_bytes()).unwrap() else {
         panic!()
     };

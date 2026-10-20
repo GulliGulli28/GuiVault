@@ -19,7 +19,9 @@ import { ConfirmDialog } from "./ConfirmDialog";
 import { AuditList } from "./VaultSettings";
 import { IconIdentity, IconLifebuoy } from "./secret-icons";
 import { EmergencySettings } from "./EmergencySettings";
-import { IconMonitor, IconPalette, IconShield, IconTrash } from "./ui-icons";
+import { AutoTypeSettings } from "./AutoType";
+import { autoTypeBridge } from "../lib/platform";
+import { IconKeyboard, IconMonitor, IconPalette, IconShield, IconTrash } from "./ui-icons";
 import { CopyButton, Eyebrow, Fingerprint, formatWhen, Modal, PasswordInput } from "./ui";
 
 /** Les catégories, avec leur nom — la colonne de gauche du panneau
@@ -28,6 +30,7 @@ const CATEGORIES: { key: SettingsSection; label: string; Icon: ComponentType<{ s
   { key: "apparence", label: "Apparence", Icon: IconPalette },
   { key: "compte", label: "Compte", Icon: IconIdentity },
   { key: "securite", label: "Sécurité", Icon: IconShield },
+  { key: "saisie", label: "Saisie automatique", Icon: IconKeyboard },
   { key: "urgence", label: "Accès d'urgence", Icon: IconLifebuoy },
   { key: "sessions", label: "Sessions", Icon: IconMonitor },
 ];
@@ -54,7 +57,7 @@ export function SettingsPage({ ctx, section }: { ctx: PageContext; section: Sett
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(reload, []);
 
-  const categories = CATEGORIES.filter((c) => (c.key !== "urgence" || supports("emergency")) && (c.key !== "sessions" || supports("sessions")));
+  const categories = CATEGORIES.filter((c) => (c.key !== "urgence" || supports("emergency")) && (c.key !== "sessions" || supports("sessions")) && (c.key !== "saisie" || !!autoTypeBridge()));
   const current = categories.find((c) => c.key === section) ?? categories[0];
   const local = session.local;
   const who = local ? coffreName(local.path) : session.user.email;
@@ -68,7 +71,7 @@ export function SettingsPage({ ctx, section }: { ctx: PageContext; section: Sett
       <div className="flex min-h-0 flex-1 max-md:flex-col">
         {/* Les catégories, avec leur nom : en colonne à gauche, en rangée
             au-dessus quand la fenêtre est étroite. */}
-        <nav className="flex shrink-0 gap-px border-[var(--c-border)] p-2.5 max-md:overflow-x-auto max-md:border-b md:w-[10rem] md:flex-col md:border-r">
+        <nav className="flex shrink-0 gap-px border-[var(--c-border)] p-2.5 max-md:overflow-x-auto max-md:border-b md:w-[11.5rem] md:flex-col md:border-r">
           {categories.map((c) => {
             const active = current.key === c.key;
             return (
@@ -160,6 +163,8 @@ export function SettingsPage({ ctx, section }: { ctx: PageContext; section: Sett
             </section>
           )}
           {current.key === "securite" && supports("passkeys") && <PasskeySettings ctx={ctx} />}
+
+          {current.key === "saisie" && <AutoTypeSettings notify={ctx.notify} />}
 
           {current.key === "urgence" && <EmergencySettings ctx={ctx} />}
 

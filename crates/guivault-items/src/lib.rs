@@ -175,6 +175,37 @@ pub struct Login {
     pub passkeys: Vec<Passkey>,
     #[serde(default)]
     pub password_history: Vec<PasswordHistoryEntry>,
+    /// La saisie automatique de l'application (`web/src/lib/autotype.ts`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub auto_type: Option<AutoType>,
+}
+
+/// Comment l'application tape un identifiant dans une autre fenêtre, à la
+/// KeePass : sa séquence, et les fenêtres où le raccourci global le propose.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutoType {
+    /// `Some(false)` : jamais tapé.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub enabled: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sequence: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub windows: Option<Vec<AutoTypeWindow>>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Un motif de titre de fenêtre (`*` = n'importe quoi, sans casse), et la
+/// séquence à y taper.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutoTypeWindow {
+    pub title: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sequence: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

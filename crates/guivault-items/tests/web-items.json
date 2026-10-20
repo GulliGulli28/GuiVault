@@ -51,7 +51,16 @@
           "value": "true",
           "type": "boolean"
         }
-      ]
+      ],
+      "autoType": {
+        "sequence": "{USERNAME}{TAB}{PASSWORD}{TAB}{TOTP}{ENTER}",
+        "windows": [
+          {
+            "title": "*GitHub*Firefox",
+            "sequence": "{PASSWORD}{ENTER}"
+          }
+        ]
+      }
     }
   },
   {

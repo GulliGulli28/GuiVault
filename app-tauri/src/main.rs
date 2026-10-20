@@ -8,10 +8,13 @@
 //! au serveur en HTTP, comme dans un navigateur (CORS ouvert sur l'API).
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod autotype;
+
 use guivault_local::{LocalVault, NewCoffre};
 use serde_json::Value;
 use std::sync::Mutex;
-use tauri::State;
+use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow};
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 
 /// Le coffre ouvert, un à la fois. `LocalVault` ne garde que son chemin :
 /// on le clone pour travailler hors du verrou.
@@ -74,15 +77,123 @@ async fn local_call(state: State<'_, Coffre>, op: String, args: Value) -> Result
     blocking(move || guivault_local::rpc::call(&vault, &op, &args).map_err(error)).await
 }
 
+// ─── Saisie automatique (`src/autotype.rs`) ─────────────────────────────────
+
+/// Le raccourci global en place, pour le rendre si le suivant est refusé.
+#[derive(Default)]
+struct Hotkey(Mutex<Option<String>>);
+
+fn autotype_error(e: autotype::Error) -> Value {
+    serde_json::to_value(e).unwrap_or(Value::Null)
+}
+
+/// Le handle de la fenêtre de GuiVault, pour ne jamais s'y taper soi-même.
+fn own_handle(window: &WebviewWindow) -> Option<isize> {
+    #[cfg(windows)]
+    {
+        window.hwnd().ok().map(|h| h.0 as isize)
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = window;
+        None
+    }
+}
+
+#[tauri::command]
+fn autotype_available() -> bool {
+    cfg!(windows)
+}
+
+/// Pose le raccourci global (`""` le retire). Pressé, il note la fenêtre au
+/// premier plan **à cet instant** et la confie à l'interface
+/// (`autotype-request`), qui choisit quoi y taper.
+#[tauri::command]
+fn autotype_set_hotkey(app: AppHandle, state: State<'_, Hotkey>, accelerator: String) -> Result<(), Value> {
+    if !cfg!(windows) {
+        return Err(autotype_error(autotype::Error::new(
+            "autotype_unsupported",
+            "La saisie automatique n'existe encore que sous Windows.",
+        )));
+    }
+    let gs = app.global_shortcut();
+    let mut current = state.0.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some(old) = current.take() {
+        let _ = gs.unregister(old.as_str());
+    }
+    let accelerator = accelerator.trim().to_string();
+    if accelerator.is_empty() {
+        return Ok(());
+    }
+    let register = |accel: &str| {
+        gs.on_shortcut(accel, |app, _shortcut, event| {
+            if event.state != ShortcutState::Pressed {
+                return;
+            }
+            let own = app.get_webview_window("main").and_then(|w| own_handle(&w));
+            let Some(fg) = autotype::foreground() else { return };
+            // Pressé dans GuiVault lui-même : rien à taper.
+            if own.is_some_and(|o| o.to_string() == fg.target) {
+                return;
+            }
+            let _ = app.emit_to("main", "autotype-request", fg);
+        })
+    };
+    match register(&accelerator) {
+        Ok(()) => {
+            *current = Some(accelerator);
+            Ok(())
+        }
+        Err(e) => Err(autotype_error(autotype::Error::new(
+            "autotype_hotkey",
+            format!("Raccourci « {accelerator} » refusé : {e}. Il est peut-être déjà pris par une autre application."),
+        ))),
+    }
+}
+
+/// Tape `actions` (résolues par `lib/autotype.ts`) dans `target`, ou dans
+/// la fenêtre d'avant GuiVault. Le texte est effacé de la mémoire ensuite,
+/// quoi qu'il arrive.
+#[tauri::command]
+async fn autotype_type(window: WebviewWindow, actions: Value, target: Option<String>) -> Result<(), Value> {
+    let mut actions: Vec<autotype::Action> = serde_json::from_value(actions)
+        .map_err(|e| autotype_error(autotype::Error::new("invalid_request", e.to_string())))?;
+    let own = own_handle(&window);
+    tauri::async_runtime::spawn_blocking(move || {
+        let minimize = || {
+            let _ = window.minimize();
+        };
+        let r = autotype::type_actions(target.as_deref(), own, &minimize, &actions);
+        autotype::wipe(&mut actions);
+        r.map_err(autotype_error)
+    })
+    .await
+    .map_err(|e| autotype_error(autotype::Error::new("autotype_failed", e.to_string())))?
+}
+
+/// Le handle de la fenêtre de GuiVault : une cible pour les tests de bout en
+/// bout (`web/app/e2e`), qui tapent dans l'application elle-même plutôt que
+/// dans une fenêtre de la personne qui les lance.
+#[tauri::command]
+fn autotype_self_target(window: WebviewWindow) -> Option<String> {
+    own_handle(&window).map(|h| h.to_string())
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .manage(Coffre::default())
+        .manage(Hotkey::default())
         .invoke_handler(tauri::generate_handler![
             local_create,
             local_open,
             local_close,
-            local_call
+            local_call,
+            autotype_available,
+            autotype_set_hotkey,
+            autotype_type,
+            autotype_self_target
         ])
         .run(tauri::generate_context!())
         .expect("échec du lancement de GuiVault");

@@ -24,8 +24,8 @@ export type Route =
   /** Un lien de partage reçu : public, hors session. */
   | { page: "send"; id: string; secret: string };
 
-export type SettingsSection = "apparence" | "compte" | "securite" | "urgence" | "sessions";
-const SECTIONS: SettingsSection[] = ["apparence", "compte", "securite", "urgence", "sessions"];
+export type SettingsSection = "apparence" | "compte" | "securite" | "saisie" | "urgence" | "sessions";
+const SECTIONS: SettingsSection[] = ["apparence", "compte", "securite", "saisie", "urgence", "sessions"];
 
 export function parseRoute(hash: string): Route {
   const parts = hash.replace(/^#\/?/, "").split("/").filter(Boolean);

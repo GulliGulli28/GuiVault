@@ -9,7 +9,8 @@
 //   Rendu          WebKitGTK                      WebView2 (ce que lancent les utilisateurs)
 //   Pilote         /usr/bin/WebKitWebDriver       msedgedriver.exe (EDGEDRIVER_PATH)
 //   Binaire        debug (`cargo build`)          release + `tauri/custom-protocol`
-//   Interface      Vite sur :1431 (devUrl)        `web/dist-app` embarqué
+//   Interface      `vite preview` sur :1431       `web/dist-app` embarqué
+//                  (devUrl, construite avant)
 //
 // Préalables : `cargo install tauri-driver` ; Linux : `webkit2gtk-driver` ;
 // Windows : `msedgedriver.exe` de la même version majeure que le runtime
@@ -65,20 +66,16 @@ function waitForPort(port, timeoutMs) {
   });
 }
 
-/** Le premier `/src/main.tsx` fait pré-empaqueter les dépendances par Vite :
- * on le paie ici, pas dans l'attente du montage de React. */
-async function warmVite(timeoutMs) {
+async function waitHttp(url, timeoutMs) {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
     try {
-      const r = await fetch("http://localhost:1431/src/main.tsx");
-      await r.text();
-      if (r.ok) return;
+      if ((await fetch(url)).ok) return;
     } catch {
       // pas encore prêt
     }
-    if (Date.now() > deadline) throw new Error("Vite n'a jamais servi /src/main.tsx");
-    await new Promise((r) => setTimeout(r, 500));
+    if (Date.now() > deadline) throw new Error(`rien ne répond sur ${url}`);
+    await new Promise((r) => setTimeout(r, 300));
   }
 }
 
@@ -256,6 +253,78 @@ scenario("créer une note : écrite chiffrée dans le coffre", async (b) => {
   await shot(b, "3-note");
 });
 
+/** Une commande de l'application, depuis la page (W3C : la promesse est
+ * attendue). Rend `{ ok, value }` ou `{ ok: false, error }`. */
+async function invoke(b, cmd, args = {}) {
+  return b.execute((c, a) => window.__TAURI_INTERNALS__.invoke(c, a).then((value) => ({ ok: true, value }), (error) => ({ ok: false, error })), cmd, args);
+}
+
+async function openSettings(b, section) {
+  await (await b.$("//a[contains(normalize-space(), 'Coffre local et paramètres')]")).click();
+  await waitText(b, "Coffre local « Mon coffre »");
+  if (section) await (await b.$(`//a[normalize-space()=${xpathText(section)}]`)).click();
+}
+
+scenario("saisie automatique : fiche, réglages, frappe réelle (Windows)", async (b) => {
+  const available = (await invoke(b, "autotype_available")).value === true;
+  if (!available) {
+    await openSettings(b);
+    assert(!(await bodyText(b)).includes("Saisie automatique"), "« Saisie automatique » est proposée sur un système où l'application ne sait pas taper");
+    await (await b.$("//a[.//span[normalize-space()='Personnel']]")).click();
+    return "ignoré : pas de saisie automatique sur ce système (et rien n'en est montré)";
+  }
+
+  // Un identifiant, et son bouton sur la fiche.
+  await (await b.$("//button[contains(normalize-space(), 'Nouveau') and @aria-haspopup='menu']")).click();
+  await (await b.$("//button[@role='menuitem'][normalize-space()='Identifiant']")).click();
+  await waitText(b, "Nouvel identifiant");
+  await fillField(b, "Nom", "Banque en ligne");
+  await fillField(b, "Utilisateur", "alice");
+  await fillField(b, "Mot de passe", "s3cret!");
+  await waitText(b, "Saisie automatique");
+  await click(b, "Enregistrer");
+  await (await b.$('button[aria-label="Saisie automatique"]')).waitForDisplayed({ timeout: 10_000, timeoutMsg: "pas de bouton « Saisie automatique » sur la fiche d'un identifiant" });
+
+  // Les réglages : un raccourci mal écrit refusé, un bon posé — puis ceux de
+  // la personne qui lance le test remis tels quels (même profil d'app).
+  const saved = await b.execute(() => localStorage.getItem("guivault.autotype"));
+  try {
+    await openSettings(b, "Saisie automatique");
+    const hotkey = await b.$("#autotype-hotkey");
+    await hotkey.waitForDisplayed({ timeout: 10_000 });
+    await hotkey.clearValue();
+    await hotkey.setValue("Ctrl+Pomme");
+    await click(b, "Appliquer");
+    await waitText(b, "refusé");
+    await hotkey.clearValue();
+    await hotkey.setValue("Ctrl+Alt+Shift+F11");
+    await click(b, "Appliquer");
+    await waitText(b, "Raccourci global : Ctrl+Alt+Shift+F11");
+    await shot(b, "4-saisie-auto");
+  } finally {
+    const before = saved ? JSON.parse(saved).hotkey ?? "Ctrl+Alt+A" : "Ctrl+Alt+A";
+    await b.execute((v) => { if (v === null) localStorage.removeItem("guivault.autotype"); else localStorage.setItem("guivault.autotype", v); }, saved);
+    await invoke(b, "autotype_set_hotkey", { accelerator: before });
+  }
+
+  // Une vraie frappe (SendInput), dans GuiVault lui-même : le champ de
+  // filtre de la page du vault. Jamais dans une autre fenêtre.
+  await (await b.$("//a[.//span[normalize-space()='Personnel']]")).click();
+  const filter = await b.$('input[placeholder^="Filtrer"]');
+  await filter.waitForDisplayed({ timeout: 10_000 });
+  await filter.click();
+  const self = (await invoke(b, "autotype_self_target")).value;
+  assert(typeof self === "string", "pas de handle pour la fenêtre de GuiVault");
+  const r = await invoke(b, "autotype_type", { actions: [{ kind: "text", text: "saisie-é€x" }, { kind: "key", key: "Backspace" }], target: self });
+  if (!r.ok && ["autotype_focus_lost", "autotype_modifiers"].includes(r.error?.code)) {
+    await filter.clearValue();
+    return `ignoré pour la frappe : ${r.error.message} (la fenêtre de test n'avait pas le premier plan)`;
+  }
+  assert(r.ok, `la saisie a échoué : ${JSON.stringify(r.error)}`);
+  await b.waitUntil(async () => (await filter.getValue()) === "saisie-é€", { timeout: 5000, timeoutMsg: "le champ ne contient pas le texte tapé" });
+  await filter.clearValue();
+});
+
 scenario("fermer puis rouvrir : coffres récents, mauvais mot de passe refusé", async (b) => {
   await click(b, "Fermer le coffre");
   await button(b, "Créer un coffre local");
@@ -310,9 +379,20 @@ async function main() {
 
   let vite = null;
   if (profile === "debug") {
-    // Le binaire de dev charge devUrl. node + vite.js plutôt que le `npx`
-    // de Windows (un .cmd, que cmd.exe ne lance pas depuis un chemin UNC).
-    vite = spawn(process.execPath, [path.join(webRoot, "node_modules", "vite", "bin", "vite.js"), "-c", "vite.app.config.ts"], { cwd: webRoot, env, stdio: "ignore", detached: !isWindows });
+    // Le binaire de dev charge devUrl (:1431). Pas le serveur de dev : il
+    // pré-empaquette les dépendances au premier chargement et **recharge la
+    // page** quand il en découvre une — le test attendait alors une page
+    // vide (cache froid : toujours en CI). L'interface construite, servie par
+    // `vite preview` : rien ne bouge, et c'est ce que l'application embarque.
+    // node + vite.js plutôt que le `npx` de Windows (un .cmd, que cmd.exe ne
+    // lance pas depuis un chemin UNC).
+    const viteJs = path.join(webRoot, "node_modules", "vite", "bin", "vite.js");
+    const build = spawnSync(process.execPath, [viteJs, "build", "-c", "vite.app.config.ts", "--logLevel", "error"], { cwd: webRoot, env, stdio: "inherit" });
+    if (build.status !== 0) {
+      console.error("ÉCHEC : construction de l'interface de l'app");
+      process.exit(1);
+    }
+    vite = spawn(process.execPath, [viteJs, "preview", "-c", "vite.app.config.ts", "--port", "1431", "--strictPort"], { cwd: webRoot, env, stdio: "ignore", detached: !isWindows });
   }
   // E2E_DRIVER_LOG=fichier : ce que disent tauri-driver et le pilote natif
   // (une session refusée ne dit rien d'autre que « capabilities »).
@@ -326,7 +406,7 @@ async function main() {
 
   let failed = 0;
   try {
-    if (vite) await warmVite(120_000);
+    if (vite) await waitHttp("http://localhost:1431/", 30_000);
     await waitForPort(4444, 15_000);
     const browser = await remote({
       hostname: "127.0.0.1",
@@ -342,8 +422,11 @@ async function main() {
       for (const { name, run } of scenarios) {
         const started = Date.now();
         try {
-          await run(browser);
-          console.log(`  ✓ ${name} (${Math.round((Date.now() - started) / 100) / 10} s)`);
+          const outcome = await run(browser);
+          const took = `${Math.round((Date.now() - started) / 100) / 10} s`;
+          // Un scénario qui ne peut pas se jouer ici le dit : ○, jamais ✓.
+          if (typeof outcome === "string" && outcome.startsWith("ignoré")) console.log(`  ○ ${name} — ${outcome} (${took})`);
+          else console.log(`  ✓ ${name} (${took})`);
         } catch (e) {
           failed++;
           console.error(`  ✗ ${name}\n    ${e instanceof Error ? e.message : e}`);

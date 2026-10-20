@@ -203,6 +203,30 @@ Les jetons de rafraîchissement tournent à chaque usage ; un verrou empêche
 deux `gv` de faire tourner le même (le serveur y verrait un vol et
 révoquerait la session).
 
+## Application (`docs/APP.md`)
+
+**Coffre local** : un dossier qui garde ce que garderait le serveur, sans
+clé — le crate `guivault-local` ne chiffre ni ne déchiffre rien, la crypto
+est celle de l'interface. Qui copie le dossier peut attaquer le mot de
+passe maître hors ligne, comme qui volerait la base du serveur : même
+Argon2id, même plancher. Écritures atomiques sous verrou ; un `coffre.json`
+illisible n'est jamais réécrit.
+
+**Saisie automatique** (Windows, à la KeePass) : pour taper un identifiant,
+l'interface en remet le texte en clair au processus de l'application
+(`app-tauri/src/autotype.rs`), qui l'efface après la frappe. Il ne quitte
+pas le poste. Garde-fous : rien n'est tapé tant que Ctrl, Alt, Maj ou
+Windows sont enfoncés ; avant **chaque** caractère, la fenêtre cible doit
+avoir le focus, sinon la saisie s'arrête (`autotype_focus_lost`) ; sans
+cible, ni GuiVault, ni le bureau, ni la barre des tâches. Limites
+assumées, les mêmes que KeePass : un enregistreur de frappe, ou une
+application qui imite le titre d'une autre fenêtre, voit ce qui est tapé —
+la correspondance se fait sur le titre, que toute application choisit pour
+la sienne. D'où le choix explicite quand plusieurs identifiants
+correspondent, et la possibilité de désactiver la saisie automatique par
+identifiant. Pas encore d'« obfuscation à deux canaux » (KeePass : une
+partie par le presse-papiers).
+
 ## Déploiement
 
 - **TLS obligatoire** devant le serveur. Sans TLS, les jetons et la clé

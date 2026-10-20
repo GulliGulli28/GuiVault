@@ -24,11 +24,21 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 tauri = { version = "2", features = [] }
 tauri-plugin-dialog = "2"
+# La saisie automatique (`src/autotype.rs`) : le raccourci global, le texte
+# effacé de la mémoire une fois tapé.
+tauri-plugin-global-shortcut = "2"
+serde = { version = "1", features = ["derive"] }
+zeroize = "1"
 guivault-local = { path = "../crates/guivault-local" }
 serde_json = "1"
 # Même contrainte de résolution que chez Guiterm : cookie 0.18.1 (tiré par
 # tauri/wry) appelle une API de `time` que 0.3.48 a cassée. Jamais `use`ée.
 time = "=0.3.47"
+
+# Taper dans une autre fenêtre (`SendInput`), savoir laquelle est au premier
+# plan : l'API Win32, déjà dans l'arbre de Tauri.
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_UI_Input_KeyboardAndMouse"] }
 
 [profile.release]
 lto = "thin"

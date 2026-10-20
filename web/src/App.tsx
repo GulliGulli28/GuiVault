@@ -23,6 +23,8 @@ import { SendView } from "./components/SendView";
 import { SendsPage } from "./components/SendsPage";
 import { AdminPage } from "./components/AdminPage";
 import { HealthPage } from "./components/HealthPage";
+import { AutoTypeHost } from "./components/AutoType";
+import { autoTypeBridge } from "./lib/platform";
 import { Toasts, useToasts } from "./components/ui";
 import { PaneHandle, usePersistedPane } from "./hooks/usePersistedPane";
 
@@ -281,6 +283,7 @@ export default function App({ Welcome = LoginScreen }: { Welcome?: ComponentType
         {page}
       </main>
       {search && <SearchPalette ctx={ctx} onClose={closeSearch} />}
+      {autoTypeBridge() && <AutoTypeHost ctx={ctx} />}
       <Toasts toasts={toasts} onDismiss={dismiss} />
     </div>
   );

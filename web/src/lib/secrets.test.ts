@@ -169,7 +169,8 @@ describe("import", () => {
 function samples(): Payload[] {
   const login = { ...emptyLogin(), id: "11111111-1111-4111-8111-111111111111", name: "GitHub", username: "alice", password: "pw", uris: [{ uri: "https://github.com", match: null }], totp: "JBSWY3DPEHPK3PXP", favorite: true, notes: "n", fields: [{ name: "PIN", value: "1", type: "hidden" as const }, { name: "ok", value: "true", type: "boolean" as const }],
     passkeys: [{ credentialId: "c", keyType: "public-key", keyAlgorithm: "ECDSA", keyCurve: "P-256", keyValue: "k", rpId: "github.com", rpName: "GitHub", userHandle: "u", userName: "alice", userDisplayName: null, counter: 1, discoverable: true, createdAt: "2026-01-01T00:00:00Z" }],
-    passwordHistory: [{ password: "old", changedAt: "2025-01-01T00:00:00Z" }] };
+    passwordHistory: [{ password: "old", changedAt: "2025-01-01T00:00:00Z" }],
+    autoType: { sequence: "{USERNAME}{TAB}{PASSWORD}{TAB}{TOTP}{ENTER}", windows: [{ title: "*GitHub*Firefox", sequence: "{PASSWORD}{ENTER}" }] } };
   const note = { ...emptyNote(), id: "22222222-2222-4222-8222-222222222222", name: "Codes", content: "a\nb", attachments: [{ id: "77777777-7777-4777-8777-777777777777", name: "scan.pdf", size: 12345, mime: "application/pdf", key: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=" }], groupId: "gggggggg-gggg-4ggg-8ggg-gggggggggggg".replace(/g/g, "a") };
   const card = { ...emptyCard(), id: "33333333-3333-4333-8333-333333333333", name: "CB", cardholderName: "A", brand: "Visa", number: "4111111111111111", expMonth: "12", expYear: "2030", code: "123" };
   const identity = { ...emptyIdentity(), id: "44444444-4444-4444-8444-444444444444", name: "Moi", firstName: "Alice", lastName: "L", email: "a@b" };

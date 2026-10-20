@@ -133,6 +133,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: app-tauri -> target
@@ -152,7 +154,9 @@ jobs:
         working-directory: web
       - run: npm run build:app
         working-directory: web
-      - run: cargo build --release --features tauri/custom-protocol
+      # La saisie automatique (`SendInput`) n'est compilée que sous Windows :
+      # c'est ici seulement que clippy la voit.
+      - run: cargo clippy --all-targets -- -D warnings && cargo build --release --features tauri/custom-protocol
         working-directory: app-tauri
       - run: node app/e2e/run.mjs
         working-directory: web

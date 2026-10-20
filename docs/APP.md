@@ -236,15 +236,49 @@ Set-Location "\\wsl.localhost\Ubuntu-24.04\home\glorin\GuiVault\app-tauri"
 node "$env:USERPROFILE\guivault-tauri-cli\node_modules\@tauri-apps\cli\tauri.js" build --config "$env:TEMP\guivault-nohook.json"
 ```
 
+## Saisie automatique (Windows)
+
+Comme le « Perform Auto-Type » de KeePass2. `web/src/lib/autotype.ts` dit
+**quoi** taper (séquences KeePass : `{USERNAME}{TAB}{PASSWORD}{ENTER}`,
+`{TOTP}`, `{S:champ}`, `{DELAY n}`, `{TAB 3}`… — liste complète en tête du
+fichier et dans Paramètres › Saisie automatique) et **pour quelle fenêtre**
+(un motif associé à l'identifiant, sinon son nom dans le titre, sinon le
+domaine d'une de ses adresses) ; `app-tauri/src/autotype.rs` **tape**
+(`SendInput` en Unicode : la disposition du clavier n'y change rien).
+
+- **Raccourci global** (Ctrl+Alt+A par défaut, réglable) : la fenêtre au
+  premier plan est notée à l'instant de la pression ; un seul identifiant lui
+  correspond, il est tapé aussitôt ; plusieurs (ou aucun), GuiVault revient
+  au premier plan avec un choix et une recherche (`AutoTypeHost`). Coffre
+  verrouillé : la demande attend son ouverture (deux minutes), puis tape.
+- **Sur une fiche** (bouton clavier) : GuiVault se réduit, la séquence est
+  tapée dans la fenêtre qui reprend le premier plan.
+- **Par identifiant** (formulaire) : désactiver, une séquence propre, des
+  fenêtres associées avec leur séquence (`Login.autoType`, `docs/ITEMS.md`).
+- Réglages de l'appareil (`localStorage`) : le raccourci, la séquence par
+  défaut.
+
+L'interface commune n'importe rien de Tauri : l'application pose un pont
+(`lib/platform.ts`, `web/app/src/autotypeBridge.ts`) seulement si elle sait
+taper sur ce système — sous Linux et Android, rien n'en est montré. Les
+garde-fous (modificateurs relâchés, focus vérifié avant chaque caractère,
+texte effacé) sont dans `docs/SECURITY.md`. Linux (X11) : à faire.
+
 ## Tests de bout en bout
 
 `web/app/e2e/run.mjs` pilote **le vrai binaire** par WebDriver
 (`tauri-driver`, comme Guiterm) : de vrais `invoke`, un vrai coffre écrit
 par `guivault-local` dans un dossier temporaire, et des vérifications sur le
 disque (rien en clair dans `coffre.json`). Scénarios : l'accueil, créer un
-coffre, ce que le mode local masque, créer une note, fermer et rouvrir (coffres
+coffre, ce que le mode local masque, créer une note, la saisie automatique
+(bouton de la fiche, réglages, et une **vraie frappe** `SendInput` — dans
+GuiVault lui-même, jamais dans une fenêtre de la personne qui lance les
+tests ; ○ « ignoré » si la fenêtre n'a pas le premier plan, ou sous Linux
+où l'on vérifie que rien n'en est montré), fermer et rouvrir (coffres
 récents, mauvais mot de passe), une erreur de l'hôte (`local_exists`), un
-serveur qui ne répond pas. Les boîtes de dialogue natives ne se pilotent pas
+serveur qui ne répond pas. Sous Linux, l'interface est construite puis
+servie par `vite preview` (le serveur de dev rechargeait la page en
+découvrant ses dépendances, cache froid). Les boîtes de dialogue natives ne se pilotent pas
 par WebDriver : le script pose le chemin dans `window.__GUIVAULT_E2E_PATH__`
 (`web/app/src/dialogs.ts`). Un échec laisse une capture et le texte visible
 (`web/app/e2e/.output/`, ignoré par git).

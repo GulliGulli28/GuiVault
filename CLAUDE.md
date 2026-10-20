@@ -144,6 +144,13 @@ il ne déchiffre rien : la user key reste sous la clé que seule la PRF donne).
     seule, hors du formulaire (`AttachmentsPanel` sous la fiche). Côté
     serveur `routes/attachments.rs` ; un item déplacé emmène ses fichiers
     (`moveItem`), les exports ne les contiennent pas.
+  - `lib/autotype.ts` — la saisie automatique à la KeePass (séquences,
+    fenêtres ; pur, testé) ; `lib/platform.ts` le pont que **seule
+    l'application** pose (`web/app/src/autotypeBridge.ts` → commandes de
+    `app-tauri/src/autotype.rs`, Windows) ; `components/AutoType.tsx`
+    (raccourci global, bouton de la fiche, section du formulaire,
+    Paramètres › Saisie automatique). Sans pont (web, extension, Linux),
+    rien n'en est montré. `Login.autoType` est dans `guivault-items`.
   - `lib/accountPasskeys.ts` — se connecter avec une passkey (PRF de
     WebAuthn, `docs/PASSKEYS.md`) ; `components/PasskeySettings.tsx`
     (Paramètres › Sécurité) et le bouton de `LoginScreen`. À ne pas

@@ -11,6 +11,8 @@ import { IconDice, IconPasskey } from "../secret-icons";
 import { IconClose, IconPlus } from "../ui-icons";
 import { FileButton, PasswordInput, formatWhen } from "../ui";
 import { Field, FormShell, useSeed } from "./common";
+import { AutoTypeFields } from "../AutoType";
+import { autoTypeBridge } from "../../lib/platform";
 import { SecretFooter, SecretHeader } from "./SecretBits";
 
 const MATCH_LABELS: Record<UriMatch, string> = { domain: "domaine", host: "hôte", startsWith: "commence par", exact: "exact", regex: "expression régulière", never: "jamais" };
@@ -41,6 +43,12 @@ export function LoginForm({ initial, index, defaultGroupId, onSave, onCancel }: 
 
   const save = async () => {
     const out: Login = { ...login, name: login.name.trim(), username: login.username.trim(), uris: login.uris.filter((u) => u.uri.trim()).map((u) => ({ ...u, uri: u.uri.trim() })), totp: login.totp?.trim() || null };
+    // Une fenêtre associée sans titre ne correspondrait à rien.
+    if (out.autoType?.windows) {
+      const windows = out.autoType.windows.filter((w) => w.title.trim()).map((w) => ({ ...w, title: w.title.trim() }));
+      out.autoType = { ...out.autoType, windows: windows.length ? windows : undefined };
+      if (!out.autoType.windows) delete out.autoType.windows;
+    }
     // Un mot de passe remplacé passe dans l'historique, borné aux dix
     // derniers — le format de Bitwarden, qu'on relit et réexporte.
     if (initial && initial.password && initial.password !== out.password) {
@@ -118,6 +126,7 @@ export function LoginForm({ initial, index, defaultGroupId, onSave, onCancel }: 
         </Field>
       )}
 
+      {autoTypeBridge() && <AutoTypeFields value={login.autoType} onChange={(autoType) => setLogin({ ...login, autoType })} />}
       <SecretFooter value={login} onChange={setLogin} groups={index.groups} />
     </FormShell>
   );
