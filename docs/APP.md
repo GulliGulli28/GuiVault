@@ -309,7 +309,7 @@ commune lit sans rien importer de Tauri (`web/src/lib/platform.ts`, posés par
 Comme Guiterm : `tauri-plugin-updater` (Paramètres › Application › Mise à
 jour, et une vérification discrète au démarrage qui le signale). L'app lit
 `latest.json` sur la release **`app-updater`** du dépôt — pas sur « Latest »,
-qui est la release du serveur —, télécharge l'installeur NSIS, n'installe
+qu'une release du serveur prendrait —, télécharge l'installeur NSIS, n'installe
 que si sa signature correspond à la clé publique de `tauri.conf.json`
 (`plugins.updater.pubkey`), puis relance. « À jour » distingue « c'est la
 dernière » de « GitHub annonce encore une version plus ancienne »
@@ -323,9 +323,9 @@ brouillon ; **publier** le brouillon déclenche `app-updater.yml`, qui recopie
 Un brouillon n'atteint jamais les utilisateurs.
 
 **La clé privée de signature** a été générée hors du dépôt
-(`~/.guivault-updater/guivault-app-updater.key`, sans mot de passe) : la
-mettre dans le secret GitHub `TAURI_SIGNING_PRIVATE_KEY`, et **en garder une
-copie en lieu sûr** — perdue, plus aucune mise à jour ne serait acceptée par
+(`~/.guivault-updater/guivault-app-updater.key`, sans mot de passe) ; elle
+est dans le secret GitHub `TAURI_SIGNING_PRIVATE_KEY` depuis la 0.1.0. **En
+garder une copie en lieu sûr** — perdue, plus aucune mise à jour ne serait acceptée par
 les applications installées (il faudrait les réinstaller avec une nouvelle
 clé publique). Sans le secret, `app-release.yml` construit quand même, sans
 signature ni `latest.json`, et l'annonce.

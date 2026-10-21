@@ -2,7 +2,7 @@ name: Application (mise à jour)
 
 # L'application lit `latest.json` sur la release fixe `app-updater`
 # (`app-tauri/tauri.conf.json`, plugins.updater.endpoints) — pas sur
-# « Latest », qui est la release du serveur. Ce workflow l'y recopie quand
+# « Latest », qu'une release du serveur prendrait. Ce workflow l'y recopie quand
 # une release `app-v…` est **publiée** : tant qu'elle est en brouillon, ses
 # fichiers ne sont pas servis, et aucune application ne doit y être envoyée.
 on:

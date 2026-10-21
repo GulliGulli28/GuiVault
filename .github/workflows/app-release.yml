@@ -120,7 +120,8 @@ jobs:
         run: |
           b=app-tauri/target/release/bundle
           extra=$(ls $b/nsis/latest.json $b/nsis/*-setup.exe.sig 2>/dev/null || true)
-          # `--latest=false` : « Latest » reste la release du serveur.
+          # `--latest=false` : « Latest » revient aux releases du serveur (GitHub la
+          # donne quand même à une release app tant qu'elle est la seule).
           gh release create "$GITHUB_REF_NAME" --draft --latest=false \
             --title "GuiVault — application ${GITHUB_REF_NAME#app-v}" \
             --notes "Installeurs Windows de l'application GuiVault (coffre local, ou connexion à un serveur GuiVault). Non signés : SmartScreen avertit à la première installation. Vérifier : SHA256SUMS.txt, ou \`gh attestation verify <fichier> -R ${{ github.repository }}\`." \
