@@ -125,7 +125,11 @@ body,
   margin: 0;
 }
 
+/* Chrome pose sa propre police (et 75 %) sur le `body` des pages
+   d'extension : le popup reprend celle de `html`. */
 body {
+  font-family: inherit;
+  font-size: inherit;
   background: var(--c-bg);
   color: var(--c-text);
 }

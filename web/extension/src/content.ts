@@ -23,6 +23,7 @@
  * (`isTrusted`) : une page ne peut pas choisir un identifiant à la place de
  * l'utilisateur. */
 import { DEFAULT_GENERATOR, generate, type GeneratorOptions } from "../../src/lib/generator";
+import { tileHue, tileInitial } from "../../src/lib/tiles";
 import { collect, deepActiveElement, eventElement, eventInput, hintOf, HOST_ID, isSignup, passwordsToFill, setValue, usable, usableInputs, visible } from "./dom";
 import type { CredentialsReply, FillReply, FrameInfo, MatchesReply, MatchSummary, PasskeyToBackground, Pending, ToBackground, ToContent, TotpReply, VaultsReply } from "./messages";
 
@@ -190,7 +191,10 @@ declare global {
   let enabled = false;
   let lastUrl = "";
 
-  const ICON = `<svg viewBox="0 0 16 16" fill="none" width="16" height="16"><rect x="1.5" y="4" width="13" height="8" rx="1.5" stroke="currentColor" stroke-width="1.25"/><circle cx="4.75" cy="8" r="0.9" fill="currentColor"/><circle cx="8" cy="8" r="0.9" fill="currentColor"/><circle cx="11.25" cy="8" r="0.9" fill="currentColor"/></svg>`;
+  // Le logo de GuiVault, dessiné ici : une image de l'extension servie à la
+  // page (`web_accessible_resources`) laisserait les sites sonder sa
+  // présence.
+  const ICON = `<svg viewBox="0 0 32 32" width="20" height="20" aria-hidden="true"><defs><linearGradient id="gv-g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3fd2f6"/><stop offset="1" stop-color="#5a46ee"/></linearGradient></defs><path d="M23.7 6.8A12 12 0 1 0 28 16h-7.5" fill="none" stroke="url(#gv-g)" stroke-width="3.4" stroke-linecap="round"/><path d="M13.2 15v-1.8a2.8 2.8 0 0 1 5.6 0V15" fill="none" stroke="#c9ccf7" stroke-width="1.6"/><rect x="11.4" y="15" width="9.2" height="7.2" rx="1.6" fill="#eef0ff"/><circle cx="16" cy="18.1" r="1.1" fill="#4b45d6"/><rect x="15.45" y="18.4" width="1.1" height="2" rx=".5" fill="#4b45d6"/></svg>`;
   const ICON_EYE = `<svg viewBox="0 0 16 16" fill="none" width="14" height="14"><path d="M1.5 8s2.5-4.5 6.5-4.5S14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z" stroke="currentColor" stroke-width="1.25"/><circle cx="8" cy="8" r="2" stroke="currentColor" stroke-width="1.25"/></svg>`;
   const ICON_DICE = `<svg viewBox="0 0 16 16" fill="none" width="14" height="14"><rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" stroke-width="1.25"/><circle cx="5.5" cy="5.5" r="1" fill="currentColor"/><circle cx="10.5" cy="5.5" r="1" fill="currentColor"/><circle cx="8" cy="8" r="1" fill="currentColor"/><circle cx="5.5" cy="10.5" r="1" fill="currentColor"/><circle cx="10.5" cy="10.5" r="1" fill="currentColor"/></svg>`;
 
@@ -204,52 +208,88 @@ declare global {
     shadow = host.attachShadow({ mode: "closed" });
     const style = document.createElement("style");
     style.textContent = `
-      :host { all: initial; }
-      .btn { position: fixed; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; border-radius: 4px; background: #2563eb; color: #fff; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,.35); font: 0/0 a; }
-      .btn:hover { background: #3b82f6; }
-      .menu { position: fixed; z-index: 2; display: flex; flex-direction: column; box-sizing: border-box; width: 280px; max-width: calc(100vw - 8px); background: #121215; color: #e7e7ea; border: 1px solid #26262b; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,.45); font: 13px system-ui, -apple-system, "Segoe UI", sans-serif; padding: 4px; overflow: hidden; }
-      .list { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: #3f3f46 transparent; }
-      .head { font-size: 10.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: #71717a; padding: 4px 8px 2px; }
-      .item .fill { font-size: 10.5px; color: #60a5fa; }
-      .toast { position: fixed; z-index: 3; box-sizing: border-box; max-width: 320px; display: flex; align-items: center; gap: 8px; background: #121215; color: #e7e7ea; border: 1px solid #26262b; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,.45); font: 12px system-ui, -apple-system, "Segoe UI", sans-serif; padding: 6px 10px; }
-      .item { display: flex; flex-direction: column; gap: 1px; padding: 6px 8px; border-radius: 6px; cursor: pointer; text-align: left; border: 0; background: none; color: inherit; width: 100%; box-sizing: border-box; font: inherit; }
-      .item:hover, .item:focus { background: rgba(255,255,255,.08); outline: none; }
+      :host { all: initial;
+        --bg: #18191e; --surface: #111215; --line: #2a2c33; --line2: #3a3d46; --text: #ecedef; --text2: #c9cbd1; --muted: #8b8f98;
+        --hover: rgba(255,255,255,.06); --sel: #24253b; --accent: #8b8cff; --accent-h: #a0a1ff; --on-accent: #0b0c0e; --accent-text: #b9baff;
+        --input: #0f1013; --danger: #ff8a8f; --veil: rgba(5,6,8,.55); --shadow: 0 18px 48px rgba(0,0,0,.55);
+        --tile-s: 32%; --tile-l: 20%; --tile-ts: 85%; --tile-tl: 78%;
+        --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+        --mono: ui-monospace, "Cascadia Mono", Consolas, Menlo, monospace; }
+      @media (prefers-color-scheme: light) { :host {
+        --bg: #ffffff; --surface: #f7f7f5; --line: #e3e3df; --line2: #d3d3cd; --text: #17181b; --text2: #3c3f45; --muted: #63666d;
+        --hover: rgba(0,0,0,.05); --sel: #ececfb; --accent: #5755d9; --accent-h: #4846c8; --on-accent: #fff; --accent-text: #4644c2;
+        --input: #ffffff; --danger: #a3241d; --veil: rgba(23,24,27,.32); --shadow: 0 18px 48px rgba(23,24,27,.18);
+        --tile-s: 70%; --tile-l: 93%; --tile-ts: 55%; --tile-tl: 32%; } }
+      .btn { position: fixed; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; border-radius: 7px; background: transparent; cursor: pointer; font: 0/0 a; transition: background-color .1s, box-shadow .1s; }
+      .btn:hover { background: rgba(139,140,255,.16); box-shadow: 0 0 0 1px rgba(139,140,255,.5); }
+      .menu, .toast, .dialog, .banner { box-sizing: border-box; background: var(--bg); color: var(--text); border: 1px solid var(--line2); box-shadow: var(--shadow); font: 13.5px/1.4 var(--font); -webkit-font-smoothing: antialiased; }
+      .menu { position: fixed; z-index: 2; display: flex; flex-direction: column; width: 320px; max-width: calc(100vw - 8px); border-radius: 12px; overflow: hidden; }
+      .list { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--line2) transparent; padding: 0 4px 4px; }
+      .head { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); padding: 10px 12px 6px; min-width: 0; }
+      .head > span:last-child { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .list .head { padding: 10px 8px 4px; }
+      .head svg, .logo svg { width: 16px; height: 16px; }
+      .item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 9px; cursor: pointer; text-align: left; border: 0; background: none; color: inherit; width: 100%; box-sizing: border-box; font: inherit; min-width: 0; }
+      .item:hover, .item:focus { background: var(--sel); outline: none; }
+      .tile { flex: none; width: 32px; height: 32px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font: 600 13px/1 var(--font); background: hsl(var(--h, 230) var(--tile-s) var(--tile-l)); color: hsl(var(--h, 230) var(--tile-ts) var(--tile-tl)); }
+      .tile.plain { background: var(--hover); color: var(--text2); font-size: 16px; font-weight: 500; }
+      .txt { display: flex; flex-direction: column; min-width: 0; flex: 1; }
       .name { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-      .user { font-size: 11px; color: #a1a1aa; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-      .foot { flex-shrink: 0; font-size: 10.5px; color: #71717a; padding: 4px 8px 2px; border-top: 1px solid #26262b; margin-top: 2px; }
-      .sticky { flex-shrink: 0; border-top: 1px solid #26262b; margin-top: 2px; padding-top: 2px; }
-      .veil { position: fixed; z-index: 4; inset: 0; background: rgba(0,0,0,.45); }
-      .dialog { position: fixed; z-index: 4; left: 50%; top: 18%; transform: translateX(-50%); width: min(360px, calc(100vw - 32px)); background: #121215; color: #e7e7ea; border: 1px solid #26262b; border-radius: 12px; box-shadow: 0 16px 48px rgba(0,0,0,.55); font: 13px system-ui, -apple-system, "Segoe UI", sans-serif; padding: 14px; }
-      .dialog h2 { margin: 0 0 6px; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
-      .dialog p { margin: 0 0 10px; color: #a1a1aa; line-height: 1.45; }
-      .dialog select { width: 100%; box-sizing: border-box; margin: 0 0 10px; padding: 6px 8px; border-radius: 6px; border: 1px solid #26262b; background: rgba(0,0,0,.25); color: inherit; font: inherit; }
-      .row { display: flex; justify-content: flex-end; gap: 6px; }
-      .b { padding: 6px 10px; border-radius: 6px; border: 1px solid transparent; font: inherit; font-size: 12px; font-weight: 500; cursor: pointer; }
-      .b-primary { background: #2563eb; color: #fff; }
-      .b-ghost { background: none; color: #a1a1aa; }
-      .b-ghost:hover { color: #e7e7ea; background: rgba(255,255,255,.06); }
-      .f { display: block; margin: 0 0 8px; }
-      .f > span:first-child { display: block; font-size: 11.5px; color: #a1a1aa; margin-bottom: 3px; }
-      .i { width: 100%; box-sizing: border-box; padding: 6px 8px; border-radius: 6px; border: 1px solid #26262b; background: rgba(0,0,0,.25); color: #e7e7ea; font: 13px system-ui, -apple-system, "Segoe UI", sans-serif; }
-      .i:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 2px rgba(37,99,235,.18); }
+      .user { font-size: 12.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .user:empty { display: none; }
+      .note { font-size: 13px; color: var(--muted); padding: 8px 10px; }
+      .foot { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--muted); padding: 8px 12px; border-top: 1px solid var(--line); }
+      .kbd { font: 11px/16px var(--mono); padding: 0 5px; border: 1px solid var(--line2); border-radius: 5px; white-space: nowrap; }
+      .sticky { flex-shrink: 0; border-top: 1px solid var(--line); padding: 4px; }
+      .toast { position: fixed; z-index: 3; max-width: 340px; display: flex; align-items: center; gap: 10px; border-radius: 12px; font-size: 13px; padding: 9px 12px; }
+      .logo { display: inline-flex; width: 18px; height: 18px; align-items: center; justify-content: center; flex-shrink: 0; }
+      .logo svg { width: 18px; height: 18px; }
+      .veil { position: fixed; z-index: 4; inset: 0; background: var(--veil); }
+      .dialog { position: fixed; z-index: 4; left: 50%; top: 14%; transform: translateX(-50%); width: min(400px, calc(100vw - 32px)); max-height: 80vh; overflow-y: auto; border-radius: 16px; padding: 18px; }
+      .dialog h2 { margin: 0 0 6px; font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 10px; color: var(--text); }
+      .dialog h2 .logo, .dialog h2 .logo svg { width: 22px; height: 22px; }
+      .dialog h2 + .f { margin-top: 14px; }
+      .dialog p { margin: 0 0 14px; color: var(--muted); line-height: 1.45; font-size: 13px; }
+      .choices { display: flex; flex-direction: column; gap: 8px; margin: 0 0 14px; }
+      .choice { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line2); background: var(--surface); color: inherit; font: inherit; text-align: left; cursor: pointer; width: 100%; box-sizing: border-box; }
+      .choice[aria-checked="true"] { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+      .choice:focus { outline: none; border-color: var(--accent); }
+      .row { display: flex; justify-content: flex-end; align-items: center; gap: 8px; flex-wrap: wrap; }
+      .b { height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid transparent; font: inherit; font-size: 13px; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap; }
+      .b:disabled { opacity: .45; cursor: default; }
+      .b-primary { background: var(--accent); color: var(--on-accent); }
+      .b-primary:hover { background: var(--accent-h); }
+      .b-ghost { background: none; color: var(--text2); }
+      .b-ghost:hover { color: var(--text); background: var(--hover); }
+      .b-secondary { background: var(--surface); border-color: var(--line2); color: var(--text); }
+      .b-icon { width: 32px; padding: 0; color: var(--muted); }
+      .f { display: block; margin: 0 0 10px; }
+      .f > span:first-child { display: block; font-size: 13px; font-weight: 500; color: var(--text2); margin-bottom: 5px; }
+      .i { width: 100%; height: 36px; box-sizing: border-box; padding: 0 12px; border-radius: 9px; border: 1px solid var(--line2); background: var(--input); color: var(--text); font: 13.5px var(--font); }
+      select.i { padding-right: 8px; }
+      .i:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(139,140,255,.22); }
       .pw { display: flex; gap: 4px; align-items: center; }
-      .pw .b { padding: 4px 6px; display: inline-flex; align-items: center; }
-      .err { color: #ef4444; font-size: 12px; margin: 0 0 8px; }
-      .gen { border: 1px solid #26262b; border-radius: 8px; padding: 8px; margin: -2px 0 10px; background: rgba(0,0,0,.15); }
-      .gen-out { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
-      .gen-value { flex: 1; min-width: 0; font: 13px ui-monospace, "JetBrains Mono", Consolas, monospace; word-break: break-all; color: #e7e7ea; }
-      .seg { display: inline-flex; border: 1px solid #26262b; border-radius: 6px; padding: 2px; margin-bottom: 8px; background: #0c0c0e; }
-      .seg button { border: 0; background: none; color: #71717a; font: inherit; font-size: 12px; padding: 3px 8px; border-radius: 4px; cursor: pointer; }
-      .seg button[data-active="true"] { background: #19191d; color: #e7e7ea; }
-      .checks { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: #e7e7ea; }
-      .checks label { display: inline-flex; align-items: center; gap: 4px; }
-      .checks .sep { width: 3em; padding: 2px 4px; }
-      input[type=range] { width: 100%; accent-color: #2563eb; }
-      .logo { display: inline-flex; width: 18px; height: 18px; border-radius: 4px; background: #2563eb; color: #fff; align-items: center; justify-content: center; flex-shrink: 0; }
-      .banner { position: fixed; z-index: 3; top: 12px; right: 12px; display: grid; grid-template-columns: auto 1fr; gap: 8px 10px; align-items: center; width: min(420px, calc(100vw - 24px)); box-sizing: border-box; background: #121215; color: #e7e7ea; border: 1px solid #26262b; border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.5); font: 13px system-ui, -apple-system, "Segoe UI", sans-serif; padding: 10px 12px; line-height: 1.4; }
-      .banner .text { min-width: 0; }
-      .banner .actions { grid-column: 1 / -1; display: flex; justify-content: flex-end; align-items: center; gap: 6px; flex-wrap: wrap; }
-      .banner select { padding: 4px 6px; border-radius: 6px; border: 1px solid #26262b; background: rgba(0,0,0,.25); color: inherit; font: inherit; font-size: 12px; max-width: 140px; }
+      .pw .i { font-family: var(--mono); }
+      .err { color: var(--danger); font-size: 13px; margin: 0 0 10px; }
+      .gen { border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin: -2px 0 12px; background: var(--surface); }
+      .gen-out { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; padding: 8px 6px 8px 12px; border-radius: 10px; background: var(--input); border: 1px solid var(--line); }
+      .gen-value { flex: 1; min-width: 0; font: 14px var(--mono); word-break: break-all; color: var(--text); }
+      .seg { display: flex; border-radius: 10px; padding: 3px; margin-bottom: 10px; background: var(--hover); gap: 2px; }
+      .seg button { flex: 1; border: 0; background: none; color: var(--muted); font: inherit; font-size: 12.5px; font-weight: 500; height: 28px; border-radius: 8px; cursor: pointer; }
+      .seg button[data-active="true"] { background: var(--bg); color: var(--text); box-shadow: 0 0 0 1px var(--line); }
+      .checks { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; color: var(--text); }
+      .checks label { display: inline-flex; align-items: center; gap: 6px; }
+      .checks .sep { width: 3em; height: 28px; padding: 0 6px; }
+      input[type=range], input[type=checkbox] { accent-color: var(--accent); }
+      input[type=range] { width: 100%; }
+      .banner { position: fixed; z-index: 3; top: 12px; right: 12px; display: flex; flex-direction: column; gap: 12px; width: min(400px, calc(100vw - 24px)); border-radius: 14px; padding: 14px 16px; }
+      .banner .top { display: flex; align-items: center; gap: 10px; min-width: 0; }
+      .banner .top .logo, .banner .top .logo svg { width: 22px; height: 22px; }
+      .banner .text { flex: 1; min-width: 0; font-size: 14.5px; font-weight: 600; }
+      .banner .card { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); min-width: 0; }
+      .banner .where { display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--muted); min-width: 0; }
+      .banner .where select { flex: 1; min-width: 0; height: 32px; padding: 0 8px; border-radius: 8px; border: 1px solid var(--line2); background: var(--input); color: var(--text); font: 13px var(--font); }
+      .banner .actions { display: flex; justify-content: flex-end; align-items: center; gap: 8px; flex-wrap: wrap; }
     `;
     shadow.appendChild(style);
     document.documentElement.appendChild(host);
@@ -263,8 +303,8 @@ declare global {
     }
     const r = input.getBoundingClientRect();
     btn.style.display = "flex";
-    btn.style.left = `${Math.round(r.right - 24)}px`;
-    btn.style.top = `${Math.round(r.top + (r.height - 20) / 2)}px`;
+    btn.style.left = `${Math.round(r.right - 28)}px`;
+    btn.style.top = `${Math.round(r.top + (r.height - 24) / 2)}px`;
   };
 
   /** Le bouton sous lequel le menu est ouvert : le menu le suit quand la
@@ -315,17 +355,45 @@ declare global {
     fill({ username: c.username, password: c.password }, input);
   };
 
-  /** Une ligne de menu : un nom, une ligne secondaire, une action. */
-  const menuItem = (name: string, sub: string, onClick: () => void, hint?: string) => {
+  /** Une ligne de menu : sa tuile (l'initiale du nom sur sa teinte, ou un
+   * signe), un nom, une ligne secondaire, une action. */
+  const menuItem = (name: string, sub: string, onClick: () => void, hint?: string, sign?: string) => {
     const b = document.createElement("button");
     b.className = "item";
     b.setAttribute("role", "menuitem");
-    b.innerHTML = `<span class="name"></span><span class="user"></span>`;
-    (b.firstChild as HTMLElement).textContent = name;
-    (b.lastChild as HTMLElement).textContent = sub;
+    b.innerHTML = `<span class="tile"></span><span class="txt"><span class="name"></span><span class="user"></span></span>`;
+    const tile = b.firstChild as HTMLElement;
+    if (sign) {
+      tile.classList.add("plain");
+      tile.textContent = sign;
+    } else {
+      tile.textContent = tileInitial(name);
+      tile.style.setProperty("--h", String(tileHue(name)));
+    }
+    (b.querySelector(".name") as HTMLElement).textContent = name;
+    (b.querySelector(".user") as HTMLElement).textContent = sub;
     if (hint) b.title = hint;
     onTrustedClick(b, onClick);
     return b;
+  };
+
+  /** L'en-tête d'un menu : le logo, et de quoi il s'agit. */
+  const menuHead = (text: string) => {
+    const h = document.createElement("div");
+    h.className = "head";
+    h.innerHTML = `<span class="logo">${ICON}</span><span></span>`;
+    (h.lastChild as HTMLElement).textContent = text;
+    return h;
+  };
+
+  /** Le pied d'un menu : une aide, et un raccourci. */
+  const menuFoot = (text: string, key?: string) => {
+    const f = document.createElement("div");
+    f.className = "foot";
+    f.innerHTML = `<span></span>${key ? `<span class="kbd"></span>` : ""}`;
+    (f.firstChild as HTMLElement).textContent = text;
+    if (key) (f.lastChild as HTMLElement).textContent = key;
+    return f;
   };
 
   /** Un menu vide sous `btn` : sa liste défilante, où ajouter les lignes. */
@@ -336,15 +404,19 @@ declare global {
     menu.className = "menu";
     menu.setAttribute("role", "menu");
     menuBtn = btn;
-    if (heading) {
-      const h = document.createElement("div");
-      h.className = "head";
-      h.textContent = heading;
-      menu.appendChild(h);
-    }
+    if (heading) menu.appendChild(menuHead(heading));
     const list = document.createElement("div");
     list.className = "list";
     menu.appendChild(list);
+    // Les flèches passent d'une ligne à l'autre, action du bas comprise.
+    menu.addEventListener("keydown", (e) => {
+      if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+      const items = Array.from(menu!.querySelectorAll<HTMLButtonElement>("button"));
+      if (!items.length) return;
+      e.preventDefault();
+      const i = items.indexOf(e.target as HTMLButtonElement);
+      items[(i + (e.key === "ArrowDown" ? 1 : items.length - 1)) % items.length].focus();
+    });
     root.appendChild(menu);
     return { menu, list };
   };
@@ -357,12 +429,13 @@ declare global {
   };
 
   const openMenu = (input: HTMLInputElement, btn: HTMLElement) => {
-    const { menu: m, list } = newMenu(btn, matches.length ? `${matches.length} identifiant${matches.length > 1 ? "s" : ""} pour ce site` : null);
+    const site = location.hostname.replace(/^www\./, "");
+    const { menu: m, list } = newMenu(btn, `GuiVault · ${site}`);
     for (const l of matches) list.appendChild(menuItem(`${l.favorite ? "★ " : ""}${l.name}`, l.username || "—", () => void choose(l, input), "Remplir avec cet identifiant"));
     if (parent?.logins.length) {
       const h = document.createElement("div");
       h.className = "head";
-      h.textContent = `De ${parent.host} — cadre servi par ${parent.frameHost}`;
+      h.textContent = `De ${parent.host}, dans un cadre de ${parent.frameHost}`;
       list.appendChild(h);
       for (const l of parent.logins) list.appendChild(menuItem(`${l.favorite ? "★ " : ""}${l.name}`, `${l.username || "—"} · à confirmer`, () => void choose(l, input, true), `Identifiant de ${parent!.host}, dans un cadre de ${parent!.frameHost} : GuiVault demandera confirmation`));
     }
@@ -370,15 +443,14 @@ declare global {
     const sticky = document.createElement("div");
     if (matches.length || parent?.logins.length) sticky.className = "sticky";
     sticky.appendChild(menuItem(
-      signup ? "+ Générer un mot de passe et enregistrer…" : matches.length ? "+ Nouvel identifiant…" : `+ Enregistrer un identifiant pour ${location.hostname.replace(/^www\./, "")}…`,
-      signup ? "Formulaire d'inscription ou de nouveau mot de passe" : matches.length ? "" : "Aucun identifiant GuiVault pour ce site",
+      signup ? "Générer un mot de passe" : "Nouvel identifiant pour ce site",
+      signup ? "Et l'enregistrer dans GuiVault" : matches.length ? "" : "Aucun identifiant GuiVault ici",
       () => { closeMenu(); void newLoginDialog(input, signup); },
+      undefined,
+      "+",
     ));
     m.appendChild(sticky);
-    const foot = document.createElement("div");
-    foot.className = "foot";
-    foot.textContent = "GuiVault — Ctrl+Maj+L pour remplir";
-    m.appendChild(foot);
+    m.appendChild(menuFoot("Entrée remplit · Échap ferme", "Ctrl Maj L"));
     placeMenu();
     (m.querySelector("button") as HTMLElement | null)?.focus();
   };
@@ -410,7 +482,7 @@ declare global {
     toast.innerHTML = `<span class="logo">${ICON}</span><span></span>`;
     (toast.lastChild as HTMLElement).textContent = text;
     const r = field.getBoundingClientRect();
-    toast.style.left = `${Math.max(4, Math.min(window.innerWidth - 324, r.left))}px`;
+    toast.style.left = `${Math.max(4, Math.min(window.innerWidth - 344, r.left))}px`;
     toast.style.top = `${Math.min(window.innerHeight - 40, r.bottom + 6)}px`;
     root.appendChild(toast);
     const mine = toast;
@@ -427,19 +499,15 @@ declare global {
 
   const openTotpMenu = (field: HTMLInputElement, btn: HTMLElement) => {
     const list = totpCandidates();
-    const { menu: m, list: box } = newMenu(btn, "Code à usage unique");
+    const { menu: m, list: box } = newMenu(btn, "GuiVault · code à usage unique");
     for (const c of list) box.appendChild(menuItem(`${c.favorite ? "★ " : ""}${c.name}`, c === recent ? `${c.username || "—"} · rempli juste avant` : c.username || "—", () => void fillTotp(c, field), "Remplir le code TOTP de cet identifiant"));
     if (list.length === 0) {
       const p = document.createElement("div");
-      p.className = "user";
-      p.style.padding = "6px 8px";
-      p.textContent = "Aucun identifiant de ce site n'a de secret TOTP.";
+      p.className = "note";
+      p.textContent = "Aucun identifiant de ce site n'a de code 2FA.";
       box.appendChild(p);
     }
-    const foot = document.createElement("div");
-    foot.className = "foot";
-    foot.textContent = "GuiVault — le code change toutes les 30 s";
-    m.appendChild(foot);
+    m.appendChild(menuFoot("Le code change toutes les 30 s"));
     placeMenu();
     (m.querySelector("button") as HTMLElement | null)?.focus();
   };
@@ -650,11 +718,20 @@ declare global {
     banner.className = "banner";
     banner.setAttribute("role", "dialog");
     banner.setAttribute("aria-label", "Enregistrer dans GuiVault");
-    const text = p.mode === "update" ? `Mettre à jour le mot de passe de « ${p.loginName} » ?` : `Enregistrer l'identifiant${p.username ? ` « ${p.username} »` : ""} pour ${p.host} ?`;
-    banner.innerHTML = `<span class="logo">${ICON}</span><span class="text"></span>`;
-    (banner.querySelector(".text") as HTMLElement).textContent = text;
+    const update = p.mode === "update";
+    banner.innerHTML = `<div class="top"><span class="logo">${ICON}</span><span class="text"></span><button type="button" class="b b-ghost b-icon" data-act="close" aria-label="Fermer">✕</button></div><div class="card"><span class="tile"></span><span class="txt"><span class="name"></span><span class="user"></span></span></div>`;
+    (banner.querySelector(".text") as HTMLElement).textContent = update ? "Mettre à jour le mot de passe ?" : "Enregistrer cet identifiant ?";
+    const label = (update ? p.loginName : p.host) ?? p.host ?? "";
+    const tile = banner.querySelector(".tile") as HTMLElement;
+    tile.textContent = tileInitial(label);
+    tile.style.setProperty("--h", String(tileHue(label)));
+    (banner.querySelector(".name") as HTMLElement).textContent = label;
+    (banner.querySelector(".user") as HTMLElement).textContent = p.username || (update ? "" : "sans utilisateur");
     let select: HTMLSelectElement | null = null;
     if (p.mode === "new" && p.vaults.length > 1) {
+      const where = document.createElement("div");
+      where.className = "where";
+      where.innerHTML = `<span>Dans</span>`;
       select = document.createElement("select");
       select.setAttribute("aria-label", "Vault");
       for (const v of p.vaults) {
@@ -664,13 +741,14 @@ declare global {
         o.selected = v.id === p.defaultVaultId;
         select.appendChild(o);
       }
+      where.appendChild(select);
+      banner.appendChild(where);
     }
     const actions = document.createElement("div");
     actions.className = "actions";
-    if (select) actions.appendChild(select);
     const later = document.createElement("button");
-    later.className = "b b-ghost";
-    later.textContent = "Pas maintenant";
+    later.className = "b b-secondary";
+    later.textContent = "Plus tard";
     const save = document.createElement("button");
     save.className = "b b-primary";
     save.textContent = p.mode === "update" ? "Mettre à jour" : "Enregistrer";
@@ -678,11 +756,12 @@ declare global {
     banner.appendChild(actions);
     const close = () => { banner?.remove(); banner = null; };
     onTrustedClick(later, () => { void send({ type: "guivault-dismiss-captured" }); close(); });
+    onTrustedClick(banner.querySelector("[data-act=close]") as HTMLElement, () => { void send({ type: "guivault-dismiss-captured" }); close(); });
     onTrustedClick(save, () => {
       save.disabled = true;
       void send<{ ok: true; name: string } | { ok: false; error: string }>({ type: "guivault-save-captured", vaultId: select?.value ?? p.defaultVaultId }).then((r) => {
-        (banner?.querySelector(".text") as HTMLElement | null)?.replaceChildren(document.createTextNode(r.ok ? `« ${r.name} » enregistré dans GuiVault.` : `Échec : ${r.error}`));
-        select?.remove();
+        (banner?.querySelector(".text") as HTMLElement | null)?.replaceChildren(document.createTextNode(r.ok ? `« ${r.name} » enregistré.` : `Échec : ${r.error}`));
+        select?.closest(".where")?.remove();
         save.remove();
         later.textContent = "Fermer";
         if (r.ok) setTimeout(close, 4000);
@@ -717,17 +796,42 @@ declare global {
       box.innerHTML = `<h2><span class="logo">${ICON}</span><span></span></h2><p></p>`;
       (box.querySelector("h2 span:last-child") as HTMLElement).textContent = title;
       (box.querySelector("p") as HTMLElement).textContent = text;
-      let select: HTMLSelectElement | null = null;
+      // Les choix : des cartes, une seule cochée (au clavier : flèches).
+      let chosen = choices?.[0]?.value ?? "";
       if (choices) {
-        select = document.createElement("select");
-        select.setAttribute("aria-label", "Identifiant");
-        for (const c of choices) {
-          const o = document.createElement("option");
-          o.value = c.value;
-          o.textContent = c.sub ? `${c.label} — ${c.sub}` : c.label;
-          select.appendChild(o);
-        }
-        box.appendChild(select);
+        const list = document.createElement("div");
+        list.className = "choices";
+        list.setAttribute("role", "radiogroup");
+        list.setAttribute("aria-label", "Identifiant");
+        const cards: HTMLButtonElement[] = [];
+        const pick = (i: number) => {
+          chosen = choices[i].value;
+          cards.forEach((c, j) => { c.setAttribute("aria-checked", String(j === i)); c.tabIndex = j === i ? 0 : -1; });
+        };
+        choices.forEach((c, i) => {
+          const card = document.createElement("button");
+          card.type = "button";
+          card.className = "choice";
+          card.setAttribute("role", "radio");
+          card.innerHTML = `<span class="tile"></span><span class="txt"><span class="name"></span><span class="user"></span></span>`;
+          const tile = card.querySelector(".tile") as HTMLElement;
+          tile.textContent = tileInitial(c.label);
+          tile.style.setProperty("--h", String(tileHue(c.label)));
+          (card.querySelector(".name") as HTMLElement).textContent = c.label;
+          (card.querySelector(".user") as HTMLElement).textContent = c.sub;
+          onTrustedClick(card, () => pick(i));
+          card.addEventListener("keydown", (e) => {
+            if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+            e.preventDefault();
+            const n = (i + (e.key === "ArrowDown" ? 1 : choices.length - 1)) % choices.length;
+            pick(n);
+            cards[n].focus();
+          });
+          cards.push(card);
+          list.appendChild(card);
+        });
+        pick(0);
+        box.appendChild(list);
       }
       const row = document.createElement("div");
       row.className = "row";
@@ -746,7 +850,7 @@ declare global {
         resolve(v);
       };
       onTrustedClick(cancel, () => done(null));
-      onTrustedClick(ok, () => done(select ? select.value : ""));
+      onTrustedClick(ok, () => done(choices ? chosen : ""));
       box.addEventListener("keydown", (e) => { if (e.key === "Escape") done(null); });
       root.append(veil, box);
       ok.focus();

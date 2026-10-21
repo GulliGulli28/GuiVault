@@ -257,7 +257,7 @@ export function InfoTip({ label, items, align = "left" }: { label: string; items
 export function SettingRow({ title, desc, children, htmlFor }: { title: ReactNode; desc?: ReactNode; children?: ReactNode; htmlFor?: string }) {
   return (
     <div className="setting-row">
-      <div className="min-w-0 flex-[1_1_260px]">
+      <div className="min-w-0 flex-[1_1_200px]">
         {htmlFor ? <label htmlFor={htmlFor} className="setting-title flex flex-wrap items-center gap-1.5">{title}</label> : <div className="setting-title flex flex-wrap items-center gap-1.5">{title}</div>}
         {desc && <div className="setting-desc">{desc}</div>}
       </div>

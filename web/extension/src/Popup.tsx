@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react
 import { api, ApiError, errorMessage, setBaseUrl, setSessionLostHandler, setTokensChangedHandler } from "../../src/lib/api";
 import { filterEntities, indexItems, toEntities } from "../../src/lib/entities";
 import { buildVaultTree } from "../../src/lib/vaultTree";
-import { describeSecret, isSecret } from "../../src/lib/items";
+import { describeSecret, isSecret, uriHost } from "../../src/lib/items";
 import { openOffline, acceptIntegrity, acceptRollback, closeLocal, loadItems, login, openLocal, payloadEntity, payloadName, refresh, setDeviceLabel, type DecodedItem, type SessionState, type VaultView } from "../../src/lib/session";
 import { applyBackend } from "./backend";
 import { coffreLabel, knownCoffres, nativeCoffre } from "./nativeHost";
@@ -10,13 +10,14 @@ import { loginMatches } from "../../src/lib/urimatch";
 import { canWrite, KIND_LABELS, KIND_LABELS_PLURAL, type CustomIcon, type GuiVaultEntity, type ItemKind, type Login, type Payload, type TokenPair } from "../../src/lib/types";
 import { GeneratorPanel } from "../../src/components/GeneratorPanel";
 import { ItemView } from "../../src/components/ItemView";
-import { EntityIcon, ItemTree, KIND_ICONS } from "../../src/components/ItemTree";
-import { PasswordStrength } from "../../src/components/PasswordStrength";
+import { ItemTile, ItemTree, KIND_ICONS } from "../../src/components/ItemTree";
 import { TotpCode } from "../../src/components/TotpCode";
 import { TotpList } from "../../src/components/TotpList";
 import { ItemForm } from "../../src/components/forms/ItemForm";
-import { IconDice, IconGlobe, IconShieldClock, IconStar } from "../../src/components/secret-icons";
-import { IconChevronDown, IconChevronRight, IconCopy, IconEdit, IconExternal, IconLock, IconPlus, IconRefresh, IconSearch, IconSettings, IconTrash, IconVault } from "../../src/components/ui-icons";
+import { IconGlobe, IconIdentity } from "../../src/components/secret-icons";
+import { IconCheck, IconChevronDown, IconChevronRight, IconCopy, IconEdit, IconExternal, IconLock, IconPlus, IconRefresh, IconSearch, IconSettings, IconTrash } from "../../src/components/ui-icons";
+import { useVaultColors, vaultColor } from "../../src/lib/vaultColors";
+import { personInitials } from "../../src/lib/tiles";
 import { AppearanceSettings, SettingsSyncToggle } from "../../src/components/AppearanceSettings";
 import { onSettingsApplied, registerSettingsSection, settingsChanged, startSettingsSync } from "../../src/lib/syncedSettings";
 import "../../src/lib/settingsSections";
@@ -28,7 +29,7 @@ import { useMerge } from "../../src/components/MergeDialog";
 import { AttachmentsPanel } from "../../src/components/AttachmentsPanel";
 import { OfflineSetting } from "../../src/components/OfflineSetting";
 import { loadOfflineCopy, refreshOfflineCopy, type OfflineCopy } from "../../src/lib/offline";
-import { copyText, PasswordInput, SecretValue } from "../../src/components/ui";
+import { copyText, formatAgo, InfoTip, PasswordInput, SettingRow } from "../../src/components/ui";
 import { clearLockReason, lock, lockReason, loadItemsCache, loadPopupState, loadSession, loadSettings, parseOtpPatterns, POPUP_STATE_TTL_MS, saveItemsCache, savePopupState, saveSession, saveSettings, saveTokens, touchLock, type ItemsCache, type LockReason, type PopupView, type Settings } from "./store";
 import { deleteItem, saveLogin, savePayload } from "./vaultops";
 import type { FillTabReply, PopupToBackground } from "./messages";
@@ -91,6 +92,10 @@ interface Entry {
 
 interface LoginEntry extends Entry {
   login: Login;
+}
+
+function capitalize(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 function isLoginEntry(e: Entry): e is LoginEntry {
@@ -251,6 +256,15 @@ export function Popup() {
     };
   }, [sync]);
 
+  useEffect(() => {
+    if (!newMenu) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setNewMenu(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [newMenu]);
+
   // Réglages de l'extension reçus d'un autre appareil.
   useEffect(() => onSettingsApplied(() => void loadSettings().then(setSettings)), []);
 
@@ -289,6 +303,8 @@ export function Popup() {
   const canFill = !!pageUrl && /^https?:/.test(pageUrl);
   const forPage = useMemo(() => (canFill ? logins.filter((e) => loginMatches(e.login, pageUrl!)) : []), [logins, pageUrl, canFill]);
   const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const pageHost = useMemo(() => { try { return pageUrl ? new URL(pageUrl).hostname.replace(/^www\./, "") : ""; } catch { return ""; } }, [pageUrl]);
+  const colors = useVaultColors();
 
   /** Le seul formulaire est dans un cadre servi par un autre site que
    * l'identifiant : on demande avant d'y mettre un mot de passe. */
@@ -375,27 +391,25 @@ export function Popup() {
   const indexFor = (vaultId: string) => indexItems(cache[vaultId]?.items ?? []);
 
   return (
-    <div className="flex h-[600px] flex-col bg-[var(--c-bg2)] text-[var(--c-text)]">
-      <header className="flex shrink-0 items-center gap-2 border-b border-[var(--c-border)] bg-[var(--c-bg)] px-3 py-2">
+    <div className="relative flex h-[600px] flex-col bg-[var(--c-bg2)] text-[var(--c-text)]">
+      <header className="flex min-h-[52px] shrink-0 items-center gap-2 border-b border-[var(--c-border)] pl-3.5 pr-2">
         {/* Le logo grise quand le coffre est verrouillé — comme l'icône de
             l'extension dans la barre du navigateur. */}
-        <Logo size={22} locked={screen.kind !== "vault"} />
-        <span className="text-[13px] font-semibold">GuiVault</span>
-        <span className="ml-auto flex items-center gap-0.5">
-          {screen.kind === "vault" && (
-            <>
-              <button onClick={() => void sync(screen.state, cache)} className="btn btn-ghost btn-sm btn-icon" title="Rafraîchir" aria-label="Rafraîchir"><IconRefresh size={12} className={refreshing ? "animate-spin" : ""} /></button>
-              {!screen.state.local && <a href={settings.serverUrl} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-sm btn-icon" title="Ouvrir le coffre (interface web)" aria-label="Ouvrir le coffre"><IconExternal size={12} /></a>}
-              <button onClick={() => go(view.kind === "settings" ? { kind: "list" } : { kind: "settings" })} className={`btn btn-sm btn-icon ${view.kind === "settings" ? "btn-toggled" : "btn-ghost"}`} title="Réglages" aria-label="Réglages" aria-pressed={view.kind === "settings"}><IconSettings size={12} /></button>
-              <button onClick={() => void doLock()} className="btn btn-ghost btn-sm btn-icon" title="Verrouiller" aria-label="Verrouiller"><IconLock size={12} /></button>
-            </>
-          )}
-        </span>
+        <Logo size={24} locked={screen.kind !== "vault"} />
+        <span className="min-w-0 flex-1 truncate text-[14px] font-semibold">GuiVault</span>
+        {screen.kind === "vault" ? (
+          <span className="flex items-center">
+            <button onClick={() => void sync(screen.state, cache)} className="btn btn-ghost btn-icon" title="Rafraîchir" aria-label="Rafraîchir"><IconRefresh size={15} className={refreshing ? "animate-spin" : ""} /></button>
+            {!screen.state.local && <a href={settings.serverUrl} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-icon" title="Ouvrir le coffre (interface web)" aria-label="Ouvrir le coffre"><IconExternal size={15} /></a>}
+            <button onClick={() => go(view.kind === "settings" ? { kind: "list" } : { kind: "settings" })} className={`btn btn-icon ${view.kind === "settings" ? "btn-toggled" : "btn-ghost"}`} title="Réglages" aria-label="Réglages" aria-pressed={view.kind === "settings"}><IconSettings size={15} /></button>
+            <button onClick={() => void doLock()} className="btn btn-ghost btn-icon" title="Verrouiller" aria-label="Verrouiller"><IconLock size={15} /></button>
+          </span>
+        ) : screen.kind === "login" && <span className="tag">Verrouillé</span>}
       </header>
       {screen.kind === "vault" && screen.state.offline && (
-        <div role="status" className="shrink-0 p-2 pb-0">
-          <div className="callout callout-warn flex items-center gap-2 text-[11.5px]">
-            <span className="min-w-0 flex-1">Hors ligne — la copie du {new Date(screen.state.offline.savedAt).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}, en lecture seule.</span>
+        <div role="status" className="shrink-0 px-3.5 pt-2.5">
+          <div className="callout callout-warn flex items-center gap-2 py-2">
+            <span className="min-w-0 flex-1 truncate">Hors ligne · copie du {new Date(screen.state.offline.savedAt).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}</span>
             <button onClick={() => void doLock()} className="btn btn-secondary btn-sm shrink-0">Se reconnecter</button>
           </div>
         </div>
@@ -498,36 +512,37 @@ export function Popup() {
         />
       ) : (
         <>
-          <nav className="flex shrink-0 items-center gap-1 border-b border-[var(--c-border)] px-2 py-1.5">
-            {(["vaults", "totp", "generator"] as Tab[]).map((t) => (
-              <button key={t} onClick={() => setTab(t)} className={`btn btn-sm ${tab === t ? "btn-toggled" : "btn-ghost"}`}>
-                {t === "vaults" ? <><IconVault size={12} /> Vaults</> : t === "totp" ? <><IconShieldClock size={12} /> Codes</> : <><IconDice size={12} /> Générateur</>}
-              </button>
-            ))}
-            {tab === "vaults" && screen.state.vaults.some((v) => v.role !== "reader") && (
-              <div className="relative ml-auto">
-                <button onClick={() => setNewMenu((m) => !m)} className="btn btn-primary btn-sm" aria-haspopup="menu" aria-expanded={newMenu}><IconPlus size={11} /> Nouveau <IconChevronDown size={10} /></button>
-                {newMenu && (
-                  <>
-                    <div className="fixed inset-0 z-10" onClick={() => setNewMenu(false)} />
-                    <div className="popover absolute right-0 z-20 mt-1 w-44 py-1" role="menu">
-                      {NEW_KINDS.map((k, i) => {
-                        if (k === "sep") return <div key={i} className="menu-sep" />;
-                        const Icon = KIND_ICONS[k];
-                        return (
-                          <button key={k} role="menuitem" onClick={() => { setNewMenu(false); go({ kind: "new", itemKind: k, vaultId: (screen.state.vaults.find((v) => v.kind === "personal") ?? screen.state.vaults[0]).id }); }} className="menu-item">
-                            <Icon size={13} /> {KIND_LABELS[k].charAt(0).toUpperCase() + KIND_LABELS[k].slice(1)}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
-          </nav>
-          <div className="sidebar-scroll min-h-0 flex-1 overflow-y-auto p-2">
+          <div className="shrink-0 px-3.5 pt-2.5">
+            <div className="segmented flex w-full" role="tablist" aria-label="Vue">
+              {(["vaults", "totp", "generator"] as Tab[]).map((t) => (
+                <button key={t} role="tab" aria-selected={tab === t} data-active={tab === t} onClick={() => setTab(t)} className="flex-1">
+                  {t === "vaults" ? "Coffres" : t === "totp" ? "Codes" : "Générateur"}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="sidebar-scroll min-h-0 flex-1 overflow-y-auto px-3.5 pb-4 pt-3">
             {tab === "generator" && <GeneratorPanel compact />}
+            {tab === "totp" && forPage.some((e) => e.login.totp) && (
+              <section data-section="page-codes" className="mb-3.5 flex flex-col gap-1.5">
+                <div className="flex min-w-0 items-center gap-1.5 px-0.5 text-[12px] font-medium text-[var(--c-text-muted)]">
+                  <IconGlobe size={13} />
+                  <span className="min-w-0 flex-1 truncate">Sur {pageHost}</span>
+                </div>
+                <div className="card divide-y divide-[var(--c-border)]">
+                  {forPage.filter((e) => e.login.totp).map((e) => (
+                    <div key={e.item.id} className="flex min-w-0 items-center gap-2.5 py-2.5 pl-3 pr-2.5">
+                      <ItemTile entity={e.entity} customIcons={e.customIcons} size={32} />
+                      <div className="flex min-w-0 flex-1 flex-col">
+                        <span className="truncate text-[13.5px] font-medium">{e.name}</span>
+                        <TotpCode secret={e.login.totp!} />
+                      </div>
+                      <button onClick={() => void fill(e, "totp")} className="btn btn-primary" title="Remplir le code dans la page">Remplir</button>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
             {tab === "totp" && (
               <TotpList
                 compact
@@ -544,24 +559,31 @@ export function Popup() {
               />
             )}
             {tab === "vaults" && (
-              <>
-                <div className="relative mb-1.5">
-                  <IconSearch size={12} className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[var(--c-text-muted)]" />
-                  <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Rechercher…" aria-label="Rechercher" className="input pl-7" />
-                </div>
+              <div className="flex flex-col gap-3.5">
+                {forPage.length > 0 && terms.length === 0 && filter === "all" && (
+                  <section data-section="page" className="flex flex-col gap-1.5">
+                    <div className="flex min-w-0 items-center gap-1.5 px-0.5 text-[12px] font-medium text-[var(--c-text-muted)]">
+                      <IconGlobe size={13} />
+                      <span className="min-w-0 flex-1 truncate">Sur {pageHost}</span>
+                      <span>{forPage.length}</span>
+                    </div>
+                    <div className="card divide-y divide-[var(--c-border)]">
+                      {forPage.map((e) => <SiteRow key={e.item.id} entry={e} onFill={fill} onOpen={() => go({ kind: "detail", id: e.item.id })} say={say} />)}
+                    </div>
+                  </section>
+                )}
+                <label className="flex h-9 min-w-0 items-center gap-2 rounded-[9px] border border-[var(--c-border)] bg-[var(--c-surface)] px-2.5 text-[var(--c-text-muted)] focus-within:border-[var(--c-accent)]">
+                  <IconSearch size={14} />
+                  <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={`Rechercher dans ${screen.state.vaults.length > 1 ? `${screen.state.vaults.length} coffres` : "le coffre"}`} aria-label="Rechercher" className="min-w-0 flex-1 bg-transparent text-[13.5px] text-[var(--c-text)] outline-none placeholder:text-[var(--c-text-muted)] focus-visible:outline-none" />
+                </label>
                 {entries.some((e) => e.payload.kind !== "login") && (
-                  <div className="mb-2 flex flex-wrap gap-1" role="tablist" aria-label="Type d'élément">
+                  <div className="-mx-3.5 flex gap-1.5 overflow-x-auto px-3.5 [scrollbar-width:none]" role="tablist" aria-label="Type d'élément">
                     {FILTERS.filter((f) => f === "all" || (counts[f] ?? 0) > 0).map((f) => (
-                      <button key={f} role="tab" aria-selected={filter === f} onClick={() => setFilter(f)} className={`btn btn-sm shrink-0 ${filter === f ? "btn-toggled" : "btn-ghost"}`}>
-                        {f === "all" ? "Tout" : KIND_LABELS_PLURAL[f]}<span className="text-[10px] text-[var(--c-text-faint)]">{counts[f]}</span>
+                      <button key={f} role="tab" aria-selected={filter === f} onClick={() => setFilter(f)} className={`inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full border px-3 text-[12.5px] ${filter === f ? "border-[var(--c-text)] bg-[var(--c-text)] text-[var(--c-bg2)]" : "border-[var(--c-border)] text-[var(--c-text-secondary)] hover:border-[var(--c-border-strong)]"}`}>
+                        {f === "all" ? "Tout" : capitalize(KIND_LABELS_PLURAL[f])}<span className="opacity-60">{counts[f]}</span>
                       </button>
                     ))}
                   </div>
-                )}
-                {forPage.length > 0 && terms.length === 0 && filter === "all" && (
-                  <Section id="page" title="Identifiants sur cette page" icon={<IconGlobe size={12} />} count={forPage.length} collapsed={collapsed.has("page")} onToggle={() => toggleCollapsed("page")} accent>
-                    {forPage.map((e) => <Row key={e.item.id} entry={e} canFill onFill={fill} onOpen={() => go({ kind: "detail", id: e.item.id })} say={say} />)}
-                  </Section>
                 )}
                 {screen.state.vaults.map((v) => {
                   // Le contenu du vault dans son arborescence — la même que
@@ -574,7 +596,7 @@ export function Popup() {
                   const count = ents.filter((e) => e.kind !== "group" && shown.has(e.id)).length;
                   if (terms.length && count === 0) return null;
                   return (
-                    <Section key={v.id} id={v.id} title={v.name} icon={<IconVault size={12} />} count={count} collapsed={collapsed.has(v.id) && terms.length === 0} onToggle={() => toggleCollapsed(v.id)}>
+                    <Section key={v.id} id={v.id} title={v.name} dot={vaultColor(v.id, v.kind === "personal", colors)} count={count} collapsed={collapsed.has(v.id) && terms.length === 0} onToggle={() => toggleCollapsed(v.id)}>
                       <ItemTree
                         entities={ents}
                         customIcons={mine[0]?.customIcons ?? []}
@@ -590,55 +612,84 @@ export function Popup() {
                     </Section>
                   );
                 })}
-                {entries.length === 0 && <p className="px-2 py-6 text-center text-[12px] text-[var(--c-text-muted)]">Rien pour l'instant : « Nouveau », ou enregistrez un identifiant depuis une page de connexion.</p>}
-              </>
+                {entries.length === 0 && <p className="px-2 py-8 text-center text-[13px] text-[var(--c-text-muted)]">Rien pour l'instant.</p>}
+              </div>
             )}
           </div>
+          <footer className="flex min-h-[40px] shrink-0 items-center gap-2 border-t border-[var(--c-border)] pl-3.5 pr-2 text-[12px] text-[var(--c-text-muted)]">
+            <span className="min-w-0 flex-1 truncate">{canFill ? <>Remplir depuis la page : <span className="kbd">Ctrl Maj L</span></> : "Cet onglet n'est pas une page web."}</span>
+            {screen.state.vaults.some((v) => v.role !== "reader") && (
+              <div className="relative">
+                <button onClick={() => setNewMenu((m) => !m)} className="btn btn-ghost btn-sm text-[var(--c-accent-text)]" aria-haspopup="menu" aria-expanded={newMenu}><IconPlus size={13} /> Nouveau</button>
+                {newMenu && (
+                  <>
+                    <div className="fixed inset-0 z-10" onClick={() => setNewMenu(false)} />
+                    <div className="popover absolute bottom-full right-0 z-20 mb-1.5 max-h-[calc(100vh-110px)] w-52 overflow-y-auto py-1" role="menu">
+                      {NEW_KINDS.map((k, i) => {
+                        if (k === "sep") return <div key={i} className="menu-sep" />;
+                        const Icon = KIND_ICONS[k];
+                        return (
+                          <button key={k} role="menuitem" onClick={() => { setNewMenu(false); go({ kind: "new", itemKind: k, vaultId: (screen.state.vaults.find((v) => v.kind === "personal") ?? screen.state.vaults[0]).id }); }} className="menu-item">
+                            <Icon size={14} /> {capitalize(KIND_LABELS[k])}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </footer>
         </>
       )}
       {frameConfirm && (
-        <div role="alertdialog" aria-label="Remplir dans un cadre" className="callout callout-warn m-2 shrink-0 space-y-2 text-[12px]">
-          <p>Le formulaire de cette page est dans un cadre servi par <span className="font-medium">{frameConfirm.host}</span>, qui ne correspond pas à « {frameConfirm.entry.login.name} ». Ne remplissez que si c'est bien la connexion de ce site, pas une publicité ou un widget.</p>
+        <div role="alertdialog" aria-label="Remplir dans un cadre" className="callout callout-warn absolute inset-x-3 bottom-12 z-30 space-y-2.5 shadow-[var(--shadow-md)]">
+          <p><b className="font-semibold">Remplir dans {frameConfirm.host} ?</b> Ce cadre ne correspond pas à « {frameConfirm.entry.login.name} » : seulement si c'est bien la connexion du site, pas une publicité.</p>
           <div className="flex justify-end gap-2">
-            <button onClick={() => setFrameConfirm(null)} className="btn btn-ghost btn-sm">Annuler</button>
-            <button onClick={() => { const c = frameConfirm; setFrameConfirm(null); void fill(c.entry, c.what, c.frameId); }} className="btn btn-primary btn-sm">Remplir quand même</button>
+            <button onClick={() => setFrameConfirm(null)} className="btn btn-ghost">Annuler</button>
+            <button onClick={() => { const c = frameConfirm; setFrameConfirm(null); void fill(c.entry, c.what, c.frameId); }} className="btn btn-primary">Remplir quand même</button>
           </div>
         </div>
       )}
-      {notice && <div role="status" className="shrink-0 border-t border-[var(--c-border)] bg-[var(--c-bg)] px-3 py-1.5 text-[11.5px] text-[var(--c-text-secondary)]">{notice}</div>}
+      {notice && (
+        <div role="status" className="popover absolute inset-x-3 bottom-12 z-20 flex items-center gap-2.5 px-3 py-2.5 text-[13px]">
+          <IconCheck size={15} className="shrink-0 text-[var(--c-ok)]" />
+          <span className="min-w-0 flex-1 truncate">{notice}</span>
+          {/copié/.test(notice) && <span className="shrink-0 text-[12px] text-[var(--c-text-muted)]">vidé après le délai</span>}
+        </div>
+      )}
       {merging.dialog}
     </div>
   );
 }
 
 /** Une section repliable : « Identifiants sur cette page », ou un vault. */
-function Section({ id, title, icon, count, collapsed, onToggle, accent, children }: { id: string; title: string; icon: React.ReactNode; count: number; collapsed: boolean; onToggle: () => void; accent?: boolean; children: React.ReactNode }) {
+function Section({ id, title, dot, count, collapsed, onToggle, children }: { id: string; title: string; dot: string; count: number; collapsed: boolean; onToggle: () => void; children: React.ReactNode }) {
   return (
-    <section className="mb-2" data-section={id}>
-      <button onClick={onToggle} aria-expanded={!collapsed} className={`flex w-full items-center gap-1.5 rounded-md px-1.5 py-1 text-left text-[11px] font-semibold uppercase tracking-[0.06em] hover:bg-[var(--c-hover)] ${accent ? "text-[var(--c-accent-text)]" : "text-[var(--c-text-muted)]"}`}>
-        {collapsed ? <IconChevronRight size={10} /> : <IconChevronDown size={10} />}
-        {icon}
+    <section data-section={id}>
+      <button onClick={onToggle} aria-expanded={!collapsed} className="flex w-full min-w-0 items-center gap-2 rounded-md px-0.5 py-1 text-left text-[12px] font-medium text-[var(--c-text-muted)] hover:text-[var(--c-text)]">
+        <span className="vdot" style={{ background: dot }} />
         <span className="min-w-0 flex-1 truncate">{title}</span>
-        <span className="text-[10px] font-normal text-[var(--c-text-faint)]">{count}</span>
+        <span className="font-normal">{count}</span>
+        {collapsed ? <IconChevronRight size={12} /> : <IconChevronDown size={12} />}
       </button>
-      {!collapsed && <div className="mt-0.5">{children}</div>}
+      {!collapsed && <div className="-mx-1.5 mt-0.5">{children}</div>}
     </section>
   );
 }
 
-function Row({ entry, canFill, onFill, onOpen, say }: { entry: Entry; canFill: boolean; onFill: (e: LoginEntry, what: "credentials" | "totp") => Promise<void>; onOpen: () => void; say: (m: string) => void }) {
-  const favorite = !!payloadEntity(entry.payload).favorite;
-  const { entity } = entry;
+/** Un identifiant du site ouvert : « Remplir » d'abord, copier à côté. */
+function SiteRow({ entry, onFill, onOpen, say }: { entry: LoginEntry; onFill: (e: LoginEntry, what: "credentials" | "totp") => Promise<void>; onOpen: () => void; say: (m: string) => void }) {
+  const copy = () => copyText(entry.login.password).then((ok) => say(ok ? "Mot de passe copié." : "Copie refusée par le navigateur."));
   return (
-    <div className="list-row mb-0.5 flex-wrap py-1.5">
-      <button onClick={onOpen} className="flex min-w-0 flex-1 items-center gap-2 text-left" title={`Ouvrir (${KIND_LABELS[entry.payload.kind]})`}>
-        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[var(--c-bg3)] text-[var(--c-text-secondary)] [&>.host-icon]:h-[72%] [&>.host-icon]:w-[72%] [&>.host-icon>*]:h-full [&>.host-icon>*]:w-full"><EntityIcon entity={entity} customIcons={entry.customIcons} size={12} /></span>
-        <span className="flex min-w-0 flex-1 flex-col leading-tight">
-          <span className="flex items-center gap-1 truncate text-[12.5px] font-medium text-[var(--c-text)]">{entry.name}{favorite && <IconStar size={10} filled className="text-[var(--c-warn)]" />}{entity.badge && <span className="tag">{entity.badge}</span>}</span>
-          <span className={`truncate text-[10.5px] text-[var(--c-text-muted)] ${entity.mono && entry.subtitle ? "font-mono" : ""}`}>{entry.subtitle || KIND_LABELS[entry.payload.kind]}</span>
-        </span>
+    <div className="flex min-w-0 items-center gap-2.5 py-2.5 pl-3 pr-2.5">
+      <ItemTile entity={entry.entity} customIcons={entry.customIcons} size={32} />
+      <button onClick={onOpen} className="flex min-w-0 flex-1 flex-col text-left" title={`Ouvrir « ${entry.name} »`}>
+        <span className="truncate text-[13.5px] font-medium">{entry.name}</span>
+        <span className="truncate text-[12.5px] text-[var(--c-text-muted)]">{entry.login.username || entry.subtitle || "—"}</span>
       </button>
-      {isLoginEntry(entry) && <span className="flex shrink-0 items-center gap-0.5"><LoginActions entry={entry} canFill={canFill} onFill={onFill} say={say} /></span>}
+      {entry.login.password && <button onClick={() => void copy()} className="btn btn-ghost btn-icon" title="Copier le mot de passe" aria-label="Copier le mot de passe"><IconCopy size={15} /></button>}
+      <button onClick={() => void onFill(entry, "credentials")} className="btn btn-primary" title="Remplir la page">Remplir</button>
     </div>
   );
 }
@@ -649,75 +700,67 @@ function LoginActions({ entry, canFill, onFill, say }: { entry: LoginEntry; canF
   const copy = (label: string, v: string) => () => copyText(v).then((ok) => say(ok ? `${label} copié.` : "Copie refusée par le navigateur."));
   return (
     <>
+      {entry.login.username && <button onClick={copy("Utilisateur", entry.login.username)} className="btn btn-ghost btn-sm btn-icon" title="Copier l'utilisateur" aria-label="Copier l'utilisateur"><IconIdentity size={13} /></button>}
+      {entry.login.password && <button onClick={copy("Mot de passe", entry.login.password)} className="btn btn-ghost btn-sm btn-icon" title="Copier le mot de passe" aria-label="Copier le mot de passe"><IconCopy size={13} /></button>}
       {canFill && <button onClick={() => void onFill(entry, "credentials")} className="btn btn-secondary btn-sm" title="Remplir la page">Remplir</button>}
-      {entry.login.username && <button onClick={copy("Utilisateur", entry.login.username)} className="btn btn-ghost btn-sm" title="Copier l'utilisateur" aria-label="Copier l'utilisateur">U</button>}
-      {entry.login.password && <button onClick={copy("Mot de passe", entry.login.password)} className="btn btn-ghost btn-sm btn-icon" title="Copier le mot de passe" aria-label="Copier le mot de passe"><IconCopy size={11} /></button>}
     </>
   );
 }
 
 function Detail({ entry, vault, offline, index, canFill, writable, onBack, onFill, onEdit, onDelete, say }: { entry: Entry; vault: VaultView | undefined; offline: boolean; index: ReturnType<typeof indexItems>; canFill: boolean; writable: boolean; onBack: () => void; onFill: (e: LoginEntry, what: "credentials" | "totp") => Promise<void>; onEdit: () => void; onDelete: () => Promise<void>; say: (m: string) => void }) {
   const [confirm, setConfirm] = useState(false);
-  const header = (
-    <div className="flex shrink-0 items-center gap-1 border-b border-[var(--c-border)] px-2 py-1.5">
-      <button onClick={onBack} className="btn btn-ghost btn-sm">←</button>
-      <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">{entry.name}</span>
-      {/* Un vault en lecture (ou la copie hors ligne) ne se modifie pas d'ici. */}
-      {writable && <button onClick={onEdit} className="btn btn-secondary btn-sm" title="Modifier"><IconEdit size={11} /> Modifier</button>}
-      {writable && <button onClick={() => setConfirm(true)} className="btn btn-ghost btn-sm btn-icon hover:text-[var(--c-danger)]" title="Supprimer" aria-label="Supprimer"><IconTrash size={11} /></button>}
-    </div>
-  );
-  // Les pièces jointes : lecture et téléchargement (joindre se fait dans
-  // l'interface web — le sélecteur de fichier fermerait le popup).
-  const attachments = vault && isSecret(entry.payload) && (
-    <AttachmentsPanel vault={vault} item={entry.item} writable={false} offline={offline} onChanged={() => {}} notify={say} error={say} />
-  );
-  const confirmBox = confirm && (
-    <div className="shrink-0 border-t border-[var(--c-border)] bg-[var(--c-bg)] p-3">
-      <p className="mb-2 text-[12px]">Supprimer « {entry.name} » ? Une pierre tombale est laissée pour vos autres appareils.</p>
-      <div className="flex justify-end gap-1.5">
-        <button onClick={() => setConfirm(false)} className="btn btn-ghost btn-sm">Annuler</button>
-        <button onClick={() => void onDelete()} className="btn btn-danger btn-sm">Supprimer</button>
-      </div>
-    </div>
-  );
-  if (!isLoginEntry(entry)) {
-    // Les autres types : la fiche de l'interface web, telle quelle.
-    return (
-      <div className="flex min-h-0 flex-1 flex-col">
-        {header}
-        <div className="sidebar-scroll min-h-0 flex-1 overflow-y-auto px-3 py-2">
-          <p className="mb-2 flex items-center gap-1 text-[11px] text-[var(--c-text-muted)]"><IconVault size={11} /> {entry.vaultName} · {KIND_LABELS[entry.payload.kind]}</p>
-          <ItemView payload={entry.payload} index={index} />
-          {attachments}
-        </div>
-        {confirmBox}
-      </div>
-    );
-  }
-  const l = entry.login;
+  const login = isLoginEntry(entry) ? entry : null;
+  const site = login?.login.uris[0]?.uri;
   const copy = (label: string, v: string) => () => copyText(v).then((ok) => say(ok ? `${label} copié.` : "Copie refusée par le navigateur."));
-  const row = (label: string, body: React.ReactNode) => (
-    <div className="grid grid-cols-[5.5rem_1fr] items-start gap-x-2 border-b border-[var(--c-border)] py-1.5">
-      <span className="text-[11px] font-medium text-[var(--c-text-secondary)]">{label}</span>
-      <span className="min-w-0 break-words text-[12.5px]">{body}</span>
-    </div>
-  );
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {header}
-      <div className="sidebar-scroll min-h-0 flex-1 overflow-y-auto px-3 py-1">
-        {row("Vault", <span className="flex items-center gap-1 text-[var(--c-text-secondary)]"><IconVault size={11} /> {entry.vaultName}</span>)}
-        {row("Utilisateur", l.username ? <span className="flex items-center gap-1 font-mono text-[12px]">{l.username}<button onClick={copy("Utilisateur", l.username)} className="btn btn-ghost btn-sm btn-icon" title="Copier" aria-label="Copier l'utilisateur"><IconCopy size={11} /></button></span> : <span className="text-[var(--c-text-muted)]">—</span>)}
-        {row("Mot de passe", l.password ? <span className="flex flex-wrap items-center gap-x-2 gap-y-1"><SecretValue value={l.password} /><PasswordStrength password={l.password} /></span> : <span className="text-[var(--c-text-muted)]">—</span>)}
-        {l.totp && row("TOTP", <span className="flex items-center gap-2"><TotpCode secret={l.totp} />{canFill && <button onClick={() => void onFill(entry, "totp")} className="btn btn-ghost btn-sm" title="Remplir le code dans la page" aria-label="Remplir le code dans la page">↵</button>}</span>)}
-        {l.uris.length > 0 && row(l.uris.length > 1 ? "Sites" : "Site", <span className="flex flex-col gap-0.5">{l.uris.map((u, i) => <a key={i} href={/^[a-z][a-z0-9+.-]*:/i.test(u.uri) ? u.uri : `https://${u.uri}`} target="_blank" rel="noopener noreferrer" className="truncate font-mono text-[11.5px] text-[var(--c-accent-text)] hover:underline">{u.uri}</a>)}</span>)}
-        {l.notes && row("Notes", <span className="whitespace-pre-wrap text-[12px]">{l.notes}</span>)}
-        {l.passkeys.length > 0 && row("Passkeys", <span className="text-[12px]">{l.passkeys.map((k) => k.rpName || k.rpId).join(", ")}</span>)}
-        {attachments}
-        {canFill && <button onClick={() => void onFill(entry, "credentials")} className="btn btn-primary btn-sm mt-3 w-full">Remplir la page</button>}
+      <div className="flex min-h-[48px] shrink-0 items-center gap-1 border-b border-[var(--c-border)] px-1.5">
+        <button onClick={onBack} className="btn btn-ghost btn-icon" title="Retour" aria-label="Retour"><IconChevronRight size={15} className="rotate-180" /></button>
+        <span className="min-w-0 flex-1 truncate text-[12.5px] text-[var(--c-text-muted)]">{entry.vaultName}{entry.entity.path ? ` · ${entry.entity.path}` : ""}</span>
+        {/* Un vault en lecture (ou la copie hors ligne) ne se modifie pas d'ici. */}
+        {writable && <button onClick={onEdit} className="btn btn-ghost btn-icon" title="Modifier" aria-label="Modifier"><IconEdit size={15} /></button>}
+        {writable && <button onClick={() => setConfirm(true)} className="btn btn-ghost btn-icon hover:text-[var(--c-danger)]" title="Supprimer" aria-label="Supprimer"><IconTrash size={15} /></button>}
       </div>
-      {confirmBox}
+      <div className="sidebar-scroll min-h-0 flex-1 overflow-y-auto px-3.5 pb-5 pt-4">
+        <div className="flex flex-col gap-4">
+          <div className="flex min-w-0 items-center gap-3.5">
+            <ItemTile entity={entry.entity} customIcons={entry.customIcons} size={52} />
+            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+              <h1 className="clamp-2 text-[18px] font-semibold leading-tight tracking-[-0.015em]" title={entry.name}>{entry.name}</h1>
+              {site
+                ? <a href={/^[a-z][a-z0-9+.-]*:/i.test(site) ? site : `https://${site}`} target="_blank" rel="noopener noreferrer" className="truncate text-[12.5px]">{uriHost(site)}</a>
+                : <span className="truncate text-[12.5px] text-[var(--c-text-muted)]">{capitalize(KIND_LABELS[entry.payload.kind])}</span>}
+            </div>
+          </div>
+          {login && (canFill || login.login.password) && (
+            <div className="flex flex-col gap-2">
+              <div className="flex gap-2">
+                {canFill && <button onClick={() => void onFill(login, "credentials")} className="btn btn-primary btn-lg min-w-0 flex-1">Remplir la page<span className="kbd">Ctrl Maj L</span></button>}
+                {login.login.password && <button onClick={copy("Mot de passe", login.login.password)} className={`btn btn-secondary btn-lg ${canFill ? "" : "flex-1"}`}><IconCopy size={15} /> Mot de passe</button>}
+              </div>
+              {canFill && login.login.totp && <button onClick={() => void onFill(login, "totp")} className="btn btn-secondary w-full">Remplir le code 2FA</button>}
+            </div>
+          )}
+          <ItemView payload={entry.payload} index={index} />
+          {/* Les pièces jointes : lecture et téléchargement (joindre se fait
+              dans l'interface web — le sélecteur de fichier fermerait le popup). */}
+          {vault && isSecret(entry.payload) && (
+            <AttachmentsPanel vault={vault} item={entry.item} writable={false} offline={offline} onChanged={() => {}} notify={say} error={say} />
+          )}
+        </div>
+      </div>
+      <footer className="flex min-h-[36px] shrink-0 items-center border-t border-[var(--c-border)] px-3.5 text-[12px] text-[var(--c-text-muted)]">
+        <span className="truncate" title={entry.item.updatedAt}>Modifié {formatAgo(entry.item.updatedAt)}</span>
+      </footer>
+      {confirm && (
+        <div className="popover absolute inset-x-3 bottom-12 z-30 p-3.5">
+          <p className="mb-3 text-[13px]">Supprimer « <span className="font-medium">{entry.name}</span> » ? Il reste dans la corbeille du vault.</p>
+          <div className="flex justify-end gap-2">
+            <button onClick={() => setConfirm(false)} className="btn btn-ghost">Annuler</button>
+            <button onClick={() => void onDelete()} className="btn btn-danger">Supprimer</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -726,68 +769,100 @@ function Detail({ entry, vault, offline, index, canFill, writable, onBack, onFil
  * (les mêmes que sous « Réglages » à la connexion), et l'apparence — la
  * même page que dans l'interface web et dans Guiterm, en une colonne. */
 function SettingsView({ settings, state, say, onSettings, onBack }: { settings: Settings; state: SessionState | null; say: (m: string) => void; onSettings: (s: Settings) => void; onBack: () => void }) {
+  const toggle = (label: string, on: boolean, set: (v: boolean) => void) => (
+    <button type="button" role="switch" aria-checked={on} aria-label={label} onClick={() => set(!on)} className="switch" />
+  );
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex shrink-0 items-center gap-1 border-b border-[var(--c-border)] px-2 py-1.5">
-        <button onClick={onBack} className="btn btn-ghost btn-sm" aria-label="Retour">←</button>
-        <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">Réglages</span>
+      <div className="flex min-h-[48px] shrink-0 items-center gap-1 border-b border-[var(--c-border)] px-1.5">
+        <button onClick={onBack} className="btn btn-ghost btn-icon" title="Retour" aria-label="Retour"><IconChevronRight size={15} className="rotate-180" /></button>
+        <span className="min-w-0 flex-1 truncate text-[14px] font-semibold">Réglages</span>
       </div>
-      <div className="sidebar-scroll min-h-0 flex-1 space-y-4 overflow-y-auto p-3">
-        <section className="space-y-2">
-          <p className="eyebrow">Extension</p>
-          <p className="flex items-center justify-between gap-2 text-[11.5px] text-[var(--c-text-muted)]"><span>Serveur</span><span className="truncate font-mono">{settings.serverUrl}</span></p>
-          <label className="block">
-            <span className="field-label">Verrouiller après</span>
-            <select value={settings.lockMinutes} onChange={(e) => onSettings({ ...settings, lockMinutes: Number(e.target.value) })} className="input">
-              <option value={5}>5 minutes d'inactivité</option>
-              <option value={15}>15 minutes d'inactivité</option>
-              <option value={60}>1 heure d'inactivité</option>
-              <option value={480}>8 heures d'inactivité</option>
-              <option value={0}>À la fermeture du navigateur</option>
-            </select>
-          </label>
-          <ClipboardSelect />
-          {state && <OfflineSetting session={state} notify={say} error={say} compact />}
-          <label className="flex cursor-pointer items-start gap-2 text-[12.5px]">
-            <input type="checkbox" checked={settings.inlineAutofill} onChange={(e) => onSettings({ ...settings, inlineAutofill: e.target.checked })} className="mt-0.5" />
-            <span>Proposer le remplissage dans les pages<span className="help-text block">Un bouton GuiVault dans les formulaires de connexion quand le coffre a quelque chose pour le site.</span></span>
-          </label>
+      <div className="sidebar-scroll min-h-0 flex-1 space-y-5 overflow-y-auto px-3.5 pb-5 pt-4 [&_.setting-row]:px-3.5 [&_.setting-row]:py-3">
+        <section className="flex flex-col gap-2">
+          <h2 className="eyebrow">Dans les pages</h2>
+          <div className="card">
+            <SettingRow title="Bouton GuiVault dans les champs" desc="Sur les sites dont vous avez un identifiant.">
+              {toggle("Bouton GuiVault dans les champs", settings.inlineAutofill, (v) => onSettings({ ...settings, inlineAutofill: v }))}
+            </SettingRow>
+            <SettingRow title="Remplir le code 2FA tout seul" desc="Quand un seul identifiant du site en a un.">
+              {toggle("Remplir le code 2FA tout seul", settings.autoTotp, (v) => onSettings({ ...settings, autoTotp: v }))}
+            </SettingRow>
+            <OtpPatterns settings={settings} onSettings={onSettings} />
+          </div>
         </section>
-        <OtpSettings settings={settings} onSettings={onSettings} />
-        <SettingsSyncToggle />
-        <AppearanceSettings compact />
+        <section className="flex flex-col gap-2">
+          <h2 className="eyebrow">Sécurité</h2>
+          <div className="card">
+            <SettingRow htmlFor="ext-lock" title="Verrouiller après">
+              <select id="ext-lock" value={settings.lockMinutes} onChange={(e) => onSettings({ ...settings, lockMinutes: Number(e.target.value) })} className="input w-auto">
+                {LOCK_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </SettingRow>
+            <ClipboardSelect />
+            {state && <OfflineSetting session={state} notify={say} error={say} />}
+          </div>
+        </section>
+        <section className="flex flex-col gap-2">
+          <h2 className="eyebrow">Apparence</h2>
+          <SettingsSyncToggle />
+          <AppearanceSettings compact />
+        </section>
+        <p className="truncate text-center text-[12px] text-[var(--c-text-muted)]" title={settings.serverUrl}>{state?.local ? "Coffre local" : settings.serverUrl}</p>
       </div>
     </div>
   );
 }
 
-/** Les codes à usage unique (TOTP) : remplissage automatique, et motifs
- * pour les champs que la détection ne reconnaît pas. */
-function OtpSettings({ settings, onSettings }: { settings: Settings; onSettings: (s: Settings) => void }) {
+const LOCK_OPTIONS = [
+  { value: 5, label: "5 min" },
+  { value: 15, label: "15 min" },
+  { value: 60, label: "1 heure" },
+  { value: 480, label: "8 heures" },
+  { value: 0, label: "Navigateur fermé" },
+];
+
+/** Les champs de code que la détection ne reconnaît pas : une ligne qui se
+ * déplie sur ses règles (une regex par ligne). */
+function OtpPatterns({ settings, onSettings }: { settings: Settings; onSettings: (s: Settings) => void }) {
+  const [open, setOpen] = useState(false);
   const [text, setText] = useState(settings.otpPatterns);
   const { errors } = useMemo(() => parseOtpPatterns(text), [text]);
+  const count = settings.otpPatterns.split("\n").filter((l) => l.trim()).length;
   return (
-    <section className="space-y-2">
-      <p className="eyebrow">Codes à usage unique</p>
-      <label className="flex cursor-pointer items-start gap-2 text-[12.5px]">
-        <input type="checkbox" checked={settings.autoTotp} onChange={(e) => onSettings({ ...settings, autoTotp: e.target.checked })} className="mt-0.5" />
-        <span>Remplir le code tout seul<span className="help-text block">Quand une page demande un code et qu'un seul identifiant du site a un secret TOTP. Sinon, le bouton GuiVault du champ propose les codes.</span></span>
-      </label>
-      <label className="block">
-        <span className="field-label">Champs de code supplémentaires</span>
-        <textarea
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onBlur={() => { if (text !== settings.otpPatterns) onSettings({ ...settings, otpPatterns: text }); }}
-          rows={3}
-          spellCheck={false}
-          placeholder={"verif_code\nsso\\.exemple\\.fr => ^pin$"}
-          className="input input-mono h-auto py-1.5 text-[11.5px]"
-        />
-      </label>
-      <p className="help-text">Une regex par ligne, comparée au nom, à l'id, au libellé et au texte d'aide du champ ; <span className="kbd">regex d'URL =&gt; regex de champ</span> pour la limiter à certaines pages. Les champs <span className="kbd">autocomplete="one-time-code"</span>, « code de vérification », « 2FA », « OTP »… sont reconnus d'office, de même que les codes en cases séparées.</p>
-      {errors.length > 0 && <p className="callout callout-warn">Ligne{errors.length > 1 ? "s" : ""} {errors.join(", ")} : regex invalide, ignorée.</p>}
-    </section>
+    <div className="setting-row flex-col items-stretch">
+      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="flex min-w-0 items-center gap-3 text-left">
+        <span className="min-w-0 flex-1">
+          <span className="setting-title block">Champs de code personnalisés</span>
+          <span className="setting-desc block">Pour les sites que GuiVault ne reconnaît pas.</span>
+        </span>
+        <span className="tag">{count} règle{count > 1 ? "s" : ""}</span>
+        {open ? <IconChevronDown size={13} /> : <IconChevronRight size={13} />}
+      </button>
+      {open && (
+        <div className="flex flex-col gap-2">
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onBlur={() => { if (text !== settings.otpPatterns) onSettings({ ...settings, otpPatterns: text }); }}
+            rows={3}
+            spellCheck={false}
+            aria-label="Règles des champs de code"
+            placeholder={"verif_code\nsso\\.exemple\\.fr => ^pin$"}
+            className="input input-mono text-[12.5px]"
+          />
+          <p className="flex items-center gap-1.5 text-[12.5px] text-[var(--c-text-muted)]">
+            Une regex par ligne
+            <InfoTip label="Syntaxe des règles" align="right" items={[
+              { text: "Comparée au nom, à l'id, au libellé et à l'aide du champ." },
+              { text: <><span className="font-mono">regex d'URL =&gt; regex de champ</span> la limite à certaines pages.</> },
+              { text: "Les champs « one-time-code », « 2FA », « OTP » et les codes en cases sont reconnus d'office.", tone: "ok" },
+            ]} />
+          </p>
+          {errors.length > 0 && <p className="callout callout-warn">Ligne{errors.length > 1 ? "s" : ""} {errors.join(", ")} : regex invalide, ignorée.</p>}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -872,67 +947,74 @@ function LoginView({ settings, reason, onSettings, onSession }: { settings: Sett
 
   if (totp) {
     return (
-      <form onSubmit={async (e) => { e.preventDefault(); setBusy("Vérification…"); setError(null); try { await totp.verify(code); } catch (err) { setError(errorMessage(err)); } finally { setBusy(null); } }} className="space-y-3 p-3">
-        <p className="text-[12.5px] text-[var(--c-text-secondary)]">Code de votre application d'authentification, ou code de récupération.</p>
-        <input value={code} onChange={(e) => setCode(e.target.value)} autoFocus inputMode="numeric" autoComplete="one-time-code" placeholder="123 456" className="input input-mono text-center tracking-[0.2em]" />
-        {error && <p className="callout callout-danger">{error}</p>}
-        <div className="flex justify-end gap-2">
-          <button type="button" onClick={() => { setTotp(null); setCode(""); }} className="btn btn-ghost btn-sm">Annuler</button>
-          <button type="submit" disabled={!code.trim() || busy !== null} className="btn btn-primary btn-sm">{busy ?? "Valider"}</button>
+      <form onSubmit={async (e) => { e.preventDefault(); setBusy("Vérification…"); setError(null); try { await totp.verify(code); } catch (err) { setError(errorMessage(err)); } finally { setBusy(null); } }} className="flex flex-col gap-4 px-7 py-6">
+        <div>
+          <h1 className="text-[20px] font-semibold tracking-[-0.015em]">Second facteur</h1>
+          <p className="page-sub">Le code de votre application, ou un code de récupération.</p>
         </div>
+        <input value={code} onChange={(e) => setCode(e.target.value)} autoFocus inputMode="numeric" autoComplete="one-time-code" placeholder="123 456" aria-label="Code" className="input input-mono h-[42px] text-center text-[16px] tracking-[0.2em]" />
+        {error && <p className="callout callout-danger">{error}</p>}
+        <button type="submit" disabled={!code.trim() || busy !== null} className="btn btn-primary btn-lg w-full">{busy ?? "Valider"}</button>
+        <button type="button" onClick={() => { setTotp(null); setCode(""); }} className="btn btn-ghost w-full">Revenir</button>
       </form>
     );
   }
 
   return (
-    <form onSubmit={submit} className="space-y-3 p-3">
-      {reason === "expired" && <p className="callout callout-warn">La session au serveur a expiré ou a été révoquée : reconnectez-vous.</p>}
-      {reason === "timeout" && <p className="callout">Verrouillé après inactivité.</p>}
-      {more ? (
+    <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
+      <div className="sidebar-scroll flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-7 pb-5 pt-5">
+        {reason === "expired" && <p className="callout callout-warn">Session expirée ou révoquée : reconnectez-vous.</p>}
+        {reason === "timeout" && <p className="callout">Verrouillé après inactivité.</p>}
+        {!more && settings.email ? (
+          <div className="card flex min-w-0 items-center gap-3 px-3 py-2.5">
+            <span className="tile h-[34px] w-[34px] rounded-full text-[12px]" style={{ "--tile-h": 238 } as React.CSSProperties}>{personInitials(email)}</span>
+            <span className="flex min-w-0 flex-1 flex-col">
+              <span className="truncate font-medium">{email}</span>
+              <span className="truncate text-[12.5px] text-[var(--c-text-muted)]">{serverUrl.replace(/^https?:\/\//, "")}</span>
+            </span>
+            <button type="button" onClick={() => setMore(true)} className="btn btn-ghost text-[var(--c-accent-text)]">Changer</button>
+          </div>
+        ) : (
+          <>
+            <label className="block">
+              <span className="field-label">Serveur GuiVault</span>
+              <input type="url" value={serverUrl} onChange={(e) => setServerUrl(e.target.value)} placeholder="https://vault.example.com" required className="input input-mono" />
+            </label>
+            <label className="block">
+              <span className="field-label">E-mail</span>
+              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" required className="input" />
+            </label>
+          </>
+        )}
         <label className="block">
-          <span className="field-label">Serveur GuiVault</span>
-          <input type="url" value={serverUrl} onChange={(e) => setServerUrl(e.target.value)} placeholder="https://vault.example.com" required className="input input-mono" />
+          <span className="field-label">Mot de passe maître</span>
+          <PasswordInput value={password} onChange={setPassword} autoFocus={!!settings.email} autoComplete="current-password" />
         </label>
-      ) : (
-        <p className="flex items-center justify-between text-[11.5px] text-[var(--c-text-muted)]"><span className="truncate font-mono">{serverUrl}</span><button type="button" onClick={() => setMore(true)} className="btn btn-ghost btn-sm">Réglages</button></p>
-      )}
-      <label className="block">
-        <span className="field-label">E-mail</span>
-        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" required className="input" />
-      </label>
-      <label className="block">
-        <span className="field-label">Mot de passe maître</span>
-        <PasswordInput value={password} onChange={setPassword} autoFocus={!!settings.email} autoComplete="current-password" />
-      </label>
-      {more && (
-        <>
-          <label className="block">
-            <span className="field-label">Verrouiller après</span>
-            <select value={lockMinutes} onChange={(e) => setLockMinutes(Number(e.target.value))} className="input">
-              <option value={5}>5 minutes d'inactivité</option>
-              <option value={15}>15 minutes d'inactivité</option>
-              <option value={60}>1 heure d'inactivité</option>
-              <option value={480}>8 heures d'inactivité</option>
-              <option value={0}>À la fermeture du navigateur</option>
-            </select>
-          </label>
-          <label className="flex cursor-pointer items-start gap-2 text-[12.5px]">
-            <input type="checkbox" checked={inlineAutofill} onChange={(e) => setInlineAutofill(e.target.checked)} className="mt-0.5" />
-            <span>Proposer le remplissage dans les pages<span className="help-text block">Un bouton GuiVault dans les formulaires de connexion quand le coffre a quelque chose pour le site.</span></span>
-          </label>
-        </>
-      )}
-      {error && <p className="callout callout-danger">{error}</p>}
-      {unreachable && offlineCopy && (
-        <div className="callout space-y-1.5 text-[11.5px]">
-          <p>Le serveur ne répond pas. Ce navigateur garde une copie chiffrée de ce compte ({new Date(offlineCopy.savedAt).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}) : elle s'ouvre avec le mot de passe maître, en lecture seule — le remplissage des pages marche.</p>
-          <div className="flex justify-end"><button type="button" onClick={() => void openCopy()} disabled={!password || busy !== null} className="btn btn-secondary btn-sm">Ouvrir la copie hors ligne</button></div>
-        </div>
-      )}
-      <div className="flex items-center justify-between gap-2">
-        <span className="help-text">{offlineCopy ? "Déchiffré ici ; copie chiffrée gardée." : "Déchiffré ici, jamais sur disque."}</span>
-        <button type="submit" disabled={!serverUrl.trim() || !email.trim() || !password || busy !== null} className="btn btn-primary btn-sm">{busy ?? "Déverrouiller"}</button>
+        {error && <p className="callout callout-danger">{error}</p>}
+        {unreachable && offlineCopy && (
+          <div className="card flex flex-col gap-2.5 p-3">
+            <p className="text-[13px]"><b className="font-semibold">Serveur injoignable.</b> <span className="text-[var(--c-text-muted)]">Copie hors ligne du {new Date(offlineCopy.savedAt).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}, en lecture seule.</span></p>
+            <button type="button" onClick={() => void openCopy()} disabled={!password || busy !== null} className="btn btn-secondary w-full">Ouvrir la copie hors ligne</button>
+          </div>
+        )}
+        <button type="submit" disabled={!serverUrl.trim() || !email.trim() || !password || busy !== null} className="btn btn-primary btn-lg w-full">{busy ?? "Déverrouiller"}</button>
+        {more && (
+          <div className="card [&_.setting-row]:px-3.5 [&_.setting-row]:py-3">
+            <SettingRow htmlFor="ext-login-lock" title="Verrouiller après">
+              <select id="ext-login-lock" value={lockMinutes} onChange={(e) => setLockMinutes(Number(e.target.value))} className="input w-auto">
+                {LOCK_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </SettingRow>
+            <SettingRow title="Bouton dans les champs" desc="Sur les sites dont vous avez un identifiant.">
+              <button type="button" role="switch" aria-checked={inlineAutofill} aria-label="Bouton dans les champs" onClick={() => setInlineAutofill(!inlineAutofill)} className="switch" />
+            </SettingRow>
+          </div>
+        )}
       </div>
+      <footer className="flex min-h-[36px] shrink-0 items-center gap-2 border-t border-[var(--c-border)] px-3.5 text-[12px] text-[var(--c-text-muted)]">
+        <IconLock size={13} />
+        <span className="min-w-0 flex-1 truncate">Déchiffré ici{offlineCopy ? " · copie chiffrée gardée" : ", jamais sur disque"}</span>
+      </footer>
     </form>
   );
 }
@@ -943,8 +1025,8 @@ function LoginChooser(props: { settings: Settings; reason: LockReason | null; on
   const setMode = (m: Settings["mode"]) => props.onSettings({ ...props.settings, mode: m });
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="px-3 pt-3">
-        <div className="segmented w-full" role="tablist" aria-label="Ouvrir">
+      <div className="px-7 pt-5">
+        <div className="segmented flex w-full" role="tablist" aria-label="Ouvrir">
           <button type="button" role="tab" aria-selected={mode === "server"} data-active={mode === "server"} onClick={() => setMode("server")} className="flex-1">Serveur</button>
           <button type="button" role="tab" aria-selected={mode === "local"} data-active={mode === "local"} onClick={() => setMode("local")} className="flex-1">Coffre local</button>
         </div>
@@ -990,37 +1072,42 @@ function LocalLoginView({ settings, reason, onSettings, onSession }: { settings:
   };
 
   return (
-    <form onSubmit={submit} className="space-y-3 p-3">
-      {reason === "timeout" && <p className="callout">Verrouillé après inactivité.</p>}
-      {coffres === null ? (
-        <p className="help-text">Recherche des coffres de l'application…</p>
-      ) : coffres.length > 0 ? (
-        <div role="radiogroup" aria-label="Coffre" className="space-y-1">
-          <span className="field-label">Coffre</span>
-          {coffres.map((p) => (
-            <label key={p} className="list-row flex cursor-pointer items-center gap-2 py-1">
-              <input type="radio" name="coffre" checked={path === p} onChange={() => setPath(p)} />
-              <span className="flex min-w-0 flex-1 flex-col leading-tight">
-                <span className="truncate text-[12.5px]">{coffreLabel(p)}</span>
-                <span className="truncate font-mono text-[10.5px] text-[var(--c-text-faint)]" title={p}>{p}</span>
-              </span>
-            </label>
-          ))}
-        </div>
-      ) : !error ? (
-        <p className="callout">Aucun coffre : ouvrez ou créez d'abord un coffre local dans l'application GuiVault.</p>
-      ) : null}
-      {coffres && coffres.length > 0 && (
-        <label className="block">
-          <span className="field-label">Mot de passe maître</span>
-          <PasswordInput value={password} onChange={setPassword} autoFocus autoComplete="current-password" />
-        </label>
-      )}
-      {error && <p className="callout callout-danger">{error}</p>}
-      <div className="flex items-center justify-between gap-2">
-        <span className="help-text">Déchiffré ici ; l'application ne transmet que du chiffré.</span>
-        <button type="submit" disabled={!path || !password || busy !== null} className="btn btn-primary btn-sm">{busy ?? "Déverrouiller"}</button>
+    <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
+      <div className="sidebar-scroll flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-7 pb-5 pt-5">
+        {reason === "timeout" && <p className="callout">Verrouillé après inactivité.</p>}
+        {coffres === null ? (
+          <p className="text-[13px] text-[var(--c-text-muted)]">Recherche des coffres de l'application…</p>
+        ) : coffres.length > 0 ? (
+          <div role="radiogroup" aria-label="Coffre" className="flex flex-col gap-1.5">
+            <span className="field-label">Coffre</span>
+            {coffres.map((p) => (
+              <label key={p} className={`card flex min-w-0 cursor-pointer items-center gap-3 px-3 py-2.5 ${path === p ? "border-[var(--c-accent)] shadow-[0_0_0_1px_var(--c-accent)]" : ""}`}>
+                <input type="radio" name="coffre" checked={path === p} onChange={() => setPath(p)} className="sr-only" />
+                <span className="tile tile-neutral" style={{ "--tile-size": "32px" } as React.CSSProperties}>{coffreLabel(p).charAt(0).toUpperCase()}</span>
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="truncate font-medium">{coffreLabel(p)}</span>
+                  <span className="truncate font-mono text-[11.5px] text-[var(--c-text-muted)]" title={p}>{p}</span>
+                </span>
+                {path === p && <IconCheck size={15} className="shrink-0 text-[var(--c-accent)]" />}
+              </label>
+            ))}
+          </div>
+        ) : !error ? (
+          <p className="callout">Aucun coffre : ouvrez ou créez d'abord un coffre local dans l'application GuiVault.</p>
+        ) : null}
+        {coffres && coffres.length > 0 && (
+          <label className="block">
+            <span className="field-label">Mot de passe maître</span>
+            <PasswordInput value={password} onChange={setPassword} autoFocus autoComplete="current-password" />
+          </label>
+        )}
+        {error && <p className="callout callout-danger">{error}</p>}
+        {coffres && coffres.length > 0 && <button type="submit" disabled={!path || !password || busy !== null} className="btn btn-primary btn-lg w-full">{busy ?? "Déverrouiller"}</button>}
       </div>
+      <footer className="flex min-h-[36px] shrink-0 items-center gap-2 border-t border-[var(--c-border)] px-3.5 text-[12px] text-[var(--c-text-muted)]">
+        <IconLock size={13} />
+        <span className="min-w-0 flex-1 truncate">Déchiffré ici · l'application ne passe que du chiffré</span>
+      </footer>
     </form>
   );
 }
@@ -1030,12 +1117,10 @@ function LocalLoginView({ settings, reason, onSettings, onSession }: { settings:
 function ClipboardSelect() {
   const [seconds, setSeconds] = useState(loadClearSeconds);
   return (
-    <label className="block">
-      <span className="field-label">Effacer ce que GuiVault copie</span>
-      <select value={seconds} onChange={(e) => { const n = Number(e.target.value); setSeconds(n); saveClearSeconds(n); }} className="input">
-        {CLEAR_CHOICES.map((c) => <option key={c.value} value={c.value}>{c.value === 0 ? c.label : `Après ${c.label}`}</option>)}
+    <SettingRow htmlFor="ext-clear" title="Vider le presse-papiers" desc="Seulement si la valeur copiée y est encore.">
+      <select id="ext-clear" value={seconds} onChange={(e) => { const n = Number(e.target.value); setSeconds(n); saveClearSeconds(n); }} className="input w-auto">
+        {CLEAR_CHOICES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
       </select>
-      <span className="help-text block">S'il est encore dans le presse-papiers : ce que vous avez copié ailleurs entre-temps n'est pas touché.</span>
-    </label>
+    </SettingRow>
   );
 }

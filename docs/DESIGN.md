@@ -6,9 +6,10 @@ Refonte décidée le 2026-10-21. Ce document et les maquettes font foi.
 refaite — socle (`web/src/index.css`, `lib/preferences.ts`, police Geist
 embarquée par `src/fonts.ts`), barre latérale, accueil, coffre et fiche,
 palette, santé, liens de partage, paramètres, connexion, formulaires,
-import/export, réglages du vault. Restent : le mobile et l'extension (popup
-et interface injectée), et quelques écrans propres à l'application (saisie
-automatique, réglages du poste) qui n'ont eu que des textes raccourcis.
+import/export, réglages du vault, et l'extension (popup et interface
+injectée). Restent : le mobile, et quelques écrans propres à l'application
+(saisie automatique, réglages du poste) qui n'ont eu que des textes
+raccourcis.
 
 ## Maquettes
 
@@ -57,7 +58,7 @@ pour que quelqu'un d'autre puisse les ouvrir.
 
 ## Extension de navigateur
 
-Approuvée le 2026-10-21, pas encore implémentée. Planches `X*.dc.html`
+Approuvée et implémentée le 2026-10-21. Planches `X*.dc.html`
 (popup) et `P*.dc.html` (dans les pages), styles en fin de `theme.css`
 (`.popup`, `.p-*`, `.inj-*`).
 
@@ -85,10 +86,28 @@ Approuvée le 2026-10-21, pas encore implémentée. Planches `X*.dc.html`
     Enregistrer ».
   - À l'inscription, une proposition de mot de passe s'ouvre sous le champ.
   - Le dialogue passkey choisit parmi des cartes.
-- Ce qui est injecté suit le thème choisi. Les mots de passe affichés gardent
-  Geist Mono : la police devra être livrée avec l'extension
-  (`web_accessible_resources`), car une page tierce ne charge pas Google
-  Fonts.
+- Ce qui est injecté suit le thème **du système** (`prefers-color-scheme`) :
+  le script de page ne lit pas les préférences du popup.
+
+Écarts avec les planches, voulus :
+
+- Dans les pages, **police du système** et logo en **SVG en ligne** au lieu
+  de Geist et du PNG : une ressource `web_accessible_resources` peut être
+  sondée par la page (elle saurait que GuiVault est installé). Le popup,
+  lui, a Geist.
+- Pas de « Jamais pour ce site » dans le bandeau d'enregistrement : la
+  fonction n'existe pas encore (« Plus tard » et la croix l'écartent pour
+  cette fois).
+- La proposition de mot de passe à l'inscription est le dialogue
+  « Nouvel identifiant » existant (générateur intégré), ouvert depuis
+  « Générer un mot de passe » dans le menu du champ.
+
+Dans le code : `extension/src/Popup.tsx` reprend les briques du web
+(`ItemTile`, `SettingRow`, `InfoTip`, `.segmented`, `.card`) ; les styles de
+l'interface injectée sont en tête de `content.ts` (`:host`, variables
+`--bg`, `--line`…, mêmes valeurs que `index.css`). Chrome pose sa propre
+police sur le `body` des pages d'extension : `index.css` la remplace par
+celle de `html`.
 
 ## Dans le code
 

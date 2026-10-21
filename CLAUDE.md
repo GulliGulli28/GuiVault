@@ -88,7 +88,7 @@ il ne déchiffre rien : la user key reste sous la clé que seule la PRF donne).
   sert aux libellés (nom du coffre au lieu de l'e-mail, « Fermer le coffre »).
 - `web/` — l'interface web, Vite + React 19 + TypeScript + Tailwind 3.
   **Refonte (2026-10-21) : on se sépare de la charte de Guiterm.** Faite
-  pour le web, pas encore pour l'extension ni le mobile. Maquettes, jetons,
+  pour le web et l'extension, pas encore pour le mobile. Maquettes, jetons,
   briques (`Page`, `SettingRow`, `InfoTip`, `ItemTile`) et règles (pas de
   paragraphes, troncature, responsive) dans `docs/DESIGN.md` et
   `docs/design/canvas/` ; tout nouvel écran suit ce design. `src/index.css`
@@ -206,6 +206,10 @@ il ne déchiffre rien : la user key reste sous la clé que seule la PRF donne).
     Le script de page (`content.ts`) voit la page par `dom.ts` (shadow
     roots, y compris fermées) ; ce qui décide pour un cadre — son URL à lui,
     jamais celle de l'onglet sans confirmation — est dans `frames.ts`.
+    Ce qu'il injecte a ses styles à lui (en tête de `content.ts`, mêmes
+    teintes que `index.css`, thème du système), la police du système et le
+    logo en SVG en ligne : rien n'est chargé depuis l'extension, qu'une page
+    pourrait sonder.
     **Corpus** : `extension/e2e/` (pages piégeuses sous de faux domaines
     `*.test`, l'extension réelle chargée, session amorcée sans serveur),
     `npm run test:ext`, dans le CI ; un site qui résiste = une page de plus
