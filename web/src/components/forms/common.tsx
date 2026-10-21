@@ -66,15 +66,15 @@ export function FormShell({ title, onSave, onCancel, children, saveLabel = "Enre
   };
   return (
     <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
-      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-[var(--c-border)] px-4 py-2.5">
-        <h2 className="truncate text-[13px] font-semibold text-[var(--c-text)]">{title}</h2>
-        <div className="flex shrink-0 gap-1.5">
-          <button type="button" onClick={onCancel} className="btn btn-ghost btn-sm">Annuler</button>
-          <button type="submit" disabled={busy} className="btn btn-primary btn-sm">{busy ? "Enregistrement…" : saveLabel}</button>
+      <div className="flex min-h-[52px] shrink-0 items-center justify-between gap-2 border-b border-[var(--c-border)] px-5 py-2 max-md:px-3">
+        <h2 className="min-w-0 truncate text-[15px] font-semibold text-[var(--c-text)]">{title}</h2>
+        <div className="flex shrink-0 gap-2">
+          <button type="button" onClick={onCancel} className="btn btn-ghost">Annuler</button>
+          <button type="submit" disabled={busy} className="btn btn-primary">{busy ? "Enregistrement…" : saveLabel}</button>
         </div>
       </div>
-      <div className="sidebar-scroll min-h-0 flex-1 overflow-y-auto p-4">
-        <div className="max-w-2xl space-y-4">
+      <div className="sidebar-scroll min-h-0 flex-1 overflow-y-auto px-8 pb-10 pt-6 max-md:px-4">
+        <div className="max-w-[720px] space-y-5">
           {error && <p className="callout callout-danger">{error}</p>}
           {children}
         </div>

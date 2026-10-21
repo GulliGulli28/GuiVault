@@ -7,7 +7,8 @@ import { emergencyEnvelopes, repairEmergencyKeys, type VaultView } from "../lib/
 import type { EmergencyGrant, EmergencyStatus, UserLookupResponse } from "../lib/types";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { IconTrash, IconVault } from "./ui-icons";
-import { Eyebrow, Field, Fingerprint, formatWhen, TrustBadge } from "./ui";
+import { IconCheck } from "./ui-icons";
+import { Eyebrow, Field, Fingerprint, formatWhen, InfoTip, TrustBadge } from "./ui";
 
 const WAIT_CHOICES = [1, 2, 3, 7, 14, 30, 60, 90];
 const days = (n: number) => `${n} jour${n > 1 ? "s" : ""}`;
@@ -60,22 +61,26 @@ export function EmergencySettings({ ctx }: { ctx: PageContext }) {
 
   return (
     <>
-      <p className="help-text max-w-2xl">
-        Un proche que vous désignez peut demander l'accès à certains de vos vaults ; il l'obtient, en lecture, si vous ne refusez pas avant la fin du délai.
-        Les clés lui sont enveloppées ici, dans votre navigateur : le serveur les garde sans pouvoir les ouvrir, et ne les lui remet qu'au bout du délai.
-        Sans alerte par e-mail sur ce serveur, une demande se voit à votre prochaine connexion : choisissez un délai en conséquence.
-      </p>
+      <div className="flex flex-wrap items-center gap-2.5">
+        <span className="pill"><IconCheck size={15} /> Lecture seule</span>
+        <span className="pill"><IconCheck size={15} /> Vous pouvez refuser pendant le délai</span>
+        <span className="pill"><IconCheck size={15} /> Clés enveloppées ici, illisibles du serveur</span>
+        <InfoTip label="Quand une demande arrive" items={[
+          { text: "Le proche obtient l'accès à la fin du délai, si vous n'avez pas refusé." },
+          { text: "Sans alerte par e-mail sur ce serveur, une demande se voit à votre prochaine connexion : choisissez un délai en conséquence.", tone: "warn" },
+        ]} />
+      </div>
 
-      <section className="max-w-2xl space-y-1.5">
+      <section className="flex flex-col gap-2.5">
         <Eyebrow>Vos contacts d'urgence</Eyebrow>
-        {overview.granted_by_me.length === 0 && <p className="text-[12.5px] text-[var(--c-text-muted)]">Personne pour l'instant.</p>}
+        {overview.granted_by_me.length === 0 && <p className="text-[13px] text-[var(--c-text-muted)]">Personne pour l'instant.</p>}
         {overview.granted_by_me.map((g) => <GrantorCard key={g.id} g={g} owned={owned} act={act} busy={busy} onPinned={repaint} ctx={ctx} />)}
         <Designate ctx={ctx} owned={owned} act={act} busy={busy} onPinned={repaint} taken={overview.granted_by_me.map((g) => g.grantee.id)} />
       </section>
 
-      <section className="max-w-2xl space-y-1.5">
+      <section className="flex flex-col gap-2.5">
         <Eyebrow>Vous êtes le contact d'urgence de</Eyebrow>
-        {overview.granted_to_me.length === 0 && <p className="text-[12.5px] text-[var(--c-text-muted)]">Personne ne vous a désigné.</p>}
+        {overview.granted_to_me.length === 0 && <p className="text-[13px] text-[var(--c-text-muted)]">Personne ne vous a désigné.</p>}
         {overview.granted_to_me.map((g) => <GranteeCard key={g.id} g={g} vaults={session.emergencyVaults.filter((v) => v.emergency?.grantId === g.id)} act={act} busy={busy} onPinned={repaint} />)}
       </section>
     </>

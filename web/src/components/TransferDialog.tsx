@@ -209,7 +209,7 @@ export function TransferDialog({ ctx, onClose }: { ctx: PageContext; onClose: ()
             ))}
           </div>
         </fieldset>
-        <p className="help-text">Tout part chiffré, historique, corbeille et pièces jointes compris ; seules les clés des vaults sont ré-enveloppées, ici. {toServer ? "Ce coffre" : "Ce compte"} ne change pas.</p>
+        <p className="help-text">Tout part chiffré, historique et pièces jointes compris. {toServer ? "Ce coffre" : "Ce compte"} ne change pas.</p>
 
         {busy && <p className="callout" role="status">{progress ? progressText(progress) : toServer && mode === "new" ? "Création du compte…" : "Connexion…"}</p>}
         {error && <p className="callout callout-danger">{error}</p>}

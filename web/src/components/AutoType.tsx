@@ -191,7 +191,7 @@ export function AutoTypeFields({ value, onChange }: { value: AutoType | undefine
             ))}
             <button type="button" onClick={() => set({ windows: [...windows, { title: "" }] })} className="btn btn-ghost btn-sm"><IconPlus size={11} /> Ajouter une fenêtre</button>
           </div>
-          <p className="help-text">Le raccourci global le propose pour une fenêtre dont le titre contient son nom, le domaine d'une de ses adresses, ou correspond à un de ces motifs (* : n'importe quoi).</p>
+          <p className="help-text">Proposé pour une fenêtre dont le titre contient son nom, son domaine, ou un de ces motifs (* : n'importe quoi).</p>
         </>
       )}
     </section>
@@ -226,7 +226,7 @@ export function AutoTypeSettings({ notify }: { notify: (m: string) => void }) {
       <div className="card space-y-3 p-3">
         <div>
           <label htmlFor="autotype-hotkey" className="text-[12.5px] text-[var(--c-text)]">Raccourci global</label>
-          <p className="help-text">Pressé dans n'importe quelle fenêtre : GuiVault y tape l'identifiant qui lui correspond, ou vous laisse choisir. Comme le Ctrl+Alt+A de KeePass.</p>
+          <p className="help-text">Dans n'importe quelle fenêtre, GuiVault tape l'identifiant qui correspond.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <input id="autotype-hotkey" value={hotkey} onChange={(e) => setHotkey(e.target.value)} placeholder="Ctrl+Alt+A" spellCheck={false} className="input input-mono w-48" />
@@ -266,7 +266,7 @@ export function AutoTypeSettings({ notify }: { notify: (m: string) => void }) {
           <dt className="font-mono text-[var(--c-text)]">{"{DELAY 500}"}</dt><dd className="text-[var(--c-text-secondary)]">une pause, en millisecondes</dd>
           <dt className="font-mono text-[var(--c-text)]">{"{{} {}}"}</dt><dd className="text-[var(--c-text-secondary)]">les accolades elles-mêmes ; le reste est tapé tel quel</dd>
         </dl>
-        <p className="help-text">GuiVault attend que vous ayez relâché Ctrl, Alt et Maj, et s'arrête si la fenêtre perd le focus : un mot de passe n'est jamais tapé ailleurs que là où il a été demandé.</p>
+        <p className="help-text">S'arrête si la fenêtre perd le focus : rien n'est tapé ailleurs.</p>
       </div>
     </section>
   );

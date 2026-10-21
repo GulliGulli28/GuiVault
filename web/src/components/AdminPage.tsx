@@ -4,7 +4,7 @@ import { api, errorMessage } from "../lib/api";
 import type { AdminOverview, AdminUserInfo, BackupRun, BackupsStatus, RegistrationInvite } from "../lib/types";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { IconTrash } from "./ui-icons";
-import { Eyebrow, Field, formatWhen, Loading, Modal, useDelayed } from "./ui";
+import { Eyebrow, Field, formatWhen, InfoTip, Loading, Modal, useDelayed } from "./ui";
 
 const REGISTRATION_LABELS: Record<AdminOverview["registration"], string> = {
   open: "ouvertes à tous",
@@ -68,14 +68,20 @@ export function AdminPage({ ctx }: { ctx: PageContext }) {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <header className="flex shrink-0 items-center gap-2 border-b border-[var(--c-border)] px-4 py-2.5 max-md:pl-14">
-        <h1 className="text-[14px] font-semibold text-[var(--c-text)]">Administration du serveur</h1>
+      <header className="flex min-h-[64px] shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-[var(--c-border)] px-6 py-3 max-md:pl-14">
+        <div className="min-w-0 flex-1">
+          <h1 className="truncate text-[18px] font-semibold tracking-[-0.015em]">Administration</h1>
+          <p className="flex items-center gap-1.5 text-[12.5px] text-[var(--c-text-muted)]">
+            Comptes et volumes, jamais leur contenu
+            <InfoTip label="Ce que voit un administrateur" items={[
+              { text: "Les comptes, leurs dates et la taille de ce qu'ils stockent.", tone: "ok" },
+              { text: "Aucune clé : pas plus que le serveur.", tone: "ok" },
+              { text: <>Le rôle se donne depuis le serveur : <code className="font-mono">guivault admin grant &lt;email&gt;</code>.</> },
+            ]} />
+          </p>
+        </div>
       </header>
-      <div className="sidebar-scroll min-h-0 flex-1 space-y-5 overflow-y-auto p-4">
-        <p className="help-text max-w-3xl">
-          Vous voyez les comptes, leurs dates et la taille de ce qu'ils stockent — jamais leur contenu : un administrateur n'a pas plus de clé que le serveur.
-          Le rôle se donne et se retire depuis le serveur lui-même : <code className="font-mono">guivault admin grant &lt;email&gt;</code>.
-        </p>
+      <div className="sidebar-scroll min-h-0 flex-1 space-y-5 overflow-y-auto px-6 py-5">
         {denied ? (
           <p className="callout callout-danger max-w-3xl">{denied}</p>
         ) : users === null || overview === null ? (slow ? <Loading /> : null) : (

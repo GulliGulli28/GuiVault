@@ -211,7 +211,7 @@ export function Row({ label, children, mono }: { label: string; children: ReactN
   return (
     <div data-row className="flex min-h-[48px] flex-wrap items-center gap-x-4 gap-y-0.5 px-[18px] py-2.5 max-sm:px-3.5">
       <span className="w-[120px] shrink-0 text-[13px] text-[var(--c-text-muted)] max-sm:w-full">{label}</span>
-      <span className={`min-w-0 flex-1 break-words text-[13.5px] text-[var(--c-text)] ${mono ? "font-mono" : ""}`}>{children}</span>
+      <span className={`min-w-0 flex-[1_1_11rem] break-words text-[13.5px] text-[var(--c-text)] ${mono ? "font-mono" : ""}`}>{children}</span>
     </div>
   );
 }

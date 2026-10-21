@@ -1,3 +1,4 @@
+import { Page } from "./Page";
 import { useState } from "react";
 import type { PageContext } from "../App";
 import { api, errorMessage } from "../lib/api";
@@ -28,43 +29,37 @@ export function InvitationsPage({ ctx }: { ctx: PageContext }) {
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <header className="flex shrink-0 items-center gap-2 border-b border-[var(--c-border)] px-4 py-2.5 max-md:pl-14">
-        <h1 className="text-[14px] font-semibold text-[var(--c-text)]">Invitations</h1>
-      </header>
-      <div className="sidebar-scroll min-h-0 flex-1 overflow-y-auto p-4">
-        {session.invitations.length === 0 ? (
-          <p className="text-[12.5px] text-[var(--c-text-muted)]">Aucune invitation en attente.</p>
-        ) : (
-          <div className="max-w-2xl space-y-2">
-            {session.invitations.map((inv) => (
-              <div key={inv.id} className="card space-y-1.5 p-3">
-                <p className="text-[12.5px] text-[var(--c-text)]"><span className="font-medium">{inv.inviter_email}</span> vous invite dans un vault partagé comme <span className="tag" title={ROLE_HINTS[inv.role]}>{ROLE_LABELS[inv.role]}</span></p>
-                <InvitationKeyInfo inv={inv} keyFrom={invitationKeyFrom(session, inv)} onPinned={() => setTrustTick((t) => t + 1)} />
-                <p className="help-text">
-                  {inv.has_key ? "La clé du vault est déjà enveloppée pour vous : accepter l'ouvre immédiatement." : "L'invitation a été émise avant que vous ayez un compte : après acceptation, l'inviteur devra vérifier votre empreinte puis vous transmettre la clé."}
-                  {" "}Expire le {formatWhen(inv.expires_at)}.
-                </p>
-                <div className="flex justify-end gap-1.5">
-                  <button onClick={() => void act(inv.id, () => api.declineInvitation(inv.id), "Invitation refusée.")} disabled={busy !== null} className="btn btn-ghost btn-sm">Refuser</button>
-                  <button
-                    onClick={() => void act(inv.id, async () => {
-                      const r = await api.acceptInvitation(inv.id);
-                      if (r.status === "accepted") navigate({ page: "vault", id: inv.vault_id });
-                    }, inv.has_key ? "Vault rejoint." : "Acceptée : en attente de la clé de l'inviteur.")}
-                    disabled={busy !== null || !acceptable(inv, invitationKeyFrom(session, inv))}
-                    title={acceptable(inv, invitationKeyFrom(session, inv)) ? undefined : "La clé jointe n'est pas celle qu'on attend : voir ci-dessus"}
-                    className="btn btn-primary btn-sm"
-                  >
-                    Accepter
-                  </button>
-                </div>
+    <Page title="Invitations" sub={session.invitations.length ? `${session.invitations.length} en attente` : undefined} width="max-w-[760px]">
+      {session.invitations.length === 0 ? (
+        <div className="card empty text-[13.5px] text-[var(--c-text-muted)]">Aucune invitation en attente.</div>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {session.invitations.map((inv) => (
+            <div key={inv.id} className="card flex flex-col gap-3 px-5 py-4">
+              <p className="text-[13.5px]"><b className="font-semibold">{inv.inviter_email}</b> vous invite dans un vault partagé comme <span className="tag" title={ROLE_HINTS[inv.role]}>{ROLE_LABELS[inv.role]}</span></p>
+              <InvitationKeyInfo inv={inv} keyFrom={invitationKeyFrom(session, inv)} onPinned={() => setTrustTick((t) => t + 1)} />
+              <p className="text-[12.5px] text-[var(--c-text-muted)]">
+                {inv.has_key ? "Ouvert dès l'acceptation" : "Après acceptation, l'inviteur vous transmettra la clé"} · expire le {formatWhen(inv.expires_at)}
+              </p>
+              <div className="flex justify-end gap-2">
+                <button onClick={() => void act(inv.id, () => api.declineInvitation(inv.id), "Invitation refusée.")} disabled={busy !== null} className="btn btn-ghost">Refuser</button>
+                <button
+                  onClick={() => void act(inv.id, async () => {
+                    const r = await api.acceptInvitation(inv.id);
+                    if (r.status === "accepted") navigate({ page: "vault", id: inv.vault_id });
+                  }, inv.has_key ? "Vault rejoint." : "Acceptée : en attente de la clé de l'inviteur.")}
+                  disabled={busy !== null || !acceptable(inv, invitationKeyFrom(session, inv))}
+                  title={acceptable(inv, invitationKeyFrom(session, inv)) ? undefined : "La clé jointe n'est pas celle qu'on attend : voir ci-dessus"}
+                  className="btn btn-primary"
+                >
+                  Accepter
+                </button>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </Page>
   );
 }
 

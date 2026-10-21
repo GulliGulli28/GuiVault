@@ -87,24 +87,26 @@ il ne déchiffre rien : la user key reste sous la clé que seule la PRF donne).
   coffre local n'a pas se masque par `supports(méthode)` ; `session.local`
   sert aux libellés (nom du coffre au lieu de l'e-mail, « Fermer le coffre »).
 - `web/` — l'interface web, Vite + React 19 + TypeScript + Tailwind 3.
-  **Refonte décidée (2026-10-21), pas encore faite : on se sépare de la
-  charte de Guiterm.** Maquettes, jetons et règles (pas de paragraphes,
-  troncature, responsive) dans `docs/DESIGN.md` et `docs/design/canvas/` ;
-  tout nouvel écran suit ce design. Jusqu'à la refonte, l'existant garde
-  la charte de Guiterm (le tactile à part : `src/touch.css`, pour
-  ne pas diverger ; `hooks/useMediaQuery.ts`) : `src/index.css` (jetons et primitives
-  `.btn`, `.input`, `.card`, `.list-row`…), `components/ui-icons.tsx`,
-  `components/icons.tsx` (banque d'icônes d'hôte), `EntityRow.tsx`,
-  `ConfirmDialog.tsx`, `hooks/useModalSurface.ts`, `hooks/useResizablePane.ts`
-  (poignées de redimensionnement ; `usePersistedPane.tsx` le complète en
-  retenant la largeur dans `localStorage`), `lib/focusTrap.ts`
-  et `lib/hostKinds.ts` sont **copiés de `~/gui-termius/src`** — les garder
-  identiques (re-copier plutôt que diverger). `lib/vaultTree.ts` en est
-  une copie avec deux écarts documentés en tête. `lib/preferences.ts`
-  reprend le sous-ensemble « Apparence » des préférences de Guiterm
-  (fonds, accents, polices, tailles de ligne : mêmes tables, à recopier
-  quand elles changent là-bas) et pose les mêmes variables CSS sur
-  `<html>` ; `components/AppearanceSettings.tsx` est sa page de réglages,
+  **Refonte (2026-10-21) : on se sépare de la charte de Guiterm.** Faite
+  pour le web, pas encore pour l'extension ni le mobile. Maquettes, jetons,
+  briques (`Page`, `SettingRow`, `InfoTip`, `ItemTile`) et règles (pas de
+  paragraphes, troncature, responsive) dans `docs/DESIGN.md` et
+  `docs/design/canvas/` ; tout nouvel écran suit ce design. `src/index.css`
+  (jetons et primitives `.btn`, `.input`, `.card`, `.tile`, `.nav-item`…)
+  et `src/touch.css` (le tactile ; `hooks/useMediaQuery.ts`) sont désormais
+  propres à GuiVault, comme `EntityRow.tsx` (prop `tile`). Restent copiés
+  de `~/gui-termius/src`, à garder identiques (re-copier plutôt que
+  diverger) : `components/ui-icons.tsx` (les icônes propres à GuiVault vont
+  dans `secret-icons.tsx`), `components/icons.tsx` (banque d'icônes
+  d'hôte), `ConfirmDialog.tsx`, `hooks/useModalSurface.ts`,
+  `hooks/useResizablePane.ts` (poignées de redimensionnement ;
+  `usePersistedPane.tsx` le complète en retenant la largeur dans
+  `localStorage`), `lib/focusTrap.ts` et `lib/hostKinds.ts`.
+  `lib/vaultTree.ts` en est une copie avec deux écarts documentés en tête.
+  `lib/preferences.ts` garde les accents nommés et les tailles de ligne de
+  Guiterm (les dossiers s'y colorent par nom d'accent), avec ses propres
+  défauts (fond « Graphite », accent « Pervenche », Geist) et pose les
+  variables CSS sur `<html>` ; `components/AppearanceSettings.tsx` est sa page de réglages,
   partagée par `SettingsPage` et le popup de l'extension. Le logo est
   `src/assets/logo.png` (+ `logo-gray.png`, la version « verrouillé »),
   généré avec les icônes de l'extension depuis `logo_GuiVault.png` à la

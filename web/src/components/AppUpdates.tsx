@@ -79,7 +79,7 @@ export function AppUpdates() {
         )}
         {status.kind === "error" && <p className="callout callout-danger">Mise à jour : {status.message}</p>}
       </div>
-      <p className="help-text">Les versions sont publiées sur GitHub (GulliGulli28/GuiVault, « app-v… »). Un installeur n'est installé que s'il est signé par la clé de GuiVault.</p>
+      <p className="help-text">Publiées sur GitHub · installées seulement si signées par GuiVault.</p>
     </section>
   );
 }

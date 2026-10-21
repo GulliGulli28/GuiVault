@@ -1,3 +1,4 @@
+import { Page } from "./Page";
 import { useEffect, useMemo, useState } from "react";
 import type { PageContext } from "../App";
 import { errorMessage } from "../lib/api";
@@ -7,12 +8,11 @@ import { importFile, NeedsKeePassKey, NeedsPassword, resolveFolders, type Import
 import { attachmentLimit, uploadAttachment } from "../lib/attachments";
 import { attachmentSealedSize } from "../lib/crypto";
 import type { FileAttachment, Payload } from "../lib/types";
-import { navigate } from "../lib/route";
 import { findVault, loadItems, payloadEntity, putPayload, type DecodedItem, type VaultView } from "../lib/session";
 import { canWrite, KIND_LABELS_PLURAL, type ItemKind } from "../lib/types";
 import { PasswordStrength } from "./PasswordStrength";
 import { GroupSelect } from "./forms/common";
-import { Eyebrow, Field, FileButton, PasswordInput } from "./ui";
+import { Field, FileButton, InfoTip, PasswordInput } from "./ui";
 
 /** Import et export d'un vault. L'import lit le fichier dans le navigateur,
  * montre ce qu'il contient, puis chiffre et envoie item par item ; l'export
@@ -34,20 +34,14 @@ function Body({ ctx, vault }: { ctx: PageContext; vault: VaultView }) {
   const writable = canWrite(vault.role);
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <header className="flex shrink-0 flex-wrap items-center gap-2 border-b border-[var(--c-border)] px-4 py-2.5 max-md:pl-14">
-        <button onClick={() => navigate({ page: "vault", id: vault.id })} className="btn btn-ghost btn-sm">← {vault.name}</button>
-        <h1 className="text-[14px] font-semibold text-[var(--c-text)]">Importer / exporter</h1>
-      </header>
-      <div className="sidebar-scroll min-h-0 flex-1 space-y-8 overflow-y-auto p-4">
-        {writable ? (
-          <ImportSection ctx={ctx} vault={vault} groups={index.groups} onDone={reload} />
-        ) : (
-          <p className="callout max-w-2xl">{vault.emergency ? `Confié par ${vault.emergency.grantor} (accès d'urgence) : lecture seule, l'export reste disponible.` : "Vous êtes lecteur de ce vault : pas d'import possible, l'export reste disponible."}</p>
-        )}
-        <ExportSection ctx={ctx} vault={vault} items={items} />
-      </div>
-    </div>
+    <Page title={writable ? "Importer ou exporter" : "Exporter"} sub={vault.name} back={{ label: vault.name, route: { page: "vault", id: vault.id } }} width="max-w-[760px]">
+      {writable ? (
+        <ImportSection ctx={ctx} vault={vault} groups={index.groups} onDone={reload} />
+      ) : (
+        <p className="callout">{vault.emergency ? `Confié par ${vault.emergency.grantor} : lecture seule, l'export reste possible.` : "Lecteur de ce vault : l'export reste possible."}</p>
+      )}
+      <ExportSection ctx={ctx} vault={vault} items={items} />
+    </Page>
   );
 }
 
@@ -150,10 +144,19 @@ function ImportSection({ ctx, vault, groups, onDone }: { ctx: PageContext; vault
   };
 
   return (
-    <section className="max-w-2xl space-y-3">
-      <Eyebrow>Importer dans « {vault.name} »</Eyebrow>
-      <p className="help-text">KeePass et KeePassXC (base .kdbx, pièces jointes et historique compris), Bitwarden (JSON, en clair ou protégé par mot de passe, et CSV), Chrome, Firefox, LastPass, KeePassXC (CSV), ou un export GuiVault. Le fichier est lu ici, dans le navigateur : rien n'en part en clair.</p>
-      <FileButton label="Choisir un fichier à importer" accept=".kdbx,.json,.csv,.txt,application/json,text/csv" small={false} onFile={(f) => void onFile(f)} />
+    <section className="flex flex-col gap-3">
+      <h2 className="section-title">Importer</h2>
+      <div className="card flex flex-col items-center gap-2 border-dashed px-5 py-7 text-center">
+        <FileButton label="Choisir un fichier" accept=".kdbx,.json,.csv,.txt,application/json,text/csv" small={false} onFile={(f) => void onFile(f)} />
+        <p className="flex flex-wrap items-center justify-center gap-1.5 text-[12.5px] text-[var(--c-text-muted)]">
+          KeePass, Bitwarden, Chrome, Firefox, LastPass, GuiVault · lu ici, rien ne part en clair
+          <InfoTip label="Formats reconnus" items={[
+            { text: "KeePass et KeePassXC : base .kdbx, pièces jointes et historique compris." },
+            { text: "Bitwarden : JSON (en clair ou protégé) et CSV." },
+            { text: "Chrome, Firefox, LastPass, KeePassXC : CSV. Et les exports GuiVault." },
+          ]} />
+        </p>
+      </div>
       {needsPassword && content !== null && (
         <form onSubmit={(e) => { e.preventDefault(); void parse(content, password, keyFile?.data); }} className="callout space-y-2">
           <p>{keePass ? `« ${filename} » est une base KeePass : son mot de passe maître, et son fichier clé si elle en a un.` : `« ${filename} » est protégé par un mot de passe.`}</p>
@@ -167,7 +170,7 @@ function ImportSection({ ctx, vault, groups, onDone }: { ctx: PageContext; vault
               {keyFile && <button type="button" onClick={() => setKeyFile(null)} className="btn btn-ghost btn-sm">Retirer</button>}
             </div>
           )}
-          {keePass && <p className="help-text">La dérivation de la clé est celle de la base (Argon2 ou AES-KDF) : quelques secondes avec les réglages de KeePassXC.</p>}
+          {keePass && <p className="help-text">Quelques secondes de dérivation (Argon2 ou AES-KDF).</p>}
         </form>
       )}
       {error && <p className="callout callout-danger">{error}</p>}
@@ -225,28 +228,32 @@ function ExportSection({ ctx, vault, items }: { ctx: PageContext; vault: VaultVi
   const ready = items !== null && (format !== "encrypted" || (password.length >= 8 && password === confirm));
 
   return (
-    <section className="max-w-2xl space-y-3">
-      <Eyebrow>Exporter « {vault.name} »</Eyebrow>
-      <p className="help-text">{items ? `${payloads.length} élément(s)` : "Chargement…"}{unreadable ? `, ${unreadable} illisible(s) laissé(s) de côté` : ""}. Tout est déchiffré dans le navigateur au moment de l'export. Les pièces jointes n'y sont pas : téléchargez-les depuis leur élément.</p>
-      <div className="segmented">
+    <section className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="section-title">Exporter</h2>
+        <span className="text-[12.5px] text-[var(--c-text-muted)]">{items ? `${payloads.length} éléments` : "Chargement…"}{unreadable ? ` · ${unreadable} illisibles laissés de côté` : ""} · sans les pièces jointes</span>
+      </div>
+      <div className="card flex flex-col gap-4 p-5">
+      <div className="segmented self-start">
         <button type="button" data-active={format === "encrypted"} onClick={() => setFormat("encrypted")}>JSON chiffré</button>
         <button type="button" data-active={format === "json"} onClick={() => setFormat("json")}>JSON en clair</button>
         <button type="button" data-active={format === "csv"} onClick={() => setFormat("csv")}>CSV</button>
       </div>
       {format === "encrypted" && (
         <div className="space-y-2">
-          <p className="help-text">Argon2id + XChaCha20-Poly1305, réimportable ici avec ce mot de passe. Il n'a rien à voir avec le mot de passe maître et ne peut pas être retrouvé.</p>
-          <div className="grid grid-cols-2 gap-2">
+          <p className="help-text">Réimportable ici avec ce mot de passe, distinct du mot de passe maître et irrécupérable.</p>
+          <div className="grid grid-cols-2 gap-3 max-sm:grid-cols-1">
             <Field label="Mot de passe du fichier"><PasswordInput value={password} onChange={setPassword} autoComplete="new-password" /></Field>
             <Field label="Confirmer"><PasswordInput value={confirm} onChange={setConfirm} autoComplete="new-password" /></Field>
           </div>
           <PasswordStrength password={password} />
         </div>
       )}
-      {format === "json" && <p className="callout callout-warn">Fichier en clair : tous les secrets y sont lisibles. À chiffrer ou à détruire après usage.</p>}
-      {format === "csv" && <p className="callout callout-warn">CSV compatible Bitwarden, en clair : identifiants et notes seulement{csvSkipped ? ` — ${csvSkipped} élément(s) d'autres types ne seront pas exportés` : ""}. Préférez le JSON pour tout emporter.</p>}
+      {format === "json" && <p className="callout callout-warn">En clair : tous les secrets y sont lisibles.</p>}
+      {format === "csv" && <p className="callout callout-warn">En clair, format Bitwarden : identifiants et notes seulement{csvSkipped ? ` (${csvSkipped} autres éléments ignorés)` : ""}.</p>}
       <div className="flex justify-end">
-        <button onClick={() => void run()} disabled={!ready || busy} className="btn btn-primary btn-sm">{busy ? "Préparation…" : "Télécharger"}</button>
+        <button onClick={() => void run()} disabled={!ready || busy} className="btn btn-primary">{busy ? "Préparation…" : "Télécharger"}</button>
+      </div>
       </div>
     </section>
   );

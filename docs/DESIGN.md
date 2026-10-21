@@ -1,8 +1,14 @@
 # Design de l'interface
 
-Refonte décidée le 2026-10-21. **Pas encore implémentée** : `web/` garde pour
-l'instant l'ancienne charte. Ce document et les maquettes font foi pour la
-refonte.
+Refonte décidée le 2026-10-21. Ce document et les maquettes font foi.
+
+**État** : l'interface web (et donc l'application, qui la reprend) est
+refaite — socle (`web/src/index.css`, `lib/preferences.ts`, police Geist
+embarquée par `src/fonts.ts`), barre latérale, accueil, coffre et fiche,
+palette, santé, liens de partage, paramètres, connexion, formulaires,
+import/export, réglages du vault. Restent : le mobile et l'extension (popup
+et interface injectée), et quelques écrans propres à l'application (saisie
+automatique, réglages du poste) qui n'ont eu que des textes raccourcis.
 
 ## Maquettes
 
@@ -83,6 +89,24 @@ Approuvée le 2026-10-21, pas encore implémentée. Planches `X*.dc.html`
   Geist Mono : la police devra être livrée avec l'extension
   (`web_accessible_resources`), car une page tierce ne charge pas Google
   Fonts.
+
+## Dans le code
+
+- **Gabarit de page** : `components/Page.tsx` (titre, sous-titre d'une ligne,
+  actions, colonne bornée). Une ligne de réglage : `SettingRow` (`ui.tsx`).
+  Une info au clic : `InfoTip` (`ui.tsx`). Un menu : `Dropdown` (`ui.tsx`).
+- **Tuiles** : `ItemTile` (`ItemTree.tsx`) — l'icône choisie, sinon l'initiale
+  sur une teinte tirée du nom (`lib/tiles.ts`, classe `.tile`).
+- **Couleur d'un vault** : `lib/vaultColors.ts`, préférence de l'utilisateur
+  (section synchronisée `vaultColors`), réglée depuis le menu « … » du vault
+  ou ses réglages.
+- **Éléments de tous les vaults** (accueil, compteurs de la barre) :
+  `lib/allItems.ts` (`useAllItems`, `healthSummary`), effacés avec la session.
+- **Préférences** : `DESIGN_VERSION` — des préférences d'avant la refonte
+  (locales ou synchronisées) prennent une fois le fond, l'accent, la police
+  et les lignes d'entité par défaut.
+- **Coffre** : liste et fiche côte à côte à partir de 1280 px, un volet à la
+  fois en dessous.
 
 ## Règles d'écriture de l'interface
 

@@ -3,6 +3,7 @@
  * par le serveur (`routes::history`). Restaurer, c'est la renvoyer telle
  * quelle (l'élément est recréé) ; la supprimer définitivement efface ses
  * versions. */
+import { IconChevronRight } from "./ui-icons";
 import { useCallback, useEffect, useState } from "react";
 import type { PageContext } from "../App";
 import { api, errorMessage } from "../lib/api";
@@ -67,12 +68,14 @@ function Body({ ctx, vault }: { ctx: PageContext; vault: VaultView }) {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <header className="flex shrink-0 flex-wrap items-center gap-2 border-b border-[var(--c-border)] px-4 py-2.5 max-md:pl-14">
-        <button onClick={() => navigate({ page: "vault", id: vault.id })} className="btn btn-ghost btn-sm">← {vault.name}</button>
-        <h1 className="text-[14px] font-semibold text-[var(--c-text)]">Corbeille</h1>
-        {entries && entries.length > 0 && <span className="text-[11px] text-[var(--c-text-faint)]">{entries.length} élément(s)</span>}
+      <header className="flex min-h-[64px] shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-[var(--c-border)] px-6 py-3 max-md:pl-14">
+        <button onClick={() => navigate({ page: "vault", id: vault.id })} className="btn btn-ghost btn-icon" title={`Retour à ${vault.name}`} aria-label={`Retour à ${vault.name}`}><IconChevronRight size={14} className="rotate-180" /></button>
+        <div className="min-w-0 flex-1">
+          <h1 className="truncate text-[18px] font-semibold tracking-[-0.015em]">Corbeille</h1>
+          <p className="truncate text-[12.5px] text-[var(--c-text-muted)]">{vault.name}{entries ? ` · ${entries.length} ${entries.length > 1 ? "éléments" : "élément"}` : ""}</p>
+        </div>
         {writable && entries && entries.length > 0 && (
-          <button onClick={() => setConfirm({ kind: "empty" })} disabled={busy} className="btn btn-danger btn-sm ml-auto">Vider la corbeille</button>
+          <button onClick={() => setConfirm({ kind: "empty" })} disabled={busy} className="btn btn-danger">Vider la corbeille</button>
         )}
       </header>
 

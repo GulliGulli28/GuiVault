@@ -53,7 +53,7 @@ export function AppSettings({ error }: { error: (m: string) => void }) {
               <span className="min-w-0 flex-1 text-[12.5px] text-[var(--c-text)]">Démarrer avec Windows, dans la zone de notification</span>
             </label>
           </div>
-          <p className="help-text">Rangé là, GuiVault garde le raccourci de saisie automatique ; son icône le rouvre, le verrouille ou le quitte. Relancer GuiVault ramène la fenêtre déjà ouverte.</p>
+          <p className="help-text">Le raccourci de saisie reste actif ; l'icône rouvre, verrouille ou quitte.</p>
         </section>
       )}
 
@@ -65,7 +65,7 @@ export function AppSettings({ error }: { error: (m: string) => void }) {
             <span className="min-w-0 flex-1 text-[12.5px] text-[var(--c-text)]">Permettre à l'extension GuiVault d'ouvrir les coffres locaux de cet ordinateur</span>
           </label>
         </div>
-        <p className="help-text">L'extension (Chrome, Edge, Brave, Firefox) propose alors « Coffre local » : elle déchiffre elle-même, avec votre mot de passe maître ; l'application ne lui transmet que du chiffré, et seulement des coffres déjà ouverts ici. Cette application n'a pas besoin d'être ouverte.</p>
+        <p className="help-text">L'extension propose alors « Coffre local » et déchiffre elle-même ; l'application ne lui passe que du chiffré.</p>
       </section>
 
       <section className="max-w-2xl space-y-1.5">
@@ -95,7 +95,7 @@ export function AppSettings({ error }: { error: (m: string) => void }) {
             </div>
           )}
         </div>
-        {system?.systemEvents && <p className="help-text">Sur tout l'ordinateur : GuiVault reste ouvert tant que vous travaillez ailleurs — pratique avec la saisie automatique, moins sûr si vous vous absentez sans verrouiller la session. La saisie automatique, elle, réduit la fenêtre sans la verrouiller.</p>}
+        {system?.systemEvents && <p className="help-text">Sur tout l'ordinateur : plus pratique avec la saisie automatique, moins sûr si vous vous absentez sans verrouiller la session.</p>}
       </section>
     </div>
   );

@@ -166,6 +166,17 @@ async function button(browser, text, timeout = 10_000) {
 
 const click = async (browser, text, timeout) => (await button(browser, text, timeout)).click();
 
+/** Une entrée du menu du compte (pied de la barre latérale) : le compte,
+ * la sécurité, se déconnecter ou fermer le coffre. */
+async function account(browser, item) {
+  const open = await browser.$("//aside//button[@aria-label='Compte']");
+  await open.waitForClickable({ timeout: 10_000, timeoutMsg: "bouton du compte introuvable" });
+  await open.click();
+  const entry = await browser.$(`//button[@role='menuitem'][normalize-space()=${xpathText(item)}]`);
+  await entry.waitForClickable({ timeout: 10_000, timeoutMsg: `« ${item} » introuvable dans le menu du compte` });
+  await entry.click();
+}
+
 async function fillField(browser, label, value) {
   const el = await browser.$(`//label[span[normalize-space()=${xpathText(label)}]]//*[self::input or self::textarea]`);
   await el.waitForDisplayed({ timeout: 10_000, timeoutMsg: `champ « ${label} » introuvable` });
@@ -249,15 +260,15 @@ scenario("créer un coffre local : un dossier sur le disque, rien en clair", asy
 scenario("en local, ce qui demande un serveur n'apparaît pas", async (b) => {
   const side = await sidebarText(b);
   for (const absent of ["Invitations", "Liens de partage", "Se déconnecter"]) assert(!side.includes(absent), `« ${absent} » est dans la barre latérale d'un coffre local`);
-  assert(side.includes("Mon coffre") && side.includes("Fermer le coffre"), "la barre latérale ne nomme pas le coffre local");
-  await (await b.$("//a[contains(normalize-space(), 'Coffre local et paramètres')]")).click();
+  assert(side.includes("Mon coffre") && side.includes("Coffre local"), "la barre latérale ne nomme pas le coffre local");
+  await account(b, "Coffre local");
   await waitText(b, "Coffre local « Mon coffre »");
   let text = await bodyText(b);
   for (const absent of ["Sessions", "Accès d'urgence", "Supprimer le compte", "Votre empreinte"]) assert(!text.includes(absent), `« ${absent} » est dans les paramètres d'un coffre local`);
   await (await b.$("//a[normalize-space()='Sécurité']")).click();
   await waitText(b, "Mot de passe maître");
   text = await bodyText(b);
-  for (const absent of ["Second facteur", "Copie hors ligne", "Passkeys"]) assert(!text.includes(absent), `« ${absent} » est dans la sécurité d'un coffre local`);
+  for (const absent of ["Double authentification", "Copie hors ligne", "Passkeys"]) assert(!text.includes(absent), `« ${absent} » est dans la sécurité d'un coffre local`);
   await shot(b, "2-parametres");
   await (await b.$("//a[.//span[normalize-space()='Personnel']]")).click();
 });
@@ -283,7 +294,7 @@ async function invoke(b, cmd, args = {}) {
 }
 
 async function openSettings(b, section) {
-  await (await b.$("//a[contains(normalize-space(), 'Coffre local et paramètres')]")).click();
+  await account(b, "Coffre local");
   await waitText(b, "Coffre local « Mon coffre »");
   if (section) await (await b.$(`//a[normalize-space()=${xpathText(section)}]`)).click();
 }
@@ -517,7 +528,7 @@ scenario("copier : le coffre vers un nouveau compte, puis le compte vers un nouv
   await click(b, "Fermer");
 
   // 2. Le compte s'ouvre avec le même mot de passe, et la note s'y déchiffre.
-  await click(b, "Fermer le coffre");
+  await account(b, "Fermer le coffre");
   await click(b, "Se connecter à un serveur");
   const server = await b.$('input[placeholder="https://vault.exemple.fr"]');
   await server.clearValue();
@@ -525,12 +536,12 @@ scenario("copier : le coffre vers un nouveau compte, puis le compte vers un nouv
   await click(b, "Continuer");
   await fillField(b, "E-mail", email);
   await fillPasswords(b, PASSWORD);
-  await click(b, "Se connecter");
+  await click(b, "Déverrouiller");
   await b.waitUntil(async () => (await bodyText(b)).includes(SECRET), { timeout: 60_000, timeoutMsg: "la note copiée n'apparaît pas dans le compte" });
 
   // 3. Le compte → un coffre neuf : mêmes vaults, mêmes items, pièce jointe comprise.
   const back = path.join(scratch, "Retour.guivault");
-  await (await b.$("//a[contains(normalize-space(), 'Compte et paramètres')]")).click();
+  await account(b, "Compte");
   await waitText(b, "Copier ce compte dans un nouveau coffre local");
   await click(b, "Copier…");
   await b.execute((p) => { window.__GUIVAULT_E2E_PATH__ = p; }, back);
@@ -546,12 +557,12 @@ scenario("copier : le coffre vers un nouveau compte, puis le compte vers un nouv
   assert(live(copy) === live(before), "les items du coffre neuf ne sont pas ceux du coffre d'origine");
   assert(copy.vaults[0].attachments.length === 1 && copy.vaults[0].attachments[0].complete, "la pièce jointe n'a pas fait l'aller-retour");
   await click(b, "Fermer");
-  await click(b, "Se déconnecter");
+  await account(b, "Se déconnecter");
   await unlockFromRecents(b);
 });
 
 scenario("fermer puis rouvrir : coffres récents, mauvais mot de passe refusé", async (b) => {
-  await click(b, "Fermer le coffre");
+  await account(b, "Fermer le coffre");
   await button(b, "Créer un coffre local");
   await (await b.$(`//button[.//span[normalize-space()='Mon coffre']]`)).click();
   await fillPasswords(b, "pas le bon mot de passe");
@@ -562,7 +573,7 @@ scenario("fermer puis rouvrir : coffres récents, mauvais mot de passe refusé",
   await input.setValue(PASSWORD);
   await click(b, "Déverrouiller");
   await b.waitUntil(async () => (await bodyText(b)).includes(SECRET), { timeout: 60_000, timeoutMsg: "la note n'est pas revenue après le déverrouillage" });
-  await click(b, "Fermer le coffre");
+  await account(b, "Fermer le coffre");
   await button(b, "Créer un coffre local");
 });
 

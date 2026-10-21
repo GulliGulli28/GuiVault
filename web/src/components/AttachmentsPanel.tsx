@@ -14,7 +14,7 @@ import { ConfirmDialog } from "./ConfirmDialog";
 import { IconLink, IconPaperclip } from "./secret-icons";
 import { ShareLinkDialog } from "./SendsPage";
 import { Eyebrow } from "./ui";
-import { IconDownload, IconPlus, IconTrash } from "./ui-icons";
+import { IconDownload, IconPlus, IconTrash, IconUpload } from "./ui-icons";
 
 export function AttachmentsPanel({ vault, item, writable, offline = false, session, onChanged, notify, error }: {
   vault: VaultView;
@@ -104,14 +104,16 @@ export function AttachmentsPanel({ vault, item, writable, offline = false, sessi
   };
 
   return (
-    <section className="mt-5">
-      <div className="mb-1 flex items-center gap-2">
+    <section>
+      <div className="mb-2 flex min-h-7 items-center gap-2">
         <Eyebrow>Pièces jointes</Eyebrow>
         {canAdd && (
           <>
-            <button type="button" onClick={() => input.current?.click()} disabled={busy !== null} className="btn btn-ghost btn-sm ml-auto">
-              <IconPlus size={11} /> Joindre un fichier
-            </button>
+            {attachments.length > 0 && (
+              <button type="button" onClick={() => input.current?.click()} disabled={busy !== null} className="btn btn-ghost btn-sm ml-auto">
+                <IconPlus size={13} /> Joindre un fichier
+              </button>
+            )}
             <input
               ref={input}
               type="file"
@@ -127,40 +129,46 @@ export function AttachmentsPanel({ vault, item, writable, offline = false, sessi
         )}
       </div>
       {attachments.length === 0 ? (
-        <p className="text-[12px] text-[var(--c-text-muted)]">
-          Aucune. Un fichier est chiffré ici, sous une clé qui lui est propre, avant d'être envoyé{limit ? ` (${formatSize(limit)} au plus)` : ""}.
-        </p>
+        canAdd ? (
+          <button type="button" onClick={() => input.current?.click()} disabled={busy !== null} className="flex w-full flex-col items-center gap-1.5 rounded-xl border border-dashed border-[var(--c-border-strong)] bg-[var(--c-surface)] px-5 py-5 text-center hover:border-[var(--c-accent)]">
+            <IconUpload size={18} className="text-[var(--c-text-muted)]" />
+            <span className="text-[13.5px] font-medium">Joindre un fichier</span>
+            <span className="text-[12.5px] text-[var(--c-text-muted)]">{limit ? `${formatSize(limit)} max · ` : ""}chiffré avant l'envoi</span>
+          </button>
+        ) : (
+          <p className="text-[13px] text-[var(--c-text-muted)]">Aucune.</p>
+        )
       ) : (
-        <ul className="divide-y divide-[var(--c-border)]">
+        <ul className="card divide-y divide-[var(--c-border)]">
           {attachments.map((a) => (
-            <li key={a.id} className="flex items-center gap-2 py-1.5 text-[12.5px]">
-              <IconPaperclip size={13} className="shrink-0 text-[var(--c-text-muted)]" />
+            <li key={a.id} className="flex min-w-0 items-center gap-2.5 px-[18px] py-2.5 text-[13.5px]">
+              <IconPaperclip size={15} className="shrink-0 text-[var(--c-text-muted)]" />
               <span className="min-w-0 flex-1 truncate text-[var(--c-text)]" title={a.name}>{a.name}</span>
-              <span className="shrink-0 text-[11px] text-[var(--c-text-faint)]">{formatSize(a.size)}</span>
+              <span className="shrink-0 text-[12px] text-[var(--c-text-muted)]">{formatSize(a.size)}</span>
               {session && !offline && supports("createSend") && (
-                <button type="button" onClick={() => void share(a)} disabled={busy !== null} className="btn btn-ghost btn-sm btn-icon" title="Partager par lien : une copie chiffrée, qui expire" aria-label={`Partager ${a.name} par lien`}>
-                  <IconLink size={12} />
+                <button type="button" onClick={() => void share(a)} disabled={busy !== null} className="btn btn-ghost btn-icon" title="Partager par lien : une copie chiffrée, qui expire" aria-label={`Partager ${a.name} par lien`}>
+                  <IconLink size={14} />
                 </button>
               )}
-              <button type="button" onClick={() => void download(a)} disabled={busy !== null || offline} className="btn btn-ghost btn-sm btn-icon" title={offline ? "Hors ligne : les fichiers ne sont pas dans la copie" : "Télécharger"} aria-label={`Télécharger ${a.name}`}>
-                <IconDownload size={12} />
+              <button type="button" onClick={() => void download(a)} disabled={busy !== null || offline} className="btn btn-ghost btn-icon" title={offline ? "Hors ligne : les fichiers ne sont pas dans la copie" : "Télécharger"} aria-label={`Télécharger ${a.name}`}>
+                <IconDownload size={14} />
               </button>
               {writable && !offline && !vault.emergency && (
-                <button type="button" onClick={() => setRemoving(a)} disabled={busy !== null} className="btn btn-ghost btn-sm btn-icon hover:text-[var(--c-danger)]" title="Retirer" aria-label={`Retirer ${a.name}`}>
-                  <IconTrash size={12} />
+                <button type="button" onClick={() => setRemoving(a)} disabled={busy !== null} className="btn btn-ghost btn-icon hover:text-[var(--c-danger)]" title="Retirer" aria-label={`Retirer ${a.name}`}>
+                  <IconTrash size={14} />
                 </button>
               )}
             </li>
           ))}
         </ul>
       )}
-      {offline && attachments.length > 0 && <p className="mt-1 text-[11.5px] text-[var(--c-text-muted)]">Hors ligne : les fichiers sont sur le serveur, pas dans la copie.</p>}
-      {busy && <p role="status" className="mt-1 text-[11.5px] text-[var(--c-text-muted)]">{busy}</p>}
+      {offline && attachments.length > 0 && <p className="mt-1.5 text-[12.5px] text-[var(--c-text-muted)]">Hors ligne : les fichiers sont sur le serveur, pas dans la copie.</p>}
+      {busy && <p role="status" className="mt-1.5 text-[12.5px] text-[var(--c-text-muted)]">{busy}</p>}
       {sharing && session && <ShareLinkDialog session={session} file={sharing} onClose={closeSharing} />}
       {removing && (
         <ConfirmDialog
           title={`Retirer « ${removing.name} » ?`}
-          message="Le fichier est effacé du serveur : une version précédente de l'élément qui le mentionne ne pourra plus l'ouvrir."
+          message="Effacé du serveur : les anciennes versions de l'élément ne l'ouvriront plus."
           confirmLabel="Retirer"
           danger
           onConfirm={() => void remove()}

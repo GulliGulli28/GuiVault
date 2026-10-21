@@ -80,7 +80,7 @@ export function LoginForm({ initial, index, defaultGroupId, onSave, onCancel }: 
         )}
       </div>
 
-      <Field group label="Sites (URI)" hint="Le premier sert de ligne secondaire dans la liste. Le mode de correspondance est celui que lira un remplissage automatique.">
+      <Field group label="Sites (URI)" hint="Le premier s'affiche dans la liste ; la correspondance guide le remplissage.">
         <div className="space-y-1">
           {login.uris.map((u, i) => (
             <div key={i} className="grid grid-cols-[1fr_auto_auto] items-center gap-1">
@@ -96,7 +96,7 @@ export function LoginForm({ initial, index, defaultGroupId, onSave, onCancel }: 
         </div>
       </Field>
 
-      <Field label="Secret TOTP" hint="Collez l'URI otpauth:// (le texte du QR code), le secret base32, ou une image du QR code (fichier, ou Ctrl+V dans le champ). Le code courant s'affiche dès qu'il se lit.">
+      <Field label="Secret TOTP" hint="Lien otpauth://, secret base32 ou image du QR code (Ctrl+V).">
         <input
           value={login.totp ?? ""}
           onChange={(e) => setLogin({ ...login, totp: e.target.value || null })}
@@ -122,7 +122,7 @@ export function LoginForm({ initial, index, defaultGroupId, onSave, onCancel }: 
               </div>
             ))}
           </div>
-          <p className="help-text mt-1">Une passkey se crée depuis un authentificateur (Guiterm, extension), pas depuis cette page : ici on la garde ou on la retire.</p>
+          <p className="help-text mt-1">Une passkey se crée depuis l'extension ou Guiterm.</p>
         </Field>
       )}
 

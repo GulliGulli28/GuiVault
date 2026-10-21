@@ -1,3 +1,6 @@
+import { Page } from "./Page";
+import { ACCENT_COLORS } from "../lib/preferences";
+import { setVaultColor, useVaultColors, VAULT_COLORS, vaultColor, vaultColorName } from "../lib/vaultColors";
 import { useCallback, useEffect, useState } from "react";
 import type { PageContext } from "../App";
 import { api, errorMessage, supports } from "../lib/api";
@@ -23,6 +26,7 @@ type Confirm = null | { kind: "remove"; m: VaultMember } | { kind: "leave" } | {
 function Body({ ctx, vault }: { ctx: PageContext; vault: VaultView }) {
   const { session } = ctx;
   const isPersonal = vault.kind === "personal";
+  const colors = useVaultColors();
   // Un coffre local (l'app) n'a qu'un utilisateur : ni membres, ni
   // invitations, ni journal, ni rotation — un vault y sert à ranger.
   const sharing = supports("members");
@@ -80,15 +84,24 @@ function Body({ ctx, vault }: { ctx: PageContext; vault: VaultView }) {
   const canInvite = lookup !== null && (lookup === "none" || fingerprintTrust(lookup.email, lookup.fingerprint).kind === "pinned");
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <header className="flex shrink-0 flex-wrap items-center gap-2 border-b border-[var(--c-border)] px-4 py-2.5 max-md:pl-14">
-        <button onClick={() => navigate({ page: "vault", id: vault.id })} className="btn btn-ghost btn-sm">← {vault.name}</button>
-        <h1 className="text-[14px] font-semibold text-[var(--c-text)]">Réglages</h1>
-        <span className="tag" title={ROLE_HINTS[vault.role]}>{isPersonal ? "personnel" : ROLE_LABELS[vault.role]}</span>
-      </header>
+    <Page
+      title={isPersonal || !sharing ? "Réglages du vault" : "Membres et réglages"}
+      sub={<span className="inline-flex max-w-full items-center gap-2"><span className="vdot" style={{ background: vaultColor(vault.id, isPersonal, colors) }} /><span className="truncate">{vault.name}</span><span className="tag" title={ROLE_HINTS[vault.role]}>{isPersonal ? "Personnel" : ROLE_LABELS[vault.role]}</span></span>}
+      back={{ label: vault.name, route: { page: "vault", id: vault.id } }}
+      width="max-w-[760px]"
+    >
+        <section className="flex flex-col gap-2.5">
+          <Eyebrow>Couleur</Eyebrow>
+          <div className="flex flex-wrap items-center gap-2">
+            {VAULT_COLORS.map((c) => {
+              const on = vaultColorName(vault.id, isPersonal, colors) === c;
+              return <button key={c} onClick={() => setVaultColor(vault.id, c)} aria-pressed={on} title={ACCENT_COLORS[c].label} aria-label={`Couleur ${ACCENT_COLORS[c].label}`} className={`h-7 w-7 rounded-full ${on ? "ring-2 ring-[var(--c-text)] ring-offset-2 ring-offset-[var(--c-bg2)]" : ""}`} style={{ background: ACCENT_COLORS[c].c500 }} />;
+            })}
+            <span className="text-[12.5px] text-[var(--c-text-muted)]">Pour vous seul, sur tous vos appareils.</span>
+          </div>
+        </section>
 
-      <div className="sidebar-scroll min-h-0 flex-1 space-y-6 overflow-y-auto p-4">
-        <section className="max-w-2xl space-y-2">
+        <section className="flex flex-col gap-2.5">
           <Eyebrow>Nom</Eyebrow>
           {renaming === null ? (
             <div className="flex items-center gap-2">
@@ -110,17 +123,17 @@ function Body({ ctx, vault }: { ctx: PageContext; vault: VaultView }) {
               <button type="button" onClick={() => setRenaming(null)} className="btn btn-ghost btn-sm">Annuler</button>
             </form>
           )}
-          <p className="help-text">{sharing ? "Chiffré sous la clé du vault : le serveur ne le lit pas." : "Chiffré sous la clé du vault."}</p>
+          <p className="help-text">Chiffré sous la clé du vault{sharing ? " : le serveur ne le lit pas" : ""}.</p>
         </section>
 
         {isPersonal && sharing && (
-          <p className="callout max-w-2xl">Votre vault personnel n'a ni membres ni invitations : c'est ce qui se synchronise entre vos appareils. Pour partager, créez un vault partagé depuis la barre latérale.</p>
+          <p className="callout">Le vault personnel ne se partage pas. Pour partager, créez un vault avec « + » dans la barre latérale.</p>
         )}
 
         {!isPersonal && sharing && <KeyProvenance vault={vault} members={members} onPinned={repaint} />}
 
         {!isPersonal && sharing && (
-          <section className="max-w-2xl space-y-1.5">
+          <section className="flex flex-col gap-2.5">
             <Eyebrow>Membres</Eyebrow>
             {members.map((m) => {
               const isMe = m.user_id === session.user.id;
@@ -158,7 +171,7 @@ function Body({ ctx, vault }: { ctx: PageContext; vault: VaultView }) {
         )}
 
         {manage && (
-          <section className="max-w-2xl space-y-1.5">
+          <section className="flex flex-col gap-2.5">
             <Eyebrow>Inviter</Eyebrow>
             <div className="flex flex-wrap gap-1.5">
               <input value={inviteEmail} onChange={(e) => { setInviteEmail(e.target.value); setLookup(null); }} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void doLookup(); } }} placeholder="E-mail" type="email" className="input min-w-[9rem] flex-1" />
@@ -222,7 +235,7 @@ function Body({ ctx, vault }: { ctx: PageContext; vault: VaultView }) {
         )}
 
         {!isPersonal && (
-          <section className="max-w-2xl space-y-2 border-t border-[var(--c-border)] pt-4">
+          <section className="flex flex-col gap-2.5 border-t border-[var(--c-border)] pt-5">
             <div className="flex flex-wrap items-center gap-1.5">
               {manage && (
                 <button onClick={() => { if (audit === null) api.vaultAudit(vault.id).then(setAudit).catch((e) => ctx.error(errorMessage(e))); else setAudit(null); }} className="btn btn-ghost btn-sm">{audit === null ? "Journal" : "Masquer le journal"}</button>
@@ -234,7 +247,6 @@ function Body({ ctx, vault }: { ctx: PageContext; vault: VaultView }) {
             {audit && <AuditList entries={audit} />}
           </section>
         )}
-      </div>
 
       {confirm?.kind === "remove" && (
         <ConfirmDialog
@@ -286,7 +298,7 @@ function Body({ ctx, vault }: { ctx: PageContext; vault: VaultView }) {
           onCancel={() => setConfirm(null)}
         />
       )}
-    </div>
+    </Page>
   );
 }
 
@@ -314,7 +326,7 @@ function KeyProvenance({ vault, members, onPinned }: { vault: VaultView; members
   const from = vault.keyFrom;
   if (from.kind === "self") {
     return (
-      <section className="max-w-2xl space-y-1.5">
+      <section className="flex flex-col gap-2.5">
         <Eyebrow>Clé du vault</Eyebrow>
         <p className="text-[12.5px] text-[var(--c-text-secondary)]">Créée ou renouvelée par vous.</p>
       </section>
@@ -322,7 +334,7 @@ function KeyProvenance({ vault, members, onPinned }: { vault: VaultView; members
   }
   if (from.kind === "anonymous") {
     return (
-      <section className="max-w-2xl space-y-1.5">
+      <section className="flex flex-col gap-2.5">
         <Eyebrow>Clé du vault</Eyebrow>
         <p className="callout">
           Enveloppe à l'ancien format : elle ne dit pas qui vous a remis la clé de ce vault. Un admin peut la renouveler
@@ -333,7 +345,7 @@ function KeyProvenance({ vault, members, onPinned }: { vault: VaultView; members
   }
   const sender = members.find((m) => m.fingerprint === from.fingerprint);
   return (
-    <section className="max-w-2xl space-y-1.5">
+    <section className="flex flex-col gap-2.5">
       <Eyebrow>Clé du vault</Eyebrow>
       {sender ? (
         <>

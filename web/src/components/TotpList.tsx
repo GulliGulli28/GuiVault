@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { Login } from "../lib/types";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { TotpCode } from "./TotpCode";
-import { IconLogin } from "./secret-icons";
+import { tileHue, tileInitial } from "../lib/tiles";
 import { GroupRow } from "./EntityRow";
 import { IconSearch, IconTrash, IconVault } from "./ui-icons";
 
@@ -47,36 +47,47 @@ export function TotpList({ entries, compact, onRemove, emptyMessage = "Aucun ide
       else next.add(id);
       return next;
     });
+  const row = (e: TotpEntry) => (
+    <div key={e.id} className={compact ? "list-row mb-0.5 flex-wrap py-1.5" : "flex min-w-0 flex-wrap items-center gap-3 px-[18px] py-3"}>
+      <span className="tile" style={{ "--tile-size": compact ? "28px" : "36px", "--tile-h": tileHue(e.login.name) } as React.CSSProperties}>{tileInitial(e.login.name)}</span>
+      <span className="flex min-w-0 flex-1 flex-col leading-tight">
+        <span className="truncate font-medium text-[var(--c-text)]">{e.login.name}</span>
+        <span className="truncate text-[12.5px] text-[var(--c-text-muted)]">{e.login.username || "—"}</span>
+      </span>
+      <TotpCode secret={e.login.totp!} />
+      {onRemove && <button onClick={() => setRemoving(e)} className="btn btn-ghost btn-icon hover:text-[var(--c-danger)]" title="Retirer ce code" aria-label={`Retirer le code de ${e.login.name}`}><IconTrash size={14} /></button>}
+    </div>
+  );
   return (
-    <div>
-      <div className="relative mb-2">
-        <IconSearch size={12} className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[var(--c-text-muted)]" />
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Rechercher un code…" aria-label="Rechercher un code" className="input pl-7" />
-      </div>
-      {shown.length === 0 && <p className="px-2 py-6 text-center text-[12px] text-[var(--c-text-muted)]">{entries.some((e) => e.login.totp) ? "Rien ne correspond." : emptyMessage}</p>}
+    <div className={compact ? "" : "flex flex-col gap-6"}>
+      <label className={`flex h-9 min-w-0 items-center gap-2 rounded-[9px] border border-[var(--c-border)] bg-[var(--c-surface)] px-2.5 text-[var(--c-text-muted)] focus-within:border-[var(--c-accent)] ${compact ? "mb-2" : "max-w-md"}`}>
+        <IconSearch size={14} />
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Rechercher un code" aria-label="Rechercher un code" className="min-w-0 flex-1 bg-transparent text-[13.5px] text-[var(--c-text)] outline-none placeholder:text-[var(--c-text-muted)] focus-visible:outline-none" />
+      </label>
+      {shown.length === 0 && <p className="px-2 py-6 text-center text-[13px] text-[var(--c-text-muted)]">{entries.some((e) => e.login.totp) ? "Rien ne correspond." : emptyMessage}</p>}
       {vaults.map((v) => {
         const expanded = terms.length > 0 || !collapsed.has(v.id);
+        if (!compact) {
+          return (
+            <section key={v.id} data-totp-vault={v.name} className="flex flex-col gap-2.5">
+              <button onClick={() => toggle(v.id)} aria-expanded={expanded} className="flex min-w-0 items-center gap-2 text-left text-[13px] font-medium text-[var(--c-text-muted)] hover:text-[var(--c-text)]">
+                <span className="truncate">{v.name}</span><span className="font-normal">{v.rows.length}</span>
+              </button>
+              {expanded && <div className="card divide-y divide-[var(--c-border)]">{v.rows.map(row)}</div>}
+            </section>
+          );
+        }
         return (
           <section key={v.id} data-totp-vault={v.name}>
             <GroupRow depth={0} expanded={expanded} onToggle={() => toggle(v.id)} icon={<IconVault size={14} />} name={v.name} count={v.rows.length} />
-            {expanded && v.rows.map((e) => (
-              <div key={e.id} className={`list-row mb-0.5 ml-4 flex-wrap ${compact ? "py-1.5" : "py-2"}`}>
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[var(--c-bg3)] text-[var(--c-text-secondary)]"><IconLogin size={12} /></span>
-                <span className="flex min-w-0 flex-1 flex-col leading-tight">
-                  <span className="truncate text-[12.5px] font-medium text-[var(--c-text)]">{e.login.name}</span>
-                  <span className="truncate text-[10.5px] text-[var(--c-text-muted)]">{e.login.username || "—"}</span>
-                </span>
-                <TotpCode secret={e.login.totp!} />
-                {onRemove && <button onClick={() => setRemoving(e)} className="btn btn-ghost btn-sm btn-icon hover:text-[var(--c-danger)]" title="Retirer ce code" aria-label={`Retirer le code de ${e.login.name}`}><IconTrash size={11} /></button>}
-              </div>
-            ))}
+            {expanded && v.rows.map(row)}
           </section>
         );
       })}
       {removing && onRemove && (
         <ConfirmDialog
           title={`Retirer le code de « ${removing.login.name} » ?`}
-          message="Le secret TOTP est effacé de l'identifiant (qui reste). Si ce site exige encore ce second facteur, vous ne pourrez plus vous y connecter sans vos codes de récupération ou une autre méthode : désactivez-le d'abord chez lui."
+          message="L'identifiant reste. Si le site exige encore ce code, désactivez d'abord la 2FA chez lui."
           confirmLabel="Retirer le code"
           danger
           onConfirm={() => { const e = removing; setRemoving(null); void onRemove(e); }}

@@ -71,7 +71,7 @@ export function RunbookForm({ initial, index, onSave, onCancel }: {
       <Field label="Nom">
         <input value={rb.name} onChange={(e) => setRb({ ...rb, name: e.target.value })} autoFocus placeholder="Mise à jour des serveurs web" className="input" />
       </Field>
-      <Field label="Description" hint="À quoi sert la procédure, en une ou deux phrases : affichée en tête de l'onglet et dans le rapport.">
+      <Field label="Description" hint="Une ou deux phrases, affichées en tête et dans le rapport.">
         <textarea value={rb.description} onChange={(e) => setRb({ ...rb, description: e.target.value })} rows={2} className="input" />
       </Field>
       <div role="group" aria-label="Étapes" className="space-y-2">
@@ -100,7 +100,7 @@ export function RunbookForm({ initial, index, onSave, onCancel }: {
               const a = s.action;
               return (
                 <div className="grid grid-cols-2 gap-2">
-                  <Field label="Hôte relais" className="col-span-2" hint="L'hôte d'où le playbook est joué (le nœud de contrôle Ansible).">
+                  <Field label="Hôte relais" className="col-span-2" hint="Le nœud de contrôle Ansible.">
                     <HostSelect index={index} value={a.relayHostId || null} none={a.relayHostLabel ? `${a.relayHostLabel} (absent de ce vault)` : "Choisir…"} onChange={(id) => setStep(i, { action: { ...a, relayHostId: id ?? "", relayHostLabel: index.hosts.find((h) => h.id === id)?.label ?? "" } })} />
                   </Field>
                   <Field label="Playbook (sur le relais)">
@@ -130,7 +130,7 @@ export function RunbookForm({ initial, index, onSave, onCancel }: {
                 </select>
               </Field>
             </div>
-            <Field label="Notes" hint="Le pourquoi, le ticket, ce qu'il faut vérifier avant de continuer. Jamais exécutées.">
+            <Field label="Notes" hint="Jamais exécutées.">
               <textarea value={s.notes} onChange={(e) => setStep(i, { notes: e.target.value })} rows={2} className="input" />
             </Field>
           </div>

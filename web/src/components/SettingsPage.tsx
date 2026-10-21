@@ -150,7 +150,7 @@ export function SettingsPage({ ctx, section }: { ctx: PageContext; section: Sett
                         { text: "Historique, corbeille et pièces jointes suivent.", tone: "ok" },
                         { text: "Interrompue, elle reprend où elle en était." },
                       ]} /></>}
-                      desc={local ? "Créer un compte avec ce coffre, ou le copier dans un compte existant." : "Dans un nouveau coffre local, ou un coffre existant."}
+                      desc={local ? "Créer un compte avec ce coffre, ou le copier dans un compte existant." : "Copier ce compte dans un nouveau coffre local, ou un coffre existant."}
                     >
                       <button onClick={() => setDialog("transfer")} className="btn btn-secondary">Copier…</button>
                     </SettingRow>

@@ -45,7 +45,7 @@ export function KeyForm({ initial, onSave, onCancel }: {
           </Field>
           <button type="button" onClick={() => setShowGenerator((g) => !g)} aria-pressed={showGenerator} className={`btn btn-icon self-start mt-[18px] ${showGenerator ? "btn-toggled" : "btn-secondary"}`} title="Générer une paire de clés" aria-label="Générer une paire de clés"><IconDice size={14} /></button>
         </div>
-        <p className="help-text mt-1">Collé, chargé depuis un fichier, ou généré ici : chiffré dans le vault, il suit la clé sur chaque appareil.</p>
+        <p className="help-text mt-1">Collé, chargé ou généré ici · chiffré dans le vault.</p>
         <FileButton label="Charger un fichier de clé" className="mt-1.5" onFile={(f) => { loadFile(f); setPublicKey(null); }} />
         {showGenerator && (
           <div className="card mt-2 p-3">
@@ -65,7 +65,7 @@ export function KeyForm({ initial, onSave, onCancel }: {
           <p className="callout mt-2 break-all font-mono text-[11px]">Clé publique à déposer sur les serveurs : {publicKey}</p>
         )}
       </div>
-      <Field label="Chemin (optionnel)" hint="Sans contenu : la clé est lue à ce chemin sur la machine qui se connecte.">
+      <Field label="Chemin (optionnel)" hint="Sans contenu, la clé est lue à ce chemin.">
         <input value={path} onChange={(e) => setPath(e.target.value)} placeholder="~/.ssh/id_ed25519" className="input input-mono" />
       </Field>
       <Field label="Passphrase (optionnelle)">

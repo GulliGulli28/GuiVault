@@ -1,3 +1,4 @@
+import { Page } from "./Page";
 import { useCallback, useEffect, useState } from "react";
 import { DEFAULT_GENERATOR, generate, type GeneratorOptions } from "../lib/generator";
 import { DEFAULT_SSH_KEY, generateSshKey, type SshKeyOptions, type SshKeyPair } from "../lib/sshkey";
@@ -67,19 +68,19 @@ export function GeneratorPanel({ onUse, onUseKey, compact, initialMode }: { onUs
         <SshKeyGenerator compact={compact} onUse={onUseKey} />
       ) : (
         <>
-      <div className="card p-3">
-        <div className="flex items-start gap-2">
-          <output className="min-w-0 flex-1 break-all font-mono text-[14px] leading-relaxed text-[var(--c-text)]" aria-live="polite">
+      <div className={`card ${compact ? "p-3" : "p-5"}`}>
+        <div className="flex items-start gap-1">
+          <output className={`min-w-0 flex-1 break-all font-mono leading-relaxed text-[var(--c-text)] ${compact ? "text-[15px]" : "text-[20px]"}`} aria-live="polite">
             {Array.from(value).map((ch, i) => (
-              <span key={i} style={{ color: /\d/.test(ch) ? "var(--c-accent-text)" : /[^A-Za-z0-9]/.test(ch) ? "var(--c-danger)" : undefined }}>{ch}</span>
+              <span key={i} style={{ color: /\d/.test(ch) ? "var(--c-warn-text)" : /[^A-Za-z0-9]/.test(ch) ? "var(--c-danger-text)" : undefined }}>{ch}</span>
             ))}
           </output>
-          <button type="button" onClick={() => regenerate(opts)} className="btn btn-ghost btn-sm btn-icon" title="Regénérer" aria-label="Regénérer"><IconRefresh size={12} /></button>
+          <button type="button" onClick={() => regenerate(opts)} className="btn btn-ghost btn-icon text-[var(--c-text-muted)]" title="Regénérer" aria-label="Regénérer"><IconRefresh size={15} /></button>
           <CopyButton value={value} label="Copier" />
         </div>
-        <div className="mt-2 flex items-center justify-between gap-2">
+        <div className="mt-3 flex items-center justify-between gap-2">
           <PasswordStrength password={value} />
-          {onUse && <button type="button" onClick={() => onUse(value)} className="btn btn-primary btn-sm">Utiliser</button>}
+          {onUse && <button type="button" onClick={() => onUse(value)} className="btn btn-primary">Utiliser</button>}
         </div>
       </div>
 
@@ -112,7 +113,7 @@ export function GeneratorPanel({ onUse, onUseKey, compact, initialMode }: { onUs
             <Check label="Majuscule initiale" checked={pp.capitalize} onChange={(v) => setPp({ capitalize: v })} />
             <Check label="Ajouter un chiffre" checked={pp.includeNumber} onChange={(v) => setPp({ includeNumber: v })} />
           </div>
-          <p className="help-text">Mots tirés de la grande liste de l'EFF (7 776 mots, ≈ 12,9 bits par mot).</p>
+          <p className="help-text">Liste de l'EFF · ≈ 12,9 bits par mot.</p>
         </div>
       )}
         </>
@@ -198,7 +199,7 @@ export function SshKeyGenerator({ compact, onUse }: { compact?: boolean; onUse?:
         <input value={opts.comment} onChange={(e) => set({ comment: e.target.value })} placeholder="alice@portable" className="input input-mono" />
       </label>
       <div className="flex items-center justify-between gap-2">
-        <span className="help-text">Sans passphrase : c'est le coffre qui protège la clé. Ed25519 est court, rapide et sans paramètre à choisir.</span>
+        <span className="help-text">Sans passphrase : le coffre la protège.</span>
         <button type="button" onClick={() => void run(opts)} disabled={busy} className="btn btn-secondary btn-sm shrink-0"><IconRefresh size={12} /> {busy ? "Génération…" : key ? "Regénérer" : "Générer"}</button>
       </div>
       {error && <p className="callout callout-danger">{error}</p>}
@@ -240,15 +241,8 @@ function Check({ label, checked, onChange }: { label: string; checked: boolean; 
 
 export function GeneratorPage() {
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <header className="flex shrink-0 items-center gap-2 border-b border-[var(--c-border)] px-4 py-2.5 max-md:pl-14">
-        <h1 className="text-[14px] font-semibold text-[var(--c-text)]">Générateur</h1>
-      </header>
-      <div className="sidebar-scroll min-h-0 flex-1 overflow-y-auto p-4">
-        <div className="max-w-xl">
-          <GeneratorPanel />
-        </div>
-      </div>
-    </div>
+    <Page title="Générateur" sub="Mots de passe, phrases de passe et clés SSH, générés ici." width="max-w-[680px]">
+      <GeneratorPanel />
+    </Page>
   );
 }

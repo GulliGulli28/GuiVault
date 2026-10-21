@@ -166,7 +166,7 @@ export function ItemView({ payload, index, shared }: { payload: Payload; index: 
                   </span>
                 </div>
               ))}
-              <p className="help-text pt-1">Stockées et synchronisées ; une page web ne peut pas s'en servir pour se connecter — c'est le rôle de Guiterm ou d'une extension.</p>
+              <p className="help-text pt-1">Utilisables par l'extension ou Guiterm.</p>
             </Section>
           )}
           {l.passwordHistory.length > 0 && <PasswordHistory entries={l.passwordHistory} />}

@@ -32,7 +32,7 @@ export function IconForm({ initial, onSave, onCancel }: { initial?: CustomIcon; 
       <Field label="Nom">
         <input value={name} onChange={(e) => setName(e.target.value)} autoFocus className="input" />
       </Field>
-      <Field group label="Image" hint="SVG ou PNG, 64 Ko au plus. Référencée par les hôtes et dossiers via son identifiant.">
+      <Field group label="Image" hint="SVG ou PNG, 64 Ko max.">
         <div className="flex items-center gap-3">
           <span className="flex h-10 w-10 items-center justify-center rounded-md border border-[var(--c-border)] bg-[var(--c-bg3)]">{dataUrl && <img src={dataUrl} alt="" className="h-7 w-7" />}</span>
           <FileButton label="Choisir une image" accept="image/svg+xml,image/png,image/webp" onFile={loadFile} />

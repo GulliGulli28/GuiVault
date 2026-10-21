@@ -174,7 +174,7 @@ export function HostForm({ initial, index, defaultGroupId, onSave, onCancel, onA
           <HostSelect index={index} value={dockerVia} onChange={setDockerVia} exclude={h?.id} />
         </Field>
       )}
-      {kind === "k8sExec" && <p className="help-text -mt-1.5">Authentifié via kubeconfig, pas par adresse/port. La sélection du pod se fait au moment de la connexion.</p>}
+      {kind === "k8sExec" && <p className="help-text -mt-1.5">Authentifié par kubeconfig ; le pod se choisit à la connexion.</p>}
 
       <Field label={usernameLabel}>
         <input value={username} onChange={(e) => setUsername(e.target.value)} className="input" />
@@ -191,7 +191,7 @@ export function HostForm({ initial, index, defaultGroupId, onSave, onCancel, onA
         </Field>
       )}
       {showAuth && authKind === "agent" && sshExtras && (
-        <Checkbox checked={agentForward} onChange={setAgentForward} label="Transférer l'agent SSH" hint="Seulement pour un hôte de confiance : une machine compromise peut utiliser l'agent tant que la session est ouverte." />
+        <Checkbox checked={agentForward} onChange={setAgentForward} label="Transférer l'agent SSH" hint="Seulement vers un hôte de confiance." />
       )}
       {showAuth && authKind === "privateKey" && (
         <>
@@ -206,7 +206,7 @@ export function HostForm({ initial, index, defaultGroupId, onSave, onCancel, onA
               <input value={keyPath} onChange={(e) => setKeyPath(e.target.value)} placeholder="~/.ssh/id_ed25519" className="input input-mono" />
             </Field>
           )}
-          <Field label="Certificat (optionnel)" hint="Un certificat OpenSSH présenté avec la clé, lu à chaque connexion.">
+          <Field label="Certificat (optionnel)" hint="Certificat OpenSSH présenté avec la clé.">
             <input value={certPath} onChange={(e) => setCertPath(e.target.value)} placeholder="~/.ssh/id_ed25519-cert.pub" className="input input-mono" />
           </Field>
         </>
@@ -218,7 +218,7 @@ export function HostForm({ initial, index, defaultGroupId, onSave, onCancel, onA
       )}
 
       {sshExtras && (
-        <Field group label="Chaîne de bastions" hint="Dans l'ordre de traversée. Exclusif avec la commande de proxy.">
+        <Field group label="Chaîne de bastions" hint="Dans l'ordre de traversée · exclut la commande de proxy.">
           <div className="space-y-1">
             {jumpVia.map((id, i) => (
               <div key={`${id}-${i}`} className="flex items-center gap-1">
@@ -236,7 +236,7 @@ export function HostForm({ initial, index, defaultGroupId, onSave, onCancel, onA
         </Field>
       )}
       {sshExtras && (
-        <Field label="Commande de proxy" hint="OpenSSH ProxyCommand (%h, %p, %r) : SSM, IAP, Bastion, cloudflared… Remplace la chaîne de bastions.">
+        <Field label="Commande de proxy" hint="ProxyCommand OpenSSH (%h, %p, %r) · remplace les bastions.">
           <input value={proxyCommand} onChange={(e) => setProxyCommand(e.target.value)} placeholder="aws ssm start-session --target %h --document-name AWS-StartSSHSession --parameters portNumber=%p" className="input input-mono" />
         </Field>
       )}
@@ -247,7 +247,7 @@ export function HostForm({ initial, index, defaultGroupId, onSave, onCancel, onA
       <Field label="Étiquettes">
         <TagsInput value={tags} onChange={setTags} />
       </Field>
-      <Field group label="Icône" hint="Celle de la banque de Guiterm, ou une icône du vault. Sans choix : l'icône du genre d'hôte.">
+      <Field group label="Icône" hint="Sans choix : celle du genre d'hôte.">
         <IconField value={icon} onChange={setIcon} customIcons={index.icons} onAddIcon={onAddIcon} fallback={(() => { const K = HOST_KINDS.find((k) => k.key === kind)?.Icon ?? IconHosts; return <K size={14} />; })()} />
       </Field>
 
@@ -271,7 +271,7 @@ export function HostForm({ initial, index, defaultGroupId, onSave, onCancel, onA
       )}
 
       {kind !== "rdp" && (
-        <Field group label="Variables d'environnement" hint="Une variable secrète voit sa valeur chiffrée à part, jamais dans la définition de l'hôte.">
+        <Field group label="Variables d'environnement" hint="Une variable secrète est chiffrée à part.">
           <div className="space-y-1">
             {envVars.map((v, i) => (
               <div key={i} className="grid grid-cols-[1fr_1fr_auto_auto] items-center gap-1">
