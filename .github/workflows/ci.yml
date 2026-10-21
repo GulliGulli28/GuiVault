@@ -84,6 +84,18 @@ jobs:
   # local sous Windows qui le couvre (`docs/APP.md`).
   app:
     runs-on: ubuntu-24.04
+    # Un vrai serveur pour le scénario « copier » (coffre ↔ compte) de l'E2E.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: guivault
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: guivault_e2e
+        ports: ["55432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U guivault -d guivault_e2e"
+          --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -91,7 +103,9 @@ jobs:
           components: clippy, rustfmt
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: app-tauri -> target
+          workspaces: |
+            app-tauri -> target
+            . -> target
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -115,9 +129,22 @@ jobs:
         working-directory: web
       - run: cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo build
         working-directory: app-tauri
+      - name: Serveur GuiVault (inscription ouverte)
+        run: |
+          cargo build -p guivault-server
+          nohup target/debug/guivault > guivault-e2e.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf http://127.0.0.1:8090/api/v1/health && exit 0; sleep 1; done
+          cat guivault-e2e.log; exit 1
+        env:
+          GUIVAULT_DATABASE_URL: postgres://guivault:test@localhost:55432/guivault_e2e
+          GUIVAULT_BIND: 127.0.0.1:8090
+          GUIVAULT_REGISTRATION: open
+          GUIVAULT_SECRET: e2e-secret-e2e-secret-e2e-secret-e2e-secret
       # Profondeur 24 bits explicite : à 8, WebKit rend mal ou pas du tout.
       - run: xvfb-run -a -s "-screen 0 1920x1080x24" npm run test:app
         working-directory: web
+        env:
+          GUIVAULT_E2E_SERVER: http://127.0.0.1:8090
       # L'extension sur un coffre local, par l'hôte natif : il lui faut le
       # binaire de l'app, construit juste au-dessus (`native.spec.ts`).
       - run: npx playwright install --with-deps chromium && npm run test:ext -- native
@@ -143,7 +170,9 @@ jobs:
           components: clippy
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: app-tauri -> target
+          workspaces: |
+            app-tauri -> target
+            . -> target
       - uses: actions/setup-node@v4
         with:
           node-version: 22

@@ -322,8 +322,10 @@ L gros.
 - [ ] **Agent SSH Windows** (M, KeePassXC, KeeAgent) : les clés du coffre
   dans l'agent OpenSSH tant que le coffre est ouvert — l'agent de Guiterm
   est réutilisable.
-- [ ] **Pousser un coffre local vers un serveur**, et l'inverse (M) : mêmes
-  ids, mêmes enveloppes (`APP.md`).
+- [x] **Copier un coffre local vers un serveur**, et l'inverse (M) : compte
+  neuf ou existant, coffre neuf ou existant ; historique, corbeille et
+  pièces jointes compris, reprise après coupure (`POST /vaults/{id}/import`)
+  — [`TRANSFERT.md`](TRANSFERT.md) ; E2E contre un vrai serveur.
 - [ ] **Synchroniser deux coffres locaux** (L, « Synchroniser » de KeePass) :
   un dossier sur Nextcloud ou Syncthing, fusion par révisions et manifeste.
 - [ ] **Fichier clé** (M, KeePass) : un coffre local qui s'ouvre avec le mot

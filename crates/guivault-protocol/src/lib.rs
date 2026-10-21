@@ -1097,6 +1097,56 @@ pub struct DeleteItemRequest {
     pub manifest: Option<ManifestWrite>,
 }
 
+/// `POST /vaults/{id}/import` : un lot d'items copiés d'ailleurs (un coffre
+/// local, un autre compte — `docs/TRANSFERT.md`), avec leur historique et
+/// leur corbeille, tels quels : le serveur n'en voit que des blobs, comme pour
+/// un `PUT`. Seulement des ids que le vault n'a jamais eus.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ImportItemsRequest {
+    /// Au plus [`IMPORT_BATCH`] : le client découpe.
+    pub items: Vec<ImportedItem>,
+    /// Le manifeste de la source, sur le dernier lot (ses chiffrés sont les
+    /// mêmes) : le vault ne doit pas en avoir, et n'en a plus le droit ensuite.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub manifest: Option<VaultManifest>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImportedItem {
+    pub id: Uuid,
+    pub item_type: String,
+    /// Vide pour un item de la corbeille (`deleted_at`) : sa dernière version
+    /// est alors la dernière de `versions`.
+    #[serde(with = "b64")]
+    pub ciphertext: Vec<u8>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub deleted_at: Option<DateTime<Utc>>,
+    /// Ses versions précédentes, de la plus ancienne à la plus récente.
+    #[serde(default)]
+    pub versions: Vec<ImportedVersion>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImportedVersion {
+    pub item_type: String,
+    #[serde(with = "b64")]
+    pub ciphertext: Vec<u8>,
+    pub written_at: DateTime<Utc>,
+    pub replaced_at: DateTime<Utc>,
+}
+
+/// Items par lot d'import (`400 import_too_large` au-delà).
+pub const IMPORT_BATCH: usize = 1000;
+
+/// Réponse de `POST /vaults/{id}/import` : la révision du vault après le lot.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImportItemsResponse {
+    pub revision: i64,
+    pub imported: usize,
+}
+
 /// Le manifeste d'un vault tel que le serveur le garde : un blob qu'il ne
 /// lit pas, et sa révision (le compteur scellé dedans).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

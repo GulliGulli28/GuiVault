@@ -8,9 +8,9 @@
 //! un test.
 use crate::{Error, LocalVault, PasswordChange, Result};
 use guivault_protocol::{
-    CreateAttachmentRequest, CreateVaultRequest, DeleteItemRequest, HealthResponse, KdfParams, MoveAttachmentRequest,
-    PROTOCOL_VERSION, PutItemRequest, PutManifestRequest, PutUserSettingsRequest, RegistrationMode, RenameVaultRequest,
-    SyncResponse, b64,
+    CreateAttachmentRequest, CreateVaultRequest, DeleteItemRequest, HealthResponse, ImportItemsRequest, KdfParams,
+    MoveAttachmentRequest, PROTOCOL_VERSION, PutItemRequest, PutManifestRequest, PutUserSettingsRequest,
+    RegistrationMode, RenameVaultRequest, SyncResponse, b64,
 };
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -35,6 +35,7 @@ pub const OPS: &[&str] = &[
     "deleteItem",
     "manifest",
     "putManifest",
+    "importItems",
     "itemVersions",
     "vaultVersions",
     "trash",
@@ -126,6 +127,7 @@ pub fn call(vault: &LocalVault, op: &str, args: &Value) -> Result<Value> {
         }
         "manifest" => json(vault.manifest(v()?)?),
         "putManifest" => json(vault.put_manifest(v()?, arg::<PutManifestRequest>(args, "req")?)?),
+        "importItems" => json(vault.import_items(v()?, arg::<ImportItemsRequest>(args, "req")?)?),
         "itemVersions" => json(vault.item_versions(v()?, id()?)?),
         "vaultVersions" => json(vault.vault_versions(v()?)?),
         "trash" => json(vault.trash(v()?)?),

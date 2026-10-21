@@ -31,7 +31,7 @@ export interface NewCoffre {
 export type LocalOp =
   | "health" | "account" | "changePassword" | "me" | "sync" | "settings" | "putSettings"
   | "vault" | "createVault" | "renameVault" | "deleteVault"
-  | "items" | "putItem" | "deleteItem" | "manifest" | "putManifest"
+  | "items" | "putItem" | "deleteItem" | "manifest" | "putManifest" | "importItems"
   | "itemVersions" | "vaultVersions" | "trash" | "purgeTrashItem" | "emptyTrash"
   | "attachments" | "createAttachment" | "putAttachmentChunk" | "completeAttachment" | "attachmentChunk" | "deleteAttachment" | "moveAttachment";
 
@@ -82,6 +82,7 @@ export function localTransport(host: LocalHost): Partial<Transport> {
     deleteItem: (vault, id, opts = {}) => call("deleteItem", { vault, id, moved: opts.moved ?? false, req: opts.manifest ? { manifest: opts.manifest } : undefined }),
     manifest: (vault) => call("manifest", { vault }),
     putManifest: (vault, req) => call("putManifest", { vault, req }),
+    importItems: (vault, req) => call("importItems", { vault, req }),
     itemVersions: (vault, id) => call("itemVersions", { vault, id }),
     vaultVersions: (vault) => call("vaultVersions", { vault }),
     trash: (vault) => call("trash", { vault }),

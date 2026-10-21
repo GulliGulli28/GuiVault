@@ -3887,6 +3887,228 @@ async fn mail_goes_out_when_configured_and_never_blocks() {
 }
 
 /// Écrit un item avec (ou sans) le manifeste qui l'accompagne.
+/// Un vault copié d'ailleurs (coffre local, autre compte) : items, historique
+/// et corbeille gardent leurs dates ; rien d'existant ne se réécrit ; le
+/// manifeste de la source arrive avec le dernier lot et ferme l'import.
+#[tokio::test]
+async fn vault_import_keeps_history_trash_and_dates() {
+    use chrono::{Duration as Days, Utc};
+    let Some(server) = TestServer::start_with(RegistrationMode::Open, |c| c.item_history = 3).await else {
+        return;
+    };
+    let alice = User::register(&server, "alice@t.io", "pw").await;
+    let bob = User::register(&server, "bob@t.io", "pw").await;
+    // Le vault d'arrivée : même id et même clé que la source, enveloppe pour alice.
+    let (vault, key) = alice.create_vault("Copié").await;
+    let vid = vault.id;
+    add_member(&alice, &vault, &key, &bob, Role::Admin).await;
+    let seal =
+        |id: Uuid, text: &str| gc::seal_item(&key, &vid.to_string(), &id.to_string(), "note", text.as_bytes()).unwrap();
+    let open = |id: Uuid, ct: &[u8]| {
+        String::from_utf8(gc::open_item(&key, &vid.to_string(), &id.to_string(), "note", ct).unwrap()).unwrap()
+    };
+    let at = |days: i64| Utc::now() - Days::days(days);
+    let version = |id: Uuid, text: &str, written: i64, replaced: i64| ImportedVersion {
+        item_type: "note".into(),
+        ciphertext: seal(id, text),
+        written_at: at(written),
+        replaced_at: at(replaced),
+    };
+    let import = |user: &User, req: &ImportItemsRequest| {
+        user.req(reqwest::Method::POST, &format!("/vaults/{vid}/import"))
+            .json(req)
+            .send()
+    };
+
+    // A : vivant, cinq versions précédentes (le serveur en garde trois).
+    let a = Uuid::new_v4();
+    let a_ct = seal(a, "a6");
+    let item_a = ImportedItem {
+        id: a,
+        item_type: "note".into(),
+        ciphertext: a_ct.clone(),
+        created_at: at(100),
+        updated_at: at(1),
+        deleted_at: None,
+        versions: (1..=5)
+            .map(|n| version(a, &format!("a{n}"), 100 - n * 10, 90 - n * 10))
+            .collect(),
+    };
+    let batch = ImportItemsRequest {
+        items: vec![item_a.clone()],
+        manifest: None,
+    };
+
+    // Seul le propriétaire importe — un admin non.
+    status!(import(&bob, &batch).await.unwrap(), StatusCode::FORBIDDEN);
+    let body = status!(import(&alice, &batch).await.unwrap(), StatusCode::OK);
+    let res: ImportItemsResponse = serde_json::from_str(&body).unwrap();
+    assert_eq!(res.imported, 1);
+
+    let page: ItemsPage = alice.get(&format!("/vaults/{vid}/items")).await;
+    assert_eq!(page.revision, res.revision);
+    let got = page.items.iter().find(|i| i.id == a).unwrap();
+    assert_eq!(got.ciphertext, a_ct);
+    assert!(
+        (got.created_at - at(100)).num_seconds().abs() < 5,
+        "date de création conservée"
+    );
+    let versions: Vec<ItemVersion> = alice.get(&format!("/vaults/{vid}/items/{a}/versions")).await;
+    let texts: Vec<String> = versions.iter().map(|v| open(a, &v.ciphertext)).collect();
+    assert_eq!(
+        texts,
+        ["a5", "a4", "a3"],
+        "les trois plus récentes, la plus récente d'abord"
+    );
+    assert!(
+        (versions[0].written_at - at(50)).num_seconds().abs() < 5,
+        "date d'écriture conservée"
+    );
+    assert!(versions.iter().all(|v| v.revision < got.revision));
+
+    // Rien d'existant ne se réécrit : le même lot une deuxième fois est refusé, et dit quoi.
+    let body = status!(import(&alice, &batch).await.unwrap(), StatusCode::CONFLICT);
+    assert!(body.contains("item_exists") && body.contains(&a.to_string()), "{body}");
+    // … ni un item créé normalement.
+    let c = Uuid::new_v4();
+    status!(
+        alice.put_item(vid, &key, c, "note", "c1", None).await,
+        StatusCode::CREATED
+    );
+    let mut item_c = item_a.clone();
+    item_c.id = c;
+    item_c.ciphertext = seal(c, "c0");
+    item_c.versions.clear();
+    let body = status!(
+        import(
+            &alice,
+            &ImportItemsRequest {
+                items: vec![item_c],
+                manifest: None
+            }
+        )
+        .await
+        .unwrap(),
+        StatusCode::CONFLICT
+    );
+    assert!(body.contains("item_exists"), "{body}");
+
+    // Lots mal formés.
+    let b = Uuid::new_v4();
+    let trashed = ImportedItem {
+        id: b,
+        item_type: "note".into(),
+        ciphertext: vec![],
+        created_at: at(40),
+        updated_at: at(10),
+        deleted_at: Some(at(10)),
+        versions: vec![version(b, "b1", 40, 20), version(b, "b2", 20, 10)],
+    };
+    let mut bad = trashed.clone();
+    bad.versions.clear();
+    let body = status!(
+        import(
+            &alice,
+            &ImportItemsRequest {
+                items: vec![bad],
+                manifest: None
+            }
+        )
+        .await
+        .unwrap(),
+        StatusCode::BAD_REQUEST
+    );
+    assert!(body.contains("invalid_import"), "{body}");
+    let mut bad = item_a.clone();
+    bad.id = Uuid::new_v4();
+    bad.item_type = gc::MANIFEST_TYPE.into();
+    let body = status!(
+        import(
+            &alice,
+            &ImportItemsRequest {
+                items: vec![bad],
+                manifest: None
+            }
+        )
+        .await
+        .unwrap(),
+        StatusCode::BAD_REQUEST
+    );
+    assert!(body.contains("invalid_item_type"), "{body}");
+    let body = status!(
+        import(
+            &alice,
+            &ImportItemsRequest {
+                items: vec![trashed.clone(), trashed.clone()],
+                manifest: None
+            }
+        )
+        .await
+        .unwrap(),
+        StatusCode::BAD_REQUEST
+    );
+    assert!(body.contains("invalid_import"), "{body}");
+
+    // Dernier lot : B à la corbeille (supprimé il y a dix jours), et le
+    // manifeste de la source (A et C : ses chiffrés sont ceux d'ici).
+    let page: ItemsPage = alice.get(&format!("/vaults/{vid}/items")).await;
+    let c_ct = page.items.iter().find(|i| i.id == c).unwrap().ciphertext.clone();
+    let manifest = gc::Manifest::of(
+        7,
+        [
+            (a.to_string().as_str(), a_ct.as_slice()),
+            (c.to_string().as_str(), c_ct.as_slice()),
+        ],
+    );
+    let last = ImportItemsRequest {
+        items: vec![trashed],
+        manifest: Some(VaultManifest {
+            ciphertext: gc::seal_manifest(&key, &vid.to_string(), &manifest).unwrap(),
+            revision: 7,
+        }),
+    };
+    status!(import(&alice, &last).await.unwrap(), StatusCode::OK);
+    let trash: Vec<TrashedItem> = alice.get(&format!("/vaults/{vid}/trash")).await;
+    assert_eq!(trash.len(), 1);
+    assert_eq!(open(b, &trash[0].ciphertext), "b2");
+    assert!(
+        (trash[0].deleted_at - at(10)).num_seconds().abs() < 5,
+        "date de suppression conservée"
+    );
+    let page: ItemsPage = alice.get(&format!("/vaults/{vid}/items")).await;
+    let verified = verify_page(&key, vid, &page, None);
+    assert!(verified.problems.is_empty(), "{:?}", verified.problems);
+    assert_eq!(page.manifest.as_ref().unwrap().revision, 7);
+
+    // Le vault a un manifeste : l'import est fermé.
+    let mut more = item_a;
+    more.id = Uuid::new_v4();
+    more.ciphertext = seal(more.id, "x");
+    more.versions.clear();
+    let body = status!(
+        import(
+            &alice,
+            &ImportItemsRequest {
+                items: vec![more],
+                manifest: None
+            }
+        )
+        .await
+        .unwrap(),
+        StatusCode::CONFLICT
+    );
+    assert!(body.contains("import_closed"), "{body}");
+
+    let db = server.db().await;
+    let (n,): (i64,) = sqlx::query_as("SELECT count(*) FROM audit_log WHERE action = 'vault.import' AND vault_id = $1")
+        .bind(vid)
+        .fetch_one(&db)
+        .await
+        .unwrap();
+    assert_eq!(n, 2);
+    server.stop().await;
+}
+
 async fn put_with_manifest(
     user: &User,
     vault: Uuid,

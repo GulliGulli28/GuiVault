@@ -37,9 +37,10 @@ use chrono::{DateTime, Duration, Utc};
 use format::{Coffre, StoredAttachment, StoredItem, StoredVault, StoredVersion};
 use guivault_crypto::{ATTACHMENT_CHUNK, ATTACHMENT_CHUNK_OVERHEAD, RekeyMaterial, attachment_chunk_count};
 use guivault_protocol::{
-    Attachment, CreateAttachmentRequest, CreateVaultRequest, DeleteItemRequest, Item, ItemVersion, ItemsPage,
-    KdfParams, ManifestWrite, MoveAttachmentRequest, PutItemRequest, PutManifestRequest, PutUserSettingsRequest,
-    RenameVaultRequest, TrashedItem, UserProfile, UserSettings, Vault, VaultKind, VaultManifest,
+    Attachment, CreateAttachmentRequest, CreateVaultRequest, DeleteItemRequest, IMPORT_BATCH, ImportItemsRequest,
+    ImportItemsResponse, Item, ItemVersion, ItemsPage, KdfParams, ManifestWrite, MoveAttachmentRequest, PutItemRequest,
+    PutManifestRequest, PutUserSettingsRequest, RenameVaultRequest, TrashedItem, UserProfile, UserSettings, Vault,
+    VaultKind, VaultManifest,
 };
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -406,6 +407,108 @@ impl LocalVault {
                 i.ciphertext.clear();
             }
             Ok(())
+        })
+    }
+
+    /// Copie d'un vault venu d'ailleurs, avec ses dates — les règles de
+    /// `POST /vaults/{id}/import` : seulement des ids que le vault n'a jamais
+    /// eus, au plus `GUIVAULT_ITEM_HISTORY` versions par item, et plus
+    /// d'import une fois que le vault a un manifeste (celui de la source
+    /// arrive avec le dernier lot).
+    pub fn import_items(&self, vault_id: Uuid, req: ImportItemsRequest) -> Result<ImportItemsResponse> {
+        let opts = self.options;
+        if req.items.len() > IMPORT_BATCH {
+            return Err(Error::bad_request(
+                "import_too_large",
+                format!("au plus {IMPORT_BATCH} items par lot"),
+            ));
+        }
+        let mut ids = std::collections::HashSet::new();
+        for it in &req.items {
+            if !ids.insert(it.id) {
+                return Err(Error::bad_request(
+                    "invalid_import",
+                    "un item apparaît deux fois dans le lot",
+                ));
+            }
+            if it.deleted_at.is_some() {
+                let Some(last) = it.versions.last() else {
+                    return Err(Error::bad_request(
+                        "invalid_import",
+                        "un item de la corbeille sans version",
+                    ));
+                };
+                if !it.ciphertext.is_empty() || last.item_type != it.item_type {
+                    return Err(Error::bad_request("invalid_import", "item de la corbeille incohérent"));
+                }
+            } else {
+                validate::item(&it.item_type, &it.ciphertext, opts.max_item_bytes)?;
+            }
+            for v in &it.versions {
+                validate::item(&v.item_type, &v.ciphertext, opts.max_item_bytes)?;
+            }
+        }
+        if let Some(m) = &req.manifest {
+            validate::manifest(&m.ciphertext, opts.max_item_bytes)?;
+            if m.revision < 1 {
+                return Err(Error::bad_request("invalid_manifest", "révision de manifeste invalide"));
+            }
+        }
+        self.write(|c, _, now| {
+            let v = c.vault_mut(vault_id)?;
+            if v.manifest.is_some() {
+                return Err(Error::conflict(
+                    "import_closed",
+                    "ce vault a un manifeste : on n'y importe plus",
+                ));
+            }
+            let existing: Vec<Uuid> = req
+                .items
+                .iter()
+                .map(|it| it.id)
+                .filter(|id| v.item(*id).is_some())
+                .collect();
+            if !existing.is_empty() {
+                return Err(
+                    Error::conflict("item_exists", "des items du lot existent déjà dans ce vault")
+                        .with_extra(serde_json::json!({ "items": existing })),
+                );
+            }
+            let keep = opts.item_history;
+            let mut imported = 0;
+            for it in req.items {
+                if it.deleted_at.is_some() && keep == 0 {
+                    continue;
+                }
+                let skip = it.versions.len().saturating_sub(keep);
+                for ver in it.versions.into_iter().skip(skip) {
+                    let revision = v.bump(now);
+                    v.versions.push(StoredVersion {
+                        item_id: it.id,
+                        revision,
+                        item_type: ver.item_type,
+                        ciphertext: ver.ciphertext,
+                        written_at: ver.written_at,
+                        replaced_at: ver.replaced_at,
+                    });
+                }
+                let revision = v.bump(now);
+                v.items.push(StoredItem {
+                    id: it.id,
+                    item_type: it.item_type,
+                    revision,
+                    ciphertext: it.ciphertext,
+                    created_at: it.created_at,
+                    updated_at: it.updated_at,
+                    deleted_at: it.deleted_at,
+                });
+                imported += 1;
+            }
+            store_manifest(v, req.manifest.map(|m| (m.ciphertext, m.revision)));
+            Ok(ImportItemsResponse {
+                revision: v.revision,
+                imported,
+            })
         })
     }
 

@@ -344,6 +344,120 @@ fn history_is_capped_and_a_move_skips_the_trash() {
     assert!(store.trash(v).unwrap().is_empty());
 }
 
+/// `POST /vaults/{id}/import` : mêmes règles qu'au serveur (`tests/api.rs`,
+/// `vault_import_keeps_history_trash_and_dates`).
+#[test]
+fn import_keeps_history_trash_and_dates_like_the_server() {
+    use chrono::{Duration, Utc};
+    use guivault_protocol::{ImportItemsRequest, ImportedItem, ImportedVersion, VaultManifest};
+    let tmp = TempDir::new();
+    let options = Options {
+        item_history: 3,
+        ..Options::default()
+    };
+    let (store, client) = new_coffre_with(&tmp.coffre(), options);
+    let v = client.personal;
+    let at = |days: i64| Utc::now() - Duration::days(days);
+    let version = |id: Uuid, text: &str, days: i64| ImportedVersion {
+        item_type: "note".into(),
+        ciphertext: client.seal(v, id, "note", text),
+        written_at: at(days),
+        replaced_at: at(days - 1),
+    };
+    let a = Uuid::new_v4();
+    let item_a = ImportedItem {
+        id: a,
+        item_type: "note".into(),
+        ciphertext: client.seal(v, a, "note", "a6"),
+        created_at: at(100),
+        updated_at: at(1),
+        deleted_at: None,
+        versions: (1..=5).map(|n| version(a, &format!("a{n}"), 60 - n * 10)).collect(),
+    };
+    let b = Uuid::new_v4();
+    let item_b = ImportedItem {
+        id: b,
+        item_type: "note".into(),
+        ciphertext: vec![],
+        created_at: at(40),
+        updated_at: at(10),
+        deleted_at: Some(at(10)),
+        versions: vec![version(b, "b1", 30)],
+    };
+    let res = store
+        .import_items(
+            v,
+            ImportItemsRequest {
+                items: vec![item_a.clone()],
+                manifest: None,
+            },
+        )
+        .unwrap();
+    assert_eq!(res.imported, 1);
+    let page = store.items(v, None).unwrap();
+    assert_eq!(page.revision, res.revision);
+    let got = page.items.iter().find(|i| i.id == a).unwrap();
+    assert_eq!(client.open(v, a, "note", &got.ciphertext), "a6");
+    assert_eq!(got.created_at, item_a.created_at);
+    let versions = store.item_versions(v, a).unwrap();
+    let texts: Vec<String> = versions
+        .iter()
+        .map(|x| client.open(v, a, "note", &x.ciphertext))
+        .collect();
+    assert_eq!(texts, ["a5", "a4", "a3"]);
+    assert_eq!(versions[0].written_at, item_a.versions[4].written_at);
+
+    let again = store.import_items(
+        v,
+        ImportItemsRequest {
+            items: vec![item_a.clone()],
+            manifest: None,
+        },
+    );
+    assert_eq!(again.unwrap_err().code, "item_exists");
+    let mut bad = item_b.clone();
+    bad.versions.clear();
+    let err = store
+        .import_items(
+            v,
+            ImportItemsRequest {
+                items: vec![bad],
+                manifest: None,
+            },
+        )
+        .unwrap_err();
+    assert_eq!(err.code, "invalid_import");
+
+    store
+        .import_items(
+            v,
+            ImportItemsRequest {
+                items: vec![item_b.clone()],
+                manifest: Some(VaultManifest {
+                    ciphertext: client.seal(v, Uuid::nil(), "manifest", "{}"),
+                    revision: 4,
+                }),
+            },
+        )
+        .unwrap();
+    let trash = store.trash(v).unwrap();
+    assert_eq!(trash.len(), 1);
+    assert_eq!(trash[0].deleted_at, item_b.deleted_at.unwrap());
+    assert_eq!(store.manifest(v).unwrap().unwrap().revision, 4);
+    let mut more = item_a;
+    more.id = Uuid::new_v4();
+    let err = store
+        .import_items(
+            v,
+            ImportItemsRequest {
+                items: vec![more],
+                manifest: None,
+            },
+        )
+        .unwrap_err();
+    assert_eq!(err.code, "import_closed");
+}
+
 #[test]
 fn trash_purge_and_empty() {
     let tmp = TempDir::new();

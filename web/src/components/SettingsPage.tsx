@@ -22,7 +22,8 @@ import { EmergencySettings } from "./EmergencySettings";
 import { AutoTypeSettings } from "./AutoType";
 import { AppSettings } from "./AppSettings";
 import { LocalBackups } from "./LocalBackups";
-import { autoTypeBridge, backupBridge, systemBridge } from "../lib/platform";
+import { autoTypeBridge, backupBridge, coffreBridge, systemBridge } from "../lib/platform";
+import { TransferDialog } from "./TransferDialog";
 import { IconKeyboard, IconMonitor, IconPalette, IconSettings, IconShield, IconTrash } from "./ui-icons";
 import { CopyButton, Eyebrow, Fingerprint, formatWhen, Modal, PasswordInput } from "./ui";
 
@@ -46,8 +47,9 @@ export function SettingsPage({ ctx, section }: { ctx: PageContext; section: Sett
   const [sessions, setSessions] = useState<Session[]>([]);
   const [totp, setTotp] = useState<boolean | null>(null);
   const [audit, setAudit] = useState<AuditEntry[] | null>(null);
-  const [dialog, setDialog] = useState<null | "password" | "totp-setup" | "totp-disable" | "delete-account">(null);
+  const [dialog, setDialog] = useState<null | "password" | "totp-setup" | "totp-disable" | "delete-account" | "transfer">(null);
   const [revoke, setRevoke] = useState<Session | null>(null);
+  const closeDialog = useCallback(() => setDialog(null), []);
   const [lockMinutes, setLockMinutes] = useState(loadLockMinutes);
 
   // Un coffre local (l'app) n'a ni sessions, ni second facteur, ni accès
@@ -124,6 +126,16 @@ export function SettingsPage({ ctx, section }: { ctx: PageContext; section: Sett
                 <section className="max-w-2xl space-y-1.5">
                   <Eyebrow>Sauvegardes</Eyebrow>
                   <LocalBackups path={local.path} onError={ctx.error} onRestored={(dest) => ctx.notify(`Copie créée : ${dest}. Elle est dans les coffres récents — fermez ce coffre pour l'ouvrir.`)} />
+                </section>
+              )}
+              {!session.offline && coffreBridge() && (
+                <section className="max-w-2xl space-y-1.5">
+                  <Eyebrow>{local ? "Copier vers un serveur" : "Copier dans un coffre local"}</Eyebrow>
+                  <div className="card flex flex-wrap items-center gap-2 p-3">
+                    <span className="min-w-0 flex-1 text-[12.5px] text-[var(--c-text)]">{local ? "Créer un compte avec ce coffre, ou le copier dans un compte existant." : "Copier ce compte dans un nouveau coffre local, ou dans un coffre existant."}</span>
+                    <button onClick={() => setDialog("transfer")} className="btn btn-secondary btn-sm">Copier…</button>
+                  </div>
+                  <p className="help-text">Une copie, pas un déplacement : {local ? "ce coffre" : "ce compte"} reste tel quel. Historique, corbeille et pièces jointes suivent ; une copie interrompue reprend où elle en était.</p>
                 </section>
               )}
               {!session.offline && supports("deleteAccount") && (
@@ -207,6 +219,7 @@ export function SettingsPage({ ctx, section }: { ctx: PageContext; section: Sett
       </div>
 
       {dialog === "password" && <PasswordDialog ctx={ctx} onClose={() => setDialog(null)} />}
+      {dialog === "transfer" && <TransferDialog ctx={ctx} onClose={closeDialog} />}
       {dialog === "delete-account" && <DeleteAccountDialog ctx={ctx} totp={totp === true} onClose={() => setDialog(null)} />}
       {dialog === "totp-setup" && <TotpSetupDialog ctx={ctx} onClose={() => { setDialog(null); reload(); }} />}
       {dialog === "totp-disable" && <TotpDisableDialog ctx={ctx} onClose={() => { setDialog(null); reload(); }} />}

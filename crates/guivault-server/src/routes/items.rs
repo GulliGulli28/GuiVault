@@ -9,7 +9,8 @@ use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use guivault_protocol::{
-    DeleteItemRequest, Item, ItemsPage, PutItemRequest, PutManifestRequest, Role, ServerEvent, VaultManifest,
+    DeleteItemRequest, IMPORT_BATCH, ImportItemsRequest, ImportItemsResponse, Item, ItemsPage, PutItemRequest,
+    PutManifestRequest, Role, ServerEvent, VaultManifest,
 };
 use serde::Deserialize;
 use uuid::Uuid;
@@ -246,6 +247,178 @@ pub async fn delete(
         )
         .await?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+// ─── Import ─────────────────────────────────────────────────────────────────
+
+/// Copie d'un vault venu d'ailleurs (coffre local, autre compte) : des items
+/// avec leur historique et leur corbeille, **dates comprises** — ce que des
+/// `PUT` rejoués perdraient. Réservé au propriétaire, et seulement pour des
+/// ids que le vault n'a jamais eus : rien d'existant ne peut être réécrit, ni
+/// son histoire changée. Chaque lot est une transaction ; un transfert coupé
+/// reprend en n'envoyant que ce qui manque. Plus d'import une fois que le
+/// vault a un manifeste (celui de la source arrive avec le dernier lot).
+pub async fn import(
+    State(state): State<AppState>,
+    user: AuthUser,
+    ClientIp(ip): ClientIp,
+    Path(vault_id): Path<Uuid>,
+    Json(req): Json<ImportItemsRequest>,
+) -> ApiResult<Json<ImportItemsResponse>> {
+    let max = state.config.max_item_bytes;
+    if req.items.len() > IMPORT_BATCH {
+        return Err(AppError::bad_request(
+            "import_too_large",
+            format!("au plus {IMPORT_BATCH} items par lot"),
+        ));
+    }
+    let mut ids = std::collections::HashSet::new();
+    for it in &req.items {
+        if !ids.insert(it.id) {
+            return Err(AppError::bad_request(
+                "invalid_import",
+                "un item apparaît deux fois dans le lot",
+            ));
+        }
+        if it.deleted_at.is_some() {
+            // Un item de la corbeille n'existe que par sa dernière version.
+            let Some(last) = it.versions.last() else {
+                return Err(AppError::bad_request(
+                    "invalid_import",
+                    "un item de la corbeille sans version",
+                ));
+            };
+            if !it.ciphertext.is_empty() || last.item_type != it.item_type {
+                return Err(AppError::bad_request(
+                    "invalid_import",
+                    "item de la corbeille incohérent",
+                ));
+            }
+        } else {
+            validate::item(&it.item_type, &it.ciphertext, max)?;
+        }
+        for v in &it.versions {
+            validate::item(&v.item_type, &v.ciphertext, max)?;
+        }
+    }
+    if let Some(m) = &req.manifest {
+        validate::manifest(&m.ciphertext, max)?;
+        if m.revision < 1 {
+            return Err(AppError::bad_request(
+                "invalid_manifest",
+                "révision de manifeste invalide",
+            ));
+        }
+    }
+    db::vault_with_role(&state.db, user.id, vault_id, Role::Owner).await?;
+
+    let mut tx = state.db.begin().await?;
+    let (mut rev,): (i64,) = sqlx::query_as("SELECT revision FROM vaults WHERE id = $1 FOR UPDATE")
+        .bind(vault_id)
+        .fetch_one(&mut *tx)
+        .await?;
+    if db::locked_manifest(&mut tx, vault_id).await?.0.is_some() {
+        return Err(AppError::conflict(
+            "import_closed",
+            "ce vault a un manifeste : on n'y importe plus",
+        ));
+    }
+    let wanted: Vec<Uuid> = req.items.iter().map(|it| it.id).collect();
+    let existing: Vec<(Uuid,)> = sqlx::query_as("SELECT id FROM items WHERE vault_id = $1 AND id = ANY($2)")
+        .bind(vault_id)
+        .bind(&wanted)
+        .fetch_all(&mut *tx)
+        .await?;
+    if !existing.is_empty() {
+        let ids: Vec<Uuid> = existing.into_iter().map(|(id,)| id).collect();
+        return Err(
+            AppError::conflict("item_exists", "des items du lot existent déjà dans ce vault")
+                .with_extra(serde_json::json!({ "items": ids })),
+        );
+    }
+    let live: usize = req
+        .items
+        .iter()
+        .filter(|it| it.deleted_at.is_none())
+        .map(|it| it.ciphertext.len())
+        .sum();
+    db::check_quota(&mut tx, state.config.quota_bytes, vault_id, Uuid::nil(), 0, live).await?;
+
+    // Comme `keep_version` : au plus `GUIVAULT_ITEM_HISTORY` versions par
+    // item. Sans historique, pas de corbeille non plus.
+    let keep = state.config.item_history;
+    let (mut imported, mut versions) = (0usize, 0usize);
+    for it in &req.items {
+        if it.deleted_at.is_some() && keep == 0 {
+            continue;
+        }
+        for v in &it.versions[it.versions.len().saturating_sub(keep)..] {
+            rev += 1;
+            sqlx::query(
+                "INSERT INTO item_versions
+                    (vault_id, item_id, revision, item_type, ciphertext, written_at, replaced_at, replaced_by)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+            )
+            .bind(vault_id)
+            .bind(it.id)
+            .bind(rev)
+            .bind(&v.item_type)
+            .bind(&v.ciphertext)
+            .bind(v.written_at)
+            .bind(v.replaced_at)
+            .bind(user.id)
+            .execute(&mut *tx)
+            .await?;
+            versions += 1;
+        }
+        rev += 1;
+        sqlx::query(
+            "INSERT INTO items (id, vault_id, item_type, revision, ciphertext, created_at, updated_at, deleted_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+        )
+        .bind(it.id)
+        .bind(vault_id)
+        .bind(&it.item_type)
+        .bind(rev)
+        .bind(&it.ciphertext)
+        .bind(it.created_at)
+        .bind(it.updated_at)
+        .bind(it.deleted_at)
+        .execute(&mut *tx)
+        .await?;
+        imported += 1;
+    }
+    sqlx::query("UPDATE vaults SET revision = $2, updated_at = now() WHERE id = $1")
+        .bind(vault_id)
+        .bind(rev)
+        .execute(&mut *tx)
+        .await?;
+    if let Some(m) = &req.manifest {
+        db::store_manifest(&mut tx, vault_id, &m.ciphertext, m.revision).await?;
+    }
+    Audit::new("vault.import")
+        .actor(user.id)
+        .vault(vault_id)
+        .ip(ip)
+        .meta(serde_json::json!({ "items": imported, "versions": versions, "manifest": req.manifest.is_some() }))
+        .write(&mut *tx)
+        .await?;
+    tx.commit().await?;
+    state
+        .events
+        .vault(
+            &state.db,
+            vault_id,
+            ServerEvent::VaultChanged {
+                vault_id,
+                revision: rev,
+            },
+        )
+        .await?;
+    Ok(Json(ImportItemsResponse {
+        revision: rev,
+        imported,
+    }))
 }
 
 // ─── Manifeste ──────────────────────────────────────────────────────────────

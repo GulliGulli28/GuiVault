@@ -490,6 +490,66 @@ scenario("import KeePass : une vraie base .kdbx, pièce jointe comprise", async 
   await waitText(b, "Wi-Fi maison");
 });
 
+/** Un vrai serveur GuiVault (inscription ouverte) : `GUIVAULT_E2E_SERVER`,
+ * posé par le CI (`ci.yml`, job app) ; sans lui, le scénario est ignoré. */
+const e2eServer = process.env.GUIVAULT_E2E_SERVER;
+
+scenario("copier : le coffre vers un nouveau compte, puis le compte vers un nouveau coffre", async (b) => {
+  if (!e2eServer) return "ignoré : pas de serveur (GUIVAULT_E2E_SERVER)";
+  const email = `e2e-${Date.now()}@example.org`;
+  const before = coffreOnDisk(coffre).json;
+
+  // 1. Coffre local → compte neuf, avec le compte du coffre.
+  await openSettings(b);
+  await waitText(b, "Créer un compte avec ce coffre");
+  await click(b, "Copier…");
+  const url = await b.$('input[placeholder="https://vault.example.org"]');
+  await url.waitForDisplayed({ timeout: 10_000 });
+  await clearField(b, url);
+  await url.setValue(e2eServer);
+  await fillField(b, "E-mail", email);
+  await fillPasswords(b, PASSWORD);
+  await click(b, "Copier");
+  await waitText(b, "La copie est faite", 120_000);
+  await shot(b, "copie-vers-serveur");
+  const pre = await (await fetch(`${e2eServer}/api/v1/auth/prelogin`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email }) })).json();
+  assert(pre.kdf_salt === before.account.kdf_salt, "le compte n'a pas été créé avec le compte du coffre");
+  await click(b, "Fermer");
+
+  // 2. Le compte s'ouvre avec le même mot de passe, et la note s'y déchiffre.
+  await click(b, "Fermer le coffre");
+  await click(b, "Se connecter à un serveur");
+  const server = await b.$('input[placeholder="https://vault.exemple.fr"]');
+  await server.clearValue();
+  await server.setValue(e2eServer);
+  await click(b, "Continuer");
+  await fillField(b, "E-mail", email);
+  await fillPasswords(b, PASSWORD);
+  await click(b, "Se connecter");
+  await b.waitUntil(async () => (await bodyText(b)).includes(SECRET), { timeout: 60_000, timeoutMsg: "la note copiée n'apparaît pas dans le compte" });
+
+  // 3. Le compte → un coffre neuf : mêmes vaults, mêmes items, pièce jointe comprise.
+  const back = path.join(scratch, "Retour.guivault");
+  await (await b.$("//a[contains(normalize-space(), 'Compte et paramètres')]")).click();
+  await waitText(b, "Copier ce compte dans un nouveau coffre local");
+  await click(b, "Copier…");
+  await b.execute((p) => { window.__GUIVAULT_E2E_PATH__ = p; }, back);
+  await click(b, "Créer le coffre…");
+  await waitText(b, "Retour.guivault");
+  await fillPasswords(b, PASSWORD);
+  await click(b, "Copier");
+  await waitText(b, "est dans les coffres récents", 120_000);
+  const copy = coffreOnDisk(back).json;
+  assert(copy.account.kdf_salt === before.account.kdf_salt, "le coffre neuf n'a pas le compte du compte");
+  assert(copy.vaults[0].id === before.vaults[0].id, "le vault personnel a changé d'identifiant");
+  const live = (j) => j.vaults[0].items.filter((i) => !i.deleted_at).map((i) => i.id).sort().join();
+  assert(live(copy) === live(before), "les items du coffre neuf ne sont pas ceux du coffre d'origine");
+  assert(copy.vaults[0].attachments.length === 1 && copy.vaults[0].attachments[0].complete, "la pièce jointe n'a pas fait l'aller-retour");
+  await click(b, "Fermer");
+  await click(b, "Se déconnecter");
+  await unlockFromRecents(b);
+});
+
 scenario("fermer puis rouvrir : coffres récents, mauvais mot de passe refusé", async (b) => {
   await click(b, "Fermer le coffre");
   await button(b, "Créer un coffre local");

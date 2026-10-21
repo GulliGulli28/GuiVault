@@ -237,6 +237,16 @@ comme lui, et ouvrables avec le mot de passe maître **de leur date** —
 changer de mot de passe ne protège pas les sauvegardes d'avant d'un
 mot de passe déjà compromis ; les effacer (dossier `backups/`) le fait.
 
+**Copier entre un coffre et un serveur** (`docs/TRANSFERT.md`) : tout passe
+chiffré, tel quel ; seules les clés de vault sont ré-enveloppées, dans
+l'interface, pour le compte d'arrivée. Un compte créé depuis un coffre en
+reprend le compte entier (même mot de passe maître, mêmes clés) : un
+mot de passe compromis l'est des deux côtés — le changer sur l'un ne change
+pas l'autre. La route d'import (`POST /vaults/{id}/import`) accepte des
+dates fournies par le client, mais seulement du propriétaire, seulement pour
+des ids jamais vus dans le vault, et plus du tout une fois le vault doté
+d'un manifeste : elle ne peut ni écraser un item ni réécrire son histoire.
+
 **Extension sur un coffre local** (`docs/EXTENSION.md`, « Coffre local ») :
 l'hôte natif ne sert que des blobs ; l'extension déchiffre avec le mot de
 passe maître. Le navigateur ne lance l'hôte que pour cette extension

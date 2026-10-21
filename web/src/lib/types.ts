@@ -287,6 +287,24 @@ export interface VaultManifest {
   revision: number;
 }
 
+/** `POST /vaults/{id}/import` (`transfer.ts`) : des items copiés d'ailleurs,
+ * avec leur historique (du plus ancien au plus récent) et leur corbeille. */
+export interface ImportedItem {
+  id: string;
+  item_type: string;
+  /** Vide pour un item de la corbeille : sa dernière version est la sienne. */
+  ciphertext: string;
+  created_at: string;
+  updated_at: string;
+  deleted_at?: string;
+  versions: { item_type: string; ciphertext: string; written_at: string; replaced_at: string }[];
+}
+
+export interface ImportItemsRequest {
+  items: ImportedItem[];
+  manifest?: VaultManifest;
+}
+
 /** Un manifeste qui accompagne une écriture, sur la révision lue. */
 export interface ManifestWrite {
   ciphertext: string;

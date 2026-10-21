@@ -47,9 +47,10 @@ Ce qu'on y gagne :
   dans les clients (`crypto.ts`, `guivault-crypto`) ;
 - **l'interface ne change pas** : `session.ts` chiffre et déchiffre comme
   aujourd'hui, il parle juste à un autre transport ;
-- **un coffre local pourra devenir un compte** (« Pousser vers un serveur ») :
-  mêmes ids (dans l'AAD), mêmes enveloppes — il suffira de s'inscrire avec la
-  même user key et de rejouer les écritures ;
+- **un coffre local peut devenir un compte**, et l'inverse (Paramètres ›
+  Compte › « Copier », [`TRANSFERT.md`](TRANSFERT.md)) : mêmes ids (dans
+  l'AAD), mêmes enveloppes — on s'inscrit avec le compte du coffre, et les
+  items passent tels quels, historique et corbeille compris ;
 - **`gv` et Guiterm pourront l'ouvrir** en consommant le crate, sans nouveau
   format à apprendre (voir plus bas) ;
 - précédent : `cache.json` de `gv` garde déjà les items « chiffrés comme sur
@@ -409,5 +410,8 @@ ce port bloque aussi le Windows d'à côté (relayé par `wslrelay.exe`).
    msedgedriver demande) : l'app la reprend elle-même dans les arguments
    passés à WebView2 (`create_main_window`, `app-tauri/src/main.rs`).
    `E2E_DRIVER_LOG` donne le journal détaillé du pilote.
-6. Plus tard : Android ; « Pousser vers un serveur » ; `gv` sur un coffre
-   local ; Guiterm sur un coffre local.
+6. Copier entre un coffre local et un serveur ([`TRANSFERT.md`](TRANSFERT.md)) :
+   fait ; son scénario E2E tourne contre un vrai serveur quand
+   `GUIVAULT_E2E_SERVER` est posé (job `app` du CI).
+7. Plus tard : Android ; `gv` sur un coffre local ; Guiterm sur un coffre
+   local.

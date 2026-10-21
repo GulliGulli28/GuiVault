@@ -122,7 +122,11 @@ il ne déchiffre rien : la user key reste sous la clé que seule la PRF donne).
     `lib/localHost.ts` : le transport du coffre local de l'app (hôte Tauri,
     `docs/APP.md`), ouvert par `session.createLocal` / `openLocal` ;
     une méthode ajoutée à `api` qui a un sens sans serveur s'ajoute là, à
-    `rpc.rs` et à `ops.json`.
+    `rpc.rs` et à `ops.json`. `serverConnection` : une seconde connexion
+    HTTP (ses jetons à elle), pour `lib/transfer.ts` — copier un coffre
+    local vers un serveur et l'inverse (`docs/TRANSFERT.md`,
+    `TransferDialog`, pont `coffreBridge` de l'app), par `POST
+    /vaults/{id}/import` (miroir `LocalVault::import_items`).
     `lib/session.ts` (compte déverrouillé, vaults, items, partage),
     `lib/types.ts` (protocole en snake_case + entités Guiterm en camelCase,
     **même JSON que `termius_core::guivault::entity::Payload`** : un item

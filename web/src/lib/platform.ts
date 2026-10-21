@@ -4,6 +4,7 @@
  * vide et les composants n'en montrent rien. */
 import type { LockReason } from "./appSettings";
 import type { AutoTypeAction } from "./autotype";
+import type { LocalHost } from "./localHost";
 
 /** Une demande du raccourci global : la fenêtre qui était au premier plan
  * quand on l'a pressé. `target` est opaque (un handle de fenêtre). */
@@ -104,6 +105,29 @@ export function setBackupBridge(b: BackupBridge | null) {
 
 export function backupBridge(): BackupBridge | null {
   return backups;
+}
+
+/** Les coffres locaux vus d'une autre session (`transfer.ts`) : copier un
+ * compte dans un coffre, un coffre vers un serveur. */
+export interface CoffreBridge {
+  /** L'hôte des coffres, libre tant que la session n'est pas un coffre local. */
+  host: LocalHost;
+  pickNew(): Promise<string | null>;
+  pickExisting(): Promise<string | null>;
+  /** Le coffre rejoint les coffres récents de l'accueil. */
+  remember(path: string): void;
+  /** Le dernier serveur ouvert depuis l'accueil, ou `""`. */
+  lastServer(): string;
+}
+
+let coffres: CoffreBridge | null = null;
+
+export function setCoffreBridge(b: CoffreBridge | null) {
+  coffres = b;
+}
+
+export function coffreBridge(): CoffreBridge | null {
+  return coffres;
 }
 
 /** Une mise à jour de l'application, annoncée par la release GitHub. */

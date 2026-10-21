@@ -15,6 +15,7 @@
   "deleteItem",
   "manifest",
   "putManifest",
+  "importItems",
   "itemVersions",
   "vaultVersions",
   "trash",

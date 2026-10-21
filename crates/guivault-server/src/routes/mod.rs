@@ -105,6 +105,7 @@ pub fn router(state: AppState) -> Router {
             get(invitations::list_for_vault).post(invitations::create),
         )
         .route("/vaults/{id}/items", get(items::list))
+        .route("/vaults/{id}/import", post(items::import))
         .route(
             "/vaults/{id}/manifest",
             get(items::get_manifest).put(items::put_manifest),

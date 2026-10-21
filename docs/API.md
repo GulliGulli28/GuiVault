@@ -25,7 +25,7 @@ Erreurs : `{ "code": "…", "message": "…" }` (+ champs selon le code, ex.
 `manifest_conflict`, `manifest_too_large`, `attachments_disabled`, `attachment_too_large`,
 `attachment_exists`, `attachment_complete`, `attachment_incomplete`, `send_complete`,
 `send_incomplete`, `passkeys_disabled`, `invalid_challenge`, `invalid_passkey`,
-`passkey_exists`, `too_many_passkeys`, `invalid_*`, `internal`.
+`passkey_exists`, `too_many_passkeys`, `item_exists`, `import_closed`, `import_too_large`, `invalid_*`, `internal`.
 
 Partout : `403 ip_not_allowed` si l'adresse du client n'est pas dans
 `GUIVAULT_ALLOWED_IPS` (sauf `GET /health`).
@@ -129,6 +129,7 @@ Partout : `403 ip_not_allowed` si l'adresse du client n'est pas dans
 | `GET /vaults/{id}/trash` | membre | `[TrashedItem]` : supprimés depuis moins de `GUIVAULT_TRASH_DAYS` jours, avec leur dernière version et `expires_at` |
 | `DELETE /vaults/{id}/trash/{item_id}` | writer | supprime définitivement un item de la corbeille (404 s'il est vivant) |
 | `DELETE /vaults/{id}/trash` | writer | vide la corbeille |
+| `POST /vaults/{id}/import` | owner | copie d'un vault venu d'ailleurs (`docs/TRANSFERT.md`) : `{ items: [{ id, item_type, ciphertext, created_at, updated_at, deleted_at?, versions: [{ item_type, ciphertext, written_at, replaced_at }] }], manifest? }` → `{ revision, imported }`. Dates gardées, versions de la plus ancienne à la plus récente (les `GUIVAULT_ITEM_HISTORY` dernières), un item de la corbeille a un `ciphertext` vide et au moins une version. Au plus 1000 items par lot (`400 import_too_large`), une transaction par lot ; `409 item_exists` `{ items }` si un id existe déjà (tombale comprise) ; `manifest` (celui de la source, sur le dernier lot) ferme l'import : `409 import_closed` ensuite. `400 invalid_import` pour un lot incohérent |
 
 Restaurer une version (historique ou corbeille) : la renvoyer **telle
 quelle** par `PUT` — même clé, même AAD —, avec la révision courante de
