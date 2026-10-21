@@ -60,6 +60,14 @@ serveur puisse jamais lire un secret.
   jamais donner le mot de passe d'un site à un cadre tiers —, codes TOTP,
   passkeys, authentificateur (codes TOTP), générateur —
   [`docs/EXTENSION.md`](docs/EXTENSION.md).
+- **Application Windows** ([releases `app-v*`](https://github.com/GulliGulli28/GuiVault/releases)) :
+  se connecte à un serveur GuiVault **ou** garde un **coffre local** (un
+  dossier, chiffré comme sur le serveur, sans serveur du tout) ; saisie
+  automatique à la KeePass, presse-papiers hors de l'historique Windows,
+  verrouillage avec la session, sauvegardes, zone de notification, import
+  KeePass (KDBX), l'extension reliée au coffre local, mises à jour signées,
+  et la copie d'un coffre local vers un serveur (ou l'inverse) —
+  [`docs/APP.md`](docs/APP.md), [`docs/TRANSFERT.md`](docs/TRANSFERT.md).
 - **En ligne de commande** (`gv`) : lire un secret par référence
   (`gv://vault/élément/champ`), lancer une commande avec ses secrets en
   variables (`gv run`), `credential_process` AWS, credential helper Git —
@@ -278,7 +286,12 @@ Structure :
 - `web/` — l'interface web (Vite + React + TypeScript). `src/lib/crypto.ts`
   est le port de `guivault-crypto` ; des vecteurs générés par le crate
   Rust (et réciproquement) garantissent que les deux lisent les mêmes
-  blobs. `web/extension/` : l'extension de navigateur, sur le même code.
+  blobs. `web/extension/` : l'extension de navigateur, sur le même code ;
+  `web/app/` : l'interface de l'application.
+- `crates/guivault-local` — le coffre local de l'application : ce que
+  garde le serveur, dans un dossier, sans clé ni crypto.
+- `app-tauri/` — l'application Windows (Tauri 2, workspace Cargo à part) ;
+  publier une version : [`docs/APP.md`](docs/APP.md), « Mises à jour ».
 
 Guiterm consomme `guivault-crypto`, `guivault-protocol` et `guivault-items`
 en dépendances git, épinglées sur un commit : une réponse qui change casse

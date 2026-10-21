@@ -338,7 +338,12 @@ L gros.
   `{PICKCHARS}` (« caractères 3, 5 et 8 » des banques), Linux (X11).
 - [x] **Mises à jour automatiques signées** (M, comme Guiterm) :
   Paramètres › Application › Mise à jour, release `app-updater`
-  ([`APP.md`](APP.md), « Mises à jour »).
+  ([`APP.md`](APP.md), « Mises à jour ») ; éprouvées sur un vrai poste
+  (0.1.0 → 0.1.1, 21 octobre 2026).
+- [ ] **Mises à jour pour une installation MSI** (S) : aujourd'hui
+  `latest.json` ne sert que l'installeur NSIS ; signer aussi le MSI et
+  publier les entrées `windows-x86_64-msi` / `windows-x86_64-nsis`
+  ([`APP.md`](APP.md), « Limite connue »).
 - [ ] **Signature de code Windows** — SmartScreen avertit tant que les
   installeurs ne sont pas signés (options dans le `RELEASING.md` de Guiterm).
 - [ ] **Plusieurs coffres ouverts à la fois** (L) : local et compte côte à

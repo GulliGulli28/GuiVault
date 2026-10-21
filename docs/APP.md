@@ -350,14 +350,24 @@ Les tags `v*` sont ceux du serveur, d'où le préfixe `app-`.
 6. Sur un poste qui a la version précédente : Paramètres › Application ›
    Mise à jour la propose (ou la notification du démarrage, au bout de
    8 s) ; « Installer » télécharge, vérifie la signature, installe sans
-   question (`installMode: passive`) et relance.
+   question (`installMode: passive`) et relance. Circuit éprouvé de bout en
+   bout avec 0.1.0 → 0.1.1.
+
+**Limite connue** : `latest.json` n'a qu'une entrée, `windows-x86_64`, qui
+pointe vers l'installeur **NSIS** (par utilisateur, `%LOCALAPPDATA%`). Une
+application installée par le **MSI** (par machine) recevrait donc
+l'installeur NSIS — vraisemblablement une seconde installation à côté. À
+faire (`ROADMAP.md`, §6) : publier aussi la signature du MSI et écrire les
+entrées `windows-x86_64-msi` / `windows-x86_64-nsis`, que l'updater choisit
+selon la façon dont l'app a été installée. D'ici là, recommander l'installeur
+NSIS (`*-setup.exe`) : c'est lui que l'updater sait remplacer.
 
 ### Versions publiées
 
 | Version | Date | Contenu |
 |---|---|---|
 | [0.1.0](https://github.com/GulliGulli28/GuiVault/releases/tag/app-v0.1.0) | 21 octobre 2026 | Première version : coffre local ou serveur, saisie automatique, presse-papiers hors de l'historique Windows, verrouillage avec la session, sauvegardes du coffre local, zone de notification, import KDBX, extension reliée par l'hôte natif, mises à jour signées. Circuit de l'updater mis en place (clé, `app-updater`) |
-| [0.1.1](https://github.com/GulliGulli28/GuiVault/releases/tag/app-v0.1.1) | 21 octobre 2026 | Copier entre un coffre local et un serveur, dans les deux sens ([`TRANSFERT.md`](TRANSFERT.md)) — demande un serveur qui a `POST /vaults/{id}/import`. Première mise à jour livrée par l'updater, pour l'éprouver depuis une 0.1.0 installée |
+| [0.1.1](https://github.com/GulliGulli28/GuiVault/releases/tag/app-v0.1.1) | 21 octobre 2026 | Copier entre un coffre local et un serveur, dans les deux sens ([`TRANSFERT.md`](TRANSFERT.md)) — demande un serveur qui a `POST /vaults/{id}/import`. Première mise à jour livrée par l'updater : **éprouvée** le 21 octobre 2026 sur un vrai poste Windows — une 0.1.0 installée par NSIS l'a proposée (Paramètres › Application › Mise à jour), installée et relancée en 0.1.1 |
 
 ### La clé de signature
 
