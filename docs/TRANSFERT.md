@@ -7,6 +7,13 @@ dans un coffre local. Code : `web/src/lib/transfer.ts` (la logique),
 côté serveur (`routes/items.rs`) et son miroir `LocalVault::import_items`
 (`crates/guivault-local`, opération `importItems`).
 
+**Compatibilité** : la copie vers un serveur demande un serveur qui a la
+route d'import (le serveur de ce dépôt depuis le 21 octobre 2026) — un
+serveur plus ancien répond `404` à `POST /vaults/{id}/import`, et le
+rapport le dit pour chaque vault (le vault y est créé, vide : relancer après
+la mise à jour du serveur le complète). La copie vers un coffre local, elle,
+ne dépend que de l'application (0.1.1 et plus).
+
 ## Ce qui rend la copie simple
 
 Un coffre local garde exactement ce que garde le serveur (`APP.md`), et rien

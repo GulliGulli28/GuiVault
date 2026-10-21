@@ -316,14 +316,52 @@ que si sa signature correspond à la clé publique de `tauri.conf.json`
 dernière » de « GitHub annonce encore une version plus ancienne »
 (`app_update_advertised`).
 
-Publier une version : monter `version` dans `app-tauri/tauri.conf.json` et
-`Cargo.toml`, pousser le tag `app-v<version>` → `app-release.yml` construit
-et signe (secret `TAURI_SIGNING_PRIVATE_KEY`), joint `latest.json` au
-brouillon ; **publier** le brouillon déclenche `app-updater.yml`, qui recopie
-`latest.json` dans `app-updater` — c'est là que les applications le voient.
-Un brouillon n'atteint jamais les utilisateurs.
+### Publier une version
 
-**La clé privée de signature** a été générée hors du dépôt
+Le circuit : le tag `app-v<version>` → `app-release.yml` (runner Windows,
+~8 min) construit les installeurs, les signe (secret
+`TAURI_SIGNING_PRIVATE_KEY`) et en fait un **brouillon** avec `latest.json` ;
+**publier** le brouillon déclenche `app-updater.yml`, qui recopie
+`latest.json` dans la pré-release `app-updater` — c'est là que les
+applications installées le lisent. Un brouillon n'atteint jamais personne.
+Les tags `v*` sont ceux du serveur, d'où le préfixe `app-`.
+
+1. Monter `version` dans `app-tauri/tauri.conf.json` **et**
+   `app-tauri/Cargo.toml` (puis `cargo build` dans `app-tauri/` pour le
+   `Cargo.lock`) ; commiter, pousser. Le workflow refuse un tag qui ne
+   correspond pas à `tauri.conf.json`.
+2. `git tag -a app-v<version> -m "GuiVault — application <version>"` puis
+   `git push origin app-v<version>` ; suivre « Application (release) »
+   (`gh run watch`).
+3. **Vérifier avant de publier** : `node scripts/verify-app-release.mjs
+   app-v<version>` télécharge `latest.json` et l'installeur NSIS du
+   brouillon, et contrôle la signature contre la clé publique embarquée —
+   exactement ce que fera l'updater (version, URL, identifiant de clé,
+   commentaire de confiance).
+4. Ajouter les nouveautés en tête des notes, puis publier :
+   `gh release edit app-v<version> --notes "…" --draft=false --latest`.
+   « Latest » : le brouillon est créé avec `--latest=false` pour laisser
+   l'étiquette aux releases du serveur, mais il n'y en a encore aucune sur
+   GitHub (le tag serveur `v4.0.1` n'a jamais été poussé) — la release de
+   l'app la prend donc. L'updater ne lit de toute façon que `app-updater`.
+5. Contrôler que les applications la voient :
+   `curl -sSL https://github.com/GulliGulli28/GuiVault/releases/download/app-updater/latest.json`
+   doit annoncer la nouvelle version.
+6. Sur un poste qui a la version précédente : Paramètres › Application ›
+   Mise à jour la propose (ou la notification du démarrage, au bout de
+   8 s) ; « Installer » télécharge, vérifie la signature, installe sans
+   question (`installMode: passive`) et relance.
+
+### Versions publiées
+
+| Version | Date | Contenu |
+|---|---|---|
+| [0.1.0](https://github.com/GulliGulli28/GuiVault/releases/tag/app-v0.1.0) | 21 octobre 2026 | Première version : coffre local ou serveur, saisie automatique, presse-papiers hors de l'historique Windows, verrouillage avec la session, sauvegardes du coffre local, zone de notification, import KDBX, extension reliée par l'hôte natif, mises à jour signées. Circuit de l'updater mis en place (clé, `app-updater`) |
+| [0.1.1](https://github.com/GulliGulli28/GuiVault/releases/tag/app-v0.1.1) | 21 octobre 2026 | Copier entre un coffre local et un serveur, dans les deux sens ([`TRANSFERT.md`](TRANSFERT.md)) — demande un serveur qui a `POST /vaults/{id}/import`. Première mise à jour livrée par l'updater, pour l'éprouver depuis une 0.1.0 installée |
+
+### La clé de signature
+
+**La clé privée** a été générée hors du dépôt
 (`~/.guivault-updater/guivault-app-updater.key`, sans mot de passe) ; elle
 est dans le secret GitHub `TAURI_SIGNING_PRIVATE_KEY` depuis la 0.1.0. **En
 garder une copie en lieu sûr** — perdue, plus aucune mise à jour ne serait acceptée par

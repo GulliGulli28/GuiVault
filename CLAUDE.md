@@ -79,7 +79,11 @@ il ne déchiffre rien : la user key reste sous la clé que seule la PRF donne).
   Après un changement de comportement de l'app, passer `npm run test:app`
   (vrai binaire piloté par WebDriver ; un scénario de plus dans
   `web/app/e2e/run.mjs` pour une fonction nouvelle), puis construire et
-  lancer le vrai `.exe` Windows (recettes dans `docs/APP.md`). Ce qu'un
+  lancer le vrai `.exe` Windows (recettes dans `docs/APP.md`). Publier une
+  version de l'app : tag `app-v<version>`, puis `node
+  scripts/verify-app-release.mjs app-v<version>` **avant** de publier le
+  brouillon (`docs/APP.md`, « Mises à jour » — clé de signature hors du
+  dépôt, `latest.json` servi par la pré-release `app-updater`). Ce qu'un
   coffre local n'a pas se masque par `supports(méthode)` ; `session.local`
   sert aux libellés (nom du coffre au lieu de l'e-mail, « Fermer le coffre »).
 - `web/` — l'interface web, Vite + React 19 + TypeScript + Tailwind 3,

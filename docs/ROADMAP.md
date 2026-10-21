@@ -9,7 +9,7 @@ l'auto-hébergement sans fonctions « premium »).
 Chaque piste respecte la règle n°1 (`CLAUDE.md`) : le serveur ne garde que
 des blobs qu'il ne sait pas lire. Cocher au fur et à mesure.
 
-## État (20 octobre 2026)
+## État (21 octobre 2026)
 
 **Fait** : tout le §0 sauf le manifeste authentifié (plancher et
 paramètres Argon2id épinglés, retour en arrière détecté, enveloppes
@@ -31,12 +31,16 @@ confortable :
 2. ~~**Conflits (409)**~~ (§4) : fait — fusion champ par champ. L'exploitation
    (§5) et le mobile sont faits aussi ; la suite est à choisir parmi les
    cases encore vides ci-dessous.
-3. **Application** (§6, 20 octobre 2026) : l'app Windows (coffre local ou
+3. **Application** (§6, 21 octobre 2026) : l'app Windows (coffre local ou
    serveur, installeurs, saisie automatique) est faite, et le poste avec —
    presse-papiers hors de l'historique Windows, verrouillage avec la
    session, sauvegardes du coffre local, zone de notification — l'import
-   KDBX et l'extension reliée à l'application. Ensuite : Windows Hello. Android en
-   dernier, ou sur demande.
+   KDBX, l'extension reliée à l'application, les **mises à jour signées**
+   (0.1.0 puis 0.1.1 publiées, [`APP.md`](APP.md), « Mises à jour ») et la
+   **copie entre un coffre local et un serveur** ([`TRANSFERT.md`](TRANSFERT.md)).
+   Ensuite, au choix : agent SSH Windows, Windows Hello (reporté), ou les
+   petites pistes (feuille de secours, fuites sans serveur, mode portable).
+   Android en dernier, ou sur demande.
 
 ## 0. Sécurité face à un serveur malveillant
 
