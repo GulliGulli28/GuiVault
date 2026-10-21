@@ -49,12 +49,8 @@ jobs:
       # c'est ici seulement que clippy la voit.
       - run: cargo clippy --all-targets -- -D warnings && cargo build --release --features tauri/custom-protocol
         working-directory: app-tauri
-      # Diagnostic en cours : la session WebDriver ne se crée pas
-      # (« DevToolsActivePort file doesn't exist »). Écarté le 20 octobre :
-      # le runtime WebView2 est là (154), et l'app lancée seule démarre
-      # (fenêtre, processus WebView2, rien sur stderr) — c'est sous
-      # msedgedriver seulement. D'où son journal détaillé (E2E_DRIVER_LOG,
-      # déposé avec les captures en cas d'échec).
+      # Les versions lues (runtime WebView2, Edge), et le runtime installé s'il
+      # manquait — le pilote doit avoir la même version.
       - name: WebView2 (versions)
         shell: pwsh
         run: |
