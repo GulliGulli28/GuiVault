@@ -6,6 +6,7 @@ import { errorMessage } from "../lib/api";
 import { loadAppLock, loadAppTray, saveAppLock, saveAppTray, type AppLockSettings } from "../lib/appSettings";
 import { systemBridge } from "../lib/platform";
 import { Eyebrow } from "./ui";
+import { AppUpdates } from "./AppUpdates";
 
 export function AppSettings({ error }: { error: (m: string) => void }) {
   const [lock, setLock] = useState(loadAppLock);
@@ -38,6 +39,7 @@ export function AppSettings({ error }: { error: (m: string) => void }) {
 
   return (
     <div className="space-y-6">
+      <AppUpdates />
       {system?.tray && (
         <section className="max-w-2xl space-y-1.5">
           <Eyebrow>Zone de notification</Eyebrow>

@@ -106,6 +106,37 @@ export function backupBridge(): BackupBridge | null {
   return backups;
 }
 
+/** Une mise à jour de l'application, annoncée par la release GitHub. */
+export interface AvailableUpdate {
+  version: string;
+  notes: string | null;
+  date: string | null;
+}
+
+/** Les mises à jour de l'application (`tauri-plugin-updater`, comme
+ * Guiterm) : installeurs signés, vérifiés contre la clé publique de
+ * `app-tauri/tauri.conf.json` avant d'être installés. */
+export interface UpdaterBridge {
+  /** La version installée. */
+  version(): Promise<string>;
+  /** Une version plus récente, ou `null` ; avec `null`, `advertised` dit
+   * ce que la release annonce (égale à l'installée : à jour ; plus ancienne :
+   * la dernière publication n'y est pas encore visible). */
+  check(): Promise<{ update: AvailableUpdate | null; advertised: string | null }>;
+  /** Télécharge, vérifie la signature, installe et relance. */
+  install(onProgress?: (done: number, total: number | null) => void): Promise<void>;
+}
+
+let updater: UpdaterBridge | null = null;
+
+export function setUpdaterBridge(b: UpdaterBridge | null) {
+  updater = b;
+}
+
+export function updaterBridge(): UpdaterBridge | null {
+  return updater;
+}
+
 let autoType: AutoTypeBridge | null = null;
 
 export function setAutoTypeBridge(b: AutoTypeBridge | null) {

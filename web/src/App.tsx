@@ -25,7 +25,7 @@ import { SendsPage } from "./components/SendsPage";
 import { AdminPage } from "./components/AdminPage";
 import { HealthPage } from "./components/HealthPage";
 import { AutoTypeHost } from "./components/AutoType";
-import { autoTypeBridge, systemBridge } from "./lib/platform";
+import { autoTypeBridge, systemBridge, updaterBridge } from "./lib/platform";
 import { Toasts, useToasts } from "./components/ui";
 import { PaneHandle, usePersistedPane } from "./hooks/usePersistedPane";
 
@@ -71,6 +71,19 @@ export default function App({ Welcome = LoginScreen }: { Welcome?: ComponentType
       error(e instanceof Error ? e.message : String(e));
     }
   }, [error]);
+
+  // L'application : une mise à jour publiée se signale une fois, peu après
+  // le démarrage ; s'il n'y a pas de réseau, rien.
+  useEffect(() => {
+    const updater = updaterBridge();
+    if (!updater) return;
+    const t = setTimeout(() => {
+      updater.check().then(({ update }) => {
+        if (update) notify(`Mise à jour disponible : ${update.version} — Paramètres › Application.`);
+      }).catch(() => {});
+    }, 8000);
+    return () => clearTimeout(t);
+  }, [notify]);
 
   // Le jeton n'est plus accepté et n'a pas pu être rafraîchi : retour à la
   // connexion, en le disant.

@@ -276,6 +276,52 @@ fn app_browser_integration(enabled: Option<bool>) -> Result<bool, String> {
     Ok(browser::enabled())
 }
 
+// ─── Mises à jour ───────────────────────────────────────────────────────────
+
+/// La version qu'annonce la release (`latest.json`), quelle qu'elle soit —
+/// pour dire « à jour » ou « GitHub annonce encore une version plus
+/// ancienne ». Jamais proposée à l'installation : on ne lit que son numéro.
+#[tauri::command]
+async fn app_update_advertised(app: AppHandle) -> Result<Option<String>, String> {
+    use tauri_plugin_updater::UpdaterExt;
+    let updater = app
+        .updater_builder()
+        .version_comparator(|_current, _remote| true)
+        .build()
+        .map_err(|e| e.to_string())?;
+    Ok(updater.check().await.map_err(|e| e.to_string())?.map(|u| u.version))
+}
+
+/// Les arguments que wry passe d'office à WebView2 (et qu'en remplacer
+/// effacerait).
+#[cfg(windows)]
+const WEBVIEW2_DEFAULT_ARGS: &str = "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection";
+
+/// La fenêtre principale, créée ici plutôt que d'office (`create: false`
+/// dans `tauri.conf.json`) pour une seule raison : sous Windows, quand
+/// `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` est posée — c'est ainsi que
+/// msedgedriver demande le port de débogage aux tests de bout en bout —,
+/// elle est reprise dans les arguments passés à WebView2 par l'API.
+/// WebView2 l'applique d'ordinaire de lui-même, mais pas dans un processus
+/// administrateur (le runner Windows de GitHub) : la session WebDriver n'y
+/// trouvait jamais son port. Sans la variable, rien ne change.
+fn create_main_window(app: &tauri::App) -> tauri::Result<()> {
+    let Some(config) = app.config().app.windows.iter().find(|w| w.label == "main") else {
+        return Ok(());
+    };
+    #[allow(unused_mut)]
+    let mut config = config.clone();
+    #[cfg(windows)]
+    if let Some(extra) = std::env::var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS")
+        .ok()
+        .filter(|v| !v.trim().is_empty())
+    {
+        config.additional_browser_args = Some(format!("{WEBVIEW2_DEFAULT_ARGS} {extra}"));
+    }
+    tauri::WebviewWindowBuilder::from_config(app.handle(), &config)?.build()?;
+    Ok(())
+}
+
 fn main() {
     // Lancé par un navigateur : l'hôte natif de l'extension, sans fenêtre ni
     // Tauri — et sans passer par l'instance unique.
@@ -294,6 +340,8 @@ fn main() {
             Some(vec![START_MINIMIZED]),
         ))
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .manage(Coffre::default())
         .manage(Hotkey::default())
@@ -315,12 +363,14 @@ fn main() {
             app_tray_available,
             app_set_close_to_tray,
             app_autostart,
-            app_browser_integration
+            app_browser_integration,
+            app_update_advertised
         ])
         .setup(|app| {
             if let Err(e) = tray::install(app.handle()) {
                 eprintln!("zone de notification indisponible : {e}");
             }
+            create_main_window(app)?;
             if let Some(w) = app.get_webview_window("main") {
                 system::watch(app.handle(), &w);
                 // La fenêtre part cachée (`tauri.conf.json`) : montrée ici,

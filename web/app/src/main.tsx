@@ -12,6 +12,7 @@ import { installAutoType } from "./autotypeBridge";
 import { installClipboard } from "./clipboardBridge";
 import { installSystem } from "./systemBridge";
 import { installBackups } from "./backupBridge";
+import { installUpdater } from "./updaterBridge";
 
 // Comme l'interface web (`src/main.tsx`), sans le service worker : l'app
 // embarque déjà son interface.
@@ -22,6 +23,7 @@ setDeviceLabel("Application GuiVault");
 // d'abord — quelques millisecondes : les composants regardent au rendu si
 // c'est là.
 installBackups();
+installUpdater();
 void Promise.allSettled([installAutoType(), installClipboard(), installSystem()]).finally(() => {
   ReactDOM.createRoot(document.getElementById("root")!).render(
     <React.StrictMode>

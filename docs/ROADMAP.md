@@ -330,8 +330,11 @@ L gros.
   de passe **et** un fichier — nouvelle enveloppe, nouveau `format`.
 - [ ] **Saisie automatique, suite** (M) : obfuscation à deux canaux,
   `{PICKCHARS}` (« caractères 3, 5 et 8 » des banques), Linux (X11).
-- [ ] **Mises à jour automatiques signées** et signature de code (M, comme
-  Guiterm) — SmartScreen avertit tant que les installeurs ne sont pas signés.
+- [x] **Mises à jour automatiques signées** (M, comme Guiterm) :
+  Paramètres › Application › Mise à jour, release `app-updater`
+  ([`APP.md`](APP.md), « Mises à jour »).
+- [ ] **Signature de code Windows** — SmartScreen avertit tant que les
+  installeurs ne sont pas signés (options dans le `RELEASING.md` de Guiterm).
 - [ ] **Plusieurs coffres ouverts à la fois** (L) : local et compte côte à
   côte, transfert entre eux (les « emplacements » de Guiterm).
 - [ ] **Références entre champs** `{REF:…}` (M, KeePass).

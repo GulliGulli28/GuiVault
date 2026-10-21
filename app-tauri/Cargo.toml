@@ -31,6 +31,10 @@ tauri-plugin-global-shortcut = "2"
 # ramène la fenêtre), démarrer avec la session.
 tauri-plugin-single-instance = "2"
 tauri-plugin-autostart = "2"
+# Les mises à jour (Paramètres › Application) : installeurs signés, vérifiés
+# contre la clé publique de `tauri.conf.json` ; relancer après installation.
+tauri-plugin-updater = { version = "2", default-features = false, features = ["rustls-tls"] }
+tauri-plugin-process = "2"
 serde = { version = "1", features = ["derive"] }
 zeroize = "1"
 guivault-local = { path = "../crates/guivault-local" }

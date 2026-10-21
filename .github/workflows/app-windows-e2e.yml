@@ -1,13 +1,11 @@
 name: Application — E2E Windows
 
-# L'E2E de l'application dans WebView2 (`web/app/e2e/run.mjs`), à part du CI.
-# En investigation (20 octobre 2026) : sur le runner, msedgedriver lance l'app
-# mais ne trouve jamais son port de débogage (« DevToolsActivePort file
-# doesn't exist »), alors que la même suite passe sur un poste Windows et que
-# l'app lancée seule démarre sur le runner (WebView2 154 présent). Écartés :
-# runtime absent, plantage, version du pilote. Tant que ce n'est pas résolu,
-# son échec reste visible ici sans bloquer `ci.yml` — et sans être maquillé
-# en succès (`continue-on-error`). L'E2E Linux, lui, est dans `ci.yml`.
+# L'E2E de l'application dans WebView2 (`web/app/e2e/run.mjs`). Le runner
+# tourne en administrateur, et WebView2 n'y applique pas
+# `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` — le port de débogage que demande
+# msedgedriver (« DevToolsActivePort file doesn't exist ») : l'app la reprend
+# elle-même (`create_main_window`, `app-tauri/src/main.rs`, 21 octobre 2026).
+# L'E2E Linux est dans `ci.yml`.
 on:
   push:
     branches: [main]
@@ -70,29 +68,6 @@ jobs:
             Start-Process "$env:RUNNER_TEMP\wv2.exe" -ArgumentList '/silent','/install' -Wait
             "WebView2 Runtime après installation : $(Pv "HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\$wv2")"
           }
-          exit 0
-      # Diagnostic : WebView2 accepte-t-il seulement le débogage distant sur
-      # ce runner ? L'app lancée avec un port fixe, sans msedgedriver, et ce
-      # port interrogé ; les politiques Edge/WebView2 de l'image ; la ligne
-      # de commande réelle des processus WebView2.
-      - name: Débogage distant de WebView2 (diagnostic)
-        shell: pwsh
-        run: |
-          $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = "--remote-debugging-port=9222"
-          $p = Start-Process "app-tauri\target\release\guivault-app.exe" -PassThru
-          Start-Sleep -Seconds 12
-          try { "port 9222 : " + (Invoke-WebRequest "http://127.0.0.1:9222/json/version" -UseBasicParsing -TimeoutSec 5).Content } catch { "port 9222 : $($_.Exception.Message)" }
-          "--- processus WebView2 :"
-          Get-CimInstance Win32_Process -Filter "Name='msedgewebview2.exe'" | Select-Object -First 2 | ForEach-Object { $_.CommandLine.Substring(0, [Math]::Min(600, $_.CommandLine.Length)) }
-          "--- DevToolsActivePort :"
-          Get-ChildItem "$env:LOCALAPPDATA" -Recurse -Filter DevToolsActivePort -ErrorAction SilentlyContinue | Select-Object -First 5 | ForEach-Object { $_.FullName }
-          "--- politiques Edge / WebView2 :"
-          foreach ($k in 'HKLM:\SOFTWARE\Policies\Microsoft\Edge', 'HKLM:\SOFTWARE\Policies\Microsoft\Edge\WebView2', 'HKCU:\SOFTWARE\Policies\Microsoft\Edge') {
-            if (Test-Path $k) { "$k :"; Get-ItemProperty $k | Format-List | Out-String }
-          }
-          "--- élévation : $(([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator))"
-          Get-Process guivault-app, msedgewebview2 -ErrorAction SilentlyContinue | Stop-Process -Force
-          Remove-Item Env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS
           exit 0
       - run: |
           New-Item -ItemType Directory -Force app/e2e/.output | Out-Null

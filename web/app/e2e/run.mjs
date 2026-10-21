@@ -421,6 +421,12 @@ scenario("verrouillage : le signal du système verrouille, réglages Application
   await waitText(b, "Permettre à l'extension GuiVault d'ouvrir les coffres locaux");
   const linked = await invoke(b, "app_browser_integration", { enabled: null });
   assert(linked.ok && typeof linked.value === "boolean", `état de l'extension illisible : ${JSON.stringify(linked.error)}`);
+  // Mise à jour : la version installée, et une vérification qui aboutit — à
+  // jour, une version disponible, ou une erreur dite (pas de réseau, pas
+  // encore de release « app-updater ») ; jamais d'installation ici.
+  await waitText(b, "GuiVault 0.");
+  await click(b, "Vérifier les mises à jour");
+  await b.waitUntil(async () => /À jour|disponible|Mise à jour :/.test(await bodyText(b)), { timeout: 30_000, timeoutMsg: "la vérification des mises à jour n'a pas abouti" });
   if (isWindows) {
     // Sans casse : les intitulés de section sont en capitales par CSS.
     const text = (await bodyText(b)).toLowerCase();

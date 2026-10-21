@@ -304,6 +304,32 @@ commune lit sans rien importer de Tauri (`web/src/lib/platform.ts`, posés par
   bibliothèque d'indicateurs souvent absente — et fermer quitte. La fenêtre
   part cachée (`tauri.conf.json`) et `setup` la montre.
 
+## Mises à jour
+
+Comme Guiterm : `tauri-plugin-updater` (Paramètres › Application › Mise à
+jour, et une vérification discrète au démarrage qui le signale). L'app lit
+`latest.json` sur la release **`app-updater`** du dépôt — pas sur « Latest »,
+qui est la release du serveur —, télécharge l'installeur NSIS, n'installe
+que si sa signature correspond à la clé publique de `tauri.conf.json`
+(`plugins.updater.pubkey`), puis relance. « À jour » distingue « c'est la
+dernière » de « GitHub annonce encore une version plus ancienne »
+(`app_update_advertised`).
+
+Publier une version : monter `version` dans `app-tauri/tauri.conf.json` et
+`Cargo.toml`, pousser le tag `app-v<version>` → `app-release.yml` construit
+et signe (secret `TAURI_SIGNING_PRIVATE_KEY`), joint `latest.json` au
+brouillon ; **publier** le brouillon déclenche `app-updater.yml`, qui recopie
+`latest.json` dans `app-updater` — c'est là que les applications le voient.
+Un brouillon n'atteint jamais les utilisateurs.
+
+**La clé privée de signature** a été générée hors du dépôt
+(`~/.guivault-updater/guivault-app-updater.key`, sans mot de passe) : la
+mettre dans le secret GitHub `TAURI_SIGNING_PRIVATE_KEY`, et **en garder une
+copie en lieu sûr** — perdue, plus aucune mise à jour ne serait acceptée par
+les applications installées (il faudrait les réinstaller avec une nouvelle
+clé publique). Sans le secret, `app-release.yml` construit quand même, sans
+signature ni `latest.json`, et l'annonce.
+
 ## Tests de bout en bout
 
 `web/app/e2e/run.mjs` pilote **le vrai binaire** par WebDriver
@@ -378,10 +404,10 @@ ce port bloque aussi le Windows d'à côté (relayé par `wslrelay.exe`).
    Xvfb) et `app-windows` (clippy et build release, là où le code propre à
    Windows se compile) de `ci.yml` ; `app-release.yml` pour les
    installeurs. L'E2E dans WebView2 est à part (`app-windows-e2e.yml`) :
-   **en échec sur le runner GitHub**, enquête en cours — msedgedriver lance
-   l'app mais n'y trouve jamais le port de débogage, alors que la même suite
-   passe sur un poste Windows et que l'app démarre seule sur le runner
-   (WebView2 présent). Écartés : runtime absent, plantage, version du
-   pilote. `E2E_DRIVER_LOG` donne le journal détaillé du pilote.
+   le runner GitHub tourne en administrateur, et WebView2 n'y applique pas
+   `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` (le port de débogage que
+   msedgedriver demande) : l'app la reprend elle-même dans les arguments
+   passés à WebView2 (`create_main_window`, `app-tauri/src/main.rs`).
+   `E2E_DRIVER_LOG` donne le journal détaillé du pilote.
 6. Plus tard : Android ; « Pousser vers un serveur » ; `gv` sur un coffre
    local ; Guiterm sur un coffre local.

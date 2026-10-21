@@ -1,0 +1,36 @@
+name: Application (mise à jour)
+
+# L'application lit `latest.json` sur la release fixe `app-updater`
+# (`app-tauri/tauri.conf.json`, plugins.updater.endpoints) — pas sur
+# « Latest », qui est la release du serveur. Ce workflow l'y recopie quand
+# une release `app-v…` est **publiée** : tant qu'elle est en brouillon, ses
+# fichiers ne sont pas servis, et aucune application ne doit y être envoyée.
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    if: startsWith(github.event.release.tag_name, 'app-v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: latest.json vers la release app-updater
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event.release.tag_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          if ! gh release download "$TAG" -R "$REPO" -p latest.json -D in; then
+            echo "::warning::$TAG n'a pas de latest.json (publiée sans clé de signature) : l'updater n'est pas mis à jour."
+            exit 0
+          fi
+          cat in/latest.json
+          if ! gh release view app-updater -R "$REPO" >/dev/null 2>&1; then
+            gh release create app-updater -R "$REPO" --prerelease --latest=false \
+              --title "Mises à jour de l'application (ne pas supprimer)" \
+              --notes "Contient latest.json, lu par l'application GuiVault pour proposer ses mises à jour. Tenu par .github/workflows/app-updater.yml."
+          fi
+          gh release upload app-updater in/latest.json -R "$REPO" --clobber

@@ -4,9 +4,16 @@ name: Application (release)
 # publiés en **brouillon** de release sur un tag `app-v<version>` — les tags
 # `v*` sont ceux du serveur. Publier le brouillon reste un geste humain.
 #
-# Pas signés (pas de certificat de signature de code) : Windows SmartScreen
-# avertit à la première installation. Les sommes SHA-256 et l'attestation de
-# provenance (quel workflow, quel commit) accompagnent chaque installeur.
+# Pas signés pour Windows (pas de certificat de signature de code) :
+# SmartScreen avertit à la première installation. Les sommes SHA-256 et
+# l'attestation de provenance (quel workflow, quel commit) accompagnent
+# chaque installeur.
+#
+# Mises à jour (`tauri-plugin-updater`) : avec le secret
+# `TAURI_SIGNING_PRIVATE_KEY`, l'installeur NSIS est signé (`.sig`) et un
+# `latest.json` joint à la release ; `app-updater.yml` le recopie dans la
+# release `app-updater` — celle que lit l'application — quand celle-ci est
+# **publiée**. Sans le secret : pas de mise à jour automatique, et on le dit.
 on:
   push:
     tags:
@@ -56,11 +63,43 @@ jobs:
 
       # `tauri build` lance lui-même `npm --prefix web run build:app` (depuis
       # la racine du dépôt), compile en release avec `custom-protocol`, puis
-      # empaquette MSI (WiX) et NSIS.
+      # empaquette MSI (WiX) et NSIS — signés pour l'updater si la clé est là.
       - name: Installeurs
         shell: bash
         working-directory: app-tauri
-        run: ../web/node_modules/.bin/tauri build
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          if [ -n "$TAURI_SIGNING_PRIVATE_KEY" ]; then
+            ../web/node_modules/.bin/tauri build --config '{"bundle":{"createUpdaterArtifacts":true}}'
+          else
+            echo "::warning title=Mises à jour désactivées::secret TAURI_SIGNING_PRIVATE_KEY absent — installeurs non signés pour l'updater, pas de latest.json (docs/APP.md, « Mises à jour »)."
+            ../web/node_modules/.bin/tauri build
+          fi
+
+      # Ce que lit l'updater : la version, la signature de l'installeur NSIS
+      # et son adresse dans **cette** release.
+      - name: latest.json
+        shell: bash
+        working-directory: app-tauri/target/release/bundle/nsis
+        run: |
+          sig=$(ls *-setup.exe.sig 2>/dev/null | head -1)
+          [ -n "$sig" ] || { echo "pas de signature : pas de latest.json"; exit 0; }
+          exe="${sig%.sig}"
+          v=$(node -p "require('../../../../tauri.conf.json').version")
+          tag="${GITHUB_REF_NAME:-app-v$v}"
+          node -e '
+            const fs = require("fs");
+            const [v, tag, exe, sig, repo] = process.argv.slice(1);
+            fs.writeFileSync("latest.json", JSON.stringify({
+              version: v,
+              notes: `GuiVault ${v} — https://github.com/${repo}/releases/tag/${tag}`,
+              pub_date: new Date().toISOString(),
+              platforms: { "windows-x86_64": { signature: fs.readFileSync(sig, "utf8").trim(), url: `https://github.com/${repo}/releases/download/${tag}/${encodeURIComponent(exe)}` } },
+            }, null, 2));
+          ' "$v" "$tag" "$exe" "$sig" "${{ github.repository }}"
+          cat latest.json
 
       - name: Sommes SHA-256
         shell: bash
@@ -80,10 +119,12 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           b=app-tauri/target/release/bundle
-          gh release create "$GITHUB_REF_NAME" --draft \
+          extra=$(ls $b/nsis/latest.json $b/nsis/*-setup.exe.sig 2>/dev/null || true)
+          # `--latest=false` : « Latest » reste la release du serveur.
+          gh release create "$GITHUB_REF_NAME" --draft --latest=false \
             --title "GuiVault — application ${GITHUB_REF_NAME#app-v}" \
             --notes "Installeurs Windows de l'application GuiVault (coffre local, ou connexion à un serveur GuiVault). Non signés : SmartScreen avertit à la première installation. Vérifier : SHA256SUMS.txt, ou \`gh attestation verify <fichier> -R ${{ github.repository }}\`." \
-            $b/msi/*.msi $b/nsis/*-setup.exe $b/SHA256SUMS.txt
+            $b/msi/*.msi $b/nsis/*-setup.exe $b/SHA256SUMS.txt $extra
 
       # Sans tag (lancé à la main) : les installeurs restent téléchargeables
       # depuis l'exécution.

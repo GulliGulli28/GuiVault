@@ -19,7 +19,8 @@
         "minWidth": 380,
         "minHeight": 500,
         "resizable": true,
-        "visible": false
+        "visible": false,
+        "create": false
       }
     ],
     "security": {
@@ -49,6 +50,18 @@
           "French"
         ],
         "installMode": "currentUser"
+      }
+    },
+    "createUpdaterArtifacts": false
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDY3MEVBNEM2NUY1QTA5NzgKUldSNENWcGZ4cVFPWnc3Zzh2Q2FaNm5Gd045U0JnbnFDai9iUXFZOW12SDFXbzhyc2dkOHpValMK",
+      "endpoints": [
+        "https://github.com/GulliGulli28/GuiVault/releases/download/app-updater/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
       }
     }
   }
