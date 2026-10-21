@@ -4,96 +4,116 @@
 
 /* ── Jetons ────────────────────────────────────────────────────────────────
  *
- * Deux familles seulement : les surfaces (`--c-bg*`, posées par `App.tsx`
- * selon le fond et le mode choisis dans les préférences) et le texte. Tout le
- * reste en dérive — survol, accent atténué, ombres — de sorte qu'un thème se
- * réduit à quatre couleurs de surface et que le mode clair ne soit jamais un
- * cas particulier codé à la main dans un composant.
+ * La refonte (`docs/DESIGN.md`, maquettes `docs/design/canvas/`). Les
+ * surfaces `--c-bg*` et l'accent sont posés par `applyPreferences` selon le
+ * fond, l'accent et le mode choisis ; tout le reste en dérive :
  *
- * Le langage visuel : surfaces plates, élévation par une bordure d'un pixel
- * et un cran de ton, jamais par dégradé ni halo. L'accent est réservé à ce
- * qui *agit* (bouton primaire, élément actif, focus) — il ne colore pas le
- * décor. Les données (adresses, ports, chemins, commandes) sont en mono, la
- * coquille en sans : c'est ce qui distingue à l'œil une valeur d'un libellé. */
+ *   --c-bg       la barre latérale et les colonnes de liste
+ *   --c-bg2      la zone de contenu
+ *   --c-surface  les cartes (un cran au-dessus du contenu)
+ *   --c-bg3      les contrôles (boutons secondaires, champs au survol)
+ *   --c-raised   ce qui flotte (menus, palette, fenêtres)
+ *
+ * L'accent est réservé à ce qui agit (bouton primaire, élément actif, focus).
+ * Les valeurs (adresses, mots de passe, codes) sont en mono, la coquille en
+ * sans. */
 :root {
-  --font-ui: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, Menlo, monospace;
+  --font-ui: "Geist Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "Geist Mono Variable", "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, Menlo, monospace;
 
-  --c-accent: #2563eb;
-  --c-accent-hover: #3b82f6;
-  --c-accent-text: #93c5fd;
-  --c-accent-dim: rgba(37, 99, 235, 0.18);
-  --c-bg: #0c0c0e;
-  --c-bg2: #121215;
-  --c-bg3: #19191d;
-  --c-border: #26262b;
+  --c-accent: #8b8cff;
+  --c-accent-hover: #a0a1ff;
+  --c-accent-text: #b9baff;
+  --c-accent-dim: rgba(139, 140, 255, 0.16);
+  --c-on-accent: #0b0c0e;
+  --c-bg: #0b0c0e;
+  --c-bg2: #0e0f12;
+  --c-bg3: #17181d;
+  --c-border: #1f2127;
 
-  --c-text: #e7e7ea;
-  --c-text-secondary: #a1a1aa;
-  --c-text-muted: #71717a;
-  --c-text-faint: #52525b;
+  --c-surface: color-mix(in srgb, var(--c-bg2) 55%, var(--c-bg3));
+  --c-raised: color-mix(in srgb, var(--c-bg3) 70%, var(--c-bg2));
+  --c-sel: color-mix(in srgb, var(--c-accent) 9%, var(--c-bg3));
 
-  /* Survol / enfoncé : un voile, pour rester juste quelle que soit la surface
-     en dessous. Défini en clair aussi (voir plus bas) — un `white/5` codé en
-     dur dans un composant est invisible sur fond blanc. */
-  --c-hover: rgba(255, 255, 255, 0.06);
-  --c-active: rgba(255, 255, 255, 0.1);
-  --c-border-strong: rgba(255, 255, 255, 0.16);
-  --c-input-bg: rgba(0, 0, 0, 0.25);
+  --c-text: #ecedef;
+  --c-text-secondary: #c9cbd1;
+  --c-text-muted: #8b8f98;
+  --c-text-faint: #5f636c;
 
-  --c-ok: #22c55e;
-  --c-warn: #f59e0b;
-  --c-danger: #ef4444;
+  /* Survol / enfoncé : un voile, juste quelle que soit la surface dessous. */
+  --c-hover: rgba(255, 255, 255, 0.05);
+  --c-active: rgba(255, 255, 255, 0.09);
+  --c-border-strong: rgba(255, 255, 255, 0.14);
+  --c-input-bg: rgba(0, 0, 0, 0.22);
 
-  /* Lignes de dossier des arborescences — reposées par `App.tsx` selon la
-     préférence « taille des dossiers ». */
+  --c-ok: #3dd68c;
+  --c-warn: #f5a524;
+  --c-danger: #f2555a;
+  --c-ok-text: #6be3a8;
+  --c-warn-text: #f5b54a;
+  --c-danger-text: #ff8a8f;
+  --c-ok-soft: rgba(61, 214, 140, 0.12);
+  --c-warn-soft: rgba(245, 165, 36, 0.12);
+  --c-danger-soft: rgba(242, 85, 90, 0.13);
+
+  /* Lignes de dossier des arborescences — reposées par `applyPreferences`. */
   --group-row-font: 13px;
   --group-row-icon: 16px;
   --group-row-h: 29px;
-  /* Lignes d'entité (hôtes, clés, bases…) — idem, préférence « Hôtes ». */
-  --entity-font: 12.5px;
-  --entity-sub-font: 10.5px;
-  --entity-icon: 24px;
+  /* Lignes d'entité (identifiants, hôtes, clés…) — idem. */
+  --entity-font: 13.5px;
+  --entity-sub-font: 12px;
+  --entity-icon: 32px;
 
-  /* Ombres : seulement pour ce qui flotte (menus, palette, modales). Une
-     carte statique n'en a pas — elle se distingue par sa bordure. */
+  /* Ombres : seulement pour ce qui flotte. Une carte se distingue par sa
+     bordure. */
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.45), 0 0 0 1px var(--c-border);
-  --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.55), 0 0 0 1px var(--c-border);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.45), 0 0 0 1px var(--c-border);
+  --shadow-lg: 0 18px 48px rgba(0, 0, 0, 0.55), 0 0 0 1px var(--c-border-strong);
 }
 
 :root[data-mode="light"] {
-  /* Surfaces « Sable » et accent en mode clair — ce que `App.tsx` de Guiterm
-     pose par script selon les préférences ; ici il n'y a qu'un thème. */
-  --c-bg: #f0eee9;
-  --c-bg2: #fbfaf7;
-  --c-bg3: #e8e5de;
-  --c-border: #d6d2c8;
-  --c-accent-text: #2563eb;
-  --c-accent-dim: rgba(37, 99, 235, 0.12);
+  /* Avant le premier `applyPreferences` : « Craie », pervenche foncée. */
+  --c-bg: #f4f4f2;
+  --c-bg2: #ffffff;
+  --c-bg3: #efefec;
+  --c-border: #e3e3df;
+  --c-accent-text: #4644c2;
+  --c-accent-dim: rgba(87, 85, 217, 0.11);
 
-  --c-text: #18181b;
-  --c-text-secondary: #52525b;
-  --c-text-muted: #71717a;
-  --c-text-faint: #a1a1aa;
+  --c-surface: var(--c-bg2);
+  --c-raised: var(--c-bg2);
+  --c-sel: color-mix(in srgb, var(--c-accent) 10%, var(--c-bg2));
 
-  --c-hover: rgba(0, 0, 0, 0.05);
-  --c-active: rgba(0, 0, 0, 0.09);
-  --c-border-strong: rgba(0, 0, 0, 0.18);
+  --c-text: #17181b;
+  --c-text-secondary: #3c3f45;
+  --c-text-muted: #63666d;
+  --c-text-faint: #a3a6ac;
+
+  --c-hover: rgba(0, 0, 0, 0.045);
+  --c-active: rgba(0, 0, 0, 0.08);
+  --c-border-strong: rgba(0, 0, 0, 0.16);
   --c-input-bg: #ffffff;
 
-  --c-ok: #16a34a;
-  --c-warn: #d97706;
-  --c-danger: #dc2626;
+  --c-ok: #12805c;
+  --c-warn: #b45309;
+  --c-danger: #c2332b;
+  --c-ok-text: #0e6b4d;
+  --c-warn-text: #8a4306;
+  --c-danger-text: #a3241d;
+  --c-ok-soft: #e5f4ee;
+  --c-warn-soft: #fdf3e6;
+  --c-danger-soft: #fcebea;
 
-  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
-  --shadow-md: 0 4px 16px rgba(15, 23, 42, 0.12), 0 0 0 1px var(--c-border);
-  --shadow-lg: 0 16px 48px rgba(15, 23, 42, 0.18), 0 0 0 1px var(--c-border);
+  --shadow-sm: 0 1px 2px rgba(23, 24, 27, 0.06);
+  --shadow-md: 0 8px 24px rgba(23, 24, 27, 0.1), 0 0 0 1px var(--c-border);
+  --shadow-lg: 0 18px 48px rgba(23, 24, 27, 0.16), 0 0 0 1px var(--c-border);
 }
 
 html {
   font-family: var(--font-ui);
-  font-size: 13px;
+  font-size: 13.5px;
+  line-height: 1.45;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -203,35 +223,49 @@ input[type="checkbox"]:disabled {
  * Dans `@layer components` pour qu'une utilitaire Tailwind posée à côté
  * (`h-6`, `px-2`, `w-full`) gagne toujours sur la primitive. */
 @layer components {
-  /* Boutons. Une hauteur (28 px), quatre tons. `.btn-sm` pour les barres
-     denses (24 px), `.btn-icon` pour un bouton carré sans libellé. */
+  /* Boutons. 32 px, quatre tons ; `.btn-sm` (28 px) pour les barres denses,
+     `.btn-lg` (40 px) pour l'action principale d'une page, `.btn-icon` pour
+     un bouton carré sans libellé. */
   .btn {
-    @apply inline-flex h-7 shrink-0 select-none items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-transparent px-2.5 text-[12px] font-medium leading-none transition-colors;
+    @apply inline-flex h-8 max-w-full shrink-0 select-none items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-transparent px-3 text-[13px] font-medium leading-none transition-colors;
   }
   .btn:disabled {
     opacity: 0.45;
     pointer-events: none;
   }
   .btn-sm {
-    @apply h-6 px-2 text-[11.5px];
+    @apply h-7 rounded-md px-2.5 text-[12.5px];
+  }
+  .btn-lg {
+    @apply h-10 rounded-[10px] px-4 text-[14px];
   }
   .btn-icon {
-    @apply w-7 px-0;
+    @apply w-8 px-0;
   }
   .btn-icon.btn-sm {
-    @apply w-6;
+    @apply w-7;
   }
   .btn-primary {
     background: var(--c-accent);
-    color: #fff;
+    color: var(--c-on-accent);
   }
   .btn-primary:hover {
     background: var(--c-accent-hover);
+  }
+  .btn-primary .kbd {
+    color: inherit;
+    border-color: currentColor;
+    background: transparent;
+    opacity: 0.6;
   }
   .btn-secondary {
     background: var(--c-bg3);
     border-color: var(--c-border);
     color: var(--c-text);
+  }
+  :root[data-mode="light"] .btn-secondary {
+    background: var(--c-bg2);
+    border-color: color-mix(in srgb, var(--c-border) 70%, var(--c-text-faint));
   }
   .btn-secondary:hover {
     border-color: var(--c-border-strong);
@@ -244,27 +278,24 @@ input[type="checkbox"]:disabled {
     color: var(--c-text);
   }
   .btn-danger {
-    background: color-mix(in srgb, var(--c-danger) 12%, transparent);
-    border-color: color-mix(in srgb, var(--c-danger) 30%, transparent);
-    color: var(--c-danger);
+    background: var(--c-danger-soft);
+    color: var(--c-danger-text);
   }
   .btn-danger:hover {
-    background: color-mix(in srgb, var(--c-danger) 20%, transparent);
+    background: color-mix(in srgb, var(--c-danger) 22%, transparent);
   }
-  /* L'état « enfoncé » d'un bouton bascule (mode split, diffusion…) : accent
-     atténué et texte accentué — jamais un remplissage plein, qui se lirait
-     comme une action primaire. */
+  /* L'état « enfoncé » d'un bouton bascule : accent atténué, jamais un
+     remplissage plein, qui se lirait comme une action primaire. */
   .btn-toggled {
     background: var(--c-accent-dim);
     color: var(--c-accent-text);
   }
 
-  /* Champs. Fond plus sombre que le panneau (le creux d'un champ), bordure au
-     repos, bordure accent + anneau atténué au focus. */
+  /* Champs. 36 px, bordure au repos, bordure accent + anneau au focus. */
   .input {
-    @apply h-7 w-full rounded-md border px-2 text-[12.5px] leading-none;
+    @apply h-9 w-full min-w-0 rounded-[9px] border px-3 text-[13.5px] leading-none;
     background: var(--c-input-bg);
-    border-color: var(--c-border);
+    border-color: color-mix(in srgb, var(--c-border) 75%, var(--c-text-faint));
     color: var(--c-text);
   }
   .input::placeholder {
@@ -273,56 +304,68 @@ input[type="checkbox"]:disabled {
   .input:focus {
     outline: none;
     border-color: var(--c-accent);
-    box-shadow: 0 0 0 2px var(--c-accent-dim);
+    box-shadow: 0 0 0 3px var(--c-accent-dim);
   }
   .input:disabled {
     opacity: 0.5;
   }
   .input-mono {
-    @apply font-mono text-[12px];
+    @apply font-mono text-[13px];
   }
   textarea.input {
-    @apply h-auto py-1.5 leading-relaxed;
+    @apply h-auto py-2 leading-relaxed;
   }
   select.input {
-    @apply pr-6;
+    @apply pr-8;
     appearance: none;
-    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'><path d='M2 3.5 5 6.5 8 3.5' fill='none' stroke='%2371717a' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path d='M3 4.5 6 7.5 9 4.5' fill='none' stroke='%238b8f98' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/></svg>");
     background-repeat: no-repeat;
-    background-position: right 7px center;
+    background-position: right 10px center;
+    text-overflow: ellipsis;
   }
 
-  /* Libellé de champ, et « sourcil » de section (titre court en capitales,
-     pour découper un panneau long en zones). */
+  /* Libellé de champ ; « sourcil » de section (titre court, en minuscules
+     depuis la refonte) ; aide d'une ligne. */
   .field-label {
-    @apply mb-1 block text-[11.5px] font-medium text-[var(--c-text-secondary)];
+    @apply mb-1.5 block text-[13px] font-medium text-[var(--c-text-secondary)];
   }
   .eyebrow {
-    @apply text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[var(--c-text-muted)];
+    @apply text-[12.5px] font-medium text-[var(--c-text-muted)];
   }
   .help-text {
-    @apply text-[11.5px] leading-relaxed text-[var(--c-text-muted)];
+    @apply text-[12.5px] leading-relaxed text-[var(--c-text-muted)];
+  }
+
+  /* Titres de page et sous-titre d'une ligne. */
+  .page-title {
+    @apply text-[24px] font-semibold leading-tight tracking-[-0.02em] text-[var(--c-text)];
+  }
+  .page-sub {
+    @apply mt-1 text-[13.5px] text-[var(--c-text-muted)];
+  }
+  .section-title {
+    @apply text-[15px] font-semibold text-[var(--c-text)];
   }
 
   /* Surfaces. Une carte est statique et bordée ; un popover flotte et porte
      une ombre. */
   .card {
-    @apply rounded-lg border;
-    background: var(--c-bg3);
+    @apply rounded-xl border;
+    background: var(--c-surface);
     border-color: var(--c-border);
   }
   .popover {
-    @apply rounded-lg;
-    background: var(--c-bg2);
+    @apply rounded-xl;
+    background: var(--c-raised);
     box-shadow: var(--shadow-md);
   }
   .modal {
-    @apply rounded-xl;
-    background: var(--c-bg2);
+    @apply rounded-2xl;
+    background: var(--c-raised);
     box-shadow: var(--shadow-lg);
   }
   .menu-item {
-    @apply flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[12.5px] text-[var(--c-text-secondary)] transition-colors;
+    @apply mx-1 flex w-[calc(100%-8px)] items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] text-[var(--c-text-secondary)] transition-colors;
   }
   .menu-item:hover,
   .menu-item[data-active="true"] {
@@ -333,45 +376,111 @@ input[type="checkbox"]:disabled {
     @apply my-1 border-t border-[var(--c-border)];
   }
 
-  /* Étiquettes : tag d'hôte, badge de compte. Un rectangle à peine arrondi,
-     pas une pilule. */
+  /* Étiquettes (« chips ») : un rectangle arrondi, pas une pilule. */
   .tag {
-    @apply inline-flex shrink-0 items-center rounded-sm px-1.5 py-px text-[10.5px] font-medium leading-4;
-    background: var(--c-hover);
+    @apply inline-flex shrink-0 items-center whitespace-nowrap rounded-md border px-1.5 text-[12px] font-medium leading-5;
+    border-color: var(--c-border);
     color: var(--c-text-secondary);
   }
   .tag-accent {
+    border-color: transparent;
     background: var(--c-accent-dim);
     color: var(--c-accent-text);
   }
+  .tag-ok {
+    border-color: transparent;
+    background: var(--c-ok-soft);
+    color: var(--c-ok-text);
+  }
+  .tag-warn {
+    border-color: transparent;
+    background: var(--c-warn-soft);
+    color: var(--c-warn-text);
+  }
+  .tag-danger {
+    border-color: transparent;
+    background: var(--c-danger-soft);
+    color: var(--c-danger-text);
+  }
+  /* Compteur plein (Santé à traiter). */
+  .badge {
+    @apply inline-flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full px-1.5 text-[11.5px] font-semibold;
+    background: var(--c-warn);
+    color: var(--c-bg2);
+  }
   .kbd {
-    @apply inline-flex items-center rounded-sm border px-1 font-mono text-[10.5px] leading-4 text-[var(--c-text-muted)];
-    border-color: var(--c-border);
-    background: var(--c-bg);
+    @apply inline-flex shrink-0 items-center whitespace-nowrap rounded-[5px] border px-1 font-mono text-[11px] leading-4 text-[var(--c-text-muted)];
+    border-color: color-mix(in srgb, var(--c-border) 70%, var(--c-text-faint));
   }
 
-  /* Ligne de liste : 30 px, survol en voile, actif en accent atténué avec un
-     marqueur à gauche. Le marqueur est ce qui dit « c'est celui-ci » sans
-     remplir la ligne. */
+  /* Ligne de liste : survol en voile, actif en fond teinté d'accent. */
   .list-row {
-    @apply relative flex min-w-0 items-center gap-2.5 rounded-md px-2.5 text-left transition-colors;
-    min-height: 32px;
+    @apply relative flex min-w-0 items-center gap-2.5 rounded-lg px-2.5 text-left transition-colors;
+    min-height: 34px;
   }
   .list-row:hover {
     background: var(--c-hover);
   }
   .list-row[data-active="true"] {
-    background: var(--c-accent-dim);
+    background: var(--c-sel);
   }
-  .list-row[data-active="true"]::before {
-    content: "";
-    position: absolute;
-    left: 0;
-    top: 8px;
-    bottom: 8px;
-    width: 2px;
-    border-radius: 1px;
-    background: var(--c-accent);
+
+  /* Une entrée de la barre latérale : icône, libellé tronqué, compteur. */
+  .nav-item {
+    @apply flex h-8 min-w-0 items-center gap-2.5 rounded-lg px-2.5 text-[13.5px] text-[var(--c-text-secondary)] transition-colors;
+  }
+  .nav-item:hover {
+    background: var(--c-hover);
+    color: var(--c-text);
+  }
+  .nav-item[data-active="true"] {
+    background: var(--c-sel);
+    color: var(--c-text);
+    font-weight: 500;
+  }
+  .nav-item > svg {
+    @apply shrink-0;
+  }
+
+  /* Tuile d'un élément : l'initiale sur une teinte tirée du nom
+     (`lib/tiles.ts`), ou son icône. La teinte arrive par `--tile-h`. */
+  .tile {
+    @apply flex shrink-0 select-none items-center justify-center font-semibold leading-none;
+    width: var(--tile-size, 32px);
+    height: var(--tile-size, 32px);
+    border-radius: calc(var(--tile-size, 32px) * 0.28);
+    font-size: calc(var(--tile-size, 32px) * 0.42);
+    background: hsl(var(--tile-h, 230) 32% 20%);
+    color: hsl(var(--tile-h, 230) 85% 78%);
+  }
+  :root[data-mode="light"] .tile {
+    background: hsl(var(--tile-h, 230) 70% 93%);
+    color: hsl(var(--tile-h, 230) 55% 32%);
+  }
+  .tile-neutral {
+    background: var(--c-bg3);
+    color: var(--c-text-secondary);
+  }
+  :root[data-mode="light"] .tile-neutral {
+    background: var(--c-bg3);
+    color: var(--c-text-secondary);
+  }
+  .tile > svg {
+    width: 52%;
+    height: 52%;
+  }
+  .tile > .host-icon {
+    width: 70%;
+    height: 70%;
+  }
+  .tile > .host-icon > * {
+    width: 100%;
+    height: 100%;
+  }
+
+  /* Pastille d'un vault (sa couleur, `lib/vaultColors.ts`). */
+  .vdot {
+    @apply inline-block h-2 w-2 shrink-0 rounded-[3px];
   }
 
   /* Voyant d'état : en ligne / hors ligne / inconnu. */
@@ -389,42 +498,121 @@ input[type="checkbox"]:disabled {
     background: var(--c-danger);
   }
 
-  /* Contrôle segmenté : deux ou trois options exclusives (« Sombre / Clair »,
-     « Commande / Langage »). */
+  /* Contrôle segmenté : deux à quatre options exclusives. */
   .segmented {
-    @apply inline-flex rounded-md border p-0.5;
-    background: var(--c-bg);
-    border-color: var(--c-border);
+    @apply inline-flex min-w-0 gap-0.5 rounded-[10px] p-[3px];
+    background: var(--c-hover);
   }
   .segmented > button {
-    @apply rounded px-2.5 py-1 text-[12px] font-medium text-[var(--c-text-muted)] transition-colors;
+    @apply inline-flex h-8 min-w-0 items-center justify-center gap-1.5 truncate rounded-lg px-3 text-[13px] font-medium text-[var(--c-text-muted)] transition-colors;
   }
   .segmented > button:hover {
     color: var(--c-text);
   }
   .segmented > button[data-active="true"] {
-    background: var(--c-bg3);
+    background: var(--c-surface);
     color: var(--c-text);
-    box-shadow: var(--shadow-sm);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18), 0 0 0 1px var(--c-border);
   }
 
-  /* Bandeau d'alerte contextuel (pas la notification globale). */
+  /* Onglets soulignés (fiche, filtres de page). */
+  .tabs {
+    @apply flex min-w-0 gap-5 overflow-x-auto border-b border-[var(--c-border)];
+    scrollbar-width: none;
+  }
+  .tab {
+    @apply inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap pb-2.5 text-[13.5px] text-[var(--c-text-muted)] transition-colors;
+  }
+  .tab:hover {
+    color: var(--c-text);
+  }
+  .tab[aria-selected="true"] {
+    color: var(--c-text);
+    font-weight: 500;
+    box-shadow: inset 0 -2px 0 var(--c-accent);
+  }
+
+  /* Bandeau contextuel (pas la notification globale) : court, une ligne
+     quand c'est possible. */
   .callout {
-    @apply rounded-md border px-2.5 py-2 text-[12px] leading-relaxed;
+    @apply rounded-[10px] px-3 py-2.5 text-[13px] leading-relaxed;
     background: var(--c-hover);
-    border-color: var(--c-border);
     color: var(--c-text-secondary);
   }
   .callout-warn {
-    background: color-mix(in srgb, var(--c-warn) 10%, transparent);
-    border-color: color-mix(in srgb, var(--c-warn) 30%, transparent);
-    color: var(--c-text);
+    background: var(--c-warn-soft);
+    color: var(--c-warn-text);
   }
   .callout-danger {
-    background: color-mix(in srgb, var(--c-danger) 10%, transparent);
-    border-color: color-mix(in srgb, var(--c-danger) 30%, transparent);
-    color: var(--c-text);
+    background: var(--c-danger-soft);
+    color: var(--c-danger-text);
   }
+  .callout-ok {
+    background: var(--c-ok-soft);
+    color: var(--c-ok-text);
+  }
+
+  /* Un état vide qui dit quoi faire (pas une phrase grise isolée). */
+  .empty {
+    @apply flex flex-col items-center justify-center gap-2.5 px-5 py-10 text-center;
+  }
+
+  /* Une garantie en puce, à la place d'un paragraphe d'explication. */
+  .pill {
+    @apply inline-flex items-center gap-2 whitespace-nowrap rounded-[10px] border px-3 py-1.5 text-[13px] text-[var(--c-text-secondary)];
+    border-color: var(--c-border);
+    background: var(--c-surface);
+  }
+  .pill > svg {
+    color: var(--c-ok);
+  }
+
+  /* Interrupteur. */
+  .switch {
+    @apply relative inline-block h-5 w-9 shrink-0 rounded-full transition-colors;
+    background: color-mix(in srgb, var(--c-border) 50%, var(--c-text-faint));
+  }
+  .switch::after {
+    content: "";
+    @apply absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white transition-[left];
+  }
+  .switch[aria-checked="true"] {
+    background: var(--c-accent);
+  }
+  .switch[aria-checked="true"]::after {
+    left: 18px;
+    background: var(--c-on-accent);
+  }
+  :root[data-mode="light"] .switch[aria-checked="true"]::after {
+    background: #ffffff;
+  }
+
+  /* Une ligne de réglage : titre + une ligne d'aide, contrôle à droite. */
+  .setting-row {
+    @apply flex min-w-0 flex-wrap items-center gap-x-6 gap-y-3 px-5 py-4;
+  }
+  .setting-row + .setting-row {
+    border-top: 1px solid var(--c-border);
+  }
+  .setting-title {
+    @apply text-[14px] font-medium text-[var(--c-text)];
+  }
+  .setting-desc {
+    @apply mt-0.5 text-[13px] text-[var(--c-text-muted)];
+  }
+}
+
+/* Texte qui ne déborde jamais : une ligne avec points de suspension, ou deux
+   lignes coupées n'importe où (URL, e-mails). */
+.clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.break-any {
+  overflow-wrap: anywhere;
 }
 
 /* ── Focus clavier visible ──────────────────────────────────────────────────

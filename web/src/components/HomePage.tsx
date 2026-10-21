@@ -1,0 +1,220 @@
+import { useMemo } from "react";
+import type { PageContext } from "../App";
+import { supports } from "../lib/api";
+import { healthSummary, useAllItems, type VaultItem } from "../lib/allItems";
+import { toEntities } from "../lib/entities";
+import { primarySecret } from "../lib/items";
+import { navigate, routeHash } from "../lib/route";
+import { coffreName } from "../lib/localHost";
+import { personInitials } from "../lib/tiles";
+import { useVaultColors, vaultColor } from "../lib/vaultColors";
+import { canWrite, ROLE_LABELS, type CustomIcon, type GuiVaultEntity } from "../lib/types";
+import { ItemTile } from "./ItemTree";
+import { TotpCode } from "./TotpCode";
+import { IconChevronRight, IconCopy, IconPlus } from "./ui-icons";
+import { copyText, formatAgo } from "./ui";
+
+/** Un élément tel que l'accueil le montre : son entité (nom, ligne
+ * secondaire, épinglé) et de quoi l'ouvrir. */
+interface HomeEntry extends VaultItem {
+  entity: GuiVaultEntity;
+  icons: CustomIcon[];
+}
+
+const QUICK = 6;
+
+/** Le prénom affiché : la première partie de l'e-mail, capitalisée. */
+function firstName(email: string): string {
+  const part = email.split("@")[0].split(/[.\-_+]/)[0] ?? "";
+  return part ? part.charAt(0).toLocaleUpperCase("fr-FR") + part.slice(1) : "";
+}
+
+/** L'accueil (`docs/DESIGN.md`) : l'accès rapide (épinglés, puis les plus
+ * récents), les codes 2FA, la santé, les coffres et les invitations en
+ * attente. Tout est lu et calculé ici, comme le reste. */
+export function HomePage({ ctx }: { ctx: PageContext }) {
+  const { session } = ctx;
+  const local = session.local;
+  const colors = useVaultColors();
+  const { items, counts, loading } = useAllItems(session, ctx.error);
+
+  const entries = useMemo(() => {
+    const out: HomeEntry[] = [];
+    const byVault = new Map<string, VaultItem[]>();
+    for (const x of items) byVault.set(x.vault.id, [...(byVault.get(x.vault.id) ?? []), x]);
+    for (const list of byVault.values()) {
+      const ents = new Map(toEntities(list.map((x) => x.item)).map((e) => [e.id, e]));
+      const icons = list.flatMap((x) => (x.item.payload.kind === "icon" ? [x.item.payload.icon] : []));
+      for (const x of list) {
+        const entity = ents.get(x.item.id);
+        if (entity && entity.kind !== "group" && entity.kind !== "icon") out.push({ ...x, entity, icons });
+      }
+    }
+    return out;
+  }, [items]);
+
+  const recent = useMemo(() => [...entries].sort((a, b) => b.item.updatedAt.localeCompare(a.item.updatedAt)), [entries]);
+  const quick = useMemo(() => {
+    const pinned = entries.filter((e) => e.entity.favorite);
+    const rest = recent.filter((e) => !e.entity.favorite && e.entity.kind === "login");
+    return [...pinned, ...rest].slice(0, QUICK);
+  }, [entries, recent]);
+  const codes = useMemo(() => entries.filter((e) => e.item.payload.kind === "login" && e.item.payload.login.totp).slice(0, 5), [entries]);
+  const health = useMemo(() => healthSummary(items), [items]);
+  const total = Object.values(counts).reduce((a, b) => a + b, 0);
+  const target = session.vaults.find((v) => v.kind === "personal" && canWrite(v.role)) ?? session.vaults.find((v) => canWrite(v.role));
+  const open = (e: HomeEntry) => navigate({ page: "vault", id: e.vault.id, item: e.item.id });
+  const name = local ? coffreName(local.path) : firstName(session.user.email);
+
+  return (
+    <div className="h-full overflow-y-auto">
+      <div className="mx-auto flex max-w-[1120px] flex-col gap-7 px-10 py-8 max-md:px-4 max-md:pt-14">
+        <header className="flex flex-wrap items-end gap-4">
+          <div className="min-w-[240px] flex-1">
+            <h1 className="page-title truncate">{local ? name : `Bonjour ${name}`}</h1>
+            <p className="page-sub">
+              {session.vaults.length} {session.vaults.length > 1 ? "coffres" : "coffre"}
+              {!loading && <> · {total} {total > 1 ? "éléments" : "élément"}</>}
+            </p>
+          </div>
+          {target && (
+            <a href={routeHash({ page: "vault", id: target.id, create: "login" })} className="btn btn-primary btn-lg">
+              <IconPlus size={15} /> Nouvel élément
+            </a>
+          )}
+        </header>
+
+        {supports("myInvitations") && session.invitations.map((inv) => (
+          <div key={inv.id} className="card flex flex-wrap items-center gap-x-3.5 gap-y-2 px-[18px] py-3.5">
+            <span className="tile h-8 w-8 rounded-full text-[12px]" style={{ "--tile-h": 25 } as React.CSSProperties}>{personInitials(inv.inviter_email)}</span>
+            <p className="min-w-[220px] flex-1 truncate text-[13.5px]">
+              <b className="font-semibold">{inv.inviter_email}</b> vous invite dans un vault partagé comme {ROLE_LABELS[inv.role]}.
+            </p>
+            <a href={routeHash({ page: "invitations" })} className="btn btn-secondary">Voir l'invitation</a>
+          </div>
+        ))}
+
+        <div className="flex flex-wrap items-start gap-6">
+          <div className="flex min-w-0 flex-[999_1_520px] flex-col gap-6">
+            <section aria-labelledby="home-quick">
+              <div className="mb-3 flex items-baseline justify-between gap-3">
+                <h2 id="home-quick" className="section-title">Accès rapide</h2>
+                <span className="text-[12.5px] text-[var(--c-text-muted)]">Épinglés, puis les plus récents</span>
+              </div>
+              {quick.length === 0 ? (
+                <div className="card px-5 py-8 text-center text-[13px] text-[var(--c-text-muted)]">{loading ? "Lecture des coffres…" : "Rien à montrer pour l'instant."}</div>
+              ) : (
+                <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-2.5">
+                  {quick.map((e) => {
+                    const secret = primarySecret(e.item.payload);
+                    return (
+                      <div key={`${e.vault.id}-${e.item.id}`} className="card flex min-w-0 items-center gap-3 p-3 transition-colors hover:border-[var(--c-border-strong)]">
+                        <ItemTile entity={e.entity} customIcons={e.icons} size={36} />
+                        <a href={routeHash({ page: "vault", id: e.vault.id, item: e.item.id })} className="flex min-w-0 flex-1 flex-col text-[var(--c-text)]">
+                          <span className="truncate font-semibold">{e.entity.name}</span>
+                          <span className="truncate text-[12.5px] text-[var(--c-text-muted)]">{e.entity.subtitle ?? e.vault.name}</span>
+                        </a>
+                        {secret && (
+                          <button
+                            onClick={() => void copyText(secret.value).then((ok) => (ok ? ctx.notify(`${secret.label.charAt(0).toUpperCase()}${secret.label.slice(1)} copié.`) : ctx.error("Copie refusée par le navigateur.")))}
+                            className="btn btn-ghost btn-icon"
+                            title={`Copier ${secret.label}`}
+                            aria-label={`Copier ${secret.label} de ${e.entity.name}`}
+                          >
+                            <IconCopy size={15} />
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+
+            {recent.length > 0 && (
+              <section aria-labelledby="home-recent" className="card px-5 py-4">
+                <h2 id="home-recent" className="section-title mb-1.5">Modifiés récemment</h2>
+                <div className="divide-y divide-[var(--c-border)]">
+                  {recent.slice(0, 5).map((e) => (
+                    <button key={`${e.vault.id}-${e.item.id}`} onClick={() => open(e)} className="flex w-full min-w-0 items-center gap-3 py-2.5 text-left">
+                      <ItemTile entity={e.entity} customIcons={e.icons} size={28} />
+                      <span className="min-w-0 flex-1 truncate font-medium">{e.entity.name}</span>
+                      <span className="flex max-w-[180px] min-w-0 items-center gap-1.5 text-[12.5px] text-[var(--c-text-muted)] max-md:hidden">
+                        <span className="vdot" style={{ background: vaultColor(e.vault.id, e.vault.kind === "personal", colors) }} />
+                        <span className="truncate">{e.vault.name}</span>
+                      </span>
+                      <span className="w-24 shrink-0 text-right text-[12.5px] text-[var(--c-text-muted)]">{formatAgo(e.item.updatedAt)}</span>
+                    </button>
+                  ))}
+                </div>
+              </section>
+            )}
+          </div>
+
+          <div className="flex min-w-0 flex-[1_1_300px] flex-col gap-6">
+            {codes.length > 0 && (
+              <section aria-labelledby="home-otp" className="card px-5 py-4">
+                <div className="mb-1.5 flex items-baseline justify-between gap-3">
+                  <h2 id="home-otp" className="section-title">Codes 2FA</h2>
+                  <a href={routeHash({ page: "totp" })} className="text-[12.5px]">Tout voir</a>
+                </div>
+                <div className="divide-y divide-[var(--c-border)]">
+                  {codes.map((e) => (
+                    <div key={`${e.vault.id}-${e.item.id}`} className="flex min-w-0 items-center gap-3 py-2">
+                      <span className="min-w-0 flex-1 truncate font-medium">{e.entity.name}</span>
+                      {e.item.payload.kind === "login" && e.item.payload.login.totp && <TotpCode secret={e.item.payload.login.totp} />}
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            <section aria-labelledby="home-health" className="card flex flex-col gap-3 px-5 py-4">
+              <div className="flex items-baseline justify-between gap-3">
+                <h2 id="home-health" className="section-title">Santé</h2>
+                <span className="whitespace-nowrap"><span className="text-[24px] font-semibold tracking-[-0.02em]">{loading ? "…" : health.score}</span><span className="text-[var(--c-text-muted)]"> / 100</span></span>
+              </div>
+              <HealthBar total={health.total} weak={health.weak} reused={health.reused} />
+              {health.issues > 0 ? (
+                <a href={routeHash({ page: "health" })} className="callout callout-warn flex items-center justify-between gap-2 font-medium hover:no-underline">
+                  <span className="truncate">{health.issues} {health.issues > 1 ? "éléments à corriger" : "élément à corriger"}</span>
+                  <IconChevronRight size={14} />
+                </a>
+              ) : (
+                <p className="text-[13px] text-[var(--c-text-muted)]">{loading ? "Analyse…" : "Rien à corriger."}</p>
+              )}
+            </section>
+
+            <section aria-labelledby="home-vaults" className="card px-5 py-4">
+              <h2 id="home-vaults" className="section-title mb-1.5">Coffres</h2>
+              <div className="divide-y divide-[var(--c-border)]">
+                {session.vaults.map((v) => (
+                  <a key={v.id} href={routeHash({ page: "vault", id: v.id })} className="flex min-w-0 items-center gap-2.5 py-2.5 text-[var(--c-text)] hover:no-underline">
+                    <span className="vdot h-2.5 w-2.5" style={{ background: vaultColor(v.id, v.kind === "personal", colors) }} />
+                    <span className="min-w-0 flex-1 truncate font-medium">{v.name}</span>
+                    <span className="shrink-0 whitespace-nowrap text-[12.5px] text-[var(--c-text-muted)]">
+                      {counts[v.id] !== undefined ? `${counts[v.id]} · ` : ""}{v.kind === "personal" ? "personnel" : ROLE_LABELS[v.role]}
+                    </span>
+                  </a>
+                ))}
+              </div>
+            </section>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** La barre de santé : sains, faibles, réutilisés, en proportion. */
+export function HealthBar({ total, weak, reused }: { total: number; weak: number; reused: number }) {
+  const ok = Math.max(0, total - weak - reused);
+  if (total === 0) return <div className="h-2 rounded bg-[var(--c-bg3)]" />;
+  return (
+    <div className="flex h-2 gap-[3px]" role="img" aria-label={`${ok} sains, ${weak} faibles, ${reused} réutilisés`}>
+      {ok > 0 && <span className="rounded-l rounded-r-none bg-[var(--c-ok)] first:rounded-l last:rounded-r" style={{ flex: ok }} />}
+      {weak > 0 && <span className="bg-[var(--c-warn)] first:rounded-l last:rounded-r" style={{ flex: weak }} />}
+      {reused > 0 && <span className="bg-[var(--c-danger)] first:rounded-l last:rounded-r" style={{ flex: reused }} />}
+    </div>
+  );
+}

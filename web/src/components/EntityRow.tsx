@@ -28,6 +28,9 @@ export interface EntityRowProps {
   /** Un SVG de `ui-icons` (dessiné à 55 % de la boîte), ou une icône d'hôte
    * dans un `<span className="host-icon">` (72 %, elle est pleine). */
   icon?: ReactNode;
+  /** À la place de `icon` : une tuile déjà dessinée (`ItemTile`), posée
+   * telle quelle. */
+  tile?: ReactNode;
   title: ReactNode;
   /** À côté du titre : compte de conteneurs, genre de connexion… */
   badges?: ReactNode;
@@ -54,15 +57,16 @@ export interface EntityRowProps {
 }
 
 export function EntityRow({
-  variant = "row", leading, icon, title, badges, meta, secondary, actions, alwaysVisibleActions,
+  variant = "row", leading, icon, tile, title, badges, meta, secondary, actions, alwaysVisibleActions,
   onClick, title_, active, depth = 0, className = "", children, dataAttrs,
 }: EntityRowProps) {
   const surface = variant === "card"
     ? "card mb-2 px-3 py-2.5 transition-colors hover:border-[var(--c-border-strong)]"
-    : "list-row mb-1 min-h-11 py-2";
+    : "list-row mb-0.5 min-h-11 py-2";
   const body = (
     <>
-      {icon && (
+      {tile}
+      {!tile && icon && (
         <span
           className="relative mt-px flex shrink-0 items-center justify-center rounded-md bg-[var(--c-bg3)] text-[var(--c-text-secondary)] [&>svg]:h-[55%] [&>svg]:w-[55%] [&>.host-icon]:h-[72%] [&>.host-icon]:w-[72%] [&>.host-icon>*]:h-full [&>.host-icon>*]:w-full"
           style={{ width: "var(--entity-icon)", height: "var(--entity-icon)" }}
@@ -70,7 +74,7 @@ export function EntityRow({
           {icon}
         </span>
       )}
-      <span className="flex min-w-0 flex-1 flex-col justify-center gap-1 leading-tight">
+      <span className="flex min-w-0 flex-1 flex-col justify-center gap-0.5 self-center leading-tight">
         {/* Le titre garde la priorité : les badges et la méta passent à la
             ligne avant qu'il ne se tronque. */}
         <span className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1">

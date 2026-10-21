@@ -1,12 +1,16 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { PageContext } from "../App";
 import { api, errorMessage } from "../lib/api";
-import { allSecrets, checkPwned, findExpiring, findMissingTotp, findOld, findReused, findWeak, type HealthEntry, type SecretRef } from "../lib/health";
+import { allSecrets, checkPwned, findExpiring, findMissingTotp, findOld, findReused, findWeak, type HealthEntry } from "../lib/health";
 import { navigate } from "../lib/route";
 import { loadItems, payloadName } from "../lib/session";
 import { KIND_LABELS, type TwoFactorSite } from "../lib/types";
-import { KIND_ICONS } from "./ItemTree";
-import { Eyebrow, formatWhen, Loading, useDelayed } from "./ui";
+import { tileHue, tileInitial } from "../lib/tiles";
+import { HealthBar } from "./HomePage";
+import { Page } from "./Page";
+import { IconInfo } from "./secret-icons";
+import { IconCheck, IconSearch } from "./ui-icons";
+import { Loading, useDelayed } from "./ui";
 
 /** Le rapport de santé : ce qui mérite d'être changé dans le coffre, calculé
  * dans ce navigateur. Les fuites seulement sur demande (k-anonymat, relayé
@@ -19,6 +23,8 @@ export function HealthPage({ ctx }: { ctx: PageContext }) {
   const [sites, setSites] = useState<TwoFactorSite[] | null>(null);
   const [pwned, setPwned] = useState<Map<string, number> | null>(null);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const [tab, setTab] = useState<Tab>("all");
+  const [info, setInfo] = useState(false);
   const slow = useDelayed(entries === null);
   const vaultsKey = session.vaults.map((v) => `${v.id}:${v.revision}`).join(",");
   const offline = !!session.offline;
@@ -81,125 +87,164 @@ export function HealthPage({ ctx }: { ctx: PageContext }) {
 
   const leaked = report && pwned ? report.secrets.filter((s) => (pwned.get(s.value) ?? 0) > 0) : null;
 
+  /** Tout ce qui est à traiter, une ligne par problème, le plus grave d'abord. */
+  const issues = useMemo<Issue[]>(() => {
+    if (!report) return [];
+    const out: Issue[] = [];
+    for (const s of leaked ?? []) out.push({ kind: "leaked", entry: s.entry, detail: `${capitalize(s.label)} vu ${(pwned!.get(s.value) ?? 0).toLocaleString("fr-FR")} fois dans des fuites` });
+    for (const g of report.reused) for (const s of g) {
+      const others = g.filter((o) => o !== s).map((o) => payloadName(o.entry.item.payload) || "(sans nom)");
+      out.push({ kind: "reused", entry: s.entry, detail: `Même ${s.label} que ${others.length > 1 ? `${others.length} autres éléments` : `« ${others[0]} »`}` });
+    }
+    for (const s of report.weak) out.push({ kind: "weak", entry: s.entry, detail: `${capitalize(s.label)} facile à deviner` });
+    for (const m of report.missingTotp ?? []) out.push({ kind: "totp", entry: m.entry, detail: `${m.site.name} accepte un code TOTP`, link: m.site.documentation ?? undefined });
+    for (const o of report.old) out.push({ kind: "old", entry: o.entry, detail: `Mot de passe du ${o.since.toLocaleDateString("fr-FR")}` });
+    for (const x of report.expiring) out.push({ kind: "expiring", entry: x.entry, detail: `${capitalize(x.what)} ${x.expired ? "expirée le" : "expire le"} ${x.date.toLocaleDateString("fr-FR", { timeZone: "UTC" })}` });
+    return out;
+  }, [report, leaked, pwned]);
+
+  const bad = useMemo(() => {
+    if (!report) return { weak: 0, reused: 0, healthy: 0, score: 100 };
+    const reused = new Set(report.reused.flat());
+    const weak = new Set(report.weak.filter((s) => !reused.has(s)));
+    const leakedSet = new Set((leaked ?? []).filter((s) => !reused.has(s) && !weak.has(s)));
+    const total = report.secrets.length;
+    const healthy = total - reused.size - weak.size - leakedSet.size;
+    return { weak: weak.size + leakedSet.size, reused: reused.size, healthy, score: total === 0 ? 100 : Math.round((100 * healthy) / total) };
+  }, [report, leaked]);
+
+  const counts = (k: IssueKind) => issues.filter((i) => i.kind === k).length;
+  const shown = tab === "all" ? issues.filter((i) => i.kind !== "old") : issues.filter((i) => i.kind === tab);
+  const next = !report ? null
+    : counts("leaked") > 0 ? `Changer ${counts("leaked")} mot${counts("leaked") > 1 ? "s" : ""} de passe fuité${counts("leaked") > 1 ? "s" : ""}`
+    : counts("reused") > 0 ? `Changer ${counts("reused")} secrets réutilisés`
+    : counts("weak") > 0 ? `Renforcer ${counts("weak")} secret${counts("weak") > 1 ? "s" : ""} faible${counts("weak") > 1 ? "s" : ""}`
+    : counts("totp") > 0 ? `Ajouter la 2FA sur ${counts("totp")} site${counts("totp") > 1 ? "s" : ""}`
+    : null;
+  const lookupsOff = lookups === false ? (local ? "Coffre local : sans serveur pour relayer" : offline ? "Hors ligne" : "Désactivé sur ce serveur") : null;
+
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <header className="flex shrink-0 items-center gap-2 border-b border-[var(--c-border)] px-4 py-2.5 max-md:pl-14">
-        <h1 className="text-[14px] font-semibold text-[var(--c-text)]">Santé du coffre</h1>
-        <span className="text-[11px] text-[var(--c-text-faint)]">{report ? `${report.secrets.length} secret(s) examiné(s)` : ""}</span>
-      </header>
-      <div className="sidebar-scroll min-h-0 flex-1 space-y-5 overflow-y-auto p-4">
-        <p className="help-text max-w-2xl">
-          Calculé dans ce navigateur, sur les éléments de vos vaults : le serveur ne voit rien de ce rapport. Seule la recherche de fuites interroge Have I Been Pwned — sur demande, par k-anonymat : les 5 premiers caractères de l'empreinte SHA-1 de chaque mot de passe, jamais le mot de passe ni son empreinte entière, relayés par le serveur.
-        </p>
-        {!report ? (slow ? <Loading /> : null) : (
-          <>
-            <div className="grid max-w-3xl grid-cols-2 gap-2 sm:grid-cols-3">
-              <Stat label="Fuités" value={leaked ? leaked.length : null} hint={leaked ? undefined : "à vérifier"} danger />
-              <Stat label="Réutilisés" value={report.reused.reduce((n, g) => n + g.length, 0)} danger />
-              <Stat label="Faibles" value={report.weak.length} danger />
-              <Stat label="2FA possible, non enregistrée" value={report.missingTotp ? report.missingTotp.length : null} hint={lookups === false ? "indisponible" : undefined} />
-              <Stat label="Inchangés depuis plus d'un an" value={report.old.length} />
-              <Stat label="Expirent ou expirés" value={report.expiring.length} />
-            </div>
-
-            <Section title="Fuites connues (Have I Been Pwned)" count={leaked?.length ?? null}>
-              {lookups === false ? (
-                <p className="help-text">{local ? "Coffre local : la recherche de fuites passe par un serveur GuiVault, qui la relaie sans voir vos mots de passe." : offline ? "Hors ligne : la recherche de fuites passe par le serveur." : "Désactivée sur ce serveur (GUIVAULT_HEALTH_LOOKUPS=false)."}</p>
-              ) : leaked === null ? (
-                <div className="flex flex-wrap items-center gap-2">
-                  <button onClick={() => void runPwned()} disabled={progress !== null || lookups === null || report.secrets.length === 0} className="btn btn-secondary btn-sm">
-                    {progress ? `Recherche… ${progress.done}/${progress.total || "?"}` : "Rechercher les fuites"}
-                  </button>
-                  <span className="help-text">{new Set(report.secrets.map((s) => s.value)).size} mot(s) de passe distinct(s).</span>
-                </div>
-              ) : leaked.length === 0 ? (
-                <p className="text-[12.5px] text-[var(--c-text-muted)]">Aucun de vos mots de passe n'apparaît dans les fuites connues.</p>
-              ) : (
-                leaked.map((s, i) => <SecretRow key={i} s={s} detail={`${s.label} vu ${(pwned!.get(s.value) ?? 0).toLocaleString("fr-FR")} fois dans des fuites — à changer en priorité`} danger />)
-              )}
-            </Section>
-
-            <Section title="Réutilisés" count={report.reused.length}>
-              {report.reused.length === 0 ? <Empty /> : report.reused.map((g, i) => (
-                <div key={i} className="card space-y-0.5 p-2">
-                  <p className="px-1 text-[11px] text-[var(--c-text-muted)]">Le même secret à {g.length} endroits :</p>
-                  {g.map((s, j) => <SecretRow key={j} s={s} detail={s.label} bare />)}
-                </div>
-              ))}
-            </Section>
-
-            <Section title="Faibles" count={report.weak.length}>
-              {report.weak.length === 0 ? <Empty /> : report.weak.map((s, i) => <SecretRow key={i} s={s} detail={`${s.label} facile à deviner`} />)}
-            </Section>
-
-            <Section title="Deux facteurs possibles, pas de code enregistré" count={report.missingTotp?.length ?? null}>
-              {lookups === false ? (
-                <p className="help-text">La liste des sites qui acceptent un code TOTP (2fa.directory) est relayée par le serveur : {local ? "pas de serveur pour un coffre local" : offline ? "hors ligne" : "désactivée ici"}.</p>
-              ) : report.missingTotp === null ? (
-                <Loading label="Liste des sites…" />
-              ) : report.missingTotp.length === 0 ? <Empty /> : report.missingTotp.map((m, i) => (
-                <Row key={i} entry={m.entry} detail={<>{m.site.name} accepte un code TOTP{m.site.documentation && <> — <a href={m.site.documentation} target="_blank" rel="noreferrer noopener" className="underline">comment l'activer</a></>}</>} />
-              ))}
-            </Section>
-
-            <Section title="Inchangés depuis plus d'un an" count={report.old.length}>
-              {report.old.length === 0 ? <Empty /> : report.old.map((o, i) => <Row key={i} entry={o.entry} detail={`mot de passe du ${formatWhen(o.since.toISOString())} (${Math.floor(o.days / 365)} an${o.days >= 730 ? "s" : ""})`} />)}
-            </Section>
-
-            <Section title="Expirent dans le mois, ou expirés" count={report.expiring.length}>
-              {report.expiring.length === 0 ? <Empty /> : report.expiring.map((x, i) => (
-                <Row key={i} entry={x.entry} detail={`${x.what} ${x.expired ? "expirée le" : "expire le"} ${x.date.toLocaleDateString("fr-FR", { timeZone: "UTC" })}`} danger={x.expired} />
-              ))}
-            </Section>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function Stat({ label, value, hint, danger }: { label: string; value: number | null; hint?: string; danger?: boolean }) {
-  const bad = danger && value !== null && value > 0;
-  return (
-    <div className="card p-3">
-      <p className="text-[20px] font-semibold leading-none" style={{ color: bad ? "var(--c-danger)" : value === 0 ? "var(--c-ok)" : "var(--c-text)" }}>{value ?? "—"}</p>
-      <p className="mt-1 text-[11.5px] text-[var(--c-text-muted)]">{label}{hint ? ` · ${hint}` : ""}</p>
-    </div>
-  );
-}
-
-function Section({ title, count, children }: { title: string; count: number | null; children: ReactNode }) {
-  return (
-    <section className="max-w-3xl space-y-1.5">
-      <Eyebrow>{title}{count !== null && count > 0 ? ` · ${count}` : ""}</Eyebrow>
-      <div className="space-y-1">{children}</div>
-    </section>
-  );
-}
-
-function Empty() {
-  return <p className="text-[12.5px] text-[var(--c-text-muted)]">Rien à signaler.</p>;
-}
-
-/** Une ligne qui mène à l'élément, dans son vault. */
-function Row({ entry, detail, danger, bare }: { entry: HealthEntry; detail: ReactNode; danger?: boolean; bare?: boolean }) {
-  const p = entry.item.payload;
-  const Icon = KIND_ICONS[p.kind];
-  return (
-    <button
-      onClick={() => navigate({ page: "vault", id: entry.vault.id, item: entry.item.id })}
-      className={`list-row w-full text-left ${bare ? "" : "card"} min-h-0 gap-2 px-2.5 py-1.5`}
-      title={`Ouvrir dans « ${entry.vault.name} »`}
+    <Page
+      title="Santé du coffre"
+      sub={
+        <span className="relative inline-flex flex-wrap items-center gap-1.5">
+          Analysée sur cet appareil · {session.vaults.length} {session.vaults.length > 1 ? "coffres" : "coffre"}{report ? ` · ${report.secrets.length} secrets` : ""}
+          <button onClick={() => setInfo((o) => !o)} aria-expanded={info} className="btn btn-ghost btn-icon h-6 w-6" title="Comment l'analyse est faite" aria-label="Comment l'analyse est faite"><IconInfo size={15} /></button>
+          {info && (
+            <>
+              <span className="fixed inset-0 z-10" onClick={() => setInfo(false)} />
+              <span role="tooltip" className="popover absolute left-0 top-8 z-20 flex w-[320px] max-w-[calc(100vw-2rem)] flex-col gap-2 p-3.5 text-[13px] text-[var(--c-text-secondary)]">
+                <span className="flex gap-2"><IconCheck size={15} className="mt-0.5 shrink-0 text-[var(--c-ok)]" />Calculée ici, le serveur ne voit pas ce rapport</span>
+                <span className="flex gap-2"><IconCheck size={15} className="mt-0.5 shrink-0 text-[var(--c-ok)]" />Fuites : seuls 5 caractères de l'empreinte partent, à la demande</span>
+                <span className="flex gap-2"><IconCheck size={15} className="mt-0.5 shrink-0 text-[var(--c-ok)]" />Sites 2FA : liste publique relayée par le serveur</span>
+              </span>
+            </>
+          )}
+        </span>
+      }
+      actions={lookups !== false && report && leaked === null ? (
+        <button onClick={() => void runPwned()} disabled={progress !== null || lookups === null || report.secrets.length === 0} className="btn btn-secondary btn-lg">
+          <IconSearch size={15} /> {progress ? `Recherche… ${progress.done}/${progress.total || "?"}` : "Vérifier les fuites"}
+        </button>
+      ) : undefined}
     >
-      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[var(--c-bg3)] text-[var(--c-text-secondary)]"><Icon size={12} /></span>
-      <span className="flex min-w-0 flex-1 flex-col leading-tight">
-        <span className="truncate text-[12.5px] text-[var(--c-text)]">{payloadName(p) || KIND_LABELS[p.kind]} <span className="text-[11px] text-[var(--c-text-faint)]">· {entry.vault.name}{entry.vault.role === "reader" ? " (lecture)" : ""}</span></span>
-        <span className="truncate text-[11px]" style={{ color: danger ? "var(--c-danger)" : "var(--c-text-muted)" }}>{detail}</span>
-      </span>
-    </button>
+      {!report ? (slow ? <Loading /> : null) : (
+        <>
+          <section aria-label="Score" className="card flex flex-wrap items-center gap-x-8 gap-y-5 px-7 py-6 max-sm:px-5">
+            <div className="whitespace-nowrap"><span className="text-[56px] font-semibold leading-none tracking-[-0.04em]">{bad.score}</span><span className="text-[16px] text-[var(--c-text-muted)]"> / 100</span></div>
+            <div className="flex min-w-[240px] flex-1 flex-col gap-3">
+              <HealthBar total={report.secrets.length} weak={bad.weak} reused={bad.reused} />
+              <div className="flex flex-wrap gap-x-5 gap-y-1.5 text-[13px] text-[var(--c-text-secondary)]">
+                <Legend color="var(--c-ok)">{bad.healthy} sains</Legend>
+                <Legend color="var(--c-warn)">{bad.weak} faibles{leaked && leaked.length > 0 ? " ou fuités" : ""}</Legend>
+                <Legend color="var(--c-danger)">{bad.reused} réutilisés</Legend>
+                <span className="text-[var(--c-text-muted)]">{lookupsOff ? `Fuites : ${lookupsOff.toLowerCase()}` : leaked === null ? "Fuites : pas encore vérifié" : leaked.length === 0 ? "Aucune fuite connue" : `${leaked.length} fuité${leaked.length > 1 ? "s" : ""}`}</span>
+              </div>
+            </div>
+            {next && (
+              <div className="flex min-w-[200px] flex-col gap-0.5 border-l border-[var(--c-border)] pl-7 max-sm:border-l-0 max-sm:pl-0">
+                <span className="text-[13px] text-[var(--c-text-muted)]">Le plus utile maintenant</span>
+                <span className="text-[15px] font-medium">{next}</span>
+              </div>
+            )}
+          </section>
+
+          <section aria-label="À traiter" className="flex flex-col gap-3.5">
+            <div className="tabs" role="tablist" aria-label="Filtrer">
+              {(["all", "leaked", "reused", "weak", "totp", "old", "expiring"] as Tab[]).map((t) => {
+                const n = t === "all" ? issues.filter((i) => i.kind !== "old").length : counts(t);
+                if (t !== "all" && n === 0) return null;
+                return <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className="tab">{TAB_LABELS[t]} <span className="text-[var(--c-text-muted)]">{n}</span></button>;
+              })}
+            </div>
+            {shown.length === 0 ? (
+              <div className="card empty text-[13.5px] text-[var(--c-text-muted)]">
+                <IconCheck size={20} className="text-[var(--c-ok)]" />
+                Rien à traiter.
+              </div>
+            ) : (
+              <div className="card divide-y divide-[var(--c-border)] overflow-hidden">
+                {shown.map((i, n) => <IssueRow key={n} issue={i} />)}
+              </div>
+            )}
+            <div className="flex flex-wrap gap-2.5">
+              {report.old.length === 0 && <span className="pill"><IconCheck size={15} /> Aucun mot de passe de plus d'un an</span>}
+              {report.expiring.length === 0 && <span className="pill"><IconCheck size={15} /> Rien n'expire ce mois</span>}
+              {lookupsOff && <span className="pill">{lookupsOff} : fuites et sites 2FA indisponibles</span>}
+            </div>
+          </section>
+        </>
+      )}
+    </Page>
   );
 }
 
-function SecretRow({ s, detail, danger, bare }: { s: SecretRef; detail: string; danger?: boolean; bare?: boolean }) {
-  return <Row entry={s.entry} detail={detail} danger={danger} bare={bare} />;
+type IssueKind = "leaked" | "reused" | "weak" | "totp" | "old" | "expiring";
+type Tab = "all" | IssueKind;
+interface Issue {
+  kind: IssueKind;
+  entry: HealthEntry;
+  detail: string;
+  link?: string;
+}
+
+const TAB_LABELS: Record<Tab, string> = { all: "À traiter", leaked: "Fuités", reused: "Réutilisés", weak: "Faibles", totp: "2FA possible", old: "Plus d'un an", expiring: "Expirations" };
+const CHIPS: Record<IssueKind, { label: string; tone: string; action: string }> = {
+  leaked: { label: "Fuité", tone: "tag-danger", action: "Changer" },
+  reused: { label: "Réutilisé", tone: "tag-danger", action: "Changer" },
+  weak: { label: "Faible", tone: "tag-warn", action: "Changer" },
+  totp: { label: "2FA possible", tone: "tag-accent", action: "Ajouter la 2FA" },
+  old: { label: "Ancien", tone: "", action: "Ouvrir" },
+  expiring: { label: "Expire", tone: "tag-warn", action: "Ouvrir" },
+};
+
+function capitalize(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+function Legend({ color, children }: { color: string; children: ReactNode }) {
+  return <span className="inline-flex items-center gap-2 whitespace-nowrap"><i className="inline-block h-2 w-2 rounded-sm" style={{ background: color }} />{children}</span>;
+}
+
+/** Une ligne de la file : l'élément, ce qui ne va pas, et y aller. */
+function IssueRow({ issue }: { issue: Issue }) {
+  const p = issue.entry.item.payload;
+  const name = payloadName(p) || KIND_LABELS[p.kind];
+  const chip = CHIPS[issue.kind];
+  const open = () => navigate({ page: "vault", id: issue.entry.vault.id, item: issue.entry.item.id });
+  return (
+    <div className="flex min-w-0 flex-wrap items-center gap-x-3.5 gap-y-2 px-[18px] py-3.5 hover:bg-[var(--c-hover)]">
+      <span className="tile" style={{ "--tile-size": "36px", "--tile-h": tileHue(name) } as React.CSSProperties}>{tileInitial(name)}</span>
+      <span className="flex min-w-0 flex-[1_1_200px] flex-col">
+        <span className="truncate font-medium">{name}</span>
+        <span className="truncate text-[12.5px] text-[var(--c-text-muted)]">
+          {issue.detail}
+          {issue.link && <> · <a href={issue.link} target="_blank" rel="noreferrer noopener">comment</a></>}
+        </span>
+      </span>
+      <span className={`tag ${chip.tone}`}>{chip.label}</span>
+      <span className="w-[130px] truncate text-[12.5px] text-[var(--c-text-muted)] max-lg:hidden">{issue.entry.vault.name}{issue.entry.vault.role === "reader" ? " · lecture" : ""}</span>
+      <button onClick={open} className="btn btn-secondary ml-auto">{chip.action}</button>
+    </div>
+  );
 }

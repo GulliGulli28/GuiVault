@@ -25,7 +25,7 @@ export function ItemView({ payload, index, shared }: { payload: Payload; index: 
       const s = payload.secrets ?? {};
       const kind = h.kind ?? "ssh";
       return (
-        <div className="space-y-4">
+        <div className="space-y-6">
           <Section title="Connexion">
             <Row label="Type">{HOST_KIND_LABELS[kind]}</Row>
             {kind === "dockerExec" && h.dockerViaHostId ? <Row label="Via l'hôte">{hostLabel(h.dockerViaHostId)}</Row> : <Row label={kind === "k8sExec" ? "Contexte" : "Adresse"} mono>{h.address}{kind === "ssh" || kind === "rdp" ? `:${h.port}` : ""}</Row>}
@@ -48,7 +48,7 @@ export function ItemView({ payload, index, shared }: { payload: Payload; index: 
                 <Row label="Environnement">
                   <div className="space-y-0.5">
                     {h.envVars.map((v) => (
-                      <div key={v.key} className="flex flex-wrap items-center gap-1 font-mono text-[12px]">
+                      <div key={v.key} className="flex flex-wrap items-center gap-1 font-mono text-[13px]">
                         <span>{v.key}=</span>
                         {v.secret ? (s.env?.[v.key] !== undefined ? <SecretValue value={s.env[v.key]} /> : <Muted>(secret absent)</Muted>) : <span>{v.value}</span>}
                       </div>
@@ -70,7 +70,7 @@ export function ItemView({ payload, index, shared }: { payload: Payload; index: 
         <Section title="Dossier">
           <Row label="Nom">{g.name}</Row>
           <Row label="Parent">{g.parentId ? groupPath(groups, g.parentId) || <Muted>dossier inconnu</Muted> : <Muted>racine</Muted>}</Row>
-          {g.color && <Row label="Couleur"><span className="inline-block h-3 w-3 rounded-full align-middle" style={{ background: groupColor(g.color) ?? "var(--c-bg3)" }} /> {g.color in ACCENT_COLORS ? ACCENT_COLORS[g.color as UiAccent].label : <span className="font-mono text-[12px]">{g.color}</span>}</Row>}
+          {g.color && <Row label="Couleur"><span className="inline-block h-3 w-3 rounded-full align-middle" style={{ background: groupColor(g.color) ?? "var(--c-bg3)" }} /> {g.color in ACCENT_COLORS ? ACCENT_COLORS[g.color as UiAccent].label : <span className="font-mono text-[13px]">{g.color}</span>}</Row>}
           {g.icon && <Row label="Icône"><IconCell iconId={g.icon} index={index} /></Row>}
         </Section>
       );
@@ -78,12 +78,12 @@ export function ItemView({ payload, index, shared }: { payload: Payload; index: 
     case "snippet": {
       const s = payload.snippet;
       return (
-        <div className="space-y-4">
+        <div className="space-y-6">
           <Section title={s.adaptive ? "Snippet adaptatif" : "Snippet"}>
             <Row label="Tags"><Tags tags={s.tags} /></Row>
           </Section>
           <div className="relative">
-            <pre className="card overflow-x-auto p-3 font-mono text-[12px] leading-relaxed text-[var(--c-text)]">{s.command}</pre>
+            <pre className="card overflow-x-auto p-3 font-mono text-[13px] leading-relaxed text-[var(--c-text)]">{s.command}</pre>
             <CopyButton value={s.command} label="Copier la commande" className="absolute right-1 top-1" />
           </div>
         </div>
@@ -92,7 +92,7 @@ export function ItemView({ payload, index, shared }: { payload: Payload; index: 
     case "key": {
       const k = payload.key;
       return (
-        <div className="space-y-4">
+        <div className="space-y-6">
           <Section title="Clé privée">
             <Row label="Nom">{k.name}</Row>
             {k.path && <Row label="Chemin" mono>{k.path}</Row>}
@@ -106,7 +106,7 @@ export function ItemView({ payload, index, shared }: { payload: Payload; index: 
     case "sql-connection": {
       const cnx = payload.connection;
       return (
-        <div className="space-y-4">
+        <div className="space-y-6">
           <Section title={SQL_ENGINE_LABELS[cnx.engine]}>
             {describeSql(cnx, index).map(([label, value, mono]) => <Row key={label} label={label} mono={mono}>{value}</Row>)}
             {payload.password != null && <Row label="Mot de passe"><SecretValue value={payload.password} /></Row>}
@@ -128,12 +128,12 @@ export function ItemView({ payload, index, shared }: { payload: Payload; index: 
     case "login": {
       const l = payload.login;
       return (
-        <div className="space-y-4">
+        <div className="space-y-6">
           <Section title="Identifiant">
             <Row label="Utilisateur"><Copyable value={l.username} mono /></Row>
             <Row label="Mot de passe">
               {l.password ? (
-                <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <span className="flex flex-col gap-1">
                   <SecretValue value={l.password} />
                   <PasswordStrength password={l.password} />
                 </span>
@@ -144,8 +144,8 @@ export function ItemView({ payload, index, shared }: { payload: Payload; index: 
               <Row label={l.uris.length > 1 ? "Sites" : "Site"}>
                 <div className="space-y-0.5">
                   {l.uris.map((u, i) => (
-                    <div key={i} className="flex items-center gap-1">
-                      <a href={/^[a-z][a-z0-9+.-]*:/i.test(u.uri) ? u.uri : `https://${u.uri}`} target="_blank" rel="noopener noreferrer" className="min-w-0 truncate font-mono text-[12px] text-[var(--c-accent-text)] hover:underline" title={u.uri}>{u.uri}</a>
+                    <div key={i} className="flex min-w-0 items-center gap-1">
+                      <a href={/^[a-z][a-z0-9+.-]*:/i.test(u.uri) ? u.uri : `https://${u.uri}`} target="_blank" rel="noopener noreferrer" className="min-w-0 flex-1 truncate font-mono text-[var(--c-accent-text)] hover:underline" title={u.uri}>{u.uri}</a>
                       {u.match && <span className="tag" title="Mode de correspondance">{u.match}</span>}
                       <CopyButton value={u.uri} label="Copier l'adresse" />
                     </div>
@@ -162,7 +162,7 @@ export function ItemView({ payload, index, shared }: { payload: Payload; index: 
                   <IconPasskey size={14} className="mt-0.5 shrink-0 text-[var(--c-text-muted)]" />
                   <span className="min-w-0">
                     <span className="block text-[var(--c-text)]">{k.rpName || k.rpId}{k.userName ? ` — ${k.userName}` : ""}</span>
-                    <span className="block text-[11px] text-[var(--c-text-muted)]">{k.rpId} · {k.keyAlgorithm} {k.keyCurve} · créée le {formatWhen(k.createdAt)}{k.discoverable ? " · découvrable" : ""}</span>
+                    <span className="block text-[13px] text-[var(--c-text-muted)]">{k.rpId} · {k.keyAlgorithm} {k.keyCurve} · créée le {formatWhen(k.createdAt)}{k.discoverable ? " · découvrable" : ""}</span>
                   </span>
                 </div>
               ))}
@@ -176,8 +176,8 @@ export function ItemView({ payload, index, shared }: { payload: Payload; index: 
     case "note": {
       const n = payload.note;
       return (
-        <div className="space-y-4">
-          <pre className="card whitespace-pre-wrap break-words p-3 font-sans text-[12.5px] leading-relaxed text-[var(--c-text)]">{n.content || <Muted>(vide)</Muted>}</pre>
+        <div className="space-y-6">
+          <pre className="card whitespace-pre-wrap break-words p-3 font-sans text-[13.5px] leading-relaxed text-[var(--c-text)]">{n.content || <Muted>(vide)</Muted>}</pre>
           <SecretCommon base={n} groups={groups} shared={shared} withoutNotes />
         </div>
       );
@@ -185,7 +185,7 @@ export function ItemView({ payload, index, shared }: { payload: Payload; index: 
     case "card": {
       const cd = payload.card;
       return (
-        <div className="space-y-4">
+        <div className="space-y-6">
           <Section title={cd.brand || cardBrand(cd.number) || "Carte"}>
             <Row label="Titulaire"><Copyable value={cd.cardholderName} /></Row>
             <Row label="Numéro">{cd.number ? <SecretValue value={cd.number} /> : <Muted>—</Muted>}</Row>
@@ -201,7 +201,7 @@ export function ItemView({ payload, index, shared }: { payload: Payload; index: 
       const addr = [i.address1, i.address2, i.address3].filter(Boolean).join("\n");
       const city = [i.postalCode, i.city].filter(Boolean).join(" ");
       return (
-        <div className="space-y-4">
+        <div className="space-y-6">
           <Section title="Identité">
             <Row label="Nom"><Copyable value={identityFullName(i)} /></Row>
             <Row label="Utilisateur"><Copyable value={i.username} mono /></Row>
@@ -226,7 +226,7 @@ export function ItemView({ payload, index, shared }: { payload: Payload; index: 
       const a = payload.aws;
       const text = awsConfigText(a);
       return (
-        <div className="space-y-4">
+        <div className="space-y-6">
           <Section title={a.authType === "sso" ? "Session SSO" : "Clés d'accès"}>
             {a.authType === "sso" ? (
               <>
@@ -276,9 +276,9 @@ export function ItemView({ payload, index, shared }: { payload: Payload; index: 
       const k = payload.apiKey;
       const expired = !!k.expiresAt && k.expiresAt < new Date().toISOString().slice(0, 10);
       return (
-        <div className="space-y-4">
+        <div className="space-y-6">
           <Section title={k.service || "Clé d'API"}>
-            {k.url && <Row label="URL"><a href={/^[a-z][a-z0-9+.-]*:/i.test(k.url) ? k.url : `https://${k.url}`} target="_blank" rel="noopener noreferrer" className="font-mono text-[12px] text-[var(--c-accent-text)] hover:underline">{uriHost(k.url)}</a></Row>}
+            {k.url && <Row label="URL"><a href={/^[a-z][a-z0-9+.-]*:/i.test(k.url) ? k.url : `https://${k.url}`} target="_blank" rel="noopener noreferrer" className="font-mono text-[13px] text-[var(--c-accent-text)] hover:underline">{uriHost(k.url)}</a></Row>}
             {k.keyId && <Row label="Identifiant"><Copyable value={k.keyId} mono /></Row>}
             <Row label="Secret">{k.secret ? <SecretValue value={k.secret} /> : <Muted>—</Muted>}</Row>
             {k.scopes && <Row label="Portée">{k.scopes}</Row>}
@@ -291,8 +291,8 @@ export function ItemView({ payload, index, shared }: { payload: Payload; index: 
     case "runbook": {
       const rb = payload.runbook;
       return (
-        <div className="space-y-4">
-          {rb.description && <p className="whitespace-pre-wrap text-[12.5px] leading-relaxed text-[var(--c-text-secondary)]">{rb.description}</p>}
+        <div className="space-y-6">
+          {rb.description && <p className="whitespace-pre-wrap text-[13.5px] leading-relaxed text-[var(--c-text-secondary)]">{rb.description}</p>}
           <section className="space-y-2">
             <Eyebrow>Étapes ({rb.steps.length})</Eyebrow>
             {rb.steps.map((st, i) => {
@@ -300,7 +300,7 @@ export function ItemView({ payload, index, shared }: { payload: Payload; index: 
               const scope = [st.scope.tags.length ? `tags ${st.scope.tags.join(" + ")}` : "", st.scope.groups.length ? `dans ${st.scope.groups.join(" ou ")}` : ""].filter(Boolean).join(", ");
               return (
                 <div key={st.id} className="card space-y-1.5 p-3">
-                  <p className="flex items-center gap-2 text-[12.5px] font-medium text-[var(--c-text)]"><span className="tag">{i + 1}</span>{st.title || <Muted>(sans titre)</Muted>}<span className="ml-auto text-[10.5px] font-normal text-[var(--c-text-faint)]">{ACTION_LABELS[st.action.kind]}</span></p>
+                  <p className="flex items-center gap-2 text-[13.5px] font-medium text-[var(--c-text)]"><span className="tag">{i + 1}</span>{st.title || <Muted>(sans titre)</Muted>}<span className="ml-auto text-[10.5px] font-normal text-[var(--c-text-faint)]">{ACTION_LABELS[st.action.kind]}</span></p>
                   {code !== null && (
                     <div className="relative">
                       <pre className="overflow-x-auto rounded-md bg-[var(--c-bg3)] p-2 font-mono text-[11.5px] leading-relaxed text-[var(--c-text)]">{code}</pre>
@@ -310,7 +310,7 @@ export function ItemView({ payload, index, shared }: { payload: Payload; index: 
                   {st.action.kind === "playbook" && (
                     <p className="font-mono text-[11.5px] text-[var(--c-text-secondary)]">{st.action.playbook}{st.action.inventory ? ` -i ${st.action.inventory}` : ""} <span className="font-sans text-[var(--c-text-muted)]">depuis {hostLabel(st.action.relayHostId) ?? st.action.relayHostLabel}</span></p>
                   )}
-                  <p className="text-[11px] text-[var(--c-text-muted)]">{[scope || "toutes les cibles", `échec : ${ON_FAILURE_LABELS[st.onFailure].toLowerCase()}`, `accord : ${APPROVAL_LABELS[st.approval].toLowerCase()}`].join(" · ")}</p>
+                  <p className="text-[13px] text-[var(--c-text-muted)]">{[scope || "toutes les cibles", `échec : ${ON_FAILURE_LABELS[st.onFailure].toLowerCase()}`, `accord : ${APPROVAL_LABELS[st.approval].toLowerCase()}`].join(" · ")}</p>
                   {st.notes && <p className="whitespace-pre-wrap text-[11.5px] text-[var(--c-text-secondary)]">{st.notes}</p>}
                 </div>
               );
@@ -329,7 +329,7 @@ function SecretCommon({ base, groups, withoutNotes, shared }: { base: SecretBase
     <>
       {!withoutNotes && base.notes && (
         <Section title="Notes">
-          <pre className="whitespace-pre-wrap break-words py-1 font-sans text-[12.5px] leading-relaxed text-[var(--c-text)]">{base.notes}</pre>
+          <pre className="whitespace-pre-wrap break-words font-sans text-[13.5px] leading-relaxed text-[var(--c-text-secondary)]">{base.notes}</pre>
         </Section>
       )}
       {base.fields && base.fields.length > 0 && (
@@ -357,9 +357,9 @@ function PasswordHistory({ entries }: { entries: { password: string; changedAt: 
   const [open, setOpen] = useState(false);
   return (
     <section>
-      <button type="button" onClick={() => setOpen((o) => !o)} className="eyebrow mb-1 hover:text-[var(--c-text)]">Historique des mots de passe ({entries.length}) {open ? "▾" : "▸"}</button>
+      <button type="button" onClick={() => setOpen((o) => !o)} className="eyebrow mb-2 hover:text-[var(--c-text)]">Anciens mots de passe ({entries.length}) {open ? "▾" : "▸"}</button>
       {open && (
-        <div className="divide-y divide-[var(--c-border)]">
+        <div className="card divide-y divide-[var(--c-border)]">
           {entries.map((e, i) => <Row key={i} label={formatWhen(e.changedAt)}><SecretValue value={e.password} /></Row>)}
         </div>
       )}
@@ -371,8 +371,8 @@ function PasswordHistory({ entries }: { entries: { password: string; changedAt: 
 function Copyable({ value, mono, multiline }: { value: string; mono?: boolean; multiline?: boolean }) {
   if (!value) return <Muted>—</Muted>;
   return (
-    <span className="flex min-w-0 items-start gap-1">
-      <span className={`min-w-0 break-words ${multiline ? "whitespace-pre-wrap" : ""} ${mono ? "font-mono text-[12px]" : ""}`}>{value}</span>
+    <span className="flex min-w-0 items-center gap-1">
+      <span className={`min-w-0 flex-1 break-words ${multiline ? "whitespace-pre-wrap" : ""} ${mono ? "font-mono" : ""}`}>{value}</span>
       <CopyButton value={value} />
     </span>
   );
@@ -429,17 +429,20 @@ function describeSql(c: SqlConnection, index: VaultIndex): [string, string, bool
 function KeyContent({ content }: { content: string }) {
   return (
     <div className="relative">
-      <pre className="card max-h-64 overflow-auto p-3 font-mono text-[11px] leading-relaxed text-[var(--c-text-secondary)] blur-[3px] transition hover:blur-0 focus:blur-0" tabIndex={0} title="Survoler pour lire">{content}</pre>
+      <pre className="card max-h-64 overflow-auto p-3 font-mono text-[13px] leading-relaxed text-[var(--c-text-secondary)] blur-[3px] transition hover:blur-0 focus:blur-0" tabIndex={0} title="Survoler pour lire">{content}</pre>
       <CopyButton value={content} label="Copier la clé" className="absolute right-1 top-1" />
     </div>
   );
 }
 
+/** Une section de la fiche : son titre, et ses lignes dans une carte. */
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section>
-      <Eyebrow className="mb-1">{title}</Eyebrow>
-      <div className="divide-y divide-[var(--c-border)]">{children}</div>
+    <section className="min-w-0">
+      <Eyebrow className="mb-2">{title}</Eyebrow>
+      {/* Les lignes (`Row`) ont leur marge ; le reste (notes, listes) la
+          reçoit d'ici. */}
+      <div className="card divide-y divide-[var(--c-border)] [&>*:not([data-row])]:px-[18px] [&>*:not([data-row])]:py-3">{children}</div>
     </section>
   );
 }
@@ -458,6 +461,6 @@ function Tags({ tags }: { tags: string[] }) {
  * ce vault ne la connaît pas. */
 function IconCell({ iconId, index }: { iconId: string; index: VaultIndex }) {
   const name = BUILTIN_ICONS.find((i) => i.id === iconId)?.name ?? index.icons.find((i) => i.id === iconId)?.name;
-  if (!hasIcon(iconId, index.icons)) return <span className="font-mono text-[12px]" title="Icône inconnue dans ce vault">{iconId}</span>;
+  if (!hasIcon(iconId, index.icons)) return <span className="font-mono text-[13px]" title="Icône inconnue dans ce vault">{iconId}</span>;
   return <span className="inline-flex items-center gap-1.5"><HostIcon iconId={iconId} customIcons={index.icons} size={16} /> {name}</span>;
 }

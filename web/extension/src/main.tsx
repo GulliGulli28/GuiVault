@@ -1,7 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import "../../src/index.css";
-import "@fontsource/jetbrains-mono/latin-400.css";
+import "../../src/fonts";
 import { installPreferences } from "../../src/lib/preferences";
 import { Popup } from "./Popup";
 

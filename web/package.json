@@ -17,6 +17,8 @@
     "test:ext": "npm run build:ext && playwright test -c extension/e2e"
   },
   "dependencies": {
+    "@fontsource-variable/geist": "^5.3.0",
+    "@fontsource-variable/geist-mono": "^5.3.0",
     "@fontsource/jetbrains-mono": "^5.2.8",
     "@noble/ciphers": "^2.1.1",
     "@noble/curves": "^2.0.1",

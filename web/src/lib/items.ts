@@ -161,6 +161,15 @@ export function primarySecret(p: Payload): { label: string; value: string } | nu
   }
 }
 
+/** « Copier le mot de passe », « Copier l'utilisateur » : le libellé d'un
+ * champ de `primarySecret` / `primaryUser` avec son article. */
+export function withArticle(label: string): string {
+  const l = label.toLowerCase();
+  const feminine = ["clé secrète", "commande"];
+  if (/^[aeéèêiouh]/.test(l)) return `l'${l}`;
+  return feminine.includes(l) ? `la ${l}` : `le ${l}`;
+}
+
 /** Ce que « u » (et Ctrl+Maj+C) copie : l'identifiant d'un élément. */
 export function primaryUser(p: Payload): { label: string; value: string } | null {
   const pick = (label: string, value: string | null | undefined) => (value ? { label, value } : null);

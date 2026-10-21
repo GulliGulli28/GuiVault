@@ -4,6 +4,7 @@ import { plainShortcut } from "../lib/keyboard";
 import { hostKindMeta } from "../lib/hostKinds";
 import { ACCENT_COLORS, type UiAccent } from "../lib/preferences";
 import { buildVaultTree, visibleRows, type VaultTree } from "../lib/vaultTree";
+import { tileHue, tileInitial } from "../lib/tiles";
 import { KIND_LABELS, type CustomIcon, type GuiVaultEntity, type GuiVaultEntityKind } from "../lib/types";
 import { EntityMono, EntityRow, EntityTags, GroupRow } from "./EntityRow";
 import { HostIcon, hasIcon } from "./icons";
@@ -53,6 +54,21 @@ export function EntityIcon({ entity, customIcons, size = 13 }: { entity: GuiVaul
   }
   const Icon = KIND_ICONS[entity.kind];
   return <Icon size={size} />;
+}
+
+/** La tuile d'un élément (`docs/DESIGN.md`) : son icône choisie, sinon son
+ * initiale sur une teinte tirée du nom (`lib/tiles.ts`). Un dossier garde
+ * son dossier. `size` en px, ou une variable CSS (`var(--entity-icon)`). */
+export function ItemTile({ entity, customIcons, size = 32 }: { entity: GuiVaultEntity; customIcons: CustomIcon[]; size?: number | string }) {
+  const style = { "--tile-size": typeof size === "number" ? `${size}px` : size } as React.CSSProperties;
+  if (entity.kind === "group" || hasIcon(entity.icon, customIcons)) {
+    return <span className="tile tile-neutral" style={style}><EntityIcon entity={entity} customIcons={customIcons} size={16} /></span>;
+  }
+  return (
+    <span className="tile" aria-hidden="true" style={{ ...style, "--tile-h": tileHue(entity.name) } as React.CSSProperties}>
+      {tileInitial(entity.name)}
+    </span>
+  );
 }
 
 /** La pastille de couleur d'un dossier — `c500` de l'accent nommé, comme
@@ -302,7 +318,7 @@ export function ItemTree({ entities, customIcons = [], query, selected, onSelect
             depth={row.depth}
             active={selected === entity.id}
             className="cursor-pointer"
-            icon={<EntityIcon entity={entity} customIcons={customIcons} />}
+            tile={<ItemTile entity={entity} customIcons={customIcons} size="var(--entity-icon)" />}
             title={entity.name}
             badges={alert || entity.favorite || entity.badge ? badges : undefined}
             secondary={secondary}

@@ -160,3 +160,73 @@ export function IconPaperclip({ size = 16, className }: P) {
     </svg>
   );
 }
+
+/** L'accueil : une maison. */
+export function IconHome({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <path d="M2.25 7 8 2.25 13.75 7v6.25a.75.75 0 0 1-.75.75H10V9.75H6V14H3a.75.75 0 0 1-.75-.75z" stroke="currentColor" strokeWidth="1.25" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** Un vault partagé : deux personnes. */
+export function IconUsers({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <circle cx="6" cy="5.25" r="2.25" stroke="currentColor" strokeWidth="1.25" />
+      <path d="M1.75 13.5a4.25 4.25 0 0 1 8.5 0" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" />
+      <path d="M10.5 3.1a2.25 2.25 0 0 1 0 4.3M12 9.6a4.25 4.25 0 0 1 2.25 3.9" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** Une info au clic : un « i » cerclé. */
+export function IconInfo({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <circle cx="8" cy="8" r="6.25" stroke="currentColor" strokeWidth="1.25" />
+      <path d="M8 7.25v3.75M8 5.1v.05" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** Se déconnecter : une porte et une flèche qui sort. */
+export function IconLogout({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <path d="M6.5 2.25H3.75a1 1 0 0 0-1 1v9.5a1 1 0 0 0 1 1H6.5" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" />
+      <path d="M10.5 5 13.5 8l-3 3M13.25 8H6.5" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** Plus d'actions : trois points. */
+export function IconDots({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="currentColor" className={className}>
+      <circle cx="3.5" cy="8" r="1.25" />
+      <circle cx="8" cy="8" r="1.25" />
+      <circle cx="12.5" cy="8" r="1.25" />
+    </svg>
+  );
+}
+
+/** Trier : deux flèches opposées. */
+export function IconSort({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <path d="M5 2.5v11M2.75 11.25 5 13.5l2.25-2.25M11 13.5v-11M8.75 4.75 11 2.5l2.25 2.25" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** Nouveau dossier : un dossier et un plus. */
+export function IconFolderPlus({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <path d="M1.75 4.5a1 1 0 0 1 1-1h3l1.5 1.5h5.5a1 1 0 0 1 1 1v6.5a1 1 0 0 1-1 1h-10a1 1 0 0 1-1-1z" stroke="currentColor" strokeWidth="1.25" strokeLinejoin="round" />
+      <path d="M8 7.5v3.5M6.25 9.25h3.5" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" />
+    </svg>
+  );
+}

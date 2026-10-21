@@ -6,7 +6,8 @@ import {
 } from "../lib/preferences";
 import { onSettingsApplied, setSettingsSyncEnabled, settingsChanged, settingsSyncEnabled } from "../lib/syncedSettings";
 import { EntityRow, EntityMono, EntityTags, GroupRow } from "./EntityRow";
-import { IconLogin } from "./secret-icons";
+import { InfoTip, SettingRow } from "./ui";
+import { tileHue } from "../lib/tiles";
 import { IconCheck, IconFolder, IconMonitor, IconMoon, IconSun } from "./ui-icons";
 
 /** Synchroniser ou non les réglages de cet appareil avec le compte — un
@@ -14,17 +15,22 @@ import { IconCheck, IconFolder, IconMonitor, IconMoon, IconSun } from "./ui-icon
 export function SettingsSyncToggle() {
   const [on, setOn] = useState(settingsSyncEnabled);
   return (
-    <div>
-      <label className="flex cursor-pointer items-start gap-2 text-[12.5px] text-[var(--c-text)]">
-        <input type="checkbox" checked={on} onChange={(e) => { setOn(e.target.checked); setSettingsSyncEnabled(e.target.checked); }} className="mt-0.5" />
-        <span>Synchroniser les réglages entre mes appareils</span>
-      </label>
-      <p className="help-text pl-[22px]">Apparence, générateur, remplissage de l'extension : chiffrés avec votre compte, retrouvés sur chaque appareil où vous vous connectez. Le délai de verrouillage reste propre à chaque appareil.</p>
+    <div className="card">
+      <SettingRow
+        title={<>Synchroniser entre mes appareils <InfoTip label="Ce qui est synchronisé" items={[
+          { text: "Apparence, générateur, couleurs des vaults, remplissage de l'extension." },
+          { text: "Chiffrés avec votre compte.", tone: "ok" },
+          { text: "Le délai de verrouillage reste propre à chaque appareil." },
+        ]} /></>}
+        desc="Ces réglages vous suivent sur chaque appareil."
+      >
+        <button type="button" role="switch" aria-checked={on} aria-label="Synchroniser entre mes appareils" onClick={() => { setOn(!on); setSettingsSyncEnabled(!on); }} className="switch" />
+      </SettingRow>
     </div>
   );
 }
 
-/** La section « Apparence » des paramètres de Guiterm, telle quelle : mode,
+/** La section « Apparence » : mode,
  * fond, accent, police, tailles des lignes d'entité et de dossier. Les
  * réglages s'appliquent à la frappe et se retiennent dans ce navigateur.
  * `compact` pour le popup de l'extension : les mêmes réglages, sans les
@@ -151,7 +157,7 @@ export function AppearanceSettings({ compact = false }: { compact?: boolean }) {
             <option key={f.value} value={f.value}>{f.label}</option>
           ))}
         </select>
-        {!compact && <p className="help-text">Les valeurs (adresses, mots de passe, clés) restent en JetBrains Mono, comme dans Guiterm.</p>}
+        {!compact && <p className="help-text">Les valeurs (adresses, mots de passe, clés) restent en chasse fixe.</p>}
       </section>
 
       <section className="space-y-3">
@@ -184,12 +190,12 @@ export function AppearanceSettings({ compact = false }: { compact?: boolean }) {
                 dans les listes, pas une imitation. */}
             <div className="card max-w-md px-2 py-1.5">
               <EntityRow
-                icon={<IconLogin size={13} />}
+                tile={<span className="tile" style={{ "--tile-size": "var(--entity-icon)", "--tile-h": tileHue("GitHub") } as React.CSSProperties}>G</span>}
                 title="GitHub"
                 secondary={<><EntityMono>alice@github.com</EntityMono><EntityTags tags={["travail"]} /></>}
               />
             </div>
-            <p className="help-text">Vaut pour toutes les lignes : identifiants, notes, cartes, hôtes, clés, bases. La même préférence que « Hôtes de la liste » dans Guiterm.</p>
+            <p className="help-text">Pour toutes les lignes d'éléments.</p>
           </>
         )}
       </section>

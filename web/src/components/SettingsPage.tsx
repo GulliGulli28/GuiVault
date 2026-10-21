@@ -24,8 +24,8 @@ import { AppSettings } from "./AppSettings";
 import { LocalBackups } from "./LocalBackups";
 import { autoTypeBridge, backupBridge, coffreBridge, systemBridge } from "../lib/platform";
 import { TransferDialog } from "./TransferDialog";
-import { IconKeyboard, IconMonitor, IconPalette, IconSettings, IconShield, IconTrash } from "./ui-icons";
-import { CopyButton, Eyebrow, Fingerprint, formatWhen, Modal, PasswordInput } from "./ui";
+import { IconKeyboard, IconMonitor, IconPalette, IconSettings, IconShield } from "./ui-icons";
+import { CopyButton, Fingerprint, formatAgo, formatWhen, InfoTip, Modal, PasswordInput, SettingRow } from "./ui";
 
 /** Les catégories, avec leur nom — la colonne de gauche du panneau
  * « Paramètres » de Guiterm. */
@@ -36,8 +36,19 @@ const CATEGORIES: { key: SettingsSection; label: string; Icon: ComponentType<{ s
   { key: "saisie", label: "Saisie automatique", Icon: IconKeyboard },
   { key: "application", label: "Application", Icon: IconSettings },
   { key: "urgence", label: "Accès d'urgence", Icon: IconLifebuoy },
-  { key: "sessions", label: "Sessions", Icon: IconMonitor },
+  { key: "sessions", label: "Appareils et sessions", Icon: IconMonitor },
 ];
+
+/** Une ligne sous le titre de chaque catégorie. */
+const SUBTITLES: Record<SettingsSection, string> = {
+  apparence: "Thème, couleur d'accent, police et densité.",
+  compte: "Votre identité et ce qui touche au compte entier.",
+  securite: "Comment vous vous connectez, et quand GuiVault se verrouille.",
+  saisie: "Taper un identifiant dans une autre application.",
+  application: "Ce que l'application fait sur ce poste.",
+  urgence: "Qui peut demander l'accès à vos vaults, et après quel délai.",
+  sessions: "Les appareils connectés à ce compte.",
+};
 
 /** Les paramètres : l'apparence (la même page que dans Guiterm), le compte
  * — empreinte à faire vérifier, mot de passe maître, second facteur —, les
@@ -68,35 +79,35 @@ export function SettingsPage({ ctx, section }: { ctx: PageContext; section: Sett
   const who = local ? coffreName(local.path) : session.user.email;
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <header className="flex shrink-0 items-center gap-2 border-b border-[var(--c-border)] px-4 py-2.5 max-md:pl-14">
-        <h1 className="text-[14px] font-semibold text-[var(--c-text)]">Paramètres</h1>
-        <span className="text-[11px] text-[var(--c-text-faint)]">{who}</span>
-      </header>
-      <div className="flex min-h-0 flex-1 max-md:flex-col">
-        {/* Les catégories, avec leur nom : en colonne à gauche, en rangée
-            au-dessus quand la fenêtre est étroite. */}
-        <nav className="flex shrink-0 gap-px border-[var(--c-border)] p-2.5 max-md:overflow-x-auto max-md:border-b md:w-[11.5rem] md:flex-col md:border-r">
-          {categories.map((c) => {
-            const active = current.key === c.key;
-            return (
-              <a
-                key={c.key}
-                href={routeHash({ page: "settings", section: c.key })}
-                onClick={(e) => { e.preventDefault(); navigate({ page: "settings", section: c.key }); }}
-                title={c.label}
-                data-active={active ? "true" : undefined}
-                className="list-row h-7 min-h-0 shrink-0 gap-2 px-2 text-[12.5px]"
-              >
-                <c.Icon size={14} className={`shrink-0 ${active ? "text-[var(--c-accent-text)]" : "text-[var(--c-text-muted)]"}`} />
-                <span className={`truncate ${active ? "font-medium text-[var(--c-text)]" : "text-[var(--c-text-secondary)]"}`}>{c.label}</span>
-              </a>
-            );
-          })}
-        </nav>
+    <div className="flex h-full min-h-0 max-md:flex-col">
+      {/* Les catégories : une colonne à gauche, une rangée au-dessus quand
+          la fenêtre est étroite. */}
+      <nav aria-label="Catégories" className="flex shrink-0 gap-0.5 border-[var(--c-border)] bg-[var(--c-bg)] px-3 py-5 max-md:overflow-x-auto max-md:border-b max-md:py-2.5 max-md:pl-14 md:w-[232px] md:flex-col md:border-r">
+        <p className="px-2.5 pb-3 text-[18px] font-semibold tracking-[-0.015em] max-md:hidden">Paramètres</p>
+        {categories.map((c) => {
+          const active = current.key === c.key;
+          return (
+            <a
+              key={c.key}
+              href={routeHash({ page: "settings", section: c.key })}
+              onClick={(e) => { e.preventDefault(); navigate({ page: "settings", section: c.key }); }}
+              data-active={active ? "true" : undefined}
+              aria-current={active ? "page" : undefined}
+              className="nav-item shrink-0"
+            >
+              <c.Icon size={15} />
+              <span className="truncate">{c.label}</span>
+            </a>
+          );
+        })}
+      </nav>
 
-        <div className="sidebar-scroll min-w-0 flex-1 space-y-6 overflow-y-auto px-6 py-5">
-          <p className="text-[14px] font-semibold text-[var(--c-text)]">{current.label}</p>
+      <div className="sidebar-scroll min-w-0 flex-1 overflow-y-auto">
+        <div className="flex max-w-[780px] flex-col gap-8 px-12 pb-14 pt-10 max-md:px-4 max-md:pt-6">
+          <header>
+            <h1 className="page-title">{current.label}</h1>
+            <p className="page-sub">{SUBTITLES[current.key]}</p>
+          </header>
 
           {current.key === "apparence" && (
             <>
@@ -107,43 +118,52 @@ export function SettingsPage({ ctx, section }: { ctx: PageContext; section: Sett
 
           {current.key === "compte" && (
             <>
-              <section className="max-w-2xl space-y-1.5">
-                <Eyebrow>Identité</Eyebrow>
-                <p className="text-[13px] text-[var(--c-text)]">{local ? `Coffre local « ${who} »` : who} <span className="text-[11px] text-[var(--c-text-faint)]">· {local ? "créé" : "compte créé"} le {formatWhen(session.user.created_at)}</span></p>
-                {local && (
-                  <>
-                    <p className="break-all font-mono text-[11px] text-[var(--c-text-muted)]">{local.path}</p>
-                    <p className="help-text">Un dossier sur cet appareil : sauvegardez-le comme vos autres fichiers. Sans le mot de passe maître, son contenu est illisible.</p>
-                  </>
-                )}
-                {supports("members") && <div className="card space-y-1 p-3">
-                  <p className="text-[11.5px] font-medium text-[var(--c-text-secondary)]">Votre empreinte</p>
-                  <Fingerprint value={session.fingerprint} />
-                  <p className="help-text">Communiquez-la hors bande (de vive voix, messagerie interne) à qui veut partager un vault avec vous : c'est ce qui lui permet de vérifier que la clé publique que le serveur lui montre est bien la vôtre.</p>
-                </div>}
+              <section className="flex flex-col gap-2.5">
+                <h2 className="eyebrow">Identité</h2>
+                <div className="card">
+                  <SettingRow title={<span className="truncate">{local ? `Coffre local « ${who} »` : who}</span>} desc={`${local ? "Créé" : "Compte créé"} le ${formatWhen(session.user.created_at)}`} />
+                  {local && <SettingRow title="Dossier" desc={<span className="break-all font-mono text-[12.5px]">{local.path}</span>} />}
+                  {supports("members") && (
+                    <SettingRow
+                      title={<>Votre empreinte <InfoTip label="À quoi sert l'empreinte" items={[
+                        { text: "Donnez-la par un autre canal à qui partage un vault avec vous." },
+                        { text: "Elle lui prouve que la clé montrée par le serveur est bien la vôtre.", tone: "ok" },
+                      ]} /></>}
+                      desc={<span className="mt-1 block"><Fingerprint value={session.fingerprint} /></span>}
+                    />
+                  )}
+                </div>
               </section>
               {local && backupBridge() && (
-                <section className="max-w-2xl space-y-1.5">
-                  <Eyebrow>Sauvegardes</Eyebrow>
+                <section className="flex flex-col gap-2.5">
+                  <h2 className="eyebrow">Sauvegardes</h2>
                   <LocalBackups path={local.path} onError={ctx.error} onRestored={(dest) => ctx.notify(`Copie créée : ${dest}. Elle est dans les coffres récents — fermez ce coffre pour l'ouvrir.`)} />
                 </section>
               )}
               {!session.offline && coffreBridge() && (
-                <section className="max-w-2xl space-y-1.5">
-                  <Eyebrow>{local ? "Copier vers un serveur" : "Copier dans un coffre local"}</Eyebrow>
-                  <div className="card flex flex-wrap items-center gap-2 p-3">
-                    <span className="min-w-0 flex-1 text-[12.5px] text-[var(--c-text)]">{local ? "Créer un compte avec ce coffre, ou le copier dans un compte existant." : "Copier ce compte dans un nouveau coffre local, ou dans un coffre existant."}</span>
-                    <button onClick={() => setDialog("transfer")} className="btn btn-secondary btn-sm">Copier…</button>
+                <section className="flex flex-col gap-2.5">
+                  <h2 className="eyebrow">Copie</h2>
+                  <div className="card">
+                    <SettingRow
+                      title={<>{local ? "Copier vers un serveur" : "Copier dans un coffre local"} <InfoTip label="Ce que fait la copie" items={[
+                        { text: `Une copie : ${local ? "ce coffre" : "ce compte"} reste tel quel.`, tone: "ok" },
+                        { text: "Historique, corbeille et pièces jointes suivent.", tone: "ok" },
+                        { text: "Interrompue, elle reprend où elle en était." },
+                      ]} /></>}
+                      desc={local ? "Créer un compte avec ce coffre, ou le copier dans un compte existant." : "Dans un nouveau coffre local, ou un coffre existant."}
+                    >
+                      <button onClick={() => setDialog("transfer")} className="btn btn-secondary">Copier…</button>
+                    </SettingRow>
                   </div>
-                  <p className="help-text">Une copie, pas un déplacement : {local ? "ce coffre" : "ce compte"} reste tel quel. Historique, corbeille et pièces jointes suivent ; une copie interrompue reprend où elle en était.</p>
                 </section>
               )}
               {!session.offline && supports("deleteAccount") && (
-                <section className="max-w-2xl space-y-1.5">
-                  <Eyebrow>Supprimer le compte</Eyebrow>
-                  <div className="card flex flex-wrap items-center gap-2 p-3">
-                    <p className="help-text min-w-0 flex-1">Efface le compte et tout ce qui n'appartient qu'à lui : vault personnel, vaults partagés dont vous êtes seul membre, liens de partage, accès d'urgence. Irréversible.</p>
-                    <button onClick={() => setDialog("delete-account")} className="btn btn-danger btn-sm">Supprimer…</button>
+                <section className="flex flex-col gap-2.5">
+                  <h2 className="eyebrow">Zone sensible</h2>
+                  <div className="card">
+                    <SettingRow title="Supprimer le compte" desc="Efface le compte et ce qui n'appartient qu'à lui. Irréversible.">
+                      <button onClick={() => setDialog("delete-account")} className="btn btn-danger">Supprimer…</button>
+                    </SettingRow>
                   </div>
                 </section>
               )}
@@ -151,39 +171,43 @@ export function SettingsPage({ ctx, section }: { ctx: PageContext; section: Sett
           )}
 
           {current.key === "securite" && (
-            <section className="max-w-2xl space-y-1.5">
-              <Eyebrow>Sécurité</Eyebrow>
-              <div className="card divide-y divide-[var(--c-border)]">
-                <div className="flex flex-wrap items-center gap-2 p-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[12.5px] text-[var(--c-text)]">Mot de passe maître</p>
-                    <p className="help-text">{local ? "Seule la clé du coffre est ré-enveloppée : rien d'autre n'est re-chiffré." : "Seule la clé de compte est ré-enveloppée ; vos autres sessions sont révoquées."}</p>
-                  </div>
-                  <button onClick={() => setDialog("password")} className="btn btn-secondary btn-sm">Changer</button>
+            <>
+              <section className="flex flex-col gap-2.5">
+                <h2 className="eyebrow">Connexion</h2>
+                <div className="card">
+                  <SettingRow title="Mot de passe maître" desc={local ? "Personne ne peut le réinitialiser." : "Personne ne peut le réinitialiser. Vos autres sessions seront révoquées."}>
+                    <button onClick={() => setDialog("password")} className="btn btn-secondary">Changer</button>
+                  </SettingRow>
+                  {supports("totpStatus") && (
+                    <SettingRow title={<>Double authentification {totp !== null && <span className={`tag ${totp ? "tag-ok" : ""}`}>{totp ? "Activée" : "Désactivée"}</span>}</>} desc="Un code à 6 chiffres en plus du mot de passe.">
+                      {totp === false && <button onClick={() => setDialog("totp-setup")} className="btn btn-primary">Activer</button>}
+                      {totp === true && <button onClick={() => setDialog("totp-disable")} className="btn btn-danger">Désactiver</button>}
+                    </SettingRow>
+                  )}
                 </div>
-                {supports("totpStatus") && <div className="flex flex-wrap items-center gap-2 p-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[12.5px] text-[var(--c-text)]">Second facteur (TOTP) {totp === null ? "" : <span className={`tag ml-1 ${totp ? "tag-accent" : ""}`}>{totp ? "activé" : "désactivé"}</span>}</p>
-                    <p className="help-text">Un code de votre application d'authentification à chaque connexion, en plus du mot de passe.</p>
-                  </div>
-                  {totp === false && <button onClick={() => setDialog("totp-setup")} className="btn btn-secondary btn-sm">Activer</button>}
-                  {totp === true && <button onClick={() => setDialog("totp-disable")} className="btn btn-danger btn-sm">Désactiver</button>}
-                </div>}
-                <div className="flex flex-wrap items-center gap-2 p-3">
-                  <div className="min-w-0 flex-1">
-                    <label htmlFor="lock-minutes" className="text-[12.5px] text-[var(--c-text)]">Verrouiller après</label>
-                    <p className="help-text">La session survit au rechargement de la page, pas à la fermeture de l'onglet. Passé ce délai sans un geste, les clés sont effacées et le mot de passe maître redemandé — le même réglage que dans l'extension.</p>
-                  </div>
-                  <select id="lock-minutes" value={lockMinutes} onChange={(e) => { const n = Number(e.target.value); setLockMinutes(n); saveLockMinutes(n); }} className="input w-auto">
-                    {LOCK_CHOICES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
-                  </select>
+              </section>
+              {supports("passkeys") && <PasskeySettings ctx={ctx} />}
+              <section className="flex flex-col gap-2.5">
+                <h2 className="eyebrow">Verrouillage</h2>
+                <div className="card">
+                  <SettingRow htmlFor="lock-minutes" title="Verrouiller après" desc="Sans activité de votre part. Le même réglage que l'extension.">
+                    <select id="lock-minutes" value={lockMinutes} onChange={(e) => { const n = Number(e.target.value); setLockMinutes(n); saveLockMinutes(n); }} className="input w-auto max-w-[16rem]">
+                      {LOCK_CHOICES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+                    </select>
+                  </SettingRow>
+                  <ClipboardSetting />
                 </div>
-                <ClipboardSetting />
-                {!local && <OfflineSetting session={session} notify={ctx.notify} error={ctx.error} />}
-              </div>
-            </section>
+              </section>
+              {!local && (
+                <section className="flex flex-col gap-2.5">
+                  <h2 className="eyebrow">Cet appareil</h2>
+                  <div className="card">
+                    <OfflineSetting session={session} notify={ctx.notify} error={ctx.error} />
+                  </div>
+                </section>
+              )}
+            </>
           )}
-          {current.key === "securite" && supports("passkeys") && <PasskeySettings ctx={ctx} />}
 
           {current.key === "saisie" && <AutoTypeSettings notify={ctx.notify} />}
 
@@ -193,24 +217,28 @@ export function SettingsPage({ ctx, section }: { ctx: PageContext; section: Sett
 
           {current.key === "sessions" && (
             <>
-              <section className="max-w-2xl space-y-1.5">
-                <Eyebrow>Appareils connectés</Eyebrow>
-                <div className="space-y-1">
+              <section className="flex flex-col gap-2.5">
+                <h2 className="eyebrow">Appareils connectés</h2>
+                <div className="card divide-y divide-[var(--c-border)]">
                   {sessions.map((s) => (
-                    <div key={s.id} className="card flex items-center gap-2 p-2.5">
+                    <div key={s.id} className="flex min-w-0 items-center gap-3 px-5 py-3.5">
+                      <span className="tile tile-neutral" style={{ "--tile-size": "34px" } as React.CSSProperties}><IconMonitor size={16} /></span>
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-[12.5px] text-[var(--c-text)]">{s.device_name ?? "appareil inconnu"}{s.current && <span className="tag ml-1.5">celle-ci</span>}</span>
-                        <span className="block text-[11px] text-[var(--c-text-muted)]">vue le {formatWhen(s.last_used_at)} · ouverte le {formatWhen(s.created_at)}</span>
+                        <span className="flex min-w-0 items-center gap-1.5"><span className="truncate font-medium">{s.device_name ?? "Appareil inconnu"}</span>{s.current && <span className="tag tag-accent shrink-0">Celui-ci</span>}</span>
+                        <span className="block truncate text-[12.5px] text-[var(--c-text-muted)]">Vu {formatAgo(s.last_used_at)} · ouvert le {formatWhen(s.created_at)}</span>
                       </span>
-                      {!s.current && <button onClick={() => setRevoke(s)} className="btn btn-ghost btn-sm btn-icon hover:text-[var(--c-danger)]" title="Révoquer" aria-label="Révoquer"><IconTrash size={11} /></button>}
+                      {!s.current && <button onClick={() => setRevoke(s)} className="btn btn-ghost">Révoquer</button>}
                     </div>
                   ))}
                 </div>
               </section>
-              <section className="max-w-2xl space-y-1.5">
-                <Eyebrow>Journal</Eyebrow>
-                <p className="help-text">Ce que le serveur a enregistré de vos actions : connexions, modifications de vaults, invitations.</p>
-                <button onClick={() => { if (audit === null) api.myAudit().then(setAudit).catch((e) => ctx.error(errorMessage(e))); else setAudit(null); }} className="btn btn-secondary btn-sm">{audit === null ? "Afficher le journal" : "Masquer le journal"}</button>
+              <section className="flex flex-col gap-2.5">
+                <h2 className="eyebrow">Journal</h2>
+                <div className="card">
+                  <SettingRow title="Vos actions" desc="Connexions, modifications de vaults, invitations.">
+                    <button onClick={() => { if (audit === null) api.myAudit().then(setAudit).catch((e) => ctx.error(errorMessage(e))); else setAudit(null); }} className="btn btn-secondary">{audit === null ? "Afficher" : "Masquer"}</button>
+                  </SettingRow>
+                </div>
                 {audit && <AuditList entries={audit} />}
               </section>
             </>
@@ -463,21 +491,23 @@ function ClipboardSetting() {
     navigator.clipboard.readText().catch(() => {}).finally(query);
   };
   return (
-    <div className="flex flex-wrap items-center gap-2 p-3">
-      <div className="min-w-0 flex-1">
-        <label htmlFor="clipboard-clear" className="text-[12.5px] text-[var(--c-text)]">Effacer ce que GuiVault copie</label>
-        <p className="help-text">
-          Au bout de ce délai, s'il est encore dans le presse-papiers — ce que vous avez copié ailleurs entre-temps n'est pas touché. Le même réglage que dans l'extension, qui, elle, efface même popup fermé.
-          {read === "granted"
-            ? ""
-            : read === "unsupported"
-              ? " Ce navigateur ne laisse pas une page lire le presse-papiers ni y écrire hors d'un clic : l'effacement se fait au premier clic dans GuiVault après le délai, et seulement si vous n'avez pas quitté la page depuis la copie."
-              : " Sans permission de lire le presse-papiers, l'effacement se fait au premier clic dans GuiVault après le délai, et seulement si vous n'avez pas quitté la page depuis la copie."}
-        </p>
+    <div className="setting-row">
+      <div className="min-w-0 flex-[1_1_260px]">
+        <div className="setting-title flex flex-wrap items-center gap-1.5">
+          <label htmlFor="clipboard-clear">Vider le presse-papiers</label>
+          {read !== "granted" && read !== null && (
+            <InfoTip label="Sans permission de lecture" items={[
+              { text: "Sans permission de lire le presse-papiers, il est vidé au premier clic dans GuiVault après le délai.", tone: "warn" },
+              { text: "Seulement si vous n'avez pas quitté la page depuis la copie." },
+              { text: "L'extension, elle, le vide même popup fermé." },
+            ]} />
+          )}
+        </div>
+        <div className="setting-desc">Seulement si la valeur copiée y est encore.</div>
       </div>
       {(read === "prompt" || read === "denied") && (
-        <button onClick={allow} disabled={read === "denied"} className="btn btn-secondary btn-sm" title={read === "denied" ? "Refusée : à rétablir dans les réglages du site du navigateur" : "Le navigateur demandera la permission"}>
-          {read === "denied" ? "Lecture refusée" : "Autoriser la vérification…"}
+        <button onClick={allow} disabled={read === "denied"} className="btn btn-secondary" title={read === "denied" ? "Refusée : à rétablir dans les réglages du site du navigateur" : "Le navigateur demandera la permission"}>
+          {read === "denied" ? "Lecture refusée" : "Autoriser la lecture"}
         </button>
       )}
       <select id="clipboard-clear" value={seconds} onChange={(e) => { const n = Number(e.target.value); setSeconds(n); saveClearSeconds(n); }} className="input w-auto">

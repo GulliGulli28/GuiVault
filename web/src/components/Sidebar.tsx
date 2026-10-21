@@ -1,24 +1,34 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { PageContext } from "../App";
 import { navigate, routeHash, type Route } from "../lib/route";
-import { createVault } from "../lib/session";
+import { createVault, type VaultView } from "../lib/session";
+import { healthSummary, useAllItems } from "../lib/allItems";
+import { personInitials } from "../lib/tiles";
+import { useVaultColors, vaultColor } from "../lib/vaultColors";
 import { errorMessage, supports } from "../lib/api";
 import { coffreName } from "../lib/localHost";
-import { ROLE_HINTS, ROLE_LABELS } from "../lib/types";
-import { IconDice, IconIdentity, IconLifebuoy, IconLink, IconPulse, IconShieldClock } from "./secret-icons";
-import { IconBell, IconDatabase, IconPlus, IconVault, IconSearch } from "./ui-icons";
+import { systemBridge } from "../lib/platform";
+import { ROLE_LABELS } from "../lib/types";
+import { IconDice, IconHome, IconIdentity, IconLifebuoy, IconLink, IconLogout, IconPulse, IconShieldClock, IconUsers } from "./secret-icons";
+import { IconBell, IconDatabase, IconLock, IconPlus, IconSearch, IconSettings, IconShield } from "./ui-icons";
 import { Logo } from "./Logo";
 import { Modal } from "./ui";
 import { NARROW, TOUCH, useMediaQuery } from "../hooks/useMediaQuery";
 
-/** La barre latérale : les vaults, les invitations reçues, le compte. Même
- * vocabulaire que la barre de Guiterm — surface `--c-bg`, lignes `list-row`,
- * marqueur d'accent sur l'élément actif. */
-export function Sidebar({ ctx, route, onLogout, onSearch, width }: { ctx: PageContext; route: Route; onLogout: () => void; onSearch: () => void; width: number }) {
+/** La barre latérale (`docs/DESIGN.md`) : l'accueil, les coffres avec leur
+ * pastille et leur nombre d'éléments, les outils, la sécurité ; en pied, le
+ * compte, les paramètres et « Verrouiller ». */
+export function Sidebar({ ctx, route, onLogout, onLock, onSearch, width }: { ctx: PageContext; route: Route; onLogout: () => void; onLock: () => void; onSearch: () => void; width: number }) {
   const { session } = ctx;
   // Un coffre local (l'app) : ni invitations ni liens, pas d'e-mail — son nom.
   const local = session.local;
   const [creating, setCreating] = useState(false);
+  const [accountMenu, setAccountMenu] = useState(false);
+  const accountButton = useRef<HTMLButtonElement>(null);
+  const colors = useVaultColors();
+  const { items, counts } = useAllItems(session, ctx.error);
+  const totpCount = useMemo(() => items.filter((x) => x.item.payload.kind === "login" && x.item.payload.login.totp).length, [items]);
+  const health = useMemo(() => healthSummary(items), [items]);
   // Étroit : le tiroir est ouvert pour une page ; en changer (lien, palette,
   // retour arrière) le referme sans rien d'autre à faire.
   const here = routeHash(route);
@@ -48,141 +58,131 @@ export function Sidebar({ ctx, route, onLogout, onSearch, width }: { ctx: PageCo
     setOpen(false);
   };
 
+  const nav = (r: Route, active: boolean, icon: React.ReactNode, label: string, extra?: React.ReactNode) => (
+    <a
+      key={routeHash(r)}
+      href={routeHash(r)}
+      onClick={(e) => { e.preventDefault(); go(r); }}
+      data-active={active ? "true" : undefined}
+      aria-current={active ? "page" : undefined}
+      className="nav-item"
+    >
+      {icon}
+      <span className="min-w-0 flex-1 truncate">{label}</span>
+      {extra}
+    </a>
+  );
+  const vaultRow = (v: VaultView, sub?: React.ReactNode) => nav(
+    { page: "vault", id: v.id },
+    activeVault === v.id,
+    <span className="vdot" style={{ background: vaultColor(v.id, v.kind === "personal", colors) }} />,
+    v.name,
+    <>
+      {sub}
+      {counts[v.id] !== undefined && <span className="shrink-0 text-[12px] tabular-nums text-[var(--c-text-muted)]">{counts[v.id]}</span>}
+    </>,
+  );
+  const label = (text: string, action?: React.ReactNode) => (
+    <div className="flex h-7 items-center justify-between px-2.5 text-[12px] font-medium text-[var(--c-text-muted)]">
+      <span>{text}</span>
+      {action}
+    </div>
+  );
+  const name = local ? coffreName(local.path) : session.user.email;
+
   const list = (
-    <div className="flex h-full flex-col">
-      {/* Le logo ramène à l'accueil : le premier vault. */}
+    <div className="flex h-full flex-col gap-4 px-3 pb-3 pt-4">
+      {/* Le logo ramène à l'accueil. */}
       <a
         href={routeHash({ page: "home" })}
         onClick={(e) => { e.preventDefault(); go({ page: "home" }); }}
-        className="flex items-center gap-2 px-3 py-2.5 text-[var(--c-text)] hover:text-[var(--c-accent-text)]"
+        className="flex items-center gap-2.5 px-1.5 text-[var(--c-text)]"
         title="Accueil"
       >
-        <Logo size={26} />
-        <span className="text-[13px] font-semibold">GuiVault</span>
+        <Logo size={28} />
+        <span className="text-[15.5px] font-semibold tracking-[-0.01em]">GuiVault</span>
       </a>
-      <button onClick={() => { setOpen(false); onSearch(); }} className="mx-2 mb-1.5 flex items-center gap-2 rounded-md border border-[var(--c-border)] px-2 py-1 text-left text-[12px] text-[var(--c-text-muted)] hover:border-[var(--c-border-strong)] hover:text-[var(--c-text-secondary)]" title="Rechercher dans tous les vaults">
-        <IconSearch size={12} />
-        <span className="flex-1">Rechercher…</span>
+      <button onClick={() => { setOpen(false); onSearch(); }} className="flex h-9 min-w-0 items-center gap-2.5 rounded-[9px] border border-[var(--c-border)] bg-[var(--c-surface)] px-2.5 text-left text-[13px] text-[var(--c-text-muted)] hover:border-[var(--c-border-strong)]" title="Rechercher dans tous les vaults">
+        <IconSearch size={14} />
+        <span className="min-w-0 flex-1 truncate">Rechercher partout</span>
         {!touch && <span className="kbd">Ctrl K</span>}
       </button>
 
-      <div className="sidebar-scroll -mx-1 min-h-0 flex-1 overflow-y-auto px-1">
-        <div className="flex items-center justify-between px-2 pb-1 pt-1">
-          <span className="eyebrow">Vaults</span>
-          <button onClick={() => setCreating(true)} className="btn btn-ghost btn-sm btn-icon" title={local ? "Nouveau vault" : "Nouveau vault partagé"} aria-label={local ? "Nouveau vault" : "Nouveau vault partagé"}><IconPlus size={12} /></button>
-        </div>
-        {session.vaults.map((v) => (
-          <a
-            key={v.id}
-            href={routeHash({ page: "vault", id: v.id })}
-            onClick={(e) => { e.preventDefault(); go({ page: "vault", id: v.id }); }}
-            data-active={activeVault === v.id ? "true" : undefined}
-            className="list-row mx-1 mb-0.5 py-1.5"
-          >
-            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[var(--c-bg3)] text-[var(--c-text-secondary)]"><IconVault size={12} /></span>
-            <span className="flex min-w-0 flex-1 flex-col leading-tight">
-              <span className="truncate text-[12.5px] font-medium text-[var(--c-text)]">{v.name}</span>
-              <span className="truncate text-[10.5px] text-[var(--c-text-muted)]" title={ROLE_HINTS[v.role]}>{v.kind === "personal" ? "personnel" : ROLE_LABELS[v.role]}</span>
-            </span>
-          </a>
-        ))}
+      <div className="sidebar-scroll -mx-1 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-1">
+        <nav aria-label="Général" className="flex flex-col gap-0.5">
+          {nav({ page: "home" }, route.page === "home", <IconHome size={16} />, "Accueil")}
+          {supports("myInvitations") && session.invitations.length > 0 && nav({ page: "invitations" }, route.page === "invitations", <IconBell size={16} />, "Invitations", <span className="tag tag-accent">{session.invitations.length}</span>)}
+        </nav>
 
-        {/* Les vaults qu'un accès d'urgence nous remet : à part, avec qui les
-            a confiés, en lecture seule. */}
+        <nav aria-label="Coffres" className="flex flex-col gap-0.5">
+          {label("Coffres", <button onClick={() => setCreating(true)} className="btn btn-ghost btn-sm btn-icon -mr-1.5 h-6 w-6" title={local ? "Nouveau vault" : "Nouveau vault partagé"} aria-label={local ? "Nouveau vault" : "Nouveau vault partagé"}><IconPlus size={13} /></button>)}
+          {session.vaults.map((v) => vaultRow(v, v.kind !== "personal" && !local ? <span title={`Partagé · ${ROLE_LABELS[v.role]}`} className="flex shrink-0 text-[var(--c-text-muted)]"><IconUsers size={14} /></span> : undefined))}
+        </nav>
+
+        {/* Les vaults qu'un accès d'urgence nous remet : à part, en lecture. */}
         {session.emergencyVaults.length > 0 && (
-          <>
-            <div className="px-2 pb-1 pt-3"><span className="eyebrow">Accès d'urgence</span></div>
-            {session.emergencyVaults.map((v) => (
-              <a
-                key={v.id}
-                href={routeHash({ page: "vault", id: v.id })}
-                onClick={(e) => { e.preventDefault(); go({ page: "vault", id: v.id }); }}
-                data-active={activeVault === v.id ? "true" : undefined}
-                className="list-row mx-1 mb-0.5 py-1.5"
-              >
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[var(--c-bg3)] text-[var(--c-text-secondary)]"><IconLifebuoy size={12} /></span>
-                <span className="flex min-w-0 flex-1 flex-col leading-tight">
-                  <span className="truncate text-[12.5px] font-medium text-[var(--c-text)]">{v.name}</span>
-                  <span className="truncate text-[10.5px] text-[var(--c-text-muted)]" title={`Confié par ${v.emergency?.grantor}, en lecture seule`}>de {v.emergency?.grantor}</span>
-                </span>
-              </a>
-            ))}
-          </>
+          <nav aria-label="Confiés" className="flex flex-col gap-0.5">
+            {label("Confiés")}
+            {session.emergencyVaults.map((v) => vaultRow(v, <span title={`Confié par ${v.emergency?.grantor}, en lecture seule`} className="flex shrink-0 text-[var(--c-text-muted)]"><IconLifebuoy size={13} /></span>))}
+          </nav>
         )}
 
-        {supports("myInvitations") && <a
-          href={routeHash({ page: "invitations" })}
-          onClick={(e) => { e.preventDefault(); go({ page: "invitations" }); }}
-          data-active={route.page === "invitations" ? "true" : undefined}
-          className="list-row mx-1 mt-3 py-1.5"
-        >
-          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[var(--c-bg3)] text-[var(--c-text-secondary)]"><IconBell size={12} /></span>
-          <span className="min-w-0 flex-1 truncate text-[12.5px] text-[var(--c-text)]">Invitations</span>
-          {session.invitations.length > 0 && <span className="tag tag-accent">{session.invitations.length}</span>}
-        </a>}
-        <a
-          href={routeHash({ page: "generator" })}
-          onClick={(e) => { e.preventDefault(); go({ page: "generator" }); }}
-          data-active={route.page === "generator" ? "true" : undefined}
-          className="list-row mx-1 mt-0.5 py-1.5"
-        >
-          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[var(--c-bg3)] text-[var(--c-text-secondary)]"><IconDice size={12} /></span>
-          <span className="min-w-0 flex-1 truncate text-[12.5px] text-[var(--c-text)]">Générateur</span>
-        </a>
-        <a
-          href={routeHash({ page: "totp" })}
-          onClick={(e) => { e.preventDefault(); go({ page: "totp" }); }}
-          data-active={route.page === "totp" ? "true" : undefined}
-          className="list-row mx-1 mt-0.5 py-1.5"
-        >
-          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[var(--c-bg3)] text-[var(--c-text-secondary)]"><IconShieldClock size={12} /></span>
-          <span className="min-w-0 flex-1 truncate text-[12.5px] text-[var(--c-text)]">Authentificateur</span>
-        </a>
-        {supports("sends") && <a
-          href={routeHash({ page: "sends" })}
-          onClick={(e) => { e.preventDefault(); go({ page: "sends" }); }}
-          data-active={route.page === "sends" ? "true" : undefined}
-          className="list-row mx-1 mt-0.5 py-1.5"
-        >
-          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[var(--c-bg3)] text-[var(--c-text-secondary)]"><IconLink size={12} /></span>
-          <span className="min-w-0 flex-1 truncate text-[12.5px] text-[var(--c-text)]">Liens de partage</span>
-        </a>}
-        <a
-          href={routeHash({ page: "health" })}
-          onClick={(e) => { e.preventDefault(); go({ page: "health" }); }}
-          data-active={route.page === "health" ? "true" : undefined}
-          className="list-row mx-1 mt-0.5 py-1.5"
-        >
-          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[var(--c-bg3)] text-[var(--c-text-secondary)]"><IconPulse size={12} /></span>
-          <span className="min-w-0 flex-1 truncate text-[12.5px] text-[var(--c-text)]">Santé du coffre</span>
-        </a>
-        {session.user.is_admin && (
-          <a
-            href={routeHash({ page: "admin" })}
-            onClick={(e) => { e.preventDefault(); go({ page: "admin" }); }}
-            data-active={route.page === "admin" ? "true" : undefined}
-            className="list-row mx-1 mt-0.5 py-1.5"
-          >
-            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[var(--c-bg3)] text-[var(--c-text-secondary)]"><IconDatabase size={12} /></span>
-            <span className="min-w-0 flex-1 truncate text-[12.5px] text-[var(--c-text)]">Administration</span>
-          </a>
-        )}
+        <nav aria-label="Outils" className="flex flex-col gap-0.5">
+          {label("Outils")}
+          {nav({ page: "generator" }, route.page === "generator", <IconDice size={16} />, "Générateur")}
+          {nav({ page: "totp" }, route.page === "totp", <IconShieldClock size={16} />, "Codes 2FA", totpCount > 0 ? <span className="shrink-0 text-[12px] tabular-nums text-[var(--c-text-muted)]">{totpCount}</span> : undefined)}
+          {supports("sends") && nav({ page: "sends" }, route.page === "sends", <IconLink size={16} />, "Liens de partage")}
+        </nav>
+
+        <nav aria-label="Sécurité" className="flex flex-col gap-0.5">
+          {label("Sécurité")}
+          {nav({ page: "health" }, route.page === "health", <IconPulse size={16} />, "Santé", health.issues > 0 ? <span className="badge" title={`${health.issues} élément(s) à traiter`}>{health.issues}</span> : undefined)}
+          {session.emergency && nav({ page: "settings", section: "urgence" }, route.page === "settings" && route.section === "urgence", <IconLifebuoy size={16} />, "Accès d'urgence")}
+          {session.user.is_admin && nav({ page: "admin" }, route.page === "admin", <IconDatabase size={16} />, "Administration")}
+        </nav>
       </div>
 
-      <div className="border-t border-[var(--c-border)] p-2">
-        <a
-          href={routeHash({ page: "settings", section: "compte" })}
-          onClick={(e) => { e.preventDefault(); go({ page: "settings", section: "compte" }); }}
-          data-active={route.page === "settings" ? "true" : undefined}
-          className="list-row py-1.5"
-        >
-          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[var(--c-bg3)] text-[var(--c-text-secondary)]"><IconIdentity size={12} /></span>
-          <span className="flex min-w-0 flex-1 flex-col leading-tight">
-            <span className="truncate text-[12.5px] text-[var(--c-text)]" title={local ? local.path : session.user.email}>{local ? coffreName(local.path) : session.user.email}</span>
-            <span className="truncate text-[10.5px] text-[var(--c-text-muted)]">{local ? "Coffre local et paramètres" : "Compte et paramètres"}</span>
-          </span>
-        </a>
-        <button onClick={onLogout} className="btn btn-ghost btn-sm mt-1 w-full justify-start">{local ? "Fermer le coffre" : "Se déconnecter"}</button>
+      <div className="flex flex-col gap-2">
+        <div className="relative flex min-w-0 items-center gap-1.5">
+          <button
+            ref={accountButton}
+            onClick={() => setAccountMenu((m) => !m)}
+            aria-haspopup="menu"
+            aria-expanded={accountMenu}
+            className="flex min-w-0 flex-1 items-center gap-2.5 rounded-[10px] border border-[var(--c-border)] bg-[var(--c-surface)] p-2 text-left hover:border-[var(--c-border-strong)]"
+            title={local ? local.path : session.user.email}
+          >
+            <span className="tile h-[30px] w-[30px] rounded-full text-[12px]" style={{ "--tile-h": 238 } as React.CSSProperties}>{personInitials(name)}</span>
+            <span className="flex min-w-0 flex-1 flex-col leading-tight">
+              <span className="truncate text-[13px] font-medium text-[var(--c-text)]">{name}</span>
+              <span className="truncate text-[12px] text-[var(--c-text-muted)]">{local ? "Coffre local" : "Compte"}</span>
+            </span>
+          </button>
+          <a
+            href={routeHash({ page: "settings", section: "apparence" })}
+            onClick={(e) => { e.preventDefault(); go({ page: "settings", section: "apparence" }); }}
+            data-active={route.page === "settings" ? "true" : undefined}
+            className={`btn btn-icon shrink-0 ${route.page === "settings" ? "btn-toggled" : "btn-secondary"}`}
+            title="Paramètres"
+            aria-label="Paramètres"
+          >
+            <IconSettings size={15} />
+          </a>
+          {accountMenu && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setAccountMenu(false)} />
+              <div className="popover absolute bottom-full left-0 z-20 mb-1.5 w-full py-1" role="menu">
+                <button role="menuitem" className="menu-item" onClick={() => { setAccountMenu(false); go({ page: "settings", section: "compte" }); }}><IconIdentity size={14} /> {local ? "Coffre local" : "Compte"}</button>
+                <button role="menuitem" className="menu-item" onClick={() => { setAccountMenu(false); go({ page: "settings", section: "securite" }); }}><IconShield size={14} /> Sécurité</button>
+                <div className="menu-sep" />
+                <button role="menuitem" className="menu-item text-[var(--c-danger-text)]" onClick={() => { setAccountMenu(false); onLogout(); }}><IconLogout size={14} /> {local ? "Fermer le coffre" : "Se déconnecter"}</button>
+              </div>
+            </>
+          )}
+        </div>
+        <button onClick={onLock} className="btn btn-secondary w-full" title="Verrouiller maintenant">
+          <IconLock size={14} /> Verrouiller<span className="flex-1" />{!touch && systemBridge() && <span className="kbd">Ctrl L</span>}
+        </button>
       </div>
     </div>
   );

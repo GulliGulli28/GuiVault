@@ -8,8 +8,8 @@ import { passkeysSupported, registerPasskey } from "../lib/accountPasskeys";
 import type { AccountPasskey } from "../lib/types";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { IconPasskey } from "./secret-icons";
-import { Eyebrow, formatWhen, Modal, PasswordInput } from "./ui";
-import { IconPlus, IconTrash } from "./ui-icons";
+import { formatAgo, formatWhen, InfoTip, Modal, PasswordInput, SettingRow } from "./ui";
+import { IconPlus } from "./ui-icons";
 
 export function PasskeySettings({ ctx }: { ctx: PageContext }) {
   const [enabled, setEnabled] = useState<boolean | null>(null);
@@ -32,31 +32,28 @@ export function PasskeySettings({ ctx }: { ctx: PageContext }) {
   if (enabled === null) return null;
   const supported = passkeysSupported();
   return (
-    <section className="max-w-2xl space-y-1.5">
-      <div className="flex items-center gap-2">
-        <Eyebrow>Passkeys</Eyebrow>
-        {enabled && supported && (
-          <button onClick={() => setAdding(true)} className="btn btn-ghost btn-sm ml-auto"><IconPlus size={11} /> Ajouter une passkey</button>
-        )}
-      </div>
-      <div className="card divide-y divide-[var(--c-border)]">
-        <p className="help-text p-3">
-          {!enabled
-            ? "La connexion par passkey n'est pas configurée sur ce serveur (GUIVAULT_PUBLIC_URL)."
-            : !supported
-              ? "Ce navigateur ne sait pas utiliser de passkey (WebAuthn)."
-              : "Se connecter sans taper le mot de passe maître, avec une passkey de votre système ou une clé de sécurité — son code ou votre empreinte tiennent lieu de mot de passe et de second facteur. Elle doit savoir dériver une clé (extension PRF) : c'est elle qui rouvre le coffre, le serveur n'en garde qu'une enveloppe qu'il ne sait pas ouvrir."}
-        </p>
+    <section className="flex flex-col gap-2.5">
+      <h2 className="eyebrow">Passkeys</h2>
+      <div className="card">
+        <SettingRow
+          title={<>Se connecter avec une passkey <InfoTip label="Comment ça marche" items={[
+            { text: "Son code ou votre empreinte remplacent mot de passe et second facteur.", tone: "ok" },
+            { text: "Elle rouvre le coffre elle-même (extension PRF) : le serveur n'en garde qu'une enveloppe fermée.", tone: "ok" },
+          ]} /></>}
+          desc={!enabled ? "Non configurée sur ce serveur (GUIVAULT_PUBLIC_URL)." : !supported ? "Ce navigateur ne gère pas les passkeys." : "Sans taper le mot de passe maître."}
+        >
+          {enabled && supported && <button onClick={() => setAdding(true)} className="btn btn-secondary"><IconPlus size={14} /> Ajouter</button>}
+        </SettingRow>
         {list?.map((p) => (
-          <div key={p.id} className="flex items-center gap-2 p-3">
-            <IconPasskey size={14} className="shrink-0 text-[var(--c-text-muted)]" />
+          <div key={p.id} className="setting-row">
+            <span className="tile tile-neutral" style={{ "--tile-size": "34px" } as React.CSSProperties}><IconPasskey size={16} /></span>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-[12.5px] text-[var(--c-text)]">{p.name}</p>
-              <p className="text-[11px] text-[var(--c-text-muted)]">
-                ajoutée le {formatWhen(p.created_at)}{p.last_used_at ? ` · dernière connexion le ${formatWhen(p.last_used_at)}` : " · jamais utilisée"}
+              <p className="truncate font-medium">{p.name}</p>
+              <p className="truncate text-[12.5px] text-[var(--c-text-muted)]">
+                Ajoutée le {formatWhen(p.created_at)}{p.last_used_at ? ` · utilisée ${formatAgo(p.last_used_at)}` : " · jamais utilisée"}
               </p>
             </div>
-            <button onClick={() => setRemoving(p)} className="btn btn-ghost btn-sm btn-icon hover:text-[var(--c-danger)]" title="Retirer" aria-label={`Retirer ${p.name}`}><IconTrash size={12} /></button>
+            <button onClick={() => setRemoving(p)} className="btn btn-ghost" aria-label={`Retirer ${p.name}`}>Retirer</button>
           </div>
         ))}
       </div>

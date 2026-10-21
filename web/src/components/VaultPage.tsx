@@ -6,25 +6,28 @@ import { performAutoType } from "./AutoType";
 import { filterEntities, indexItems, SORT_LABELS, toEntities, withParent, type SortMode } from "../lib/entities";
 import { plainShortcut } from "../lib/keyboard";
 import { uuid } from "../lib/bytes";
-import { isSecret, primarySecret, primaryUser } from "../lib/items";
+import { isSecret, primarySecret, primaryUser, uriHost, withArticle } from "../lib/items";
+import { parseTotp, totpCode } from "../lib/totp";
+import { ACCENT_COLORS } from "../lib/preferences";
+import { setVaultColor, useVaultColors, VAULT_COLORS, vaultColor, vaultColorName } from "../lib/vaultColors";
 import { pinnedEmailFor } from "../lib/pins";
 import { navigate } from "../lib/route";
 import { problemItem, problemText, type ManifestProblem } from "../lib/manifest";
 import { acceptIntegrity, deleteItem, findVault, loadItems, moveItem, payloadEntity, payloadName, putPayload, RevisionConflict, type DecodedItem, type VaultView } from "../lib/session";
 import { canWrite, KIND_LABELS, KIND_LABELS_PLURAL, ROLE_HINTS, ROLE_LABELS, type CustomIcon, type GuiVaultEntity, type ItemKind, type Payload } from "../lib/types";
 import { ConfirmDialog } from "./ConfirmDialog";
-import { EntityIcon, ItemTree, KIND_ICONS, type FolderNaming } from "./ItemTree";
+import { ItemTile, ItemTree, KIND_ICONS, type FolderNaming } from "./ItemTree";
 import { ItemView } from "./ItemView";
 import { ItemForm } from "./forms/ItemForm";
-import { IconHistory, IconLink, IconStar, IconTools } from "./secret-icons";
+import { IconDots, IconFolderPlus, IconHistory, IconLink, IconShieldClock, IconSort, IconStar, IconTools } from "./secret-icons";
 import { ShareLinkDialog } from "./SendsPage";
 import { ItemHistory } from "./ItemHistory";
 import { AttachmentsPanel } from "./AttachmentsPanel";
 import { IntegrityBanner } from "./IntegrityBanner";
 import { useMerge } from "./MergeDialog";
 import { ShortcutsHelp } from "./ShortcutsHelp";
-import { IconChevronDown, IconCopy, IconEdit, IconFolder, IconKeyboard, IconPlus, IconRefresh, IconSearch, IconSettings, IconTrash } from "./ui-icons";
-import { copyText, formatWhen, Loading, useDelayed } from "./ui";
+import { IconCheck, IconChevronDown, IconChevronRight, IconCopy, IconEdit, IconExternal, IconFolder, IconKeyboard, IconPlus, IconRefresh, IconSearch, IconSettings, IconTrash, IconVault } from "./ui-icons";
+import { copyText, Dropdown, formatAgo, formatWhen, Loading, useDelayed } from "./ui";
 import { PaneHandle, usePersistedPane } from "../hooks/usePersistedPane";
 import { TOUCH, useMediaQuery } from "../hooks/useMediaQuery";
 
@@ -41,10 +44,11 @@ type Filter = "all" | "favorites" | ItemKind;
 const FILTERS: Filter[] = ["all", "favorites", "login", "note", "card", "identity", "api-key", "aws", "host", "sql-connection", "key", "snippet", "runbook", "group", "icon"];
 
 /** Un vault : son contenu à gauche, la fiche ou le formulaire à droite. */
-export function VaultPage({ ctx, vaultId, itemId }: { ctx: PageContext; vaultId: string; itemId?: string }) {
+export function VaultPage({ ctx, vaultId, itemId, create }: { ctx: PageContext; vaultId: string; itemId?: string; create?: string }) {
   const vault = findVault(ctx.session, vaultId);
-  if (!vault) return <p className="p-6 text-[12.5px] text-[var(--c-text-muted)]">Ce vault n'existe pas (ou plus).</p>;
-  return <VaultBody key={vault.id} ctx={ctx} vault={vault} itemId={itemId} />;
+  if (!vault) return <p className="p-6 text-[13px] text-[var(--c-text-muted)]">Ce vault n'existe pas (ou plus).</p>;
+  const kind = NEW_KINDS.find((k): k is ItemKind => k !== "sep" && k === create);
+  return <VaultBody key={vault.id} ctx={ctx} vault={vault} itemId={itemId} create={kind} />;
 }
 
 const SORT_KEY = "guivault.sort";
@@ -58,7 +62,7 @@ function loadSort(): SortMode {
   }
 }
 
-function VaultBody({ ctx, vault, itemId }: { ctx: PageContext; vault: VaultView; itemId?: string }) {
+function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: VaultView; itemId?: string; create?: ItemKind }) {
   const [items, setItems] = useState<DecodedItem[] | null>(null);
   /** Les écarts au manifeste de la dernière lecture : tant qu'il y en a, le
    * vault est en lecture seule d'ici (`IntegrityError`). */
@@ -91,6 +95,10 @@ function VaultBody({ ctx, vault, itemId }: { ctx: PageContext; vault: VaultView;
     setQuery("");
     setFilter("all");
   }, [itemId]);
+  // Créer, demandé depuis l'accueil (`#/vault/<id>/new/<genre>`).
+  useEffect(() => {
+    if (create && canWrite(vault.role)) setMode({ kind: "new", itemKind: create });
+  }, [create, vault.role]);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [history, setHistory] = useState(false);
   // Stable, comme `closeHelp` : `useModalSurface` rend le focus à l'ouvreur
@@ -103,6 +111,7 @@ function VaultBody({ ctx, vault, itemId }: { ctx: PageContext; vault: VaultView;
   const emergency = vault.emergency;
   const [moveTo, setMoveTo] = useState<VaultView | null>(null);
   const [newMenu, setNewMenu] = useState(false);
+  const colors = useVaultColors();
   const newButton = useRef<HTMLButtonElement>(null);
   const touch = useMediaQuery(TOUCH);
   // Le menu « Nouveau » se referme à Échap, et rend le focus à son bouton.
@@ -124,7 +133,7 @@ function VaultBody({ ctx, vault, itemId }: { ctx: PageContext; vault: VaultView;
   const slow = useDelayed(loading);
   const writable = canWrite(vault.role) && problems.length === 0;
   // La colonne de la liste se redimensionne, comme les panneaux de Guiterm.
-  const list = usePersistedPane("vault-list", { initial: 340, min: 240, max: 720, axis: "horizontal", mode: "px" });
+  const list = usePersistedPane("vault-list", { initial: 380, min: 300, max: 720, axis: "horizontal", mode: "px" });
   const editingRef = useRef(false);
   editingRef.current = mode.kind !== "view";
   // `vault` et `ctx` changent d'identité à chaque `/sync` ou notification :
@@ -393,93 +402,142 @@ function VaultBody({ ctx, vault, itemId }: { ctx: PageContext; vault: VaultView;
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
+  const entity = current?.ok ? entities.find((e) => e.id === current.id) : undefined;
+  const filterLabel = (f: Filter) => (f === "all" ? "Tous les types" : f === "favorites" ? "Favoris" : capitalize(KIND_LABELS_PLURAL[f]));
+  const copyValue = (what: { label: string; value: string } | null) => {
+    if (!what) return;
+    void copyText(what.value).then((ok) => (ok ? ctx.notify(`${what.label} copié.`) : ctx.error("Copie refusée par le navigateur.")));
+  };
+  const copyTotp = (secret: string) => {
+    const params = parseTotp(secret);
+    if (!params) return ctx.error("Secret TOTP illisible.");
+    void totpCode(params).then((code) => copyValue({ label: "Code 2FA", value: code }));
+  };
+
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <header className="flex shrink-0 flex-wrap items-center gap-2 border-b border-[var(--c-border)] px-4 py-2.5 pl-4 max-md:pl-14">
-        <h1 className="min-w-0 truncate text-[14px] font-semibold text-[var(--c-text)]">{vault.name}</h1>
-        {emergency ? (
-          <span className="tag tag-accent" title={`Confié par ${emergency.grantor} par l'accès d'urgence : lecture seule`}>accès d'urgence · {emergency.grantor}</span>
-        ) : (
-          <span className="tag" title={ROLE_HINTS[vault.role]}>{vault.kind === "personal" ? "personnel" : ROLE_LABELS[vault.role]}</span>
-        )}
-        {vault.keyFrom.kind === "member" && !pinnedEmailFor(vault.keyFrom.fingerprint) && (
-          <button
-            type="button"
-            onClick={() => navigate({ page: "vault-settings", id: vault.id })}
-            className="tag"
-            style={{ color: "var(--c-warn)" }}
-            title="La clé de ce vault vous a été remise par quelqu'un dont vous n'avez pas vérifié l'empreinte — voir les réglages du vault"
-          >
-            clé non vérifiée
-          </button>
-        )}
-        <span className="hidden text-[11px] text-[var(--c-text-faint)] sm:inline" title={`Révision ${vault.revision}`}>{items ? `${items.length} élément(s)` : ""}</span>
-        <div className="ml-auto flex items-center gap-1.5">
-          <button onClick={() => void load()} className="btn btn-ghost btn-sm btn-icon" title="Recharger" aria-label="Recharger"><IconRefresh size={13} /></button>
-          {writable && (
-            <div className="relative">
-              <button ref={newButton} onClick={() => setNewMenu((m) => !m)} className="btn btn-primary btn-sm" aria-haspopup="menu" aria-expanded={newMenu}><IconPlus size={12} /> Nouveau <IconChevronDown size={10} /></button>
-              {newMenu && (
-                <>
-                  <div className="fixed inset-0 z-10" onClick={() => setNewMenu(false)} />
-                  <div className="popover absolute right-0 z-20 mt-1 w-44 py-1" role="menu" aria-label="Nouvel élément">
-                    {NEW_KINDS.map((k, i) => {
-                      if (k === "sep") return <div key={i} className="menu-sep" />;
-                      const Icon = KIND_ICONS[k];
-                      return (
-                        <button key={k} role="menuitem" onClick={() => { setNewMenu(false); if (k === "group") { setQuery(""); setFilter("all"); setNaming({ mode: "create", parentId: selectedGroupId }); } else setMode({ kind: "new", itemKind: k }); }} className="menu-item">
-                          <Icon size={13} /> {capitalize(KIND_LABELS[k])}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-          {!emergency && <button onClick={() => navigate({ page: "vault-trash", id: vault.id })} className="btn btn-secondary btn-sm btn-icon" title="Corbeille : les éléments supprimés, à restaurer" aria-label="Corbeille"><IconTrash size={13} /></button>}
-          <button onClick={() => navigate({ page: "vault-tools", id: vault.id })} className="btn btn-secondary btn-sm btn-icon" title={emergency ? "Exporter" : "Importer / exporter"} aria-label={emergency ? "Exporter" : "Importer / exporter"}><IconTools size={13} /></button>
-          {!emergency && <button onClick={() => navigate({ page: "vault-settings", id: vault.id })} className="btn btn-secondary btn-sm btn-icon" title="Réglages du vault : membres, invitations, clé" aria-label="Réglages du vault"><IconSettings size={13} /></button>}
-        </div>
-      </header>
       <IntegrityBanner name={vault.name} problems={problems} canFix={canWrite(vault.role) && !emergency} nameOf={nameOf} onAccept={acceptProblems} />
 
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
         <section
+          aria-label="Éléments du vault"
           style={{ "--list-w": `${list.value}px` } as React.CSSProperties}
-          className={`flex min-h-0 flex-col md:w-[var(--list-w)] md:shrink-0 ${mode.kind !== "view" || current ? "max-md:hidden" : ""}`}
+          className={`flex min-h-0 flex-col bg-[var(--c-bg)] md:w-[var(--list-w)] md:shrink-0 ${mode.kind !== "view" || current ? "max-md:hidden" : ""}`}
         >
-          <div className="shrink-0 space-y-1.5 p-2">
-            <div className="flex items-center gap-1.5">
-              <div className="relative min-w-0 flex-1">
-                <IconSearch size={12} className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[var(--c-text-muted)]" />
-                <input ref={filterRef} value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => { if (e.key === "Escape") { e.currentTarget.blur(); if (query) setQuery(""); } }} placeholder={touch ? "Filtrer…" : "Filtrer…  ( / )"} aria-label="Filtrer" className="input pl-7" />
-              </div>
-              <select value={sort} onChange={(e) => setSort(e.target.value as SortMode)} className="input w-auto shrink-0 px-1.5" title="Trier" aria-label="Trier">
-                {(Object.keys(SORT_LABELS) as SortMode[]).map((s) => <option key={s} value={s}>{SORT_LABELS[s]}</option>)}
-              </select>
+          <header className="shrink-0 space-y-3 px-4 pb-3 pt-[18px] max-md:pl-14">
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="vdot h-2.5 w-2.5" style={{ background: vaultColor(vault.id, vault.kind === "personal", colors) }} />
+              <h1 className="min-w-0 truncate text-[18px] font-semibold tracking-[-0.015em] text-[var(--c-text)]" title={vault.name}>{vault.name}</h1>
+              <span className="shrink-0 whitespace-nowrap text-[12.5px] text-[var(--c-text-muted)]" title={`Révision ${vault.revision}`}>{items ? `${entities.filter((e) => e.kind !== "group" && e.kind !== "icon").length} éléments` : ""}</span>
+              <span className="flex-1" />
+              <Dropdown
+                label="Le vault"
+                className="w-60"
+                trigger={({ open, toggle }) => <button onClick={toggle} aria-expanded={open} aria-haspopup="menu" className="btn btn-ghost btn-icon" title="Le vault : couleur, corbeille, import, réglages" aria-label="Actions du vault"><IconDots size={16} /></button>}
+              >
+                {(close) => (
+                  <>
+                    <div className="px-3.5 pb-2 pt-1.5">
+                      <p className="mb-2 text-[12px] font-medium text-[var(--c-text-muted)]">Couleur</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {VAULT_COLORS.map((c) => {
+                          const on = vaultColorName(vault.id, vault.kind === "personal", colors) === c;
+                          return <button key={c} onClick={() => setVaultColor(vault.id, c)} aria-pressed={on} title={ACCENT_COLORS[c].label} aria-label={`Couleur ${ACCENT_COLORS[c].label}`} className={`h-5 w-5 rounded-full ${on ? "ring-2 ring-[var(--c-text)] ring-offset-2 ring-offset-[var(--c-raised)]" : ""}`} style={{ background: ACCENT_COLORS[c].c500 }} />;
+                        })}
+                      </div>
+                    </div>
+                    <div className="menu-sep" />
+                    <button role="menuitem" className="menu-item" onClick={() => { close(); void load(); }}><IconRefresh size={14} /> Recharger</button>
+                    <button role="menuitem" className="menu-item" onClick={() => { close(); navigate({ page: "vault-tools", id: vault.id }); }}><IconTools size={14} /> {emergency ? "Exporter" : "Importer ou exporter"}</button>
+                    {!emergency && <button role="menuitem" className="menu-item" onClick={() => { close(); navigate({ page: "vault-trash", id: vault.id }); }}><IconTrash size={14} /> Corbeille</button>}
+                    {!emergency && <button role="menuitem" className="menu-item" onClick={() => { close(); navigate({ page: "vault-settings", id: vault.id }); }}><IconSettings size={14} /> Membres et réglages</button>}
+                    <button role="menuitem" className="menu-item" onClick={() => { close(); setHelp(true); }}><IconKeyboard size={14} /> Raccourcis clavier</button>
+                  </>
+                )}
+              </Dropdown>
               {writable && (
-                <button onClick={() => { setQuery(""); setFilter("all"); setNaming({ mode: "create", parentId: null }); }} className="btn btn-secondary btn-icon shrink-0" title="Nouveau dossier (à la racine ; le bouton d'un dossier en crée un dedans)" aria-label="Nouveau dossier"><IconFolder size={13} /><IconPlus size={9} className="-ml-1 -mt-2" /></button>
+                <div className="relative">
+                  <button ref={newButton} onClick={() => setNewMenu((m) => !m)} className="btn btn-primary" aria-haspopup="menu" aria-expanded={newMenu}><IconPlus size={14} /> Nouveau</button>
+                  {newMenu && (
+                    <>
+                      <div className="fixed inset-0 z-10" onClick={() => setNewMenu(false)} />
+                      <div className="popover absolute right-0 z-20 mt-1.5 w-52 py-1" role="menu" aria-label="Nouvel élément">
+                        {NEW_KINDS.map((k, i) => {
+                          if (k === "sep") return <div key={i} className="menu-sep" />;
+                          const Icon = KIND_ICONS[k];
+                          return (
+                            <button key={k} role="menuitem" onClick={() => { setNewMenu(false); if (k === "group") { setQuery(""); setFilter("all"); setNaming({ mode: "create", parentId: selectedGroupId }); } else setMode({ kind: "new", itemKind: k }); }} className="menu-item">
+                              <Icon size={14} /> {capitalize(KIND_LABELS[k])}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
+                </div>
               )}
             </div>
-            {entities.length > 0 && (
-              <div className="flex flex-wrap gap-1" role="tablist" aria-label="Type d'élément">
-                {FILTERS.filter((f) => f === "all" || (counts[f] ?? 0) > 0).map((f) => (
+            {(emergency || vault.kind !== "personal" || (vault.keyFrom.kind === "member" && !pinnedEmailFor(vault.keyFrom.fingerprint))) && (
+              <div className="flex flex-wrap items-center gap-1.5">
+                {emergency ? (
+                  <span className="tag tag-accent max-w-full truncate" title={`Confié par ${emergency.grantor} par l'accès d'urgence : lecture seule`}>Confié par {emergency.grantor}</span>
+                ) : vault.kind !== "personal" && (
+                  <span className="tag" title={ROLE_HINTS[vault.role]}>{capitalize(ROLE_LABELS[vault.role])}</span>
+                )}
+                {vault.keyFrom.kind === "member" && !pinnedEmailFor(vault.keyFrom.fingerprint) && (
                   <button
-                    key={f}
-                    role="tab"
-                    aria-selected={filter === f}
-                    onClick={() => setFilter(f)}
-                    className={`btn btn-sm shrink-0 ${filter === f ? "btn-toggled" : "btn-ghost"}`}
+                    type="button"
+                    onClick={() => navigate({ page: "vault-settings", id: vault.id })}
+                    className="tag tag-warn"
+                    title="La clé de ce vault vous a été remise par quelqu'un dont vous n'avez pas vérifié l'empreinte — voir les réglages du vault"
                   >
-                    {f === "all" ? "Tout" : f === "favorites" ? <><IconStar size={11} filled /> Favoris</> : KIND_LABELS_PLURAL[f]}
-                    <span className="text-[10px] text-[var(--c-text-faint)]">{counts[f]}</span>
+                    Clé non vérifiée
                   </button>
-                ))}
+                )}
               </div>
             )}
-          </div>
-          <div className="sidebar-scroll -mx-1 min-h-0 flex-1 overflow-y-auto px-2 pb-2">
+            <div className="flex min-w-0 items-center gap-2">
+              <label className="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-[9px] border border-[var(--c-border)] bg-[var(--c-surface)] px-2.5 text-[var(--c-text-muted)] focus-within:border-[var(--c-accent)]">
+                <IconSearch size={14} />
+                <input ref={filterRef} value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => { if (e.key === "Escape") { e.currentTarget.blur(); if (query) setQuery(""); } }} placeholder="Filtrer ce vault" aria-label="Filtrer ce vault" className="min-w-0 flex-1 bg-transparent text-[13.5px] text-[var(--c-text)] outline-none placeholder:text-[var(--c-text-muted)] focus-visible:outline-none" />
+                {!touch && !query && <span className="kbd">/</span>}
+              </label>
+              {entities.length > 0 && (
+                <Dropdown
+                  label="Type d'élément"
+                  className="w-56"
+                  trigger={({ open, toggle }) => (
+                    <button onClick={toggle} aria-expanded={open} aria-haspopup="menu" className={`btn max-w-[9.5rem] ${filter === "all" ? "btn-secondary" : "btn-toggled"}`} title="Type d'élément">
+                      <span className="truncate">{filterLabel(filter)}</span><IconChevronDown size={12} />
+                    </button>
+                  )}
+                >
+                  {(close) => FILTERS.filter((f) => f === "all" || (counts[f] ?? 0) > 0).map((f) => (
+                    <button key={f} role="menuitemradio" aria-checked={filter === f} data-active={filter === f ? "true" : undefined} onClick={() => { setFilter(f); close(); }} className="menu-item">
+                      <span className="min-w-0 flex-1 truncate">{filterLabel(f)}</span>
+                      <span className="text-[12px] tabular-nums text-[var(--c-text-muted)]">{counts[f]}</span>
+                    </button>
+                  ))}
+                </Dropdown>
+              )}
+              <Dropdown
+                label="Trier"
+                className="w-52"
+                trigger={({ open, toggle }) => <button onClick={toggle} aria-expanded={open} aria-haspopup="menu" className="btn btn-secondary btn-icon" title={`Trier : ${SORT_LABELS[sort]}`} aria-label="Trier"><IconSort size={15} /></button>}
+              >
+                {(close) => (Object.keys(SORT_LABELS) as SortMode[]).map((m) => (
+                  <button key={m} role="menuitemradio" aria-checked={sort === m} data-active={sort === m ? "true" : undefined} onClick={() => { setSort(m); close(); }} className="menu-item">
+                    <span className="flex-1">{SORT_LABELS[m]}</span>
+                    {sort === m && <IconCheck size={14} />}
+                  </button>
+                ))}
+              </Dropdown>
+              {writable && (
+                <button onClick={() => { setQuery(""); setFilter("all"); setNaming({ mode: "create", parentId: null }); }} className="btn btn-secondary btn-icon shrink-0 max-sm:hidden" title="Nouveau dossier (à la racine ; le bouton d'un dossier en crée un dedans)" aria-label="Nouveau dossier"><IconFolderPlus size={15} /></button>
+              )}
+            </div>
+          </header>
+          <div className="sidebar-scroll -mx-1 min-h-0 flex-1 overflow-y-auto px-3 pb-4">
             {items === null ? (slow ? <Loading /> : null) : (
               <ItemTree
                 entities={filtered}
@@ -491,17 +549,23 @@ function VaultBody({ ctx, vault, itemId }: { ctx: PageContext; vault: VaultView;
                 sort={sort}
                 keyboard={mode.kind === "view"}
                 alerts={alerts}
-                emptyMessage={writable ? "Rien ici pour l'instant — « Nouveau » pour commencer, importez un export, ou synchronisez depuis Guiterm." : "Rien ici pour l'instant."}
+                emptyMessage={writable ? "Ce vault est vide." : "Rien ici pour l'instant."}
                 {...(writable && sort === "name" ? { folderActions, naming, onName: (n: string) => void submitFolderName(n), onNameCancel: () => setNaming(null), onMove: (id: string, folderId: string | null) => void moveToFolder(id, folderId) } : {})}
               />
+            )}
+            {items !== null && entities.length === 0 && writable && (
+              <div className="flex flex-wrap justify-center gap-2 px-2 pb-4">
+                <button onClick={() => setMode({ kind: "new", itemKind: "login" })} className="btn btn-primary"><IconPlus size={14} /> Nouvel identifiant</button>
+                <button onClick={() => navigate({ page: "vault-tools", id: vault.id })} className="btn btn-secondary">Importer</button>
+              </div>
             )}
           </div>
         </section>
 
         <PaneHandle onMouseDown={list.onMouseDown} />
-        <section className={`flex min-h-0 flex-1 flex-col ${list.isDragging ? "pointer-events-none select-none" : ""}`}>
+        <section className={`flex min-h-0 flex-1 flex-col border-l border-[var(--c-border)] max-md:border-l-0 ${list.isDragging ? "pointer-events-none select-none" : ""}`}>
           {stale && mode.kind !== "view" && (
-            <p className="callout callout-warn m-3 mb-0">Ce vault a été modifié entre-temps. Si cet élément l'a été aussi, l'enregistrement vous proposera de fusionner les deux versions.</p>
+            <p className="callout callout-warn m-4 mb-0">Ce vault a changé entre-temps : l'enregistrement proposera de fusionner.</p>
           )}
           {mode.kind === "new" && (
             <ItemForm key={`${mode.itemKind}-${mode.groupId ?? ""}`} kind={mode.itemKind} index={index} defaultGroupId={mode.groupId !== undefined ? mode.groupId : selectedGroupId} onSave={(p) => save(p)} onCancel={() => setMode({ kind: "view" })} onAddIcon={addIcon} />
@@ -510,49 +574,93 @@ function VaultBody({ ctx, vault, itemId }: { ctx: PageContext; vault: VaultView;
             <ItemForm kind={current.payload.kind} initial={current.payload} index={index} onSave={(p) => save(p, current.revision)} onCancel={() => setMode({ kind: "view" })} onAddIcon={addIcon} />
           )}
           {mode.kind === "view" && !current && (
-            <div className="flex flex-1 items-center justify-center p-6 text-center text-[12.5px] text-[var(--c-text-muted)] max-md:hidden">
-              {items && items.length > 0 ? "Choisissez un élément dans la liste." : ""}
+            <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center max-md:hidden">
+              {items && items.length > 0 && (
+                <>
+                  <span className="flex h-11 w-11 items-center justify-center rounded-xl border border-dashed border-[var(--c-border-strong)] text-[var(--c-text-muted)]"><IconVault size={20} /></span>
+                  <p className="text-[13.5px] text-[var(--c-text-muted)]">Choisissez un élément.</p>
+                  {!touch && <p className="flex items-center gap-1.5 text-[12.5px] text-[var(--c-text-faint)]"><span className="kbd">/</span> filtrer <span className="kbd">?</span> raccourcis</p>}
+                </>
+              )}
             </div>
           )}
           {mode.kind === "view" && current && (
             <>
-              <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-[var(--c-border)] px-4 py-2.5">
+              <div className="flex min-h-[52px] shrink-0 flex-wrap items-center gap-2 border-b border-[var(--c-border)] px-5 py-2 max-md:px-3">
                 <button onClick={() => setSelected(null)} className="btn btn-ghost btn-sm md:hidden">← Liste</button>
-                {current.ok && (() => { const entity = entities.find((e) => e.id === current.id); return <span className="flex h-6 w-6 items-center justify-center rounded-md bg-[var(--c-bg3)] text-[var(--c-text-secondary)] [&>.host-icon]:h-[72%] [&>.host-icon]:w-[72%] [&>.host-icon>*]:h-full [&>.host-icon>*]:w-full">{entity ? <EntityIcon entity={entity} customIcons={index.icons} /> : null}</span>; })()}
-                <h2 className="min-w-0 truncate text-[13px] font-semibold text-[var(--c-text)]">{current.ok ? payloadName(current.payload) : "Élément illisible"}</h2>
-                <span className="text-[11px] text-[var(--c-text-faint)]" title={`Révision ${current.revision}`}>{current.ok ? KIND_LABELS[current.payload.kind] : current.itemType} · {formatWhen(current.updatedAt)}</span>
+                <div className="flex min-w-0 flex-1 items-center gap-2 text-[13px] text-[var(--c-text-muted)] max-md:hidden">
+                  <span className="truncate">{vault.name}</span>
+                  {entity?.path && <><IconChevronRight size={12} className="shrink-0 text-[var(--c-text-faint)]" /><span className="truncate">{entity.path}</span></>}
+                </div>
+                <span className="flex-1 md:hidden" />
                 {current.ok && current.payload.kind === "login" && autoTypeBridge() && (() => {
                   const login = current.payload.login;
                   return (
-                    <button onClick={() => performAutoType(login).catch((e) => ctx.error(`Saisie automatique : ${errorMessage(e)}`))} disabled={login.autoType?.enabled === false} className="btn btn-ghost btn-sm btn-icon" title={login.autoType?.enabled === false ? "Saisie automatique désactivée pour cet identifiant" : "Saisie automatique : GuiVault se réduit et le tape dans la fenêtre d'avant"} aria-label="Saisie automatique"><IconKeyboard size={13} /></button>
+                    <button onClick={() => performAutoType(login).catch((e) => ctx.error(`Saisie automatique : ${errorMessage(e)}`))} disabled={login.autoType?.enabled === false} className="btn btn-ghost btn-icon" title={login.autoType?.enabled === false ? "Saisie automatique désactivée pour cet identifiant" : "Saisie automatique : GuiVault se réduit et le tape dans la fenêtre d'avant"} aria-label="Saisie automatique"><IconKeyboard size={15} /></button>
                   );
                 })()}
                 {!emergency && isSecretItem && supports("createSend") && (
-                  <button onClick={() => setSharing(true)} className={`btn btn-ghost btn-sm btn-icon ${writable ? "" : "ml-auto"}`} title="Partager par lien : une copie chiffrée, qui expire" aria-label="Partager par lien"><IconLink size={13} /></button>
+                  <button onClick={() => setSharing(true)} className="btn btn-secondary" title="Partager par lien : une copie chiffrée, qui expire"><IconLink size={14} /> <span className="max-sm:hidden">Partager</span></button>
                 )}
-                {!emergency && <button onClick={() => setHistory(true)} className={`btn btn-ghost btn-sm btn-icon ${writable || isSecretItem ? "" : "ml-auto"}`} title="Historique : ses versions précédentes" aria-label="Historique"><IconHistory size={13} /></button>}
-                {writable && (
-                  <div className="ml-auto flex items-center gap-1">
-                    {isSecretItem && current.ok && (() => {
-                      const fav = !!(payloadEntity(current.payload).favorite);
-                      return <button onClick={() => void toggleFavorite()} aria-pressed={fav} className={`btn btn-sm btn-icon ${fav ? "btn-toggled" : "btn-ghost"}`} title={fav ? "Retirer des favoris" : "Ajouter aux favoris"} aria-label={fav ? "Retirer des favoris" : "Ajouter aux favoris"}><IconStar size={12} filled={fav} /></button>;
-                    })()}
-                    {current.ok && <button onClick={() => setMode({ kind: "edit" })} className="btn btn-secondary btn-sm"><IconEdit size={12} /> Modifier</button>}
-                    {current.ok && otherWritable.length > 0 && (
-                      <select value="" onChange={(e) => { const v = otherWritable.find((x) => x.id === e.target.value); if (v) setMoveTo(v); }} className="input h-6 w-auto text-[11.5px]" title="Déplacer vers un autre vault">
-                        <option value="">Déplacer vers…</option>
-                        {otherWritable.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
-                      </select>
-                    )}
-                    <button onClick={() => setConfirmDelete(true)} className="btn btn-ghost btn-sm btn-icon hover:text-[var(--c-danger)]" title="Supprimer" aria-label="Supprimer"><IconTrash size={12} /></button>
-                  </div>
-                )}
+                {writable && current.ok && <button onClick={() => setMode({ kind: "edit" })} className="btn btn-secondary"><IconEdit size={14} /> <span className="max-sm:hidden">Modifier</span></button>}
+                <Dropdown
+                  label="Plus d'actions"
+                  className="w-60"
+                  trigger={({ open, toggle }) => <button onClick={toggle} aria-expanded={open} aria-haspopup="menu" className="btn btn-ghost btn-icon" title="Plus d'actions" aria-label="Plus d'actions"><IconDots size={16} /></button>}
+                >
+                  {(close) => (
+                    <>
+                      {!emergency && <button role="menuitem" className="menu-item" onClick={() => { close(); setHistory(true); }}><IconHistory size={14} /> Historique<span className="flex-1" />{!touch && <span className="kbd">H</span>}</button>}
+                      {writable && current.ok && otherWritable.map((v) => (
+                        <button key={v.id} role="menuitem" className="menu-item" onClick={() => { close(); setMoveTo(v); }}>
+                          <span className="vdot" style={{ background: vaultColor(v.id, v.kind === "personal", colors) }} />
+                          <span className="min-w-0 flex-1 truncate">Déplacer vers {v.name}</span>
+                        </button>
+                      ))}
+                      {writable && <><div className="menu-sep" /><button role="menuitem" className="menu-item text-[var(--c-danger-text)]" onClick={() => { close(); setConfirmDelete(true); }}><IconTrash size={14} /> Supprimer<span className="flex-1" />{!touch && <span className="kbd">Suppr</span>}</button></>}
+                    </>
+                  )}
+                </Dropdown>
               </div>
-              <div className="sidebar-scroll min-h-0 flex-1 overflow-y-auto p-4">
-                <div className="max-w-2xl">
-                  {alerts.has(current.id) && <p className="callout callout-danger mb-3">{capitalize(alerts.get(current.id)!)} : ne vous y fiez pas avant de l'avoir vérifié.</p>}
+              <div className="sidebar-scroll min-h-0 flex-1 overflow-y-auto px-8 pb-10 pt-7 max-md:px-4 max-md:pt-5">
+                <div className="flex max-w-[860px] flex-col gap-6">
+                  {alerts.has(current.id) && <p className="callout callout-danger">{capitalize(alerts.get(current.id)!)} : ne vous y fiez pas avant de l'avoir vérifié.</p>}
                   {current.ok ? (
                     <>
+                      <div className="flex min-w-0 items-center gap-4">
+                        {entity && <ItemTile entity={entity} customIcons={index.icons} size={56} />}
+                        <div className="flex min-w-0 flex-1 flex-col gap-1">
+                          <div className="flex min-w-0 items-center gap-1.5">
+                            <h2 className="min-w-0 truncate text-[24px] font-semibold tracking-[-0.02em] text-[var(--c-text)]" title={payloadName(current.payload)}>{payloadName(current.payload) || "(sans nom)"}</h2>
+                            {writable && isSecretItem && (() => {
+                              const fav = !!(payloadEntity(current.payload).favorite);
+                              return <button onClick={() => void toggleFavorite()} aria-pressed={fav} className="btn btn-ghost btn-icon shrink-0" style={{ color: fav ? "#f5c04a" : undefined }} title={fav ? "Retirer des épinglés" : "Épingler"} aria-label={fav ? "Retirer des épinglés" : "Épingler"}><IconStar size={17} filled={fav} /></button>;
+                            })()}
+                          </div>
+                          <p className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-[13px] text-[var(--c-text-muted)]">
+                            {current.payload.kind === "login" && current.payload.login.uris[0]?.uri && <><a href={current.payload.login.uris[0].uri} target="_blank" rel="noopener noreferrer" className="max-w-[260px] truncate">{uriHost(current.payload.login.uris[0].uri)}</a><span>·</span></>}
+                            <span>{capitalize(KIND_LABELS[current.payload.kind])}</span>
+                            <span>·</span>
+                            <span title={`${formatWhen(current.updatedAt)} · révision ${current.revision}`}>Modifié {formatAgo(current.updatedAt)}</span>
+                          </p>
+                        </div>
+                      </div>
+                      {(() => {
+                        const p = current.payload;
+                        const secret = primarySecret(p);
+                        const user = primaryUser(p);
+                        const totp = p.kind === "login" ? p.login.totp : null;
+                        const site = p.kind === "login" ? p.login.uris[0]?.uri : null;
+                        if (!secret && !user && !totp && !site) return null;
+                        return (
+                          <div className="flex flex-wrap gap-2">
+                            {secret && <button onClick={() => copyValue(secret)} className="btn btn-primary btn-lg"><IconCopy size={15} /> Copier {withArticle(secret.label)}{!touch && <span className="kbd">C</span>}</button>}
+                            {user && <button onClick={() => copyValue(user)} className="btn btn-secondary btn-lg"><IconCopy size={15} /> Copier {withArticle(user.label)}</button>}
+                            {totp && <button onClick={() => copyTotp(totp)} className="btn btn-secondary btn-lg"><IconShieldClock size={15} /> Copier le code 2FA</button>}
+                            {site && /^https?:\/\//i.test(site) && <a href={site} target="_blank" rel="noopener noreferrer" className="btn btn-secondary btn-lg hover:no-underline"><IconExternal size={15} /> Ouvrir le site</a>}
+                          </div>
+                        );
+                      })()}
                       <ItemView payload={current.payload} index={index} />
                       {isSecret(current.payload) && (
                         <AttachmentsPanel key={current.id} vault={vault} item={current} writable={writable} offline={!!ctx.session.offline} session={ctx.session} onChanged={() => void load()} notify={ctx.notify} error={ctx.error} />

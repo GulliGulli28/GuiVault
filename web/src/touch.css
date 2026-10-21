@@ -1,8 +1,8 @@
 /* Écrans tactiles et étroits : ce qui s'ajoute à la charte (`index.css`,
- * identique à celle de Guiterm, pensée pour la souris). Rien ici ne change
+ * pensée pour la souris). Rien ici ne change
  * l'affichage à la souris sur un grand écran. Importée après `index.css` :
  * à spécificité égale, elle l'emporte sur les primitives et les utilitaires.
- * Tailles en px : la racine est à 13 px, un `rem` n'y fait pas un doigt. */
+ * Tailles en px : un `rem` n'y fait pas un doigt. */
 
 @media (pointer: coarse) {
   /* Safari iOS agrandit la page au focus de tout champ sous 16 px. */

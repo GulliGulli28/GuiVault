@@ -12,13 +12,14 @@ import { errorMessage, supports } from "../lib/api";
 import { autoTypeBridge } from "../lib/platform";
 import { copyText } from "../lib/clipboard";
 import { indexItems, matchesQuery, toEntities } from "../lib/entities";
-import { primarySecret, primaryUser } from "../lib/items";
+import { primarySecret, primaryUser, withArticle } from "../lib/items";
+import { vaultColor } from "../lib/vaultColors";
 import { navigate, type Route } from "../lib/route";
 import { loadItems, type DecodedItem, type VaultView } from "../lib/session";
-import { KIND_LABELS, type CustomIcon, type GuiVaultEntity, type Payload } from "../lib/types";
+import { KIND_LABELS, KIND_LABELS_PLURAL, type CustomIcon, type GuiVaultEntity, type Payload } from "../lib/types";
 import { useModalSurface } from "../hooks/useModalSurface";
-import { EntityIcon } from "./ItemTree";
-import { IconSearch } from "./ui-icons";
+import { ItemTile } from "./ItemTree";
+import { IconChevronRight } from "./ui-icons";
 
 const cache = new Map<string, DecodedItem[]>();
 
@@ -36,7 +37,7 @@ const MAX_ITEMS = 50;
 function pages(vaults: VaultView[]): Entry[] {
   const all: Entry[] = [
     { kind: "page", key: "generator", label: "Générateur de mots de passe", keywords: "générer phrase de passe clé ssh", route: { page: "generator" } },
-    { kind: "page", key: "totp", label: "Authentificateur (codes TOTP)", keywords: "2fa otp code", route: { page: "totp" } },
+    { kind: "page", key: "totp", label: "Codes 2FA", keywords: "authentificateur totp otp code", route: { page: "totp" } },
     { kind: "page", key: "invitations", label: "Invitations reçues", keywords: "partage", route: { page: "invitations" } },
     { kind: "page", key: "settings-apparence", label: "Paramètres — Apparence", keywords: "thème couleur police", route: { page: "settings", section: "apparence" } },
     { kind: "page", key: "settings-compte", label: "Paramètres — Compte", keywords: "empreinte e-mail", route: { page: "settings", section: "compte" } },
@@ -109,12 +110,14 @@ export function SearchPalette({ ctx, onClose }: { ctx: PageContext; onClose: () 
     if (!q) return pageEntries;
     const found = items
       .filter((e) => e.kind === "item" && matchesQuery(e.entity, q, e.vault.name))
-      // Le nom qui contient la recherche d'abord, puis par nom.
+      // Groupés par genre ; dans un genre, le nom qui contient la recherche
+      // d'abord, puis par nom.
       .sort((a, b) => {
         if (a.kind !== "item" || b.kind !== "item") return 0;
+        const ak = kindRank(a.entity.kind), bk = kindRank(b.entity.kind);
         const an = a.entity.name.toLowerCase().includes(q) ? 0 : 1;
         const bn = b.entity.name.toLowerCase().includes(q) ? 0 : 1;
-        return an - bn || a.entity.name.localeCompare(b.entity.name);
+        return ak - bk || an - bn || a.entity.name.localeCompare(b.entity.name);
       })
       .slice(0, MAX_ITEMS);
     return [...found, ...pageEntries];
@@ -142,11 +145,12 @@ export function SearchPalette({ ctx, onClose }: { ctx: PageContext; onClose: () 
   };
 
   const current = results[active];
+  const groupOf = (e: Entry) => (e.kind === "item" ? capitalize(KIND_LABELS_PLURAL[e.entity.kind]) : "Aller à");
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 px-4 pt-[12vh]" onClick={onClose}>
-      <div ref={ref} {...dialogProps} className="modal w-full max-w-xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center gap-2 border-b border-[var(--c-border)] px-4">
-          <IconSearch size={14} className="shrink-0 text-[var(--c-text-muted)]" />
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-[rgba(5,6,8,0.55)] px-4 pt-[12vh]" onClick={onClose}>
+      <div ref={ref} {...dialogProps} className="modal w-full max-w-[660px] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-3 border-b border-[var(--c-border)] px-[18px]">
+          <span className="font-mono text-[18px] leading-none text-[var(--c-accent)]" aria-hidden="true">›</span>
           <input
             ref={inputRef}
             value={query}
@@ -162,54 +166,84 @@ export function SearchPalette({ ctx, onClose }: { ctx: PageContext; onClose: () 
                 copy(current, e.shiftKey ? "user" : "secret");
               }
             }}
-            placeholder="Rechercher un élément dans tous les vaults, ou une page…"
+            placeholder="Rechercher dans tous les vaults, ou aller à une page"
             aria-label="Rechercher"
-            className="min-w-0 flex-1 bg-transparent py-3 text-[13.5px] text-[var(--c-text)] outline-none placeholder:text-[var(--c-text-muted)]"
+            className="min-w-0 flex-1 bg-transparent py-4 text-[16px] text-[var(--c-text)] outline-none placeholder:text-[var(--c-text-muted)] focus-visible:outline-none"
           />
-          {loading && <span className="shrink-0 text-[11px] text-[var(--c-text-faint)]">lecture des vaults…</span>}
+          {loading ? <span className="shrink-0 text-[12px] text-[var(--c-text-muted)]">Lecture…</span> : <span className="tag max-sm:hidden">Tous les vaults</span>}
+          <span className="kbd [@media(pointer:coarse)]:hidden">Échap</span>
         </div>
-        <div className="sidebar-scroll max-h-[55vh] overflow-y-auto py-1" role="listbox" aria-label="Résultats">
-          {results.length === 0 && <p className="px-4 py-6 text-center text-[12.5px] text-[var(--c-text-muted)]">{loading ? "Lecture des vaults…" : "Aucun résultat"}</p>}
+        <div className="sidebar-scroll max-h-[55vh] overflow-y-auto p-1.5" role="listbox" aria-label="Résultats">
+          {results.length === 0 && <p className="px-4 py-8 text-center text-[13px] text-[var(--c-text-muted)]">{loading ? "Lecture des vaults…" : "Aucun résultat"}</p>}
           {results.map((e, i) => (
-            <button
-              key={e.key}
-              ref={(el) => { rowRefs.current[i] = el; }}
-              role="option"
-              aria-selected={i === active}
-              onClick={() => run(e)}
-              onMouseEnter={() => setActive(i)}
-              className={`mx-1 flex w-[calc(100%-0.5rem)] items-center gap-2.5 rounded-md px-3 py-1.5 text-left transition-colors ${i === active ? "bg-[var(--c-accent-dim)]" : ""}`}
-            >
-              {e.kind === "item" ? <ItemRow entity={e.entity} icons={e.icons} vault={e.vault.name} /> : <span className="truncate text-[12.5px] text-[var(--c-text-secondary)]">{e.label}</span>}
-            </button>
+            <div key={e.key}>
+              {(i === 0 || groupOf(results[i - 1]) !== groupOf(e)) && <p className="px-3 pb-1 pt-2.5 text-[12px] font-medium text-[var(--c-text-muted)]">{groupOf(e)}</p>}
+              <button
+                ref={(el) => { rowRefs.current[i] = el; }}
+                role="option"
+                aria-selected={i === active}
+                onClick={() => run(e)}
+                onMouseEnter={() => setActive(i)}
+                className={`flex w-full min-w-0 items-center gap-3 rounded-[9px] px-3 py-2 text-left transition-colors ${i === active ? "bg-[var(--c-sel)]" : ""}`}
+              >
+                {e.kind === "item" ? (
+                  <ItemRow entity={e.entity} icons={e.icons} vault={e.vault} query={query.trim()} active={i === active} />
+                ) : (
+                  <>
+                    <span className="tile tile-neutral" style={{ "--tile-size": "28px" } as React.CSSProperties}><IconChevronRight size={14} /></span>
+                    <span className="min-w-0 flex-1 truncate text-[13.5px] text-[var(--c-text)]"><Highlight text={e.label} query={query.trim()} /></span>
+                    {i === active && <span className="kbd [@media(pointer:coarse)]:hidden">Entrée</span>}
+                  </>
+                )}
+              </button>
+            </div>
           ))}
         </div>
         {/* Des raccourcis clavier : rien à dire à un doigt. */}
-        <footer className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-[var(--c-border)] px-4 py-2 text-[11px] text-[var(--c-text-muted)] [@media(pointer:coarse)]:hidden">
+        <footer className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-[var(--c-border)] px-[18px] py-2.5 text-[12px] text-[var(--c-text-muted)] [@media(pointer:coarse)]:hidden">
           <Hint keys={["↑", "↓"]}>parcourir</Hint>
           <Hint keys={["Entrée"]}>ouvrir</Hint>
-          {current?.kind === "item" && primarySecret(current.payload) && <Hint keys={["Ctrl", "C"]}>copier {primarySecret(current.payload)!.label.toLowerCase()}</Hint>}
-          {current?.kind === "item" && primaryUser(current.payload) && <Hint keys={["Ctrl", "Maj", "C"]}>copier {primaryUser(current.payload)!.label.toLowerCase()}</Hint>}
-          <Hint keys={["Échap"]}>fermer</Hint>
+          {current?.kind === "item" && primarySecret(current.payload) && <Hint keys={["Ctrl", "C"]}>copier {withArticle(primarySecret(current.payload)!.label)}</Hint>}
+          {current?.kind === "item" && primaryUser(current.payload) && <Hint keys={["Ctrl", "Maj", "C"]}>copier {withArticle(primaryUser(current.payload)!.label)}</Hint>}
         </footer>
       </div>
     </div>
   );
 }
 
-function ItemRow({ entity, icons, vault }: { entity: GuiVaultEntity; icons: CustomIcon[]; vault: string }) {
+/** L'ordre des groupes : les identifiants et les hôtes d'abord. */
+const KIND_ORDER: GuiVaultEntity["kind"][] = ["login", "host", "card", "note", "identity", "api-key", "aws", "sql-connection", "key", "snippet", "runbook"];
+function kindRank(k: GuiVaultEntity["kind"]): number {
+  const i = KIND_ORDER.indexOf(k);
+  return i < 0 ? KIND_ORDER.length : i;
+}
+
+function capitalize(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+/** Le texte, la partie qui correspond à la recherche mise en avant. */
+function Highlight({ text, query }: { text: string; query: string }) {
+  const i = query ? text.toLowerCase().indexOf(query.toLowerCase()) : -1;
+  if (i < 0) return <>{text}</>;
+  return <>{text.slice(0, i)}<mark className="bg-transparent font-semibold text-[var(--c-accent-text)]">{text.slice(i, i + query.length)}</mark>{text.slice(i + query.length)}</>;
+}
+
+function ItemRow({ entity, icons, vault, query, active }: { entity: GuiVaultEntity; icons: CustomIcon[]; vault: VaultView; query: string; active: boolean }) {
   return (
     <>
-      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[var(--c-bg3)] text-[var(--c-text-secondary)] [&>.host-icon]:h-[72%] [&>.host-icon]:w-[72%] [&>.host-icon>*]:h-full [&>.host-icon>*]:w-full">
-        <EntityIcon entity={entity} customIcons={icons} />
-      </span>
+      <ItemTile entity={entity} customIcons={icons} size={28} />
       <span className="flex min-w-0 flex-1 flex-col leading-tight">
-        <span className="truncate text-[12.5px] text-[var(--c-text)]">{entity.name}</span>
-        <span className={`truncate text-[11px] text-[var(--c-text-muted)] ${entity.mono ? "font-mono" : ""}`}>
-          {[KIND_LABELS[entity.kind], entity.path, entity.subtitle].filter(Boolean).join(" · ")}
+        <span className={`truncate text-[13.5px] text-[var(--c-text)] ${entity.kind === "host" ? "font-mono" : ""}`}><Highlight text={entity.name} query={query} /></span>
+        <span className={`truncate text-[12px] text-[var(--c-text-muted)] ${entity.mono ? "font-mono" : ""}`}>
+          {[entity.path, entity.subtitle].filter(Boolean).join(" · ") || KIND_LABELS[entity.kind]}
         </span>
       </span>
-      <span className="tag shrink-0">{vault}</span>
+      <span className="flex max-w-[160px] min-w-0 shrink-0 items-center gap-1.5 text-[12px] text-[var(--c-text-muted)] max-sm:hidden">
+        <span className="vdot" style={{ background: vaultColor(vault.id, vault.kind === "personal") }} />
+        <span className="truncate">{vault.name}</span>
+      </span>
+      {active && <span className="kbd [@media(pointer:coarse)]:hidden">Entrée</span>}
     </>
   );
 }

@@ -1,15 +1,14 @@
-/** Les préférences d'affichage — le sous-ensemble « Apparence » de
- * `src/lib/preferences.ts` de Guiterm, avec les mêmes fonds, les mêmes
- * accents, les mêmes polices et les mêmes tailles de ligne : un vault se lit
- * pareil ici et là-bas. Les tables (`ACCENT_COLORS`, `BG_THEMES`,
- * `UI_FONT_FAMILIES`…) sont **recopiées** de Guiterm — les changer ici,
- * c'est les changer là-bas.
+/** Les préférences d'affichage. Parties du sous-ensemble « Apparence » de
+ * Guiterm (mêmes accents nommés, que les dossiers gardent comme couleur),
+ * elles ont leur défaut propre depuis la refonte (`docs/DESIGN.md`) : le fond
+ * « Graphite », l'accent « Pervenche » et la police Geist. Les autres fonds
+ * et accents restent proposés.
  *
- * Deux écarts propres au navigateur : le mode `system` (le choix du système,
- * ce qu'une page web sait suivre), et le stockage sous `guivault.preferences`
+ * Propres au navigateur : le mode `system` (le choix du système, ce qu'une
+ * page web sait suivre), et le stockage sous `guivault.preferences`
  * (l'ancien `guivault.theme` est repris une fois). */
 
-export type UiAccent = "indigo" | "blue" | "violet" | "emerald" | "rose" | "teal" | "amber" | "cyan";
+export type UiAccent = "pervenche" | "indigo" | "blue" | "violet" | "emerald" | "rose" | "teal" | "amber" | "cyan";
 /** Une couleur nommée, ou la couleur libre de `uiAccentCustom`. */
 export type UiAccentChoice = UiAccent | "custom";
 
@@ -23,9 +22,13 @@ export interface AccentColorEntry {
    * n'a pas assez de contraste sur du blanc. */
   c300: string;
   dim: string;
+  /** Remplissage et survol propres au mode clair, quand celui du sombre y
+   * manquerait de contraste (« Pervenche »). */
+  light?: { c600: string; c500: string };
 }
 
 export const ACCENT_COLORS: Record<UiAccent, AccentColorEntry> = {
+  pervenche: { label: "Pervenche", c600: "#8b8cff", c500: "#a0a1ff", c300: "#b9baff", dim: "rgba(139,140,255,0.16)", light: { c600: "#5755d9", c500: "#4846c8" } },
   indigo:  { label: "Indigo",   c600: "#4f46e5", c500: "#6366f1", c300: "#a5b4fc", dim: "rgba(79,70,229,0.18)"  },
   blue:    { label: "Bleu",     c600: "#2563eb", c500: "#3b82f6", c300: "#93c5fd", dim: "rgba(37,99,235,0.18)"  },
   violet:  { label: "Violet",   c600: "#7c3aed", c500: "#8b5cf6", c300: "#c4b5fd", dim: "rgba(124,58,237,0.18)" },
@@ -36,7 +39,7 @@ export const ACCENT_COLORS: Record<UiAccent, AccentColorEntry> = {
   cyan:    { label: "Cyan",     c600: "#0891b2", c500: "#06b6d4", c300: "#67e8f9", dim: "rgba(8,145,178,0.18)"  },
 };
 
-export type UiBg = "slate" | "gray" | "zinc" | "black" | "navy" | "aurora";
+export type UiBg = "graphite" | "slate" | "gray" | "zinc" | "black" | "navy" | "aurora";
 export type ColorMode = "dark" | "light";
 /** Le mode choisi : les deux de Guiterm, ou celui du système. */
 export type ColorModeChoice = ColorMode | "system";
@@ -63,6 +66,12 @@ export interface BgThemeEntry {
  * `bg2` est blanc — le panneau — et `bg` un gris à peine teinté pour la zone
  * de travail. */
 export const BG_THEMES: Record<UiBg, BgThemeEntry> = {
+  graphite: {
+    label: "Graphite",
+    lightLabel: "Craie",
+    dark:  { bg: "#0b0c0e", bg2: "#0e0f12", bg3: "#17181d", border: "#1f2127" },
+    light: { bg: "#f4f4f2", bg2: "#ffffff", bg3: "#efefec", border: "#e3e3df" },
+  },
   slate: {
     label: "Ardoise",
     dark:  { bg: "#0a0e17", bg2: "#10151f", bg3: "#171d2a", border: "#232b3b" },
@@ -125,7 +134,14 @@ export interface AppPreferences {
   hostGroupSize: number;
   /** Taille, en pixels, de l'icône des lignes de dossier. */
   hostGroupIconSize: number;
+  /** Version du design pour laquelle ces préférences ont été réglées. Avant
+   * la refonte (absent), fond, accent et police reprennent les nouveaux
+   * défauts une fois (`normalizePreferences`). */
+  design?: number;
 }
+
+/** La refonte de l'interface (2026-10). */
+export const DESIGN_VERSION = 2;
 
 export const HOST_GROUP_SIZE_MIN = 11;
 export const HOST_GROUP_SIZE_MAX = 20;
@@ -156,7 +172,11 @@ export function hostGroupMetrics(fontPx: number, iconPx: number): { font: string
   return { font: `${font}px`, icon: `${icon}px`, height: `${Math.round(Math.max(font * 2.2, icon + 10))}px` };
 }
 
+/** La police par défaut, embarquée (`src/fonts.ts`). */
+export const GEIST_STACK = "\"Geist Variable\", system-ui, -apple-system, \"Segoe UI\", sans-serif";
+
 export const UI_FONT_FAMILIES: { value: string; label: string }[] = [
+  { value: GEIST_STACK, label: "Geist" },
   { value: "system", label: "Système (Segoe UI sous Windows)" },
   { value: "\"Inter\", system-ui, sans-serif", label: "Inter" },
   { value: "\"Segoe UI Variable Text\", \"Segoe UI\", system-ui, sans-serif", label: "Segoe UI" },
@@ -173,6 +193,13 @@ export function uiFontStack(value: string): string {
     : value;
 }
 
+/** La luminance relative d'une couleur `#rrggbb` (0 noir, 1 blanc). */
+function luminance(hex: string): number {
+  const n = parseInt(hex.replace("#", ""), 16);
+  const lin = (c: number) => { const v = c / 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+  return 0.2126 * lin((n >> 16) & 255) + 0.7152 * lin((n >> 8) & 255) + 0.0722 * lin(n & 255);
+}
+
 /** Les quatre teintes d'accent dérivées d'une couleur libre : remplissage,
  * survol (un peu plus clair), texte sur fond sombre (nettement plus clair),
  * et le voile atténué. */
@@ -186,14 +213,15 @@ export function accentFromHex(hex: string): AccentColorEntry {
 
 export const DEFAULT_PREFERENCES: AppPreferences = {
   colorMode: "dark",
-  uiBg: "zinc",
-  uiAccent: "blue",
-  uiAccentCustom: "#2563eb",
-  uiFontFamily: "system",
-  hostRowSize: 12.5,
-  hostRowIconSize: 24,
+  uiBg: "graphite",
+  uiAccent: "pervenche",
+  uiAccentCustom: "#8b8cff",
+  uiFontFamily: GEIST_STACK,
+  hostRowSize: 13.5,
+  hostRowIconSize: 32,
   hostGroupSize: 13,
   hostGroupIconSize: 16,
+  design: DESIGN_VERSION,
 };
 
 const STORAGE_KEY = "guivault.preferences";
@@ -208,12 +236,7 @@ export function loadPreferences(): AppPreferences {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
-      const parsed = JSON.parse(raw) as Partial<AppPreferences>;
-      const prefs: AppPreferences = { ...DEFAULT_PREFERENCES, ...parsed };
-      if (!isMode(prefs.colorMode)) prefs.colorMode = DEFAULT_PREFERENCES.colorMode;
-      if (!(prefs.uiBg in BG_THEMES)) prefs.uiBg = DEFAULT_PREFERENCES.uiBg;
-      if (prefs.uiAccent !== "custom" && !(prefs.uiAccent in ACCENT_COLORS)) prefs.uiAccent = DEFAULT_PREFERENCES.uiAccent;
-      return prefs;
+      return normalizePreferences(JSON.parse(raw) as Partial<AppPreferences>);
     }
     const legacy = localStorage.getItem(LEGACY_THEME_KEY);
     if (isMode(legacy)) return { ...DEFAULT_PREFERENCES, colorMode: legacy };
@@ -221,6 +244,26 @@ export function loadPreferences(): AppPreferences {
     // Stockage indisponible ou illisible : les défauts.
   }
   return { ...DEFAULT_PREFERENCES };
+}
+
+/** Des préférences lues (stockage, autre appareil) rendues sûres : ce qui
+ * est invalide reprend le défaut, et des préférences d'avant la refonte
+ * prennent les nouveaux fond, accent, police et lignes d'entité — le mode
+ * et les dossiers restent. */
+export function normalizePreferences(parsed: Partial<AppPreferences>): AppPreferences {
+  const prefs: AppPreferences = { ...DEFAULT_PREFERENCES, ...parsed };
+  if ((parsed.design ?? 0) < DESIGN_VERSION) {
+    prefs.uiBg = DEFAULT_PREFERENCES.uiBg;
+    prefs.uiAccent = DEFAULT_PREFERENCES.uiAccent;
+    prefs.uiFontFamily = DEFAULT_PREFERENCES.uiFontFamily;
+    prefs.hostRowSize = DEFAULT_PREFERENCES.hostRowSize;
+    prefs.hostRowIconSize = DEFAULT_PREFERENCES.hostRowIconSize;
+    prefs.design = DESIGN_VERSION;
+  }
+  if (!isMode(prefs.colorMode)) prefs.colorMode = DEFAULT_PREFERENCES.colorMode;
+  if (!(prefs.uiBg in BG_THEMES)) prefs.uiBg = DEFAULT_PREFERENCES.uiBg;
+  if (prefs.uiAccent !== "custom" && !(prefs.uiAccent in ACCENT_COLORS)) prefs.uiAccent = DEFAULT_PREFERENCES.uiAccent;
+  return prefs;
 }
 
 export function savePreferences(prefs: AppPreferences): void {
@@ -246,11 +289,15 @@ export function applyPreferences(prefs: AppPreferences): void {
   const light = mode === "light";
 
   const colors = prefs.uiAccent === "custom" ? accentFromHex(prefs.uiAccentCustom) : ACCENT_COLORS[prefs.uiAccent];
-  root.style.setProperty("--c-accent", colors.c600);
-  root.style.setProperty("--c-accent-hover", colors.c500);
+  const fill = light && colors.light ? colors.light : colors;
+  root.style.setProperty("--c-accent", fill.c600);
+  root.style.setProperty("--c-accent-hover", fill.c500);
+  // Le texte posé sur l'accent : sombre sur un accent clair (« Pervenche »
+  // en sombre), blanc sinon.
+  root.style.setProperty("--c-on-accent", luminance(fill.c600) > 0.4 ? "#0b0c0e" : "#ffffff");
   // Le texte accentué doit contraster avec la surface : pastel sur sombre,
   // plein sur clair.
-  root.style.setProperty("--c-accent-text", light ? colors.c600 : colors.c300);
+  root.style.setProperty("--c-accent-text", light ? fill.c600 : colors.c300);
   root.style.setProperty("--c-accent-dim", light ? colors.dim.replace("0.18", "0.12") : colors.dim);
 
   const shade = BG_THEMES[prefs.uiBg][mode];

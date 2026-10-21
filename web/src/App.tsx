@@ -24,6 +24,8 @@ import { SendView } from "./components/SendView";
 import { SendsPage } from "./components/SendsPage";
 import { AdminPage } from "./components/AdminPage";
 import { HealthPage } from "./components/HealthPage";
+import { HomePage } from "./components/HomePage";
+import { clearAllItems } from "./lib/allItems";
 import { AutoTypeHost } from "./components/AutoType";
 import { autoTypeBridge, systemBridge, updaterBridge } from "./lib/platform";
 import { Toasts, useToasts } from "./components/ui";
@@ -121,7 +123,7 @@ export default function App({ Welcome = LoginScreen }: { Welcome?: ComponentType
   }, []);
   // Verrouiller : effacer la session d'ici (et fermer un coffre local), le
   // dire. Le même geste pour l'inactivité et pour ce que dit le système.
-  const lockNow = useCallback((message: string) => {
+  const lockNow = useCallback((message: string, tone: "error" | "notify" = "error") => {
     const s = sessionRef.current;
     if (!s) return;
     clearWebSession();
@@ -129,8 +131,11 @@ export default function App({ Welcome = LoginScreen }: { Welcome?: ComponentType
     wipe(s);
     setSession(null);
     navigate({ page: "home" });
-    error(message);
-  }, [error]);
+    (tone === "error" ? error : notify)(message);
+  }, [error, notify]);
+  // « Verrouiller » (barre latérale, Ctrl+L dans l'application) : les clés
+  // s'effacent, la session du serveur reste ; on rouvre avec le mot de passe.
+  const lockByHand = useCallback(() => lockNow("Verrouillé.", "notify"), [lockNow]);
 
   useEffect(() => {
     if (!session) return;
@@ -220,6 +225,7 @@ export default function App({ Welcome = LoginScreen }: { Welcome?: ComponentType
     if (!session) {
       setSearch(false);
       clearSearchCache();
+      clearAllItems();
       return;
     }
     const onKeyDown = (e: KeyboardEvent) => {
@@ -227,12 +233,17 @@ export default function App({ Welcome = LoginScreen }: { Welcome?: ComponentType
         e.preventDefault();
         setSearch((s) => !s);
       }
+      // Dans le navigateur, Ctrl+L est la barre d'adresse : seulement l'app.
+      if (systemBridge() && (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "l") {
+        e.preventDefault();
+        lockByHand();
+      }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
     // `session` identity only matters for connect/disconnect.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session !== null]);
+  }, [session !== null, lockByHand]);
 
   // La barre latérale se redimensionne à la souris, comme dans Guiterm.
   const sidebar = usePersistedPane("sidebar", { initial: 256, min: 200, max: 480, axis: "horizontal", mode: "px" });
@@ -257,15 +268,17 @@ export default function App({ Welcome = LoginScreen }: { Welcome?: ComponentType
     );
   }
 
-  // Sans page choisie : le premier vault (le personnel).
-  const effective = route.page === "home" && ctx.session.vaults[0] ? { page: "vault" as const, id: ctx.session.vaults[0].id } : route;
+  const effective = route;
 
   let page;
   if (booting) {
     page = <p className="p-6 text-[12.5px] text-[var(--c-text-muted)]">Reprise de la session…</p>;
   } else switch (effective.page) {
+    case "home":
+      page = <HomePage ctx={ctx} />;
+      break;
     case "vault":
-      page = <VaultPage key={effective.id} ctx={ctx} vaultId={effective.id} itemId={effective.item} />;
+      page = <VaultPage key={effective.id} ctx={ctx} vaultId={effective.id} itemId={effective.item} create={effective.create} />;
       break;
     case "vault-settings":
       page = <VaultSettings key={effective.id} ctx={ctx} vaultId={effective.id} />;
@@ -303,7 +316,7 @@ export default function App({ Welcome = LoginScreen }: { Welcome?: ComponentType
 
   return (
     <div className="flex h-full w-full overflow-hidden bg-[var(--c-bg)] text-[var(--c-text)]">
-      <Sidebar ctx={ctx} route={effective} onLogout={onLogout} onSearch={openSearch} width={sidebar.value} />
+      <Sidebar ctx={ctx} route={effective} onLogout={onLogout} onLock={lockByHand} onSearch={openSearch} width={sidebar.value} />
       <PaneHandle onMouseDown={sidebar.onMouseDown} />
       <main className={`flex min-w-0 flex-1 flex-col overflow-hidden bg-[var(--c-bg2)] ${sidebar.isDragging ? "pointer-events-none select-none" : ""}`}>
         {ctx.session.offline && (

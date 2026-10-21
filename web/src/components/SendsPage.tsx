@@ -7,8 +7,10 @@ import { createSend, listSends, SEND_LIFETIMES, shareablePayload, type MySend, t
 import type { SessionState } from "../lib/session";
 import { KIND_LABELS, type Payload, type SecretKind } from "../lib/types";
 import { ConfirmDialog } from "./ConfirmDialog";
-import { IconPlus, IconTrash } from "./ui-icons";
-import { CopyButton, Eyebrow, Field, formatWhen, Loading, Modal, PasswordInput, useDelayed } from "./ui";
+import { IconCheck, IconCopy, IconKeychain, IconLock, IconPlus, IconTrash } from "./ui-icons";
+import { IconShieldClock } from "./secret-icons";
+import { copyText, CopyButton, Field, FileButton, formatAgo, formatWhen, Loading, Modal, PasswordInput, useDelayed } from "./ui";
+import { Page } from "./Page";
 
 /** Les liens de partage de ce compte : qui en est où (ouvertures,
  * expiration), les recopier, les supprimer — et en créer un pour un texte ou
@@ -17,6 +19,7 @@ export function SendsPage({ ctx }: { ctx: PageContext }) {
   const [sends, setSends] = useState<MySend[] | null>(null);
   const [creating, setCreating] = useState(false);
   const [removing, setRemoving] = useState<MySend | null>(null);
+  const [tab, setTab] = useState<"active" | "gone">("active");
   const slow = useDelayed(sends === null);
   const { session, error } = ctx;
 
@@ -29,44 +32,60 @@ export function SendsPage({ ctx }: { ctx: PageContext }) {
 
   const closeCreate = useCallback(() => { setCreating(false); load(); }, [load]);
 
+  const shown = (sends ?? []).filter((s) => (tab === "active" ? s.available : !s.available));
+  const active = (sends ?? []).filter((s) => s.available).length;
+
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <header className="flex shrink-0 items-center gap-2 border-b border-[var(--c-border)] px-4 py-2.5 max-md:pl-14">
-        <h1 className="text-[14px] font-semibold text-[var(--c-text)]">Liens de partage</h1>
-        <button onClick={() => setCreating(true)} className="btn btn-primary btn-sm ml-auto"><IconPlus size={12} /> Nouveau lien</button>
-      </header>
-      <div className="sidebar-scroll min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
-        <p className="help-text max-w-2xl">
-          Un lien de partage transmet un secret à quelqu'un qui n'a pas de compte : il est chiffré dans votre navigateur, la clé est dans le lien, et le serveur ne garde qu'un contenu illisible qu'il efface à l'expiration ou à la dernière ouverture.
-          Pour partager un élément, ouvrez-le dans son vault et choisissez « Partager par lien ».
-        </p>
-        <section className="max-w-2xl space-y-1.5">
-          <Eyebrow>Vos liens</Eyebrow>
-          {sends === null ? (slow ? <Loading /> : null) : sends.length === 0 ? (
-            <p className="text-[12.5px] text-[var(--c-text-muted)]">Aucun lien pour l'instant.</p>
-          ) : (
-            sends.map((s) => (
-              <div key={s.id} className="card flex min-w-0 flex-wrap items-center gap-2 p-2.5">
-                <div className="min-w-0 flex-1">
-                  <p className="flex min-w-0 items-center gap-1.5 text-[12.5px] text-[var(--c-text)]">
-                    <span className="truncate">{s.name}</span>
-                    {s.kind && <span className="tag shrink-0">{s.kind === "text" ? "texte" : s.kind === "file" ? `fichier${s.file_size ? ` · ${formatSize(s.file_size)}` : ""}` : "élément"}</span>}
-                    {s.has_password && <span className="tag shrink-0" title="Un mot de passe est demandé à l'ouverture">mot de passe</span>}
-                    {!s.available && <span className="tag shrink-0">{new Date(s.expires_at) <= new Date() ? "expiré" : "épuisé"}</span>}
-                  </p>
-                  <p className="text-[11px] text-[var(--c-text-muted)]">
-                    {s.max_views === null ? `${s.views} ouverture${s.views > 1 ? "s" : ""}` : `${s.views}/${s.max_views} ouverture${s.max_views > 1 ? "s" : ""}`}
-                    {s.last_viewed_at ? ` · dernière le ${formatWhen(s.last_viewed_at)}` : ""}
-                    {` · ${s.available ? "expire" : "effacé"} le ${formatWhen(s.expires_at)}`}
-                  </p>
-                </div>
-                {s.available && s.link && <CopyButton value={s.link} label="Copier le lien" />}
-                <button onClick={() => setRemoving(s)} className="btn btn-ghost btn-sm btn-icon hover:text-[var(--c-danger)]" title="Supprimer le lien" aria-label="Supprimer le lien"><IconTrash size={12} /></button>
-              </div>
-            ))
-          )}
-        </section>
+    <Page
+      title="Liens de partage"
+      sub="Pour transmettre un secret à quelqu'un qui n'a pas de compte."
+      actions={<button onClick={() => setCreating(true)} className="btn btn-primary btn-lg"><IconPlus size={15} /> Nouveau lien</button>}
+    >
+      <div className="flex flex-wrap gap-2.5">
+        <span className="pill"><IconLock size={15} /> Chiffré avant l'envoi</span>
+        <span className="pill"><IconKeychain size={15} /> La clé reste dans le lien</span>
+        <span className="pill"><IconShieldClock size={15} /> Effacé à l'expiration</span>
       </div>
+      <section className="card">
+        <div className="tabs px-[18px] pt-3.5" role="tablist" aria-label="Liens">
+          <button role="tab" aria-selected={tab === "active"} onClick={() => setTab("active")} className="tab">Actifs <span className="text-[var(--c-text-muted)]">{active}</span></button>
+          <button role="tab" aria-selected={tab === "gone"} onClick={() => setTab("gone")} className="tab">Expirés <span className="text-[var(--c-text-muted)]">{(sends?.length ?? 0) - active}</span></button>
+        </div>
+        {sends === null ? (slow ? <Loading /> : <div className="h-16" />) : shown.length === 0 ? (
+          <div className="empty px-5 py-10 text-[13.5px] text-[var(--c-text-muted)]">
+            {tab === "active" ? "Aucun lien actif." : "Aucun lien expiré."}
+            {tab === "active" && <p className="mt-1 text-[12.5px]">Un élément se partage depuis sa fiche : « Partager ».</p>}
+          </div>
+        ) : (
+          <div className="divide-y divide-[var(--c-border)]">
+            {shown.map((s) => {
+              const kind = s.kind === "text" ? "Texte" : s.kind === "file" ? `Fichier${s.file_size ? ` · ${formatSize(s.file_size)}` : ""}` : "Élément";
+              const ratio = s.max_views ? Math.min(1, s.views / s.max_views) : 0;
+              return (
+                <div key={s.id} className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2 px-[18px] py-3.5">
+                  <span className="tile tile-neutral" style={{ "--tile-size": "36px" } as React.CSSProperties}>{s.kind === "file" ? "F" : s.kind === "text" ? "T" : "É"}</span>
+                  <span className="flex min-w-0 flex-[1_1_220px] flex-col">
+                    <span className="flex min-w-0 items-center gap-1.5">
+                      <span className="truncate font-semibold">{s.name}</span>
+                      {s.has_password && <span className="tag shrink-0" title="Un mot de passe est demandé à l'ouverture">Mot de passe</span>}
+                    </span>
+                    <span className="truncate text-[12.5px] text-[var(--c-text-muted)]">{kind}{s.last_viewed_at ? ` · ouvert ${formatAgo(s.last_viewed_at)}` : ""}</span>
+                  </span>
+                  <span className="flex w-[150px] flex-col gap-1.5 max-sm:hidden">
+                    <span className="text-[12.5px] text-[var(--c-text-secondary)]">{s.max_views === null ? `${s.views} ouverture${s.views > 1 ? "s" : ""}` : `${s.views} / ${s.max_views} ouverture${s.max_views > 1 ? "s" : ""}`}</span>
+                    {s.max_views !== null && <span className="flex h-1 rounded bg-[var(--c-bg3)]"><span className="rounded" style={{ width: `${ratio * 100}%`, background: ratio >= 0.8 ? "var(--c-warn)" : "var(--c-accent)" }} /></span>}
+                  </span>
+                  <span className="w-[130px] text-[13px] text-[var(--c-text-secondary)]" title={formatWhen(s.expires_at)}>{s.available ? `Expire ${formatIn(s.expires_at)}` : new Date(s.expires_at) <= new Date() ? "Expiré" : "Épuisé"}</span>
+                  <span className="ml-auto flex items-center gap-1">
+                    {s.available && s.link && <CopyLinkButton link={s.link} />}
+                    <button onClick={() => setRemoving(s)} className="btn btn-ghost btn-icon hover:text-[var(--c-danger)]" title="Supprimer le lien" aria-label="Supprimer le lien"><IconTrash size={15} /></button>
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
       {creating && <ShareLinkDialog session={session} onClose={closeCreate} />}
       {removing && (
         <ConfirmDialog
@@ -88,8 +107,28 @@ export function SendsPage({ ctx }: { ctx: PageContext }) {
           onCancel={() => setRemoving(null)}
         />
       )}
-    </div>
+    </Page>
   );
+}
+
+/** « Copier le lien », avec la confirmation à la place du libellé. */
+function CopyLinkButton({ link }: { link: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button onClick={() => void copyText(link).then((ok) => { if (ok) { setCopied(true); setTimeout(() => setCopied(false), 1500); } })} className="btn btn-secondary">
+      {copied ? <IconCheck size={14} className="text-[var(--c-ok)]" /> : <IconCopy size={14} />} {copied ? "Copié" : "Copier le lien"}
+    </button>
+  );
+}
+
+/** « dans 23 h », « dans 3 jours » : une échéance proche. */
+function formatIn(iso: string): string {
+  const s = Math.round((new Date(iso).getTime() - Date.now()) / 1000);
+  if (s <= 0) return "maintenant";
+  if (s < 3600) return `dans ${Math.max(1, Math.floor(s / 60))} min`;
+  if (s < 86400) return `dans ${Math.floor(s / 3600)} h`;
+  const d = Math.floor(s / 86400);
+  return `dans ${d} jour${d > 1 ? "s" : ""}`;
 }
 
 const VIEW_CHOICES: { label: string; value: number | null }[] = [
@@ -165,15 +204,16 @@ export function ShareLinkDialog({ session, item, file, onClose }: { session: Ses
   if (result) {
     return (
       <Modal title="Lien créé" onClose={onClose}>
-        <div className="space-y-3">
+        <div className="space-y-4">
           <div className="flex items-center gap-1">
-            <input readOnly value={result.link} onFocus={(e) => e.currentTarget.select()} className="input input-mono min-w-0 flex-1 text-[11.5px]" aria-label="Lien de partage" />
+            <input readOnly value={result.link} onFocus={(e) => e.currentTarget.select()} className="input input-mono min-w-0 flex-1 text-[12.5px]" aria-label="Lien de partage" />
             <CopyButton value={result.link} label="Copier le lien" />
           </div>
-          <p className="help-text">
-            La clé est dans le lien : quiconque l'a peut l'ouvrir{result.views === null ? "" : ` (${result.views} fois au plus)`} jusqu'au {formatWhen(result.expiresAt)}.
-            {result.password ? " Transmettez le mot de passe par un autre canal que le lien." : " Envoyez-le par un canal de confiance."}
-          </p>
+          <div className="flex flex-wrap gap-2">
+            <span className="pill">{result.views === null ? "Ouvertures illimitées" : `${result.views} ouverture${result.views > 1 ? "s" : ""} au plus`}</span>
+            <span className="pill">Jusqu'au {formatWhen(result.expiresAt)}</span>
+          </div>
+          {result.password && <p className="callout callout-warn">Envoyez le mot de passe par un autre canal que le lien.</p>}
           <div className="flex justify-end">
             <button onClick={onClose} className="btn btn-primary">Terminé</button>
           </div>
@@ -183,38 +223,33 @@ export function ShareLinkDialog({ session, item, file, onClose }: { session: Ses
   }
   return (
     <Modal title={title} onClose={onClose}>
-      <form onSubmit={submit} className="space-y-3">
+      <form onSubmit={submit} className="space-y-4">
         {item ? (
-          <p className="text-[12.5px] text-[var(--c-text-secondary)]">
-            Le contenu de cet élément ({KIND_LABELS[item.kind]}, sans son dossier) est chiffré dans votre navigateur ; le lien porte la clé.
-            Une copie : le modifier ensuite ne change pas ce que le lien montre.
-          </p>
+          <p className="text-[13.5px] text-[var(--c-text-secondary)]">Une copie chiffrée de cet élément ({KIND_LABELS[item.kind]}), sans son dossier : le modifier ensuite ne change pas le lien.</p>
         ) : file ? (
-          <p className="text-[12.5px] text-[var(--c-text-secondary)]">
-            « {file.name} » ({formatSize(file.size)}) est chiffré dans votre navigateur sous la clé du lien, puis envoyé ; le lien porte la clé.
-          </p>
+          <p className="truncate text-[13.5px] text-[var(--c-text-secondary)]">« {file.name} » · {formatSize(file.size)} · chiffré avant l'envoi</p>
         ) : (
           <>
             {maxFile > 0 && (
-              <div className="segmented">
-                <button type="button" data-active={mode === "text"} onClick={() => setMode("text")}>Texte</button>
-                <button type="button" data-active={mode === "file"} onClick={() => setMode("file")}>Fichier</button>
+              <div className="segmented flex w-full">
+                <button type="button" className="flex-1" data-active={mode === "text"} onClick={() => setMode("text")}>Texte</button>
+                <button type="button" className="flex-1" data-active={mode === "file"} onClick={() => setMode("file")}>Fichier</button>
               </div>
             )}
             {mode === "text" ? (
               <>
-                <Field label="Nom" hint="Pour vous retrouver dans vos liens ; le destinataire le voit aussi.">
+                <Field label="Nom" hint="Visible du destinataire.">
                   <input value={name} onChange={(e) => setName(e.target.value)} autoFocus placeholder="Code Wi-Fi" className="input" />
                 </Field>
                 <Field label="Texte">
-                  <textarea value={text} onChange={(e) => setText(e.target.value)} rows={5} className="input input-mono min-h-[6rem] py-1.5" />
+                  <textarea value={text} onChange={(e) => setText(e.target.value)} rows={4} className="input input-mono min-h-[6rem]" />
                 </Field>
               </>
             ) : (
               <div>
-                <label htmlFor="send-file" className="field-label">Fichier</label>
-                <input id="send-file" type="file" onChange={(e) => setPicked(e.target.files?.[0] ?? null)} className="block text-[12px] text-[var(--c-text-secondary)]" />
-                <p className="help-text mt-1">Chiffré dans votre navigateur avant l'envoi, {formatSize(maxFile)} au plus. Son nom est visible du destinataire, pas du serveur.</p>
+                <span className="field-label">Fichier</span>
+                <FileButton label="Choisir un fichier" small={false} onFile={(f) => setPicked(f ?? null)} />
+                <p className="help-text mt-1.5">{formatSize(maxFile)} max · chiffré avant l'envoi</p>
               </div>
             )}
           </>
@@ -233,9 +268,9 @@ export function ShareLinkDialog({ session, item, file, onClose }: { session: Ses
           </Field>
         </div>
         <div>
-          <label htmlFor="send-new-password" className="field-label">Mot de passe (facultatif)</label>
+          <label htmlFor="send-new-password" className="field-label">Mot de passe d'ouverture <span className="font-normal text-[var(--c-text-muted)]">· facultatif</span></label>
           <PasswordInput id="send-new-password" value={password} onChange={setPassword} autoComplete="new-password" />
-          <p className="help-text mt-1">Mêlé à la clé : sans lui, le lien seul n'ouvre rien — pas même pour le serveur. À transmettre par un autre canal.</p>
+          <p className="help-text mt-1.5">À transmettre par un autre canal que le lien.</p>
         </div>
         {error && <p className="callout callout-danger">{error}</p>}
         <div className="flex justify-end gap-2">

@@ -1,7 +1,7 @@
 /** Les réglages du web qui suivent le compte (voir `syncedSettings.ts`) :
  * l'apparence, les deux générateurs et l'effacement du presse-papiers. Importé pour son effet par l'app et
  * par le popup de l'extension. */
-import { applyPreferences, loadPreferences, savePreferences, type AppPreferences } from "./preferences";
+import { applyPreferences, DESIGN_VERSION, loadPreferences, savePreferences, type AppPreferences } from "./preferences";
 import { CLIPBOARD_KEY } from "./clipboard";
 import { registerSettingsSection } from "./syncedSettings";
 
@@ -11,7 +11,19 @@ registerSettingsSection({
   write: (v) => {
     if (!v || typeof v !== "object") return;
     // `loadPreferences` écarte ce qu'un autre client aurait mis d'invalide.
-    savePreferences({ ...loadPreferences(), ...(v as Partial<AppPreferences>) });
+    // Un client d'avant la refonte envoie l'ancien fond, l'ancien accent,
+    // l'ancienne police et les anciennes lignes : ils ne remplacent pas ceux
+    // d'ici.
+    const remote = { ...(v as Partial<AppPreferences>) };
+    if ((remote.design ?? 0) < DESIGN_VERSION) {
+      delete remote.uiBg;
+      delete remote.uiAccent;
+      delete remote.uiFontFamily;
+      delete remote.hostRowSize;
+      delete remote.hostRowIconSize;
+      delete remote.design;
+    }
+    savePreferences({ ...loadPreferences(), ...remote });
     applyPreferences(loadPreferences());
   },
 });
@@ -42,3 +54,5 @@ function jsonSection(key: string, storageKey: string) {
 jsonSection("generator", "guivault.generator");
 jsonSection("sshKey", "guivault.sshkey");
 jsonSection("clipboard", CLIPBOARD_KEY);
+// La couleur de chaque vault (`lib/vaultColors.ts`).
+jsonSection("vaultColors", "guivault.vaultColors");
