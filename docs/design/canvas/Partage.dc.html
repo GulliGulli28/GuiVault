@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>GuiVault — liens de partage</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./theme.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="gv shell" data-theme="{{theme}}" style="position: relative; font-family: 'Geist', system-ui, sans-serif">
+
+  <aside class="side" aria-label="Navigation">
+    <div class="brand"><img src="/_blob/b5ba6fd6f3698d6072b814fdc9c6af28" alt="" width="28" height="28"><span>GuiVault</span></div>
+    <button type="button" class="search-btn" aria-label="Rechercher partout"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg><span class="lbl grow trunc">Rechercher partout</span><span class="kbd">Ctrl K</span></button>
+    <nav class="navgroup" aria-label="Général">
+      <a href="#" class="nav"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10.5L12 4l8 6.5V19a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1z"></path></svg><span class="lbl">Accueil</span></a>
+    </nav>
+    <nav class="navgroup" aria-label="Coffres">
+      <div class="navlabel"><span>Coffres</span></div>
+      <a href="#" class="nav"><span class="vdot" style="background: #8B8CFF"></span><span class="lbl">Personnel</span><span class="count">18</span></a>
+      <a href="#" class="nav"><span class="vdot" style="background: #F5A524"></span><span class="lbl">Équipe infrastructure et production</span><span class="count">42</span></a>
+      <a href="#" class="nav"><span class="vdot" style="background: #3DD68C"></span><span class="lbl">Famille</span><span class="count">7</span></a>
+    </nav>
+    <nav class="navgroup" aria-label="Outils">
+      <div class="navlabel"><span>Outils</span></div>
+      <a href="#" class="nav"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3.5"></rect><circle cx="9" cy="9" r="1.1" fill="currentColor"></circle><circle cx="15" cy="15" r="1.1" fill="currentColor"></circle><circle cx="15" cy="9" r="1.1" fill="currentColor"></circle><circle cx="9" cy="15" r="1.1" fill="currentColor"></circle></svg><span class="lbl">Générateur</span></a>
+      <a href="#" class="nav"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><path d="M12 7.5V12l3 2"></path></svg><span class="lbl">Codes 2FA</span><span class="count">4</span></a>
+      <a href="#" class="nav" aria-current="page"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1"></path><path d="M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1"></path></svg><span class="lbl">Liens de partage</span><span class="count">3</span></a>
+    </nav>
+    <nav class="navgroup" aria-label="Sécurité">
+      <div class="navlabel"><span>Sécurité</span></div>
+      <a href="#" class="nav"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5.5c0 4.5-3 7.8-7 9.5-4-1.7-7-5-7-9.5V6z"></path><path d="M9 12l2 2 4-4"></path></svg><span class="lbl">Santé</span><span class="badge">6</span></a>
+      <a href="#" class="nav"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><circle cx="12" cy="12" r="3.5"></circle><path d="M5.9 5.9l3.6 3.6M14.5 14.5l3.6 3.6M18.1 5.9l-3.6 3.6M9.5 14.5l-3.6 3.6"></path></svg><span class="lbl">Accès d'urgence</span></a>
+    </nav>
+    <div class="side-foot">
+      <div style="display: flex; align-items: center; gap: 6px; min-width: 0">
+        <button type="button" class="account" aria-label="Compte"><span class="avatar h-indigo">GL</span><span class="stack grow"><span class="trunc" style="font-size: 13px; font-weight: 500">Guillaume Lorin</span><span class="trunc small muted">guillaume.lorin@exemple-entreprise.fr</span></span></button>
+        <a href="#" class="ibtn ibtn-bordered" aria-label="Paramètres"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"></path><circle cx="16" cy="7" r="2"></circle><circle cx="10" cy="17" r="2"></circle></svg></a>
+      </div>
+      <button type="button" class="btn btn-block"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg>Verrouiller<span class="grow"></span><span class="kbd">Ctrl L</span></button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="page">
+      <div class="page-inner" style="max-width: 1000px; gap: 22px">
+        <div class="page-head">
+          <div class="stack">
+            <h1 class="h1">Liens de partage</h1>
+            <p class="sub">Pour transmettre un secret à quelqu'un qui n'a pas de compte.</p>
+          </div>
+          <button type="button" class="btn btn-primary btn-lg"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Nouveau lien</button>
+        </div>
+
+        <div style="display: flex; flex-wrap: wrap; gap: 10px">
+          <span class="pill"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg>Chiffré avant l'envoi</span>
+          <span class="pill"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="12" r="4"></circle><path d="M12 12h9M18 12v3"></path></svg>La clé reste dans le lien</span>
+          <span class="pill"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><path d="M12 7.5V12l3 2"></path></svg>Effacé à l'expiration</span>
+        </div>
+
+        <section class="card">
+          <div class="tabs" role="tablist" aria-label="État" style="padding: 14px 18px 0">
+            <button type="button" role="tab" aria-selected="true" class="tab">Actifs <span class="muted">3</span></button>
+            <button type="button" role="tab" aria-selected="false" class="tab">Expirés <span>12</span></button>
+          </div>
+          <div class="divide">
+            <sc-for list="{{links}}" as="l" hint-placeholder-count="3">
+              <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; padding: 14px 18px; min-width: 0">
+                <span class="tile tile-md {{l.hue}}">{{l.letter}}</span>
+                <span class="stack" style="flex: 1 1 220px"><span class="trunc" style="font-weight: 500">{{l.name}}</span><span class="trunc small muted">{{l.kind}} · créé {{l.created}}</span></span>
+                <span class="stack hide-md" style="width: 150px; gap: 5px">
+                  <span class="small t2 nowrap">{{l.opens}}</span>
+                  <span style="height: 4px; border-radius: 2px; background: var(--line); display: flex"><span style="{{l.bar}}"></span></span>
+                </span>
+                <span class="small t2 nowrap" style="width: 110px">{{l.expires}}</span>
+                <div style="display: flex; gap: 4px; margin-left: auto">
+                  <button type="button" class="btn">Copier le lien</button>
+                  <button type="button" class="ibtn" aria-label="Révoquer"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <!-- Fenêtre « Nouveau lien » -->
+  <div class="scrim scrim-center">
+    <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="nl">
+      <div style="display: flex; align-items: center; gap: 8px; padding: 20px 24px 0">
+        <h2 id="nl" class="grow" style="font-size: 18px; font-weight: 600">Nouveau lien</h2>
+        <button type="button" class="ibtn" aria-label="Fermer"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>
+      </div>
+      <div style="padding: 18px 24px; display: flex; flex-direction: column; gap: 16px">
+        <div class="seg" role="radiogroup" aria-label="Contenu">
+          <button type="button" role="radio" aria-checked="true">Texte</button>
+          <button type="button" role="radio" aria-checked="false">Élément</button>
+          <button type="button" role="radio" aria-checked="false">Fichier</button>
+        </div>
+        <label class="field"><span class="field-label">Nom <span class="muted" style="font-weight: 400">· visible de vous seul</span></span><input class="input" value="Accès Wi-Fi invités"></label>
+        <label class="field"><span class="field-label">Contenu</span><textarea class="input mono" rows="3" style="font-size: 13px">wifi: Maison / correct-horse-battery-staple</textarea></label>
+        <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
+          <label class="field"><span class="field-label">Expire après</span><span class="select-wrap" style="width: 100%"><select class="select" style="width: 100%; height: 36px"><option>24 heures</option><option>7 jours</option><option>30 jours</option></select><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></span></label>
+          <label class="field"><span class="field-label">Ouvertures max.</span><input class="input" value="1" inputmode="numeric"></label>
+        </div>
+        <div style="display: flex; align-items: center; gap: 12px">
+          <span class="stack grow"><span class="field-label">Mot de passe d'ouverture</span><span class="small muted">À transmettre par un autre canal.</span></span>
+          <button type="button" role="switch" aria-checked="false" aria-label="Mot de passe d'ouverture" class="switch"><span></span></button>
+        </div>
+      </div>
+      <div style="display: flex; justify-content: flex-end; gap: 8px; padding: 14px 24px 20px; border-top: 1px solid var(--line)">
+        <button type="button" class="btn btn-ghost btn-lg">Annuler</button>
+        <button type="button" class="btn btn-primary btn-lg">Créer le lien</button>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["dark","light"],"default":"dark"},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const bar = (p, c) => 'display:block;height:4px;border-radius:2px;width:' + p + '%;background:' + c;
+    return {
+      theme: this.props.theme ?? 'dark',
+      links: [
+        { name: 'Accès Wi-Fi invités', kind: 'Texte', letter: 'T', hue: 'h-gray', created: 'hier', opens: '0 / 1 ouverture', expires: 'dans 23 h', bar: bar(0, 'var(--accent)') },
+        { name: 'Boursorama — accès pour la déclaration de revenus 2026', kind: 'Élément', letter: 'É', hue: 'h-pink', created: 'lundi', opens: '2 / 5 ouvertures', expires: 'dans 3 jours', bar: bar(40, 'var(--accent)') },
+        { name: 'contrat-de-bail-appartement-lyon-signé.pdf', kind: 'Fichier · 1,2 Mo', letter: 'F', hue: 'h-blue', created: '14 oct.', opens: '4 / 5 ouvertures', expires: 'dans 6 jours', bar: bar(80, 'var(--warn)') }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

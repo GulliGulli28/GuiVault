@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Mobile — codes 2FA</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./theme.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="gv phone" data-theme="{{theme}}" style="font-family: 'Geist', system-ui, sans-serif">
+  <header class="m-head">
+    <h1 class="m-title grow trunc">Codes 2FA</h1>
+    <svg width="26" height="26" viewBox="0 0 22 22" role="img" aria-label="18 secondes restantes"><circle cx="11" cy="11" r="8.5" fill="none" stroke="var(--line-2)" stroke-width="2.5"></circle><circle cx="11" cy="11" r="8.5" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-dasharray="32 53.4" stroke-linecap="round" transform="rotate(-90 11 11)"></circle></svg>
+    <span class="muted nowrap" style="font-size: 14px">18 s</span>
+  </header>
+  <div style="padding: 0 16px 10px">
+    <label class="m-search"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg><input type="search" placeholder="Rechercher un code" aria-label="Rechercher un code"></label>
+  </div>
+  <div class="m-body" style="gap: 10px">
+    <sc-for list="{{codes}}" as="c" hint-placeholder-count="5">
+      <button type="button" class="m-card" style="display: flex; align-items: center; gap: 14px; padding: 14px 16px; width: 100%; text-align: left; min-width: 0" aria-label="Copier le code">
+        <span class="tile {{c.hue}}" style="width: 40px; height: 40px; border-radius: 11px; font-size: 15px">{{c.initial}}</span>
+        <span class="stack grow">
+          <span class="trunc" style="font-weight: 500">{{c.name}}</span>
+          <span class="mono nowrap" style="font-size: 26px; font-weight: 500; letter-spacing: 0.08em; line-height: 1.2">{{c.code}}</span>
+        </span>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.8" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"></rect><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"></path></svg>
+      </button>
+    </sc-for>
+  </div>
+  <nav class="m-nav" aria-label="Principal">
+    <a href="MAccueil.dc.html" class="m-tab"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10.5L12 4l8 6.5V19a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1z"></path></svg>Accueil</a>
+    <a href="MCoffre.dc.html" class="m-tab"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2.5"></rect><circle cx="12" cy="12" r="3.5"></circle></svg>Coffres</a>
+    <a href="MCodes.dc.html" class="m-tab" aria-current="page"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><path d="M12 7.5V12l3 2"></path></svg>Codes</a>
+    <a href="MSante.dc.html" class="m-tab"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5.5c0 4.5-3 7.8-7 9.5-4-1.7-7-5-7-9.5V6z"></path></svg>Santé</a>
+    <a href="MParametres.dc.html" class="m-tab"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"></path><circle cx="16" cy="7" r="2"></circle><circle cx="10" cy="17" r="2"></circle></svg>Réglages</a>
+  </nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["dark","light"],"default":"dark"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const c = (name, code, hue) => ({ name: name, code: code, hue: hue, initial: name.charAt(0).toUpperCase() });
+    return {
+      theme: this.props.theme ?? 'dark',
+      codes: [c('GitHub', '346 067', 'h-ink'), c('AWS Console — compte de production principal', '556 231', 'h-amber'), c('Slack', '905 098', 'h-teal'), c('Spotify', '708 847', 'h-green'), c('Grafana prod', '120 554', 'h-teal')]
+    };
+  }
+}
+</script>
+</body>
+</html>

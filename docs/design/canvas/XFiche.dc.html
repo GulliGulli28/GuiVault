@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Extension — popup, fiche</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./theme.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="gv popup" data-theme="{{theme}}" style="font-family: 'Geist', system-ui, sans-serif">
+  <header class="p-head" style="padding-left: 6px">
+    <a href="XListe.dc.html" class="ibtn" aria-label="Retour"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg></a>
+    <span class="grow trunc small muted">Personnel · Travail</span>
+    <a href="#" class="ibtn" aria-label="Ouvrir dans l'interface web"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9"></path><path d="M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4"></path></svg></a>
+    <button type="button" class="ibtn" aria-label="Modifier"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"></path></svg></button>
+    <button type="button" class="ibtn" aria-label="Plus d'actions"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg></button>
+  </header>
+
+  <div class="p-body" style="gap: 16px">
+    <div style="display: flex; align-items: center; gap: 14px; min-width: 0">
+      <span class="tile tile-lg h-teal">A</span>
+      <div class="stack grow" style="gap: 2px">
+        <h1 class="clamp2" style="font-size: 18px; font-weight: 600; letter-spacing: -0.015em; line-height: 1.25">Atelier Nord — espace client</h1>
+        <a href="#" class="trunc small">compte.atelier-nord.test</a>
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px">
+      <button type="button" class="btn btn-primary btn-lg">Remplir la page<span class="kbd">Ctrl Maj L</span></button>
+      <button type="button" class="btn btn-lg"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"></rect><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"></path></svg>Mot de passe</button>
+    </div>
+
+    <div class="card divide">
+      <div class="kv" style="padding: 11px 6px 11px 14px"><span class="kv-k" style="width: 96px">Utilisateur</span><span class="kv-v mono trunc">guillaume.lorin@exemple-entreprise.fr</span><button type="button" class="ibtn" aria-label="Copier l'utilisateur"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"></rect><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"></path></svg></button></div>
+      <div class="kv" style="padding: 11px 6px 11px 14px"><span class="kv-k" style="width: 96px">Mot de passe</span><span class="kv-v mono trunc" style="letter-spacing: 0.1em">••••••••••••••</span><button type="button" class="ibtn" aria-label="Afficher"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"></path><circle cx="12" cy="12" r="3"></circle></svg></button></div>
+      <div class="kv" style="padding: 11px 6px 11px 14px">
+        <span class="kv-k" style="width: 96px">Code 2FA</span>
+        <span class="kv-v" style="display: flex; align-items: center; gap: 10px"><span class="mono nowrap" style="font-size: 18px; font-weight: 500; letter-spacing: 0.08em">482 913</span><svg width="18" height="18" viewBox="0 0 22 22" role="img" aria-label="12 secondes restantes"><circle cx="11" cy="11" r="8.5" fill="none" stroke="var(--line-2)" stroke-width="2.5"></circle><circle cx="11" cy="11" r="8.5" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-dasharray="21 53.4" stroke-linecap="round" transform="rotate(-90 11 11)"></circle></svg></span>
+        <button type="button" class="ibtn" aria-label="Copier le code"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"></rect><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"></path></svg></button>
+      </div>
+      <div class="kv" style="padding: 11px 6px 11px 14px"><span class="kv-k" style="width: 96px">Passkey</span><span class="kv-v trunc">Enregistrée le 3 oct.</span><span class="chip chip-ok">Active</span></div>
+    </div>
+
+    <div class="card" style="padding: 12px 14px; display: flex; flex-direction: column; gap: 4px">
+      <span class="label">Notes</span>
+      <p class="t2 clamp2 break">Numéro client 0042-88-17. Facturation trimestrielle, contact : support@atelier-nord.test.</p>
+    </div>
+  </div>
+
+  <footer class="p-foot"><span class="grow trunc">Modifié il y a 3 jours</span><a href="#" style="color: var(--muted)">Historique</a></footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["dark","light"],"default":"dark"},"$preview":{"width":440,"height":600}}'>
+class Component extends DCLogic {
+  renderVals() { return { theme: this.props.theme ?? 'dark' }; }
+}
+</script>
+</body>
+</html>

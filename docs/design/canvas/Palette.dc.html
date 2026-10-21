@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>GuiVault — palette de commandes</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./theme.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="gv shell" data-theme="{{theme}}" style="position: relative; font-family: 'Geist', system-ui, sans-serif">
+
+  <aside class="side" aria-label="Navigation">
+    <div class="brand"><img src="/_blob/b5ba6fd6f3698d6072b814fdc9c6af28" alt="" width="28" height="28"><span>GuiVault</span></div>
+    <button type="button" class="search-btn" aria-label="Rechercher partout" style="border-color: var(--accent)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg><span class="lbl grow trunc">Rechercher partout</span><span class="kbd">Ctrl K</span></button>
+    <nav class="navgroup" aria-label="Général"><a href="#" class="nav"><span class="lbl">Accueil</span></a></nav>
+    <nav class="navgroup" aria-label="Coffres">
+      <div class="navlabel"><span>Coffres</span></div>
+      <a href="#" class="nav" aria-current="page"><span class="vdot" style="background: #8B8CFF"></span><span class="lbl">Personnel</span><span class="count">18</span></a>
+      <a href="#" class="nav"><span class="vdot" style="background: #F5A524"></span><span class="lbl">Équipe infrastructure et production</span><span class="count">42</span></a>
+      <a href="#" class="nav"><span class="vdot" style="background: #3DD68C"></span><span class="lbl">Famille</span><span class="count">7</span></a>
+    </nav>
+    <nav class="navgroup" aria-label="Outils">
+      <div class="navlabel"><span>Outils</span></div>
+      <a href="#" class="nav"><span class="lbl">Générateur</span></a>
+      <a href="#" class="nav"><span class="lbl">Codes 2FA</span><span class="count">4</span></a>
+      <a href="#" class="nav"><span class="lbl">Liens de partage</span><span class="count">3</span></a>
+    </nav>
+  </aside>
+
+  <main class="main">
+    <div class="topbar"><div class="crumbs"><span class="trunc" style="color: var(--text); font-weight: 600; font-size: 15px">Personnel</span></div></div>
+    <div class="page">
+      <div class="stack" style="gap: 6px; max-width: 520px">
+        <div class="row"><span class="tile h-ink">G</span><span class="stack grow"><span class="trunc row-name">GitHub</span><span class="trunc row-sub">glorin · github.com</span></span></div>
+        <div class="row"><span class="tile h-amber">A</span><span class="stack grow"><span class="trunc row-name">AWS Console</span><span class="trunc row-sub">admin</span></span></div>
+        <div class="row"><span class="tile h-violet">F</span><span class="stack grow"><span class="trunc row-name">Figma</span><span class="trunc row-sub">glorin@example.com</span></span></div>
+        <div class="row"><span class="tile h-teal">S</span><span class="stack grow"><span class="trunc row-name">Slack</span><span class="trunc row-sub">glorin@corp.example</span></span></div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Palette -->
+  <div class="scrim">
+    <div class="palette" role="dialog" aria-modal="true" aria-label="Rechercher et agir">
+      <label class="pal-in">
+        <span class="mono" style="color: var(--accent); font-size: 18px; line-height: 1">›</span>
+        <input aria-label="Rechercher ou taper une commande" value="prod">
+        <span class="chip hide-md">Tous les coffres</span>
+        <span class="kbd">Échap</span>
+      </label>
+      <div style="padding: 6px; display: flex; flex-direction: column; max-height: 520px; overflow: auto">
+        <div class="pal-gh">Hôtes SSH</div>
+        <div class="pal-res" aria-selected="true">
+          <span class="tile tile-sm h-blue"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="3" y="4" width="18" height="7" rx="2"></rect><rect x="3" y="13" width="18" height="7" rx="2"></rect><path d="M7 7.5h.01M7 16.5h.01"></path></svg></span>
+          <span class="stack grow"><span class="mono trunc"><mark>prod</mark>-db-01</span><span class="trunc small muted">deploy@10.0.4.12 · PostgreSQL primaire</span></span>
+          <span class="chip hide-md" style="max-width: 160px"><span class="trunc">Équipe infrastructure et production</span></span>
+          <span class="small t2 nowrap hide-md">Ouvrir dans Guiterm</span><span class="kbd">Entrée</span>
+        </div>
+        <div class="pal-res">
+          <span class="tile tile-sm h-blue"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="3" y="4" width="18" height="7" rx="2"></rect><rect x="3" y="13" width="18" height="7" rx="2"></rect><path d="M7 7.5h.01M7 16.5h.01"></path></svg></span>
+          <span class="stack grow"><span class="mono trunc"><mark>prod</mark>-web-01</span><span class="trunc small muted">deploy@10.0.4.20</span></span>
+          <span class="chip hide-md" style="max-width: 160px"><span class="trunc">Équipe infrastructure et production</span></span>
+        </div>
+        <div class="pal-gh">Identifiants</div>
+        <div class="pal-res">
+          <span class="tile tile-sm h-amber">A</span>
+          <span class="stack grow"><span class="trunc">AWS Console — compte de <mark>prod</mark>uction principal</span><span class="trunc small muted">admin@infra.exemple-entreprise.fr</span></span>
+          <span class="chip hide-md">Personnel</span>
+        </div>
+        <div class="pal-res">
+          <span class="tile tile-sm h-teal">G</span>
+          <span class="stack grow"><span class="trunc">Grafana <mark>prod</mark></span><span class="trunc small muted">ops</span></span>
+          <span class="chip hide-md" style="max-width: 160px"><span class="trunc">Équipe infrastructure et production</span></span>
+        </div>
+        <div class="pal-gh">Actions</div>
+        <div class="pal-res"><span class="tile tile-sm h-gray"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></span><span class="grow trunc">Nouvel hôte « prod »</span><span class="kbd">Ctrl N</span></div>
+        <div class="pal-res"><span class="tile tile-sm h-gray"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1"></path><path d="M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1"></path></svg></span><span class="grow trunc">Partager <span class="mono">prod-db-01</span> par lien</span></div>
+        <div class="pal-res"><span class="tile tile-sm h-gray"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg></span><span class="grow trunc">Verrouiller</span><span class="kbd">Ctrl L</span></div>
+      </div>
+      <div class="pal-foot">
+        <span><span class="kbd">↑ ↓</span> parcourir</span>
+        <span><span class="kbd">Ctrl C</span> copier le secret</span>
+        <span><span class="kbd">Ctrl U</span> copier l'utilisateur</span>
+        <span><span class="kbd">Tab</span> plus d'actions</span>
+        <span><span class="kbd">&gt;</span> commandes seules</span>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["dark","light"],"default":"dark"},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() { return { theme: this.props.theme ?? 'dark' }; }
+}
+</script>
+</body>
+</html>

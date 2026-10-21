@@ -86,8 +86,12 @@ il ne déchiffre rien : la user key reste sous la clé que seule la PRF donne).
   dépôt, `latest.json` servi par la pré-release `app-updater`). Ce qu'un
   coffre local n'a pas se masque par `supports(méthode)` ; `session.local`
   sert aux libellés (nom du coffre au lieu de l'e-mail, « Fermer le coffre »).
-- `web/` — l'interface web, Vite + React 19 + TypeScript + Tailwind 3,
-  **même charte que Guiterm** (le tactile à part : `src/touch.css`, pour
+- `web/` — l'interface web, Vite + React 19 + TypeScript + Tailwind 3.
+  **Refonte décidée (2026-10-21), pas encore faite : on se sépare de la
+  charte de Guiterm.** Maquettes, jetons et règles (pas de paragraphes,
+  troncature, responsive) dans `docs/DESIGN.md` et `docs/design/canvas/` ;
+  tout nouvel écran suit ce design. Jusqu'à la refonte, l'existant garde
+  la charte de Guiterm (le tactile à part : `src/touch.css`, pour
   ne pas diverger ; `hooks/useMediaQuery.ts`) : `src/index.css` (jetons et primitives
   `.btn`, `.input`, `.card`, `.list-row`…), `components/ui-icons.tsx`,
   `components/icons.tsx` (banque d'icônes d'hôte), `EntityRow.tsx`,

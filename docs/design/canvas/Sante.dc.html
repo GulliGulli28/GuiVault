@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>GuiVault — santé du coffre</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./theme.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="gv shell" data-theme="{{theme}}" style="font-family: 'Geist', system-ui, sans-serif">
+
+  <aside class="side" aria-label="Navigation">
+    <div class="brand"><img src="/_blob/b5ba6fd6f3698d6072b814fdc9c6af28" alt="" width="28" height="28"><span>GuiVault</span></div>
+    <button type="button" class="search-btn" aria-label="Rechercher partout"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg><span class="lbl grow trunc">Rechercher partout</span><span class="kbd">Ctrl K</span></button>
+    <nav class="navgroup" aria-label="Général">
+      <a href="#" class="nav"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10.5L12 4l8 6.5V19a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1z"></path></svg><span class="lbl">Accueil</span></a>
+    </nav>
+    <nav class="navgroup" aria-label="Coffres">
+      <div class="navlabel"><span>Coffres</span></div>
+      <a href="#" class="nav"><span class="vdot" style="background: #8B8CFF"></span><span class="lbl">Personnel</span><span class="count">18</span></a>
+      <a href="#" class="nav"><span class="vdot" style="background: #F5A524"></span><span class="lbl">Équipe infrastructure et production</span><span class="count">42</span></a>
+      <a href="#" class="nav"><span class="vdot" style="background: #3DD68C"></span><span class="lbl">Famille</span><span class="count">7</span></a>
+    </nav>
+    <nav class="navgroup" aria-label="Outils">
+      <div class="navlabel"><span>Outils</span></div>
+      <a href="#" class="nav"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3.5"></rect><circle cx="9" cy="9" r="1.1" fill="currentColor"></circle><circle cx="15" cy="15" r="1.1" fill="currentColor"></circle><circle cx="15" cy="9" r="1.1" fill="currentColor"></circle><circle cx="9" cy="15" r="1.1" fill="currentColor"></circle></svg><span class="lbl">Générateur</span></a>
+      <a href="#" class="nav"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><path d="M12 7.5V12l3 2"></path></svg><span class="lbl">Codes 2FA</span><span class="count">4</span></a>
+      <a href="#" class="nav"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1"></path><path d="M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1"></path></svg><span class="lbl">Liens de partage</span><span class="count">3</span></a>
+    </nav>
+    <nav class="navgroup" aria-label="Sécurité">
+      <div class="navlabel"><span>Sécurité</span></div>
+      <a href="#" class="nav" aria-current="page"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5.5c0 4.5-3 7.8-7 9.5-4-1.7-7-5-7-9.5V6z"></path><path d="M9 12l2 2 4-4"></path></svg><span class="lbl">Santé</span><span class="badge">6</span></a>
+      <a href="#" class="nav"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><circle cx="12" cy="12" r="3.5"></circle><path d="M5.9 5.9l3.6 3.6M14.5 14.5l3.6 3.6M18.1 5.9l-3.6 3.6M9.5 14.5l-3.6 3.6"></path></svg><span class="lbl">Accès d'urgence</span></a>
+    </nav>
+    <div class="side-foot">
+      <div style="display: flex; align-items: center; gap: 6px; min-width: 0">
+        <button type="button" class="account" aria-label="Compte"><span class="avatar h-indigo">GL</span><span class="stack grow"><span class="trunc" style="font-size: 13px; font-weight: 500">Guillaume Lorin</span><span class="trunc small muted">guillaume.lorin@exemple-entreprise.fr</span></span></button>
+        <a href="#" class="ibtn ibtn-bordered" aria-label="Paramètres"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"></path><circle cx="16" cy="7" r="2"></circle><circle cx="10" cy="17" r="2"></circle></svg></a>
+      </div>
+      <button type="button" class="btn btn-block"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg>Verrouiller<span class="grow"></span><span class="kbd">Ctrl L</span></button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="page">
+      <div class="page-inner" style="max-width: 1000px">
+        <div class="page-head">
+          <div class="stack">
+            <h1 class="h1">Santé du coffre</h1>
+            <p class="sub" style="display: flex; align-items: center; gap: 6px">Analysée sur cet appareil · 3 coffres · 34 secrets
+              <button type="button" class="ibtn" aria-label="Comment l'analyse est faite" style="width: 22px; height: 22px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v5M12 8h.01"></path></svg></button>
+            </p>
+          </div>
+          <button type="button" class="btn btn-lg"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>Vérifier les fuites</button>
+        </div>
+
+        <section class="card" aria-label="Score" style="display: flex; flex-wrap: wrap; gap: 20px 32px; align-items: center; padding: 24px 28px">
+          <div class="nowrap"><span style="font-size: 56px; font-weight: 600; letter-spacing: -0.04em; line-height: 1">72</span><span class="muted" style="font-size: 16px"> / 100</span></div>
+          <div class="stack" style="flex: 1 1 280px; gap: 12px">
+            <div class="bar" role="img" aria-label="28 sains, 4 faibles, 2 réutilisés"><span style="flex: 28; background: var(--ok)"></span><span style="flex: 4; background: var(--warn)"></span><span style="flex: 2; background: var(--danger)"></span></div>
+            <div style="display: flex; flex-wrap: wrap; gap: 6px 20px; font-size: 13px" class="t2">
+              <span class="legend"><i style="background: var(--ok)"></i>28 sains</span>
+              <span class="legend"><i style="background: var(--warn)"></i>4 faibles</span>
+              <span class="legend"><i style="background: var(--danger)"></i>2 réutilisés</span>
+              <span class="legend muted">Fuites : jamais vérifié</span>
+            </div>
+          </div>
+          <div class="stack" style="flex: 0 1 260px; gap: 2px; padding-left: 24px; border-left: 1px solid var(--line)">
+            <span class="small muted">Le plus utile maintenant</span>
+            <span style="font-size: 15px; font-weight: 500">Changer 2 mots de passe réutilisés</span>
+            <span class="small" style="color: var(--ok-text)">+14 points</span>
+          </div>
+        </section>
+
+        <section aria-label="À traiter" style="display: flex; flex-direction: column; gap: 14px">
+          <div class="tabs" role="tablist" aria-label="Filtrer">
+            <button type="button" role="tab" aria-selected="true" class="tab">À traiter <span class="muted">8</span></button>
+            <button type="button" role="tab" aria-selected="false" class="tab">Réutilisés <span>2</span></button>
+            <button type="button" role="tab" aria-selected="false" class="tab">Faibles <span>4</span></button>
+            <button type="button" role="tab" aria-selected="false" class="tab">2FA possible <span>2</span></button>
+            <button type="button" role="tab" aria-selected="false" class="tab">Ignorés <span>0</span></button>
+          </div>
+          <div class="card divide" style="overflow: hidden">
+            <sc-for list="{{issues}}" as="i" hint-placeholder-count="6">
+              <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 14px 18px; min-width: 0">
+                <span class="tile tile-md {{i.hue}}">{{i.initial}}</span>
+                <span class="stack" style="flex: 1 1 200px"><span class="trunc" style="font-weight: 500">{{i.name}}</span><span class="trunc small muted">{{i.detail}}</span></span>
+                <span class="chip {{i.chip}}">{{i.kind}}</span>
+                <span class="trunc small muted hide-lg" style="width: 140px">{{i.vault}}</span>
+                <div style="display: flex; gap: 4px; margin-left: auto">
+                  <button type="button" class="btn">{{i.action}}</button>
+                  <button type="button" class="ibtn" aria-label="Ignorer"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+          <div style="display: flex; flex-wrap: wrap; gap: 10px">
+            <span class="pill"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>Aucun mot de passe de plus d'un an</span>
+            <span class="pill"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>Aucune carte n'expire ce mois</span>
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["dark","light"],"default":"dark"},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const rows = [
+      ['Gitlab interne', 'Même mot de passe que « AWS Console — compte de production principal »', 'Réutilisé', 'chip-danger', 'Personnel', 'Changer', 'h-orange'],
+      ['AWS Console — compte de production principal', 'Même mot de passe que « Gitlab interne »', 'Réutilisé', 'chip-danger', 'Personnel', 'Changer', 'h-amber'],
+      ['Netflix', '6 caractères, un mot du dictionnaire', 'Faible', 'chip-warn', 'Famille', 'Changer', 'h-red'],
+      ['Amazon', 'Motif répété, se devine en quelques minutes', 'Faible', 'chip-warn', 'Personnel', 'Changer', 'h-amber'],
+      ['Figma', 'Le site accepte un code TOTP', '2FA possible', 'chip-accent', 'Personnel', 'Ajouter la 2FA', 'h-violet'],
+      ['bastion', 'Phrase de passe de la clé : 8 caractères', 'Faible', 'chip-warn', 'Équipe infrastructure et production', 'Changer', 'h-blue']
+    ];
+    return {
+      theme: this.props.theme ?? 'dark',
+      issues: rows.map((r) => ({ name: r[0], detail: r[1], kind: r[2], chip: r[3], vault: r[4], action: r[5], hue: r[6], initial: r[0].charAt(0).toUpperCase() }))
+    };
+  }
+}
+</script>
+</body>
+</html>

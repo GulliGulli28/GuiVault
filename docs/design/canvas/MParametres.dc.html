@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Mobile — réglages</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./theme.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="gv phone" data-theme="{{theme}}" style="font-family: 'Geist', system-ui, sans-serif">
+  <header class="m-head"><h1 class="m-title grow trunc">Réglages</h1></header>
+
+  <div class="m-body" style="gap: 18px">
+    <a href="#" class="m-card" style="display: flex; align-items: center; gap: 12px; padding: 14px 16px; color: var(--text); text-decoration: none; min-width: 0">
+      <span class="avatar h-indigo" style="width: 44px; height: 44px; font-size: 15px">GL</span>
+      <span class="stack grow"><span class="trunc" style="font-weight: 600">Guillaume Lorin</span><span class="trunc muted" style="font-size: 14px">guillaume.lorin@exemple-entreprise.fr</span></span>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg>
+    </a>
+
+    <div class="stack" style="gap: 8px">
+      <span class="m-section">Apparence</span>
+      <div class="seg" role="radiogroup" aria-label="Thème" style="padding: 4px">
+        <button type="button" role="radio" aria-checked="{{darkOn}}" style="height: 40px; font-size: 15px">Sombre</button>
+        <button type="button" role="radio" aria-checked="{{lightOn}}" style="height: 40px; font-size: 15px">Clair</button>
+        <button type="button" role="radio" aria-checked="false" style="height: 40px; font-size: 15px">Système</button>
+      </div>
+    </div>
+
+    <div class="stack" style="gap: 8px">
+      <span class="m-section">Sécurité</span>
+      <div class="m-card m-list">
+        <div class="m-set"><span class="stack grow"><span>Déverrouiller avec la biométrie</span><span class="small muted">Empreinte ou visage</span></span><button type="button" role="switch" aria-checked="true" aria-label="Biométrie" class="switch"><span></span></button></div>
+        <a href="#" class="m-set"><span class="grow">Verrouiller après</span><span class="muted">5 min</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></a>
+        <a href="#" class="m-set"><span class="grow">Vider le presse-papiers</span><span class="muted">30 s</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></a>
+        <a href="#" class="m-set"><span class="grow">Double authentification</span><span class="chip chip-warn">Désactivée</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></a>
+        <a href="#" class="m-set"><span class="grow">Appareils et sessions</span><span class="muted">3</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></a>
+      </div>
+    </div>
+
+    <div class="stack" style="gap: 8px">
+      <span class="m-section">Outils</span>
+      <div class="m-card m-list">
+        <a href="MGenerateur.dc.html" class="m-set"><span class="grow">Générateur</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></a>
+        <a href="#" class="m-set"><span class="grow">Liens de partage</span><span class="muted">3 actifs</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></a>
+        <a href="#" class="m-set"><span class="grow">Accès d'urgence</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></a>
+      </div>
+    </div>
+
+    <div class="m-card m-list">
+      <a href="MConnexion.dc.html" class="m-set"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg><span class="grow">Verrouiller maintenant</span></a>
+      <a href="MConnexion.dc.html" class="m-set" style="color: var(--danger-text)"><span class="grow">Se déconnecter</span></a>
+    </div>
+    <p class="small muted" style="text-align: center">GuiVault 0.1.1 · vault.lorin.dev</p>
+  </div>
+
+  <nav class="m-nav" aria-label="Principal">
+    <a href="MAccueil.dc.html" class="m-tab"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10.5L12 4l8 6.5V19a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1z"></path></svg>Accueil</a>
+    <a href="MCoffre.dc.html" class="m-tab"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2.5"></rect><circle cx="12" cy="12" r="3.5"></circle></svg>Coffres</a>
+    <a href="MCodes.dc.html" class="m-tab"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><path d="M12 7.5V12l3 2"></path></svg>Codes</a>
+    <a href="MSante.dc.html" class="m-tab"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5.5c0 4.5-3 7.8-7 9.5-4-1.7-7-5-7-9.5V6z"></path></svg>Santé</a>
+    <a href="MParametres.dc.html" class="m-tab" aria-current="page"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"></path><circle cx="16" cy="7" r="2"></circle><circle cx="10" cy="17" r="2"></circle></svg>Réglages</a>
+  </nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["dark","light"],"default":"dark"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const theme = this.props.theme ?? 'dark';
+    return { theme: theme, darkOn: theme === 'dark' ? 'true' : 'false', lightOn: theme === 'light' ? 'true' : 'false' };
+  }
+}
+</script>
+</body>
+</html>

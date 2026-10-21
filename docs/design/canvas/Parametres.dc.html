@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>GuiVault — paramètres de sécurité</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./theme.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="gv shell" data-theme="{{theme}}" style="font-family: 'Geist', system-ui, sans-serif">
+
+  <aside class="side" aria-label="Paramètres">
+    <div class="brand"><img src="/_blob/b5ba6fd6f3698d6072b814fdc9c6af28" alt="" width="28" height="28"><span>GuiVault</span></div>
+    <a href="#" class="nav" style="color: var(--muted)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg><span class="lbl">Retour aux coffres</span></a>
+    <nav class="navgroup" aria-label="Sections">
+      <div class="navlabel"><span>Paramètres</span></div>
+      <a href="#" class="nav"><span class="lbl">Compte</span></a>
+      <a href="#" class="nav" aria-current="page"><span class="lbl">Sécurité</span></a>
+      <a href="#" class="nav"><span class="lbl">Appareils et sessions</span><span class="count">3</span></a>
+      <a href="#" class="nav"><span class="lbl">Accès d'urgence</span></a>
+      <a href="#" class="nav"><span class="lbl">Apparence</span></a>
+      <a href="#" class="nav"><span class="lbl">Saisie automatique</span><span class="chip">Windows</span></a>
+      <a href="#" class="nav"><span class="lbl">Application</span><span class="chip">Windows</span></a>
+      <a href="#" class="nav"><span class="lbl">Import et export</span></a>
+    </nav>
+    <div class="side-foot"><span class="small muted" style="padding: 0 10px">GuiVault 0.1.1 · serveur 0.1.0</span></div>
+  </aside>
+
+  <main class="main">
+    <div class="page" style="padding-top: 40px">
+      <div class="stack" style="max-width: 760px; gap: 32px">
+        <header>
+          <h1 class="h1">Sécurité</h1>
+          <p class="sub">Comment vous vous connectez, et quand GuiVault se verrouille.</p>
+        </header>
+
+        <section class="stack" style="gap: 10px">
+          <h2 class="label">Connexion</h2>
+          <div class="card divide">
+            <div class="set"><div class="stack"><span class="set-t">Mot de passe maître</span><span class="set-d">Modifié il y a 8 mois. Personne ne peut le réinitialiser.</span></div><button type="button" class="btn">Changer</button></div>
+            <div class="set"><div class="stack"><span class="set-t">Double authentification</span><span class="set-d">Un code à 6 chiffres en plus du mot de passe.</span></div><button type="button" class="btn btn-primary">Activer</button></div>
+            <div class="set">
+              <div class="stack"><span class="set-t">Passkeys</span><span class="set-d">Se connecter sans taper le mot de passe maître.</span></div>
+              <button type="button" class="btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Ajouter</button>
+              <div style="flex-basis: 100%; display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; min-width: 0">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent-text)" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="12" r="4"></circle><path d="M12 12h9M18 12v3M21 12v2"></path></svg>
+                <span class="stack grow"><span class="trunc" style="font-weight: 500">Windows Hello — PC portable du bureau</span><span class="trunc small muted">Ajoutée le 2 oct. · utilisée hier</span></span>
+                <button type="button" class="btn btn-ghost">Retirer</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="stack" style="gap: 10px">
+          <h2 class="label">Verrouillage</h2>
+          <div class="card divide">
+            <div class="set"><div class="stack"><span class="set-t">Verrouiller après</span><span class="set-d">Sans activité de votre part.</span></div>
+              <label class="select-wrap"><span class="vh">Délai de verrouillage</span><select class="select"><option>15 minutes</option><option>1 heure</option><option>Fermeture de l'onglet</option></select><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></label></div>
+            <div class="set"><div class="stack"><span class="set-t">Vider le presse-papiers</span><span class="set-d">Seulement si la valeur copiée y est encore.</span></div>
+              <label class="select-wrap"><span class="vh">Délai d'effacement</span><select class="select"><option>Après 30 secondes</option><option>Après 1 minute</option><option>Jamais</option></select><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></label></div>
+            <div class="set"><div class="stack"><span class="set-t" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap">Avec la session Windows <span class="chip">Application</span></span><span class="set-d">Verrouiller quand l'ordinateur se verrouille ou se met en veille.</span></div><button type="button" role="switch" aria-checked="true" aria-label="Avec la session Windows" class="switch"><span></span></button></div>
+          </div>
+        </section>
+
+        <section class="stack" style="gap: 10px">
+          <h2 class="label">Cet appareil</h2>
+          <div class="card divide">
+            <div class="set" style="position: relative">
+              <div class="stack">
+                <span class="set-t" style="display: flex; align-items: center; gap: 6px">Copie hors ligne
+                  <button type="button" aria-label="Ce que garde la copie" aria-expanded="true" class="ibtn" style="width: 22px; height: 22px; background: var(--hover); color: var(--text)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v5M12 8h.01"></path></svg></button>
+                </span>
+                <span class="set-d">Ouvrir vos coffres en lecture quand le serveur ne répond pas.</span>
+              </div>
+              <button type="button" role="switch" aria-checked="false" aria-label="Copie hors ligne" class="switch"><span></span></button>
+              <div class="pop" role="tooltip" style="position: absolute; left: 140px; top: 48px; z-index: 2; width: 300px; max-width: calc(100% - 40px); padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; font-size: 13px">
+                <span style="display: flex; gap: 9px; align-items: flex-start"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--ok)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-top: 2px"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>Chiffrée, comme sur le serveur</span>
+                <span style="display: flex; gap: 9px; align-items: flex-start"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--ok)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-top: 2px"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>S'ouvre avec le mot de passe maître</span>
+                <span style="display: flex; gap: 9px; align-items: flex-start; color: var(--warn-text)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" style="margin-top: 2px"><path d="M12 4l9 16H3z"></path><path d="M12 10v4M12 17.2v.1"></path></svg>À éviter sur un poste partagé</span>
+                <a href="#" class="small">En savoir plus</a>
+              </div>
+            </div>
+            <div class="set"><div class="stack"><span class="set-t">Sessions ouvertes</span><span class="set-d">3 appareils, dont celui-ci.</span></div><button type="button" class="btn">Gérer</button></div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["dark","light"],"default":"dark"},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() { return { theme: this.props.theme ?? 'dark' }; }
+}
+</script>
+</body>
+</html>

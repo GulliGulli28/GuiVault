@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Extension — popup, réglages</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./theme.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="gv popup" data-theme="{{theme}}" style="font-family: 'Geist', system-ui, sans-serif">
+  <header class="p-head" style="padding-left: 6px">
+    <a href="XListe.dc.html" class="ibtn" aria-label="Retour"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg></a>
+    <span class="grow trunc" style="font-weight: 600">Réglages</span>
+  </header>
+
+  <div class="p-body" style="gap: 16px">
+    <section class="stack" style="gap: 6px">
+      <h2 class="p-sec" style="padding-left: 2px">Dans les pages</h2>
+      <div class="card divide">
+        <div class="set" style="padding: 11px 14px; flex-wrap: nowrap"><div class="stack grow"><span class="trunc" style="font-weight: 500">Bouton GuiVault dans les champs</span><span class="trunc small muted">Sur les sites dont vous avez un identifiant</span></div><button type="button" role="switch" aria-checked="true" aria-label="Bouton GuiVault dans les champs" class="switch"><span></span></button></div>
+        <div class="set" style="padding: 11px 14px; flex-wrap: nowrap"><div class="stack grow"><span class="trunc" style="font-weight: 500">Proposer d'enregistrer</span><span class="trunc small muted">Après une connexion ou une inscription</span></div><button type="button" role="switch" aria-checked="true" aria-label="Proposer d'enregistrer" class="switch"><span></span></button></div>
+        <div class="set" style="padding: 11px 14px; flex-wrap: nowrap"><div class="stack grow"><span class="trunc" style="font-weight: 500">Remplir le code 2FA tout seul</span><span class="trunc small muted">Quand un seul identifiant du site en a un</span></div><button type="button" role="switch" aria-checked="false" aria-label="Remplir le code 2FA tout seul" class="switch"><span></span></button></div>
+        <a href="#" class="set" style="padding: 11px 14px; flex-wrap: nowrap; color: var(--text); text-decoration: none"><div class="stack grow"><span class="trunc" style="font-weight: 500">Champs de code personnalisés</span><span class="trunc small muted">Pour les sites que GuiVault ne reconnaît pas</span></div><span class="chip">2 règles</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></a>
+      </div>
+    </section>
+
+    <section class="stack" style="gap: 6px">
+      <h2 class="p-sec" style="padding-left: 2px">Sécurité</h2>
+      <div class="card divide">
+        <div class="set" style="padding: 9px 14px; flex-wrap: nowrap"><span class="grow trunc" style="font-weight: 500">Verrouiller après</span><label class="select-wrap"><span class="vh">Délai</span><select class="select"><option>15 min</option><option>1 heure</option><option>Fermeture du navigateur</option></select><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></label></div>
+        <div class="set" style="padding: 9px 14px; flex-wrap: nowrap"><span class="grow trunc" style="font-weight: 500">Vider le presse-papiers</span><label class="select-wrap"><span class="vh">Délai</span><select class="select"><option>30 s</option><option>1 min</option><option>Jamais</option></select><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></label></div>
+      </div>
+    </section>
+
+    <section class="stack" style="gap: 6px">
+      <h2 class="p-sec" style="padding-left: 2px">Apparence</h2>
+      <div class="seg" role="radiogroup" aria-label="Thème">
+        <button type="button" role="radio" aria-checked="{{darkOn}}">Sombre</button>
+        <button type="button" role="radio" aria-checked="{{lightOn}}">Clair</button>
+        <button type="button" role="radio" aria-checked="false">Système</button>
+      </div>
+    </section>
+
+    <section class="card" style="display: flex; align-items: center; gap: 12px; padding: 12px 14px; min-width: 0">
+      <span class="avatar h-indigo">GL</span>
+      <span class="stack grow"><span class="trunc" style="font-weight: 500">guillaume.lorin@exemple-entreprise.fr</span><span class="trunc small muted">vault.lorin.dev</span></span>
+      <button type="button" class="btn btn-ghost" style="color: var(--danger-text)">Déconnecter</button>
+    </section>
+  </div>
+  <footer class="p-foot"><span class="grow trunc">GuiVault 0.1.0 pour Chrome</span><a href="#" style="color: var(--muted)">Raccourcis</a></footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["dark","light"],"default":"dark"},"$preview":{"width":440,"height":600}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const theme = this.props.theme ?? 'dark';
+    return { theme: theme, darkOn: theme === 'dark' ? 'true' : 'false', lightOn: theme === 'light' ? 'true' : 'false' };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Extension — popup, nouvel identifiant</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./theme.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="gv popup" data-theme="{{theme}}" style="font-family: 'Geist', system-ui, sans-serif">
+  <header class="p-head" style="padding-left: 6px">
+    <a href="XListe.dc.html" class="ibtn" aria-label="Annuler"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg></a>
+    <span class="grow trunc" style="font-weight: 600">Nouvel identifiant</span>
+    <button type="button" class="btn btn-primary">Enregistrer</button>
+  </header>
+
+  <div class="p-body" style="gap: 14px">
+    <div class="m-chips" style="margin: 0 -14px; padding: 0 14px">
+      <button type="button" class="m-chip" aria-pressed="true" style="height: 30px; font-size: 13px">Identifiant</button>
+      <button type="button" class="m-chip" aria-pressed="false" style="height: 30px; font-size: 13px">Carte</button>
+      <button type="button" class="m-chip" aria-pressed="false" style="height: 30px; font-size: 13px">Note</button>
+      <button type="button" class="m-chip" aria-pressed="false" style="height: 30px; font-size: 13px">Identité</button>
+      <button type="button" class="m-chip" aria-pressed="false" style="height: 30px; font-size: 13px">Clé d'API</button>
+    </div>
+    <label class="field"><span class="field-label">Nom</span><input class="input" value="Atelier Nord"></label>
+    <label class="field"><span class="field-label">Utilisateur</span><input class="input mono" value="guillaume.lorin@exemple-entreprise.fr"></label>
+    <div class="field">
+      <label class="field-label" for="xpw">Mot de passe</label>
+      <div style="display: flex; gap: 8px; min-width: 0">
+        <input id="xpw" class="input mono grow input-focus" value="p7#Lm2vQ!x9RtW4ka%Z">
+        <button type="button" class="ibtn ibtn-bordered" aria-label="Générer" style="width: 36px; height: 36px; color: var(--accent-text)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3.5"></rect><circle cx="9" cy="9" r="1.1" fill="currentColor"></circle><circle cx="15" cy="15" r="1.1" fill="currentColor"></circle><circle cx="15" cy="9" r="1.1" fill="currentColor"></circle><circle cx="9" cy="15" r="1.1" fill="currentColor"></circle></svg></button>
+      </div>
+      <span style="display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--muted)"><span class="meter"><span class="on"></span><span class="on"></span><span class="on"></span><span class="on"></span></span>Très fort</span>
+    </div>
+    <label class="field"><span class="field-label">Site</span><input class="input mono" value="https://compte.atelier-nord.test"></label>
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px">
+      <label class="field"><span class="field-label">Coffre</span><span class="select-wrap" style="width: 100%"><select class="select" style="width: 100%; height: 36px"><option>Personnel</option><option>Équipe infrastructure et production</option></select><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></span></label>
+      <label class="field"><span class="field-label">Dossier</span><span class="select-wrap" style="width: 100%"><select class="select" style="width: 100%; height: 36px"><option>Aucun</option><option>Travail</option></select><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></span></label>
+    </div>
+  </div>
+  <footer class="p-foot"><span class="grow trunc">Site prérempli depuis l'onglet ouvert</span></footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["dark","light"],"default":"dark"},"$preview":{"width":440,"height":600}}'>
+class Component extends DCLogic {
+  renderVals() { return { theme: this.props.theme ?? 'dark' }; }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Mobile — fiche</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./theme.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="gv phone" data-theme="{{theme}}" style="font-family: 'Geist', system-ui, sans-serif">
+  <header class="m-head" style="padding: 8px 8px 4px">
+    <a href="MCoffre.dc.html" class="m-icon" aria-label="Retour au coffre"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg></a>
+    <span class="grow trunc muted" style="font-size: 14px">Personnel · Travail</span>
+    <a href="MEdition.dc.html" class="m-icon" aria-label="Modifier"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"></path></svg></a>
+    <a href="MPartage.dc.html" class="m-icon" aria-label="Plus d'actions"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.7"></circle><circle cx="12" cy="12" r="1.7"></circle><circle cx="19" cy="12" r="1.7"></circle></svg></a>
+  </header>
+
+  <div class="m-body" style="gap: 20px">
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; min-width: 0">
+      <span class="tile tile-xl h-ink">G</span>
+      <div class="stack" style="align-items: center; max-width: 100%">
+        <h1 class="clamp2" style="font-size: 24px; font-weight: 600; letter-spacing: -0.02em">GitHub</h1>
+        <a href="#" class="trunc" style="font-size: 14px; max-width: 100%">github.com</a>
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px">
+      <button type="button" class="m-btn m-btn-primary"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"></rect><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"></path></svg>Copier le mot de passe</button>
+      <button type="button" class="m-btn" aria-label="Ouvrir le site" style="width: 50px; padding: 0"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9"></path><path d="M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4"></path></svg></button>
+    </div>
+
+    <div class="m-card m-list">
+      <div class="m-kv">
+        <span class="stack grow"><span class="small muted">Utilisateur</span><span class="mono trunc">glorin</span></span>
+        <button type="button" class="m-icon" aria-label="Copier l'utilisateur" style="color: var(--muted)"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"></rect><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"></path></svg></button>
+      </div>
+      <div class="m-kv">
+        <span class="stack grow"><span class="small muted">Mot de passe</span><span class="mono trunc" style="letter-spacing: 0.12em">••••••••••••••••</span></span>
+        <button type="button" class="m-icon" aria-label="Afficher" style="color: var(--muted)"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"></path><circle cx="12" cy="12" r="3"></circle></svg></button>
+      </div>
+      <div class="m-kv">
+        <span class="stack grow"><span class="small muted">Code 2FA · 18 s</span><span class="mono" style="font-size: 24px; font-weight: 500; letter-spacing: 0.08em">346 067</span></span>
+        <button type="button" class="m-icon" aria-label="Copier le code" style="color: var(--muted)"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"></rect><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"></path></svg></button>
+      </div>
+      <div class="m-kv">
+        <span class="stack grow"><span class="small muted">Site</span><span class="mono trunc">https://github.com/organizations/exemple-entreprise/settings</span></span>
+        <button type="button" class="m-icon" aria-label="Ouvrir" style="color: var(--muted)"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9"></path><path d="M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4"></path></svg></button>
+      </div>
+    </div>
+
+    <div class="m-card" style="padding: 14px 16px; display: flex; flex-direction: column; gap: 6px">
+      <span class="small muted">Notes</span>
+      <p class="t2 break" style="font-size: 15px">Compte perso. Clés SSH déclarées : laptop-2024, guiterm-wsl.</p>
+    </div>
+
+    <div class="m-card m-list">
+      <a href="#" class="m-set"><span class="grow">Pièces jointes</span><span class="muted">0</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></a>
+      <a href="#" class="m-set"><span class="grow">Historique</span><span class="muted">3 versions</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></a>
+      <a href="MPartage.dc.html" class="m-set"><span class="grow">Partager par lien</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></a>
+    </div>
+    <p class="small muted" style="text-align: center">Modifié il y a 3 jours · créé le 12 mars 2025</p>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["dark","light"],"default":"dark"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return { theme: this.props.theme ?? 'dark' }; }
+}
+</script>
+</body>
+</html>

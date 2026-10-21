@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Mobile — nouvel élément</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./theme.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="gv phone" data-theme="{{theme}}" style="font-family: 'Geist', system-ui, sans-serif">
+  <header style="display: flex; align-items: center; gap: 8px; padding: 12px 16px; min-height: 60px; border-bottom: 1px solid var(--line)">
+    <a href="MCoffre.dc.html" style="font-size: 15px">Annuler</a>
+    <h1 class="grow trunc" style="font-size: 17px; font-weight: 600; text-align: center">Nouvel élément</h1>
+    <button type="button" class="m-btn m-btn-primary" style="height: 38px; padding: 0 14px; font-size: 15px">Enregistrer</button>
+  </header>
+
+  <div class="m-body" style="padding-top: 14px; gap: 16px">
+    <div class="m-chips">
+      <button type="button" class="m-chip" aria-pressed="true">Identifiant</button>
+      <button type="button" class="m-chip" aria-pressed="false">Carte</button>
+      <button type="button" class="m-chip" aria-pressed="false">Note</button>
+      <button type="button" class="m-chip" aria-pressed="false">Identité</button>
+      <button type="button" class="m-chip" aria-pressed="false">Clé d'API</button>
+      <button type="button" class="m-chip" aria-pressed="false">Hôte SSH</button>
+    </div>
+
+    <label class="field"><span class="field-label" style="font-size: 14px">Nom</span><input class="m-input" value="Figma"></label>
+    <label class="field"><span class="field-label" style="font-size: 14px">Utilisateur</span><input class="m-input mono" value="glorin@example.com"></label>
+    <div class="field">
+      <label class="field-label" for="mpw" style="font-size: 14px">Mot de passe</label>
+      <div style="display: flex; gap: 8px; min-width: 0">
+        <input id="mpw" class="m-input mono grow input-focus" value="p7#Lm2vQ!x9RtW4ka%Z">
+        <a href="MGenerateur.dc.html" class="m-icon m-icon-b" aria-label="Générer" style="width: 48px; height: 48px; color: var(--accent-text)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3.5"></rect><circle cx="9" cy="9" r="1.1" fill="currentColor"></circle><circle cx="15" cy="15" r="1.1" fill="currentColor"></circle><circle cx="15" cy="9" r="1.1" fill="currentColor"></circle><circle cx="9" cy="15" r="1.1" fill="currentColor"></circle></svg></a>
+      </div>
+      <span style="display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--muted)"><span class="meter"><span class="on"></span><span class="on"></span><span class="on"></span><span class="on"></span></span>Très fort · 20 caractères</span>
+    </div>
+    <label class="field"><span class="field-label" style="font-size: 14px">Site</span><input class="m-input mono" value="https://figma.com" inputmode="url"></label>
+
+    <div class="m-card m-list">
+      <button type="button" class="m-set" style="width: 100%; border: 0; background: none; text-align: left"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-text)" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3"></path><rect x="8" y="8" width="8" height="8" rx="1"></rect></svg><span class="grow">Scanner le QR code 2FA</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></button>
+      <button type="button" class="m-set" style="width: 100%; border: 0; border-top: 1px solid var(--line); background: none; text-align: left"><span class="grow">Dossier</span><span class="muted trunc" style="max-width: 160px">Travail</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></button>
+      <button type="button" class="m-set" style="width: 100%; border: 0; border-top: 1px solid var(--line); background: none; text-align: left"><span class="grow">Coffre</span><span class="muted trunc" style="max-width: 160px">Personnel</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></button>
+    </div>
+
+    <label class="field"><span class="field-label" style="font-size: 14px">Notes</span><textarea class="m-input" rows="3" style="height: auto; padding: 12px 14px"></textarea></label>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["dark","light"],"default":"dark"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return { theme: this.props.theme ?? 'dark' }; }
+}
+</script>
+</body>
+</html>

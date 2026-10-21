@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Extension — se connecter avec une passkey</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./theme.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="gv site" data-theme="{{theme}}">
+  <div class="site-bar">
+    <span class="site-url"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg>https://compte.atelier-nord.test/connexion</span>
+    <span class="site-ext"><img src="/_blob/b5ba6fd6f3698d6072b814fdc9c6af28" alt="GuiVault" width="20" height="20"></span>
+  </div>
+  <div class="site-main">
+    <form class="site-card">
+      <div class="site-brand"><svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><path d="M4 22L14 5l10 17z" fill="#24453A"></path><path d="M10 22l4-7 4 7z" fill="#EEF0EC"></path></svg>Atelier Nord</div>
+      <p style="margin: 0; font-size: 15px; color: #44474B">Connexion à votre espace client</p>
+      <button type="button" class="site-btn">Se connecter avec une clé d'accès</button>
+    </form>
+  </div>
+
+  <div class="inj-scrim">
+    <div class="inj inj-dialog" role="dialog" aria-modal="true" aria-labelledby="pk">
+      <div style="display: flex; align-items: center; gap: 10px; min-width: 0">
+        <img src="/_blob/b5ba6fd6f3698d6072b814fdc9c6af28" alt="" width="24" height="24">
+        <div class="stack grow">
+          <h2 id="pk" class="trunc" style="font-size: 16px; font-weight: 600">Se connecter à atelier-nord.test</h2>
+          <span class="trunc small muted">Avec une passkey de votre coffre</span>
+        </div>
+      </div>
+      <div class="stack" role="radiogroup" aria-label="Passkey" style="gap: 8px">
+        <button type="button" class="inj-choice" role="radio" aria-checked="true">
+          <span class="tile h-teal">A</span>
+          <span class="stack grow"><span class="trunc" style="font-weight: 500">Atelier Nord — espace client</span><span class="trunc small muted">guillaume.lorin@exemple-entreprise.fr · Personnel</span></span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>
+        </button>
+        <button type="button" class="inj-choice" role="radio" aria-checked="false">
+          <span class="tile h-teal">A</span>
+          <span class="stack grow"><span class="trunc" style="font-weight: 500">Atelier Nord (compte famille)</span><span class="trunc small muted">famille@example.com · Famille</span></span>
+        </button>
+      </div>
+      <div style="display: flex; align-items: center; gap: 8px">
+        <button type="button" class="btn btn-ghost" style="padding: 0 8px; color: var(--muted)">Utiliser le navigateur</button>
+        <span class="grow"></span>
+        <button type="button" class="btn">Annuler</button>
+        <button type="button" class="btn btn-primary">Continuer</button>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["dark","light"],"default":"dark"},"$preview":{"width":1200,"height":760}}'>
+class Component extends DCLogic {
+  renderVals() { return { theme: this.props.theme ?? 'dark' }; }
+}
+</script>
+</body>
+</html>

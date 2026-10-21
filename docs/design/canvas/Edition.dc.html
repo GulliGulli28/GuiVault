@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>GuiVault — modifier un élément</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./theme.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="gv shell" data-theme="{{theme}}" style="font-family: 'Geist', system-ui, sans-serif">
+
+  <aside class="side" aria-label="Navigation">
+    <div class="brand"><img src="/_blob/b5ba6fd6f3698d6072b814fdc9c6af28" alt="" width="28" height="28"><span>GuiVault</span></div>
+    <button type="button" class="search-btn" aria-label="Rechercher partout"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg><span class="lbl grow trunc">Rechercher partout</span><span class="kbd">Ctrl K</span></button>
+    <nav class="navgroup" aria-label="Général">
+      <a href="#" class="nav"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10.5L12 4l8 6.5V19a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1z"></path></svg><span class="lbl">Accueil</span></a>
+    </nav>
+    <nav class="navgroup" aria-label="Coffres">
+      <div class="navlabel"><span>Coffres</span></div>
+      <a href="#" class="nav" aria-current="page"><span class="vdot" style="background: #8B8CFF"></span><span class="lbl">Personnel</span><span class="count">18</span></a>
+      <a href="#" class="nav"><span class="vdot" style="background: #F5A524"></span><span class="lbl">Équipe infrastructure et production</span><span class="count">42</span></a>
+      <a href="#" class="nav"><span class="vdot" style="background: #3DD68C"></span><span class="lbl">Famille</span><span class="count">7</span></a>
+    </nav>
+    <nav class="navgroup" aria-label="Outils">
+      <div class="navlabel"><span>Outils</span></div>
+      <a href="#" class="nav"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3.5"></rect><circle cx="9" cy="9" r="1.1" fill="currentColor"></circle><circle cx="15" cy="15" r="1.1" fill="currentColor"></circle><circle cx="15" cy="9" r="1.1" fill="currentColor"></circle><circle cx="9" cy="15" r="1.1" fill="currentColor"></circle></svg><span class="lbl">Générateur</span></a>
+      <a href="#" class="nav"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><path d="M12 7.5V12l3 2"></path></svg><span class="lbl">Codes 2FA</span><span class="count">4</span></a>
+      <a href="#" class="nav"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1"></path><path d="M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1"></path></svg><span class="lbl">Liens de partage</span><span class="count">3</span></a>
+    </nav>
+    <nav class="navgroup" aria-label="Sécurité">
+      <div class="navlabel"><span>Sécurité</span></div>
+      <a href="#" class="nav"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5.5c0 4.5-3 7.8-7 9.5-4-1.7-7-5-7-9.5V6z"></path><path d="M9 12l2 2 4-4"></path></svg><span class="lbl">Santé</span><span class="badge">6</span></a>
+      <a href="#" class="nav"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><circle cx="12" cy="12" r="3.5"></circle><path d="M5.9 5.9l3.6 3.6M14.5 14.5l3.6 3.6M18.1 5.9l-3.6 3.6M9.5 14.5l-3.6 3.6"></path></svg><span class="lbl">Accès d'urgence</span></a>
+    </nav>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div class="crumbs"><span class="trunc">Personnel</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg><span class="trunc" style="color: var(--text); font-weight: 500">Modifier « GitHub »</span></div>
+      <span class="small muted nowrap hide-lg">Modifications non enregistrées</span>
+      <button type="button" class="btn btn-ghost">Annuler</button>
+      <button type="button" class="btn btn-primary">Enregistrer<span class="kbd hide-md">Ctrl S</span></button>
+    </div>
+
+    <div class="page">
+      <form class="cols" style="max-width: 1040px; gap: 20px">
+        <div class="col-main" style="flex-basis: 480px; gap: 16px">
+
+          <section class="card card-pad" style="display: flex; flex-direction: column; gap: 16px">
+            <div style="display: flex; align-items: flex-end; gap: 12px">
+              <button type="button" class="tile tile-lg h-ink" aria-label="Changer l'icône" style="border: 0">G</button>
+              <label class="field grow"><span class="field-label">Nom</span><input class="input input-lg" value="GitHub" style="font-size: 16px; font-weight: 500"></label>
+              <button type="button" class="ibtn ibtn-bordered" aria-label="Épingler" aria-pressed="true" style="width: 42px; height: 42px; color: #F5C04A"><svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8L3.5 9.7l5.9-.9z"></path></svg></button>
+            </div>
+            <label class="field"><span class="field-label">Utilisateur</span><input class="input mono" value="glorin"></label>
+            <div class="field" style="position: relative">
+              <label class="field-label" for="pw">Mot de passe</label>
+              <div class="inbox">
+                <input id="pw" class="input mono input-focus" value="Tr0ub4dor&amp;3xyz!Kq8m">
+                <span class="in-acts">
+                  <button type="button" class="ibtn" aria-label="Masquer"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"></path><circle cx="12" cy="12" r="3"></circle></svg></button>
+                  <button type="button" class="ibtn" aria-label="Générer" aria-expanded="true" style="background: var(--accent-soft); color: var(--accent-text)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3.5"></rect><circle cx="9" cy="9" r="1.1" fill="currentColor"></circle><circle cx="15" cy="15" r="1.1" fill="currentColor"></circle><circle cx="15" cy="9" r="1.1" fill="currentColor"></circle><circle cx="9" cy="15" r="1.1" fill="currentColor"></circle></svg></button>
+                </span>
+              </div>
+              <span style="display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--muted)"><span class="meter"><span class="on"></span><span class="on"></span><span class="on"></span><span class="on"></span></span>Très fort</span>
+
+              <!-- Générateur en surimpression -->
+              <div class="pop" role="dialog" aria-label="Générer un mot de passe" style="position: absolute; right: 0; top: 70px; z-index: 5; width: 340px; max-width: 100%; padding: 14px; display: flex; flex-direction: column; gap: 12px">
+                <div class="seg" role="radiogroup" aria-label="Genre"><button type="button" role="radio" aria-checked="true">Caractères</button><button type="button" role="radio" aria-checked="false">Phrase</button></div>
+                <div class="mono break" style="padding: 10px 12px; border-radius: 9px; background: var(--code-bg); font-size: 14px">p7<span style="color: var(--danger-text)">#</span>Lm2vQ<span style="color: var(--danger-text)">!</span>x9RtW<span style="color: var(--warn-text)">4</span>ka<span style="color: var(--danger-text)">%</span>Z</div>
+                <label style="display: flex; align-items: center; gap: 10px; font-size: 13px"><span class="nowrap">Longueur 20</span><input type="range" min="8" max="64" value="20" style="flex: 1 1 0; min-width: 0; accent-color: var(--accent)"></label>
+                <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; font-size: 13px">
+                  <span class="check"><span class="box box-on"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg></span>Chiffres</span>
+                  <span class="check"><span class="box box-on"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg></span>Symboles</span>
+                  <span class="check"><span class="box box-on"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg></span>Majuscules</span>
+                  <span class="check"><span class="box"></span>Sans ambigus</span>
+                </div>
+                <div style="display: flex; justify-content: flex-end; gap: 8px"><button type="button" class="btn btn-ghost">Régénérer</button><button type="button" class="btn btn-primary">Utiliser</button></div>
+              </div>
+            </div>
+
+            <div class="field">
+              <span class="field-label">Sites</span>
+              <div style="display: flex; gap: 8px; min-width: 0">
+                <input class="input mono grow" aria-label="Site 1" value="https://github.com">
+                <span class="select-wrap hide-md"><select class="select" aria-label="Correspondance"><option>Domaine</option><option>Hôte exact</option><option>Commence par</option></select><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></span>
+                <button type="button" class="ibtn" aria-label="Retirer le site" style="height: 36px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>
+              </div>
+              <button type="button" class="btn btn-ghost" style="align-self: flex-start; padding: 0 6px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Ajouter un site</button>
+            </div>
+          </section>
+
+          <section class="card card-pad" style="display: flex; flex-direction: column; gap: 12px">
+            <div style="display: flex; align-items: center; gap: 10px"><h2 class="h2 grow">Double authentification</h2><span class="chip chip-ok">346 067</span></div>
+            <div style="display: flex; gap: 8px; min-width: 0">
+              <input class="input mono grow" aria-label="Secret TOTP" value="JBSWY3DPEHPK3PXP">
+              <button type="button" class="btn" style="height: 36px">Image du QR code</button>
+            </div>
+            <p class="small muted">Secret, lien otpauth:// ou image du QR code.</p>
+          </section>
+
+          <section class="card card-pad" style="display: flex; flex-direction: column; gap: 12px">
+            <h2 class="h2">Notes</h2>
+            <textarea class="input" rows="3" aria-label="Notes">Compte perso. Clés SSH déclarées : laptop-2024, guiterm-wsl.</textarea>
+          </section>
+        </div>
+
+        <div class="col-side" style="flex-basis: 280px; gap: 16px">
+          <section class="card card-pad" style="display: flex; flex-direction: column; gap: 14px">
+            <h2 class="h2">Organisation</h2>
+            <label class="field"><span class="field-label">Dossier</span><span class="select-wrap" style="width: 100%"><select class="select" style="width: 100%; height: 36px"><option>Travail</option></select><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></span></label>
+            <div class="field">
+              <span class="field-label">Étiquettes</span>
+              <div class="input" style="height: auto; min-height: 36px; padding: 5px 6px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center">
+                <span class="chip">dev</span><span class="chip">code</span><span class="chip">perso</span>
+                <input aria-label="Ajouter une étiquette" placeholder="Ajouter…" style="flex: 1 1 60px; min-width: 60px; border: 0; outline: none; background: transparent">
+              </div>
+            </div>
+          </section>
+          <section class="card card-pad" style="display: flex; flex-direction: column; gap: 10px">
+            <h2 class="h2">Champs personnalisés</h2>
+            <div style="display: flex; gap: 8px; align-items: center; min-width: 0"><span class="trunc small muted" style="width: 90px">Code PIN</span><span class="mono grow trunc">••••</span></div>
+            <button type="button" class="btn btn-ghost" style="align-self: flex-start; padding: 0 6px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Ajouter un champ</button>
+          </section>
+          <section class="card card-pad" style="display: flex; flex-direction: column; gap: 10px">
+            <h2 class="h2">Saisie automatique</h2>
+            <div style="display: flex; align-items: center; gap: 10px"><span class="mono small grow trunc">{UTILISATEUR}{TAB}{MOTDEPASSE}{ENTRÉE}</span><span class="chip">Windows</span></div>
+          </section>
+        </div>
+      </form>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["dark","light"],"default":"dark"},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() { return { theme: this.props.theme ?? 'dark' }; }
+}
+</script>
+</body>
+</html>

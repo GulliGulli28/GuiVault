@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Extension — inscription et mot de passe proposé</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./theme.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="gv site" data-theme="{{theme}}">
+  <div class="site-bar">
+    <span class="site-url"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg>https://compte.atelier-nord.test/inscription</span>
+    <span class="site-ext"><img src="/_blob/b5ba6fd6f3698d6072b814fdc9c6af28" alt="GuiVault" width="20" height="20"></span>
+  </div>
+  <div class="site-main">
+    <form class="site-card">
+      <div class="site-brand"><svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><path d="M4 22L14 5l10 17z" fill="#24453A"></path><path d="M10 22l4-7 4 7z" fill="#EEF0EC"></path></svg>Atelier Nord</div>
+      <p style="margin: 0; font-size: 15px; color: #44474B">Créer votre espace client</p>
+      <div class="stack" style="gap: 6px">
+        <span class="site-label">Adresse e-mail</span>
+        <div class="site-input">guillaume.lorin@exemple-entreprise.fr</div>
+      </div>
+      <div class="stack" style="gap: 6px">
+        <span class="site-label">Choisissez un mot de passe</span>
+        <div style="position: relative">
+          <div class="site-input site-input-focus">
+            <button type="button" class="inj-btn inj-btn-on" aria-label="Proposer un mot de passe GuiVault" aria-expanded="true"><img src="/_blob/b5ba6fd6f3698d6072b814fdc9c6af28" alt="" width="20" height="20"></button>
+          </div>
+
+          <!-- Proposition GuiVault -->
+          <div class="inj inj-menu" role="dialog" aria-label="Mot de passe proposé par GuiVault" style="left: 0; top: 46px; width: 360px; padding-bottom: 12px">
+            <div class="inj-head"><img src="/_blob/b5ba6fd6f3698d6072b814fdc9c6af28" alt="" width="16" height="16"><span class="grow trunc">Mot de passe proposé par GuiVault</span></div>
+            <div style="padding: 4px 12px 0; display: flex; flex-direction: column; gap: 12px">
+              <div style="display: flex; align-items: center; gap: 8px; padding: 10px 6px 10px 12px; border-radius: 10px; background: var(--code-bg); border: 1px solid var(--line); min-width: 0">
+                <span class="mono break grow" style="font-size: 15px">p7<span style="color: var(--danger-text)">#</span>Lm<span style="color: var(--warn-text)">2</span>vQ<span style="color: var(--danger-text)">!</span>x<span style="color: var(--warn-text)">9</span>RtW<span style="color: var(--warn-text)">4</span>ka<span style="color: var(--danger-text)">%</span>Z</span>
+                <button type="button" class="ibtn" aria-label="Régénérer"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.3-4.9L4 8M4 4v4h4M4 13a8 8 0 0 0 14.3 4.9L20 16M20 20v-4h-4"></path></svg></button>
+              </div>
+              <div style="display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--muted)"><span class="meter"><span class="on"></span><span class="on"></span><span class="on"></span><span class="on"></span></span><span class="grow trunc">20 caractères · symboles</span><a href="#">Options</a></div>
+              <div style="display: flex; align-items: center; gap: 10px; min-width: 0">
+                <span class="small muted nowrap">Enregistrer dans</span>
+                <span class="select-wrap grow"><select class="select" aria-label="Coffre" style="width: 100%"><option>Personnel</option><option>Famille</option></select><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></span>
+              </div>
+              <div style="display: flex; gap: 8px; justify-content: flex-end">
+                <button type="button" class="btn btn-ghost">Le mien</button>
+                <button type="button" class="btn btn-primary">Utiliser ce mot de passe</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="stack" style="gap: 6px">
+        <span class="site-label">Confirmez le mot de passe</span>
+        <div class="site-input"></div>
+      </div>
+      <button type="button" class="site-btn">Créer mon compte</button>
+    </form>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["dark","light"],"default":"dark"},"$preview":{"width":1200,"height":760}}'>
+class Component extends DCLogic {
+  renderVals() { return { theme: this.props.theme ?? 'dark' }; }
+}
+</script>
+</body>
+</html>

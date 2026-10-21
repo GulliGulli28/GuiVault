@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Mobile — partager par lien</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./theme.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="gv phone" data-theme="{{theme}}" style="font-family: 'Geist', system-ui, sans-serif">
+  <!-- Fiche en arrière-plan -->
+  <div aria-hidden="true" style="padding: 64px 16px 0; display: flex; flex-direction: column; align-items: center; gap: 12px">
+    <span class="tile tile-xl h-pink">B</span>
+    <span style="font-size: 24px; font-weight: 600">Boursorama</span>
+    <span class="muted">boursorama.com</span>
+  </div>
+
+  <div style="position: absolute; inset: 0; background: var(--overlay)"></div>
+
+  <div class="m-sheet" role="dialog" aria-modal="true" aria-labelledby="pl">
+    <span class="m-grab"></span>
+    <div style="display: flex; align-items: center; gap: 10px; min-width: 0">
+      <h2 id="pl" class="grow trunc" style="font-size: 19px; font-weight: 600">Partager par lien</h2>
+      <a href="MFiche.dc.html" class="m-icon" aria-label="Fermer" style="width: 36px; height: 36px; color: var(--muted)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></a>
+    </div>
+    <div style="display: flex; flex-wrap: wrap; gap: 8px">
+      <span class="pill" style="font-size: 13px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg>Chiffré ici</span>
+      <span class="pill" style="font-size: 13px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><path d="M12 7.5V12l3 2"></path></svg>Effacé à l'expiration</span>
+    </div>
+
+    <div class="m-card m-list">
+      <div class="m-set"><span class="grow">Expire après</span><span class="select-wrap"><select class="select" aria-label="Expire après" style="height: 40px; font-size: 15px"><option>7 jours</option><option>24 heures</option></select><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></span></div>
+      <div class="m-set"><span class="grow">Ouvertures max.</span>
+        <span style="display: inline-flex; align-items: center; gap: 4px">
+          <button type="button" class="m-icon m-icon-b" aria-label="Moins" style="width: 40px; height: 40px">−</button>
+          <span class="mono" style="width: 28px; text-align: center">5</span>
+          <button type="button" class="m-icon m-icon-b" aria-label="Plus" style="width: 40px; height: 40px">+</button>
+        </span>
+      </div>
+      <div class="m-set"><span class="stack grow"><span>Mot de passe d'ouverture</span><span class="small muted">À donner par un autre canal</span></span><button type="button" role="switch" aria-checked="true" aria-label="Mot de passe d'ouverture" class="switch"><span></span></button></div>
+    </div>
+
+    <div class="stack" style="gap: 8px">
+      <span class="small muted">Lien créé</span>
+      <div style="display: flex; align-items: center; gap: 8px; padding: 0 6px 0 14px; height: 50px; border-radius: 12px; background: var(--code-bg); border: 1px solid var(--line); min-width: 0">
+        <span class="mono trunc grow" style="font-size: 14px">https://vault.lorin.dev/#/send/8f3c1e9b47a0d2ef/Qm9vcnNvcmFtYS1zZWNyZXQta2V5</span>
+      </div>
+    </div>
+    <button type="button" class="m-btn m-btn-primary" style="width: 100%"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"></rect><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"></path></svg>Copier le lien</button>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["dark","light"],"default":"dark"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return { theme: this.props.theme ?? 'dark' }; }
+}
+</script>
+</body>
+</html>

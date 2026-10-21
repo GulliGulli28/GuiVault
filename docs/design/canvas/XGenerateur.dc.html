@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Extension — popup, générateur</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./theme.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="gv popup" data-theme="{{theme}}" style="font-family: 'Geist', system-ui, sans-serif">
+  <header class="p-head">
+    <img src="/_blob/b5ba6fd6f3698d6072b814fdc9c6af28" alt="" width="24" height="24">
+    <span class="grow trunc" style="font-weight: 600">GuiVault</span>
+    <a href="XReglages.dc.html" class="ibtn" aria-label="Réglages"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"></path><circle cx="16" cy="7" r="2"></circle><circle cx="10" cy="17" r="2"></circle></svg></a>
+    <a href="XVerrou.dc.html" class="ibtn" aria-label="Verrouiller"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg></a>
+  </header>
+  <div class="p-tabs">
+    <div class="seg" role="tablist" aria-label="Vue">
+      <a href="XListe.dc.html" role="tab" aria-selected="false" style="flex: 1 1 0; display: inline-flex; align-items: center; justify-content: center; height: 32px; border-radius: 8px; color: var(--muted); font-weight: 500; text-decoration: none">Coffres</a>
+      <a href="XCodes.dc.html" role="tab" aria-selected="false" style="flex: 1 1 0; display: inline-flex; align-items: center; justify-content: center; height: 32px; border-radius: 8px; color: var(--muted); font-weight: 500; text-decoration: none">Codes</a>
+      <button type="button" role="tab" aria-checked="true" aria-selected="true">Générateur</button>
+    </div>
+  </div>
+
+  <div class="p-body" style="gap: 14px">
+    <div class="card" style="padding: 16px; display: flex; flex-direction: column; gap: 12px">
+      <p class="mono break" style="font-size: 19px; line-height: 1.45">p7<span style="color: var(--danger-text)">#</span>Lm<span style="color: var(--warn-text)">2</span>vQ<span style="color: var(--danger-text)">!</span>x<span style="color: var(--warn-text)">9</span>RtW<span style="color: var(--warn-text)">4</span>ka<span style="color: var(--danger-text)">%</span>Z</p>
+      <span style="display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--muted)"><span class="meter"><span class="on"></span><span class="on"></span><span class="on"></span><span class="on"></span></span>Très fort · 20 caractères</span>
+      <div style="display: flex; gap: 8px">
+        <button type="button" class="btn btn-primary btn-lg" style="flex: 1 1 0">Copier</button>
+        <button type="button" class="btn btn-lg" style="flex: 1 1 0">Remplir le champ</button>
+        <button type="button" class="ibtn ibtn-bordered" aria-label="Régénérer" style="width: 40px; height: 40px"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.3-4.9L4 8M4 4v4h4M4 13a8 8 0 0 0 14.3 4.9L20 16M20 20v-4h-4"></path></svg></button>
+      </div>
+    </div>
+
+    <div class="seg" role="radiogroup" aria-label="Genre">
+      <button type="button" role="radio" aria-checked="true">Caractères</button>
+      <button type="button" role="radio" aria-checked="false">Phrase</button>
+    </div>
+
+    <div class="card divide">
+      <label class="set" style="padding: 12px 14px; gap: 8px 12px"><span class="grow">Longueur</span><span class="mono" style="font-weight: 500">20</span><input type="range" min="8" max="64" value="20" style="flex-basis: 100%; accent-color: var(--accent)"></label>
+      <div class="set" style="padding: 10px 14px"><span class="grow">Majuscules</span><button type="button" role="switch" aria-checked="true" aria-label="Majuscules" class="switch"><span></span></button></div>
+      <div class="set" style="padding: 10px 14px"><span class="grow">Chiffres</span><button type="button" role="switch" aria-checked="true" aria-label="Chiffres" class="switch"><span></span></button></div>
+      <div class="set" style="padding: 10px 14px"><span class="grow">Symboles</span><button type="button" role="switch" aria-checked="true" aria-label="Symboles" class="switch"><span></span></button></div>
+      <div class="set" style="padding: 10px 14px"><span class="grow">Sans caractères ambigus</span><button type="button" role="switch" aria-checked="false" aria-label="Sans caractères ambigus" class="switch"><span></span></button></div>
+    </div>
+  </div>
+  <footer class="p-foot"><span class="grow trunc">Réglages synchronisés avec votre compte</span></footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["dark","light"],"default":"dark"},"$preview":{"width":440,"height":600}}'>
+class Component extends DCLogic {
+  renderVals() { return { theme: this.props.theme ?? 'dark' }; }
+}
+</script>
+</body>
+</html>

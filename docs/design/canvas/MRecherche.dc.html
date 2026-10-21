@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Mobile — recherche</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./theme.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="gv phone" data-theme="{{theme}}" style="font-family: 'Geist', system-ui, sans-serif">
+  <header style="display: flex; align-items: center; gap: 10px; padding: 14px 16px 10px">
+    <label class="m-search grow input-focus" style="border: 1px solid var(--accent); background: var(--input)">
+      <span class="mono" style="color: var(--accent); font-size: 18px">›</span>
+      <input aria-label="Rechercher ou agir" value="prod">
+      <button type="button" class="ibtn" aria-label="Effacer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>
+    </label>
+    <a href="MAccueil.dc.html" style="font-size: 15px; flex: none">Annuler</a>
+  </header>
+  <div style="padding: 0 16px 6px">
+    <div class="m-chips">
+      <button type="button" class="m-chip" aria-pressed="true">Tous les coffres</button>
+      <button type="button" class="m-chip" aria-pressed="false">Personnel</button>
+      <button type="button" class="m-chip" aria-pressed="false">Équipe infrastructure et production</button>
+      <button type="button" class="m-chip" aria-pressed="false">Famille</button>
+    </div>
+  </div>
+
+  <div class="m-body" style="gap: 4px">
+    <div class="m-section" style="padding-top: 10px">Hôtes SSH</div>
+    <div class="m-list">
+      <a href="#" class="m-row">
+        <span class="tile h-blue" style="width: 42px; height: 42px; border-radius: 12px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="3" y="4" width="18" height="7" rx="2"></rect><rect x="3" y="13" width="18" height="7" rx="2"></rect><path d="M7 7.5h.01M7 16.5h.01"></path></svg></span>
+        <span class="stack grow"><span class="mono trunc"><b style="color: var(--accent-text)">prod</b>-db-01</span><span class="trunc muted" style="font-size: 14px">Équipe infrastructure et production</span></span>
+      </a>
+      <a href="#" class="m-row">
+        <span class="tile h-blue" style="width: 42px; height: 42px; border-radius: 12px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="3" y="4" width="18" height="7" rx="2"></rect><rect x="3" y="13" width="18" height="7" rx="2"></rect><path d="M7 7.5h.01M7 16.5h.01"></path></svg></span>
+        <span class="stack grow"><span class="mono trunc"><b style="color: var(--accent-text)">prod</b>-web-01</span><span class="trunc muted" style="font-size: 14px">Équipe infrastructure et production</span></span>
+      </a>
+    </div>
+    <div class="m-section" style="padding-top: 14px">Identifiants</div>
+    <div class="m-list">
+      <a href="MFiche.dc.html" class="m-row">
+        <span class="tile h-amber" style="width: 42px; height: 42px; border-radius: 12px; font-size: 16px">A</span>
+        <span class="stack grow"><span class="trunc">AWS Console — compte de <b style="color: var(--accent-text)">prod</b>uction principal</span><span class="trunc muted" style="font-size: 14px">admin@infra.exemple-entreprise.fr</span></span>
+      </a>
+      <a href="MFiche.dc.html" class="m-row">
+        <span class="tile h-teal" style="width: 42px; height: 42px; border-radius: 12px; font-size: 16px">G</span>
+        <span class="stack grow"><span class="trunc">Grafana <b style="color: var(--accent-text)">prod</b></span><span class="trunc muted" style="font-size: 14px">ops</span></span>
+      </a>
+    </div>
+    <div class="m-section" style="padding-top: 14px">Actions</div>
+    <div class="m-list">
+      <a href="MEdition.dc.html" class="m-row"><span class="tile h-gray" style="width: 42px; height: 42px; border-radius: 12px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></span><span class="grow trunc">Nouvel élément « prod »</span></a>
+      <a href="MGenerateur.dc.html" class="m-row"><span class="tile h-gray" style="width: 42px; height: 42px; border-radius: 12px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3.5"></rect><circle cx="9" cy="9" r="1.1" fill="currentColor"></circle><circle cx="15" cy="15" r="1.1" fill="currentColor"></circle></svg></span><span class="grow trunc">Générer un mot de passe</span></a>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["dark","light"],"default":"dark"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return { theme: this.props.theme ?? 'dark' }; }
+}
+</script>
+</body>
+</html>

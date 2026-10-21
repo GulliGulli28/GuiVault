@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Extension — popup, ce site et coffres</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./theme.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="gv popup" data-theme="{{theme}}" style="font-family: 'Geist', system-ui, sans-serif">
+  <header class="p-head">
+    <img src="/_blob/b5ba6fd6f3698d6072b814fdc9c6af28" alt="" width="24" height="24">
+    <span class="grow trunc" style="font-weight: 600">GuiVault</span>
+    <button type="button" class="ibtn" aria-label="Rechercher partout"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg></button>
+    <a href="#" class="ibtn" aria-label="Ouvrir l'interface web"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9"></path><path d="M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4"></path></svg></a>
+    <a href="XReglages.dc.html" class="ibtn" aria-label="Réglages"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"></path><circle cx="16" cy="7" r="2"></circle><circle cx="10" cy="17" r="2"></circle></svg></a>
+    <a href="XVerrou.dc.html" class="ibtn" aria-label="Verrouiller"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg></a>
+  </header>
+
+  <div class="p-tabs">
+    <div class="seg" role="tablist" aria-label="Vue">
+      <button type="button" role="tab" aria-checked="true" aria-selected="true">Coffres</button>
+      <a href="XCodes.dc.html" role="tab" aria-selected="false" style="flex: 1 1 0; display: inline-flex; align-items: center; justify-content: center; height: 32px; border-radius: 8px; color: var(--muted); font-weight: 500; text-decoration: none">Codes</a>
+      <a href="XGenerateur.dc.html" role="tab" aria-selected="false" style="flex: 1 1 0; display: inline-flex; align-items: center; justify-content: center; height: 32px; border-radius: 8px; color: var(--muted); font-weight: 500; text-decoration: none">Générateur</a>
+    </div>
+  </div>
+
+  <div class="p-body">
+    <!-- Ce site -->
+    <section class="stack" style="gap: 6px">
+      <div class="p-sec"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"></path></svg><span class="trunc grow">Sur compte.atelier-nord.test</span><span>2</span></div>
+      <div class="card divide">
+        <sc-for list="{{site}}" as="s" hint-placeholder-count="2">
+          <div style="display: flex; align-items: center; gap: 10px; padding: 10px 10px 10px 12px; min-width: 0">
+            <span class="tile {{s.hue}}">{{s.initial}}</span>
+            <a href="XFiche.dc.html" class="stack grow" style="color: var(--text)"><span class="trunc" style="font-weight: 500">{{s.name}}</span><span class="trunc small muted">{{s.user}}</span></a>
+            <button type="button" class="ibtn" aria-label="Copier le mot de passe"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"></rect><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"></path></svg></button>
+            <button type="button" class="btn btn-primary">Remplir</button>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+
+    <!-- Tous les coffres -->
+    <section class="stack" style="gap: 8px">
+      <label class="search-btn" style="cursor: text">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+        <input type="search" placeholder="Rechercher dans 3 coffres" aria-label="Rechercher dans les coffres" style="flex: 1 1 0; min-width: 0; border: 0; background: transparent; outline: none">
+      </label>
+      <sc-for list="{{vaults}}" as="v" hint-placeholder-count="2">
+        <div class="stack" style="gap: 1px">
+          <div class="p-sec"><span class="vdot" style="{{v.dot}}"></span><span class="trunc grow">{{v.name}}</span><span>{{v.count}}</span></div>
+          <sc-for list="{{v.items}}" as="it" hint-placeholder-count="3">
+            <a href="XFiche.dc.html" class="p-row">
+              <span class="tile tile-sm {{it.hue}}">{{it.initial}}</span>
+              <span class="stack grow"><span class="trunc">{{it.name}}</span><span class="trunc small muted">{{it.user}}</span></span>
+            </a>
+          </sc-for>
+        </div>
+      </sc-for>
+    </section>
+  </div>
+
+  <div class="p-toast" role="status">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--ok)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>
+    <span class="grow trunc">Mot de passe copié</span>
+    <span class="small muted nowrap">effacé dans 24 s</span>
+  </div>
+
+  <footer class="p-foot">
+    <span class="grow trunc">Remplir depuis la page : <span class="kbd">Ctrl Maj L</span></span>
+    <a href="XNouveau.dc.html" class="btn btn-ghost" style="height: 26px; padding: 0 8px; color: var(--accent-text)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Nouveau</a>
+  </footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["dark","light"],"default":"dark"},"$preview":{"width":440,"height":600}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const it = (name, user, hue) => ({ name: name, user: user, hue: hue, initial: name.charAt(0).toUpperCase() });
+    return {
+      theme: this.props.theme ?? 'dark',
+      site: [it('Atelier Nord — espace client', 'guillaume.lorin@exemple-entreprise.fr', 'h-teal'), it('Atelier Nord (compte famille)', 'famille@example.com', 'h-teal')],
+      vaults: [
+        { name: 'Personnel', count: 18, dot: 'background:#8B8CFF', items: [it('GitHub', 'glorin', 'h-ink'), it('AWS Console — compte de production principal', 'admin@infra.exemple-entreprise.fr', 'h-amber'), it('Boursorama', '12345678', 'h-pink')] },
+        { name: 'Équipe infrastructure et production', count: 42, dot: 'background:#F5A524', items: [it('Grafana prod', 'ops', 'h-teal'), it('prod-db-01', 'deploy@10.0.4.12', 'h-blue')] }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

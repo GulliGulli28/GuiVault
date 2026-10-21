@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Extension — popup, codes 2FA</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./theme.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="gv popup" data-theme="{{theme}}" style="font-family: 'Geist', system-ui, sans-serif">
+  <header class="p-head">
+    <img src="/_blob/b5ba6fd6f3698d6072b814fdc9c6af28" alt="" width="24" height="24">
+    <span class="grow trunc" style="font-weight: 600">GuiVault</span>
+    <a href="XReglages.dc.html" class="ibtn" aria-label="Réglages"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"></path><circle cx="16" cy="7" r="2"></circle><circle cx="10" cy="17" r="2"></circle></svg></a>
+    <a href="XVerrou.dc.html" class="ibtn" aria-label="Verrouiller"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg></a>
+  </header>
+  <div class="p-tabs">
+    <div class="seg" role="tablist" aria-label="Vue">
+      <a href="XListe.dc.html" role="tab" aria-selected="false" style="flex: 1 1 0; display: inline-flex; align-items: center; justify-content: center; height: 32px; border-radius: 8px; color: var(--muted); font-weight: 500; text-decoration: none">Coffres</a>
+      <button type="button" role="tab" aria-checked="true" aria-selected="true">Codes</button>
+      <a href="XGenerateur.dc.html" role="tab" aria-selected="false" style="flex: 1 1 0; display: inline-flex; align-items: center; justify-content: center; height: 32px; border-radius: 8px; color: var(--muted); font-weight: 500; text-decoration: none">Générateur</a>
+    </div>
+  </div>
+
+  <div class="p-body">
+    <div style="display: flex; align-items: center; gap: 10px">
+      <label class="search-btn grow" style="cursor: text"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg><input type="search" placeholder="Rechercher un code" aria-label="Rechercher un code" style="flex: 1 1 0; min-width: 0; border: 0; background: transparent; outline: none"></label>
+      <svg width="22" height="22" viewBox="0 0 22 22" role="img" aria-label="12 secondes restantes"><circle cx="11" cy="11" r="8.5" fill="none" stroke="var(--line-2)" stroke-width="2.5"></circle><circle cx="11" cy="11" r="8.5" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-dasharray="21 53.4" stroke-linecap="round" transform="rotate(-90 11 11)"></circle></svg>
+      <span class="small muted nowrap">12 s</span>
+    </div>
+
+    <div class="p-sec"><span class="grow trunc">Ce site</span></div>
+    <button type="button" class="card" aria-label="Remplir le code dans la page" style="display: flex; align-items: center; gap: 12px; padding: 12px 14px; width: 100%; text-align: left; border-color: var(--accent)">
+      <span class="tile h-teal">A</span>
+      <span class="stack grow"><span class="trunc" style="font-weight: 500">Atelier Nord — espace client</span><span class="mono nowrap" style="font-size: 22px; font-weight: 500; letter-spacing: 0.08em">482 913</span></span>
+      <span class="chip chip-accent">Remplir</span>
+    </button>
+
+    <div class="p-sec"><span class="grow trunc">Tous les codes</span><span>5</span></div>
+    <div class="card divide">
+      <sc-for list="{{codes}}" as="c" hint-placeholder-count="4">
+        <button type="button" aria-label="Copier le code" style="display: flex; align-items: center; gap: 12px; padding: 10px 14px; width: 100%; border: 0; background: none; text-align: left; min-width: 0">
+          <span class="tile tile-sm {{c.hue}}">{{c.initial}}</span>
+          <span class="stack grow"><span class="trunc">{{c.name}}</span><span class="trunc small muted">{{c.vault}}</span></span>
+          <span class="mono nowrap" style="font-size: 17px; font-weight: 500; letter-spacing: 0.06em">{{c.code}}</span>
+        </button>
+      </sc-for>
+    </div>
+  </div>
+  <footer class="p-foot"><span class="grow trunc">Cliquer copie le code, vidé après 30 s</span></footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["dark","light"],"default":"dark"},"$preview":{"width":440,"height":600}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const c = (name, vault, code, hue) => ({ name: name, vault: vault, code: code, hue: hue, initial: name.charAt(0).toUpperCase() });
+    return {
+      theme: this.props.theme ?? 'dark',
+      codes: [c('GitHub', 'Personnel', '346 067', 'h-ink'), c('AWS Console — compte de production principal', 'Personnel', '556 231', 'h-amber'), c('Grafana prod', 'Équipe infrastructure et production', '120 554', 'h-teal'), c('Slack', 'Personnel', '905 098', 'h-teal')]
+    };
+  }
+}
+</script>
+</body>
+</html>

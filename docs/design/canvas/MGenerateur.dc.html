@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Mobile — générateur</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./theme.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="gv phone" data-theme="{{theme}}" style="font-family: 'Geist', system-ui, sans-serif">
+  <header class="m-head" style="padding-left: 8px">
+    <a href="MEdition.dc.html" class="m-icon" aria-label="Retour"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg></a>
+    <h1 class="m-title grow trunc" style="font-size: 22px">Générateur</h1>
+  </header>
+
+  <div class="m-body" style="gap: 18px">
+    <div class="m-card" style="padding: 20px 18px; display: flex; flex-direction: column; gap: 14px">
+      <p class="mono break" style="font-size: 22px; line-height: 1.45; letter-spacing: 0.02em">p7<span style="color: var(--danger-text)">#</span>Lm<span style="color: var(--warn-text)">2</span>vQ<span style="color: var(--danger-text)">!</span>x<span style="color: var(--warn-text)">9</span>RtW<span style="color: var(--warn-text)">4</span>ka<span style="color: var(--danger-text)">%</span>Z</p>
+      <span style="display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--muted)"><span class="meter"><span class="on"></span><span class="on"></span><span class="on"></span><span class="on"></span></span>Très fort · 20 caractères</span>
+      <div style="display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px">
+        <button type="button" class="m-btn" aria-label="Régénérer" style="width: 50px; padding: 0"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.3-4.9L4 8M4 4v4h4M4 13a8 8 0 0 0 14.3 4.9L20 16M20 20v-4h-4"></path></svg></button>
+        <button type="button" class="m-btn m-btn-primary">Utiliser ce mot de passe</button>
+      </div>
+    </div>
+
+    <div class="seg" role="radiogroup" aria-label="Genre" style="padding: 4px">
+      <button type="button" role="radio" aria-checked="true" style="height: 40px; font-size: 15px">Caractères</button>
+      <button type="button" role="radio" aria-checked="false" style="height: 40px; font-size: 15px">Phrase</button>
+      <button type="button" role="radio" aria-checked="false" style="height: 40px; font-size: 15px">Clé SSH</button>
+    </div>
+
+    <div class="m-card m-list">
+      <label class="m-set" style="flex-wrap: wrap; padding-top: 14px; padding-bottom: 14px"><span class="grow">Longueur</span><span class="mono" style="font-weight: 500">20</span><input type="range" min="8" max="64" value="20" style="flex-basis: 100%; accent-color: var(--accent); height: 28px"></label>
+      <div class="m-set"><span class="grow">Majuscules</span><button type="button" role="switch" aria-checked="true" aria-label="Majuscules" class="switch"><span></span></button></div>
+      <div class="m-set"><span class="grow">Chiffres</span><button type="button" role="switch" aria-checked="true" aria-label="Chiffres" class="switch"><span></span></button></div>
+      <div class="m-set"><span class="grow">Symboles</span><button type="button" role="switch" aria-checked="true" aria-label="Symboles" class="switch"><span></span></button></div>
+      <div class="m-set"><span class="grow">Sans caractères ambigus</span><button type="button" role="switch" aria-checked="false" aria-label="Sans caractères ambigus" class="switch"><span></span></button></div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["dark","light"],"default":"dark"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return { theme: this.props.theme ?? 'dark' }; }
+}
+</script>
+</body>
+</html>

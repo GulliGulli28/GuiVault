@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Extension — popup verrouillé</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./theme.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="gv popup" data-theme="{{theme}}" style="font-family: 'Geist', system-ui, sans-serif">
+  <header class="p-head">
+    <img src="/_blob/0f91a5d51b8624639299728bc25835dc" alt="" width="24" height="24">
+    <span class="grow trunc" style="font-weight: 600">GuiVault</span>
+    <span class="chip">Verrouillé</span>
+  </header>
+
+  <div class="p-body" style="padding: 24px 28px; gap: 18px">
+    <div class="seg" role="radiogroup" aria-label="Coffre">
+      <button type="button" role="radio" aria-checked="true">Serveur</button>
+      <button type="button" role="radio" aria-checked="false">Coffre local</button>
+    </div>
+
+    <div class="card" style="display: flex; align-items: center; gap: 12px; padding: 10px 12px">
+      <span class="avatar h-indigo" style="width: 34px; height: 34px">GL</span>
+      <span class="stack grow"><span class="trunc" style="font-weight: 500">guillaume.lorin@exemple-entreprise.fr</span><span class="trunc small muted">vault.lorin.dev</span></span>
+      <button type="button" class="btn btn-ghost" style="color: var(--accent-text)">Changer</button>
+    </div>
+
+    <div class="field">
+      <label class="field-label" for="xmp">Mot de passe maître</label>
+      <div class="inbox">
+        <input id="xmp" class="input input-lg input-focus" type="password" value="correcthorsebattery" style="padding-right: 48px">
+        <span class="in-acts" style="right: 6px"><button type="button" class="ibtn" aria-label="Afficher le mot de passe"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"></path><circle cx="12" cy="12" r="3"></circle></svg></button></span>
+      </div>
+    </div>
+
+    <div class="stack" style="gap: 8px">
+      <button type="button" class="btn btn-primary btn-xl btn-block">Déverrouiller</button>
+      <button type="button" class="btn btn-xl btn-block"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="12" r="4"></circle><path d="M12 12h9M18 12v3M21 12v2"></path></svg>Utiliser une passkey</button>
+    </div>
+
+    <div class="callout callout-warn" role="status"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><path d="M12 7.5V12l3 2"></path></svg><span class="grow trunc">Verrouillé après 15 min d'inactivité</span></div>
+  </div>
+
+  <footer class="p-foot">
+    <span class="legend"><i style="background: var(--ok); border-radius: 50%"></i>Serveur joignable</span>
+    <span class="grow"></span>
+    <a href="#" style="color: var(--muted)">Ouvrir l'interface web</a>
+  </footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["dark","light"],"default":"dark"},"$preview":{"width":440,"height":600}}'>
+class Component extends DCLogic {
+  renderVals() { return { theme: this.props.theme ?? 'dark' }; }
+}
+</script>
+</body>
+</html>

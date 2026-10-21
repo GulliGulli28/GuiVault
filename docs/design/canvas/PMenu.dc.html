@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Extension — menu de remplissage dans la page</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./theme.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="gv site" data-theme="{{theme}}">
+  <div class="site-bar">
+    <span class="site-url"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg>https://compte.atelier-nord.test/connexion</span>
+    <span class="site-ext"><img src="/_blob/b5ba6fd6f3698d6072b814fdc9c6af28" alt="GuiVault" width="20" height="20"></span>
+  </div>
+  <div class="site-main">
+    <form class="site-card">
+      <div class="site-brand"><svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><path d="M4 22L14 5l10 17z" fill="#24453A"></path><path d="M10 22l4-7 4 7z" fill="#EEF0EC"></path></svg>Atelier Nord</div>
+      <p style="margin: 0; font-size: 15px; color: #44474B">Connexion à votre espace client</p>
+      <div class="stack" style="gap: 6px">
+        <span class="site-label">Adresse e-mail</span>
+        <div style="position: relative">
+          <div class="site-input site-input-focus"><span style="color: #8A8E93">vous@exemple.fr</span>
+            <button type="button" class="inj-btn inj-btn-on" aria-label="Remplir avec GuiVault" aria-expanded="true"><img src="/_blob/b5ba6fd6f3698d6072b814fdc9c6af28" alt="" width="20" height="20"></button>
+          </div>
+
+          <!-- Menu GuiVault -->
+          <div class="inj inj-menu" role="listbox" aria-label="Identifiants GuiVault" style="left: 0; top: 46px">
+            <div class="inj-head"><img src="/_blob/b5ba6fd6f3698d6072b814fdc9c6af28" alt="" width="16" height="16"><span class="grow trunc">GuiVault · atelier-nord.test</span></div>
+            <sc-for list="{{matches}}" as="m" hint-placeholder-count="2">
+              <button type="button" class="inj-item" role="option" aria-selected="{{m.sel}}">
+                <span class="tile {{m.hue}}">{{m.initial}}</span>
+                <span class="stack grow"><span class="trunc" style="font-weight: 500">{{m.name}}</span><span class="trunc small muted">{{m.user}}</span></span>
+                <sc-if value="{{m.totp}}" hint-placeholder-val="{{false}}"><span class="chip">2FA</span></sc-if>
+              </button>
+            </sc-for>
+            <div style="height: 1px; background: var(--line); margin: 6px 0"></div>
+            <button type="button" class="inj-item"><span class="tile tile-sm h-gray"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></span><span class="grow trunc">Nouvel identifiant pour ce site</span></button>
+            <div class="inj-foot"><span class="grow trunc">Entrée remplit · Échap ferme</span><span class="kbd">Ctrl Maj L</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="stack" style="gap: 6px">
+        <span class="site-label">Mot de passe</span>
+        <div class="site-input"></div>
+      </div>
+      <button type="button" class="site-btn">Se connecter</button>
+    </form>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["dark","light"],"default":"dark"},"$preview":{"width":1200,"height":760}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      theme: this.props.theme ?? 'dark',
+      matches: [
+        { name: 'Atelier Nord — espace client', user: 'guillaume.lorin@exemple-entreprise.fr', hue: 'h-teal', initial: 'A', sel: 'true', totp: true },
+        { name: 'Atelier Nord (compte famille)', user: 'famille@example.com', hue: 'h-teal', initial: 'A', sel: 'false', totp: false }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

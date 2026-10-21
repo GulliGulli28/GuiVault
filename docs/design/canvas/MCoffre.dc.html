@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Mobile — coffre</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./theme.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="gv phone" data-theme="{{theme}}" style="font-family: 'Geist', system-ui, sans-serif">
+  <header class="m-head">
+    <button type="button" style="display: inline-flex; align-items: center; gap: 8px; border: 0; background: none; padding: 0; min-width: 0; flex: 1 1 0">
+      <span class="vdot" style="background: #8B8CFF; width: 10px; height: 10px"></span>
+      <span class="m-title trunc">Personnel</span>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg>
+    </button>
+    <button type="button" class="m-icon" aria-label="Trier et filtrer"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"></path></svg></button>
+  </header>
+
+  <div style="padding: 0 16px 10px; display: flex; flex-direction: column; gap: 12px">
+    <label class="m-search"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg><input type="search" placeholder="Filtrer ce coffre" aria-label="Filtrer ce coffre"></label>
+    <div class="m-chips">
+      <button type="button" class="m-chip" aria-pressed="true">Tout <span style="opacity: 0.7">18</span></button>
+      <button type="button" class="m-chip" aria-pressed="false">Épinglés</button>
+      <button type="button" class="m-chip" aria-pressed="false">Identifiants</button>
+      <button type="button" class="m-chip" aria-pressed="false">Cartes</button>
+      <button type="button" class="m-chip" aria-pressed="false">Notes</button>
+    </div>
+  </div>
+
+  <div class="m-body" style="gap: 6px; padding-top: 0">
+    <sc-for list="{{groups}}" as="g" hint-placeholder-count="3">
+      <div class="m-section" style="padding-top: 10px">{{g.name}}</div>
+      <div class="m-list">
+        <sc-for list="{{g.items}}" as="it" hint-placeholder-count="3">
+          <a href="MFiche.dc.html" class="m-row">
+            <span class="tile {{it.hue}}" style="width: 42px; height: 42px; border-radius: 12px; font-size: 16px">{{it.initial}}</span>
+            <span class="stack grow"><span class="trunc" style="font-weight: 500">{{it.name}}</span><span class="trunc muted" style="font-size: 14px">{{it.sub}}</span></span>
+            <sc-if value="{{it.weak}}" hint-placeholder-val="{{false}}"><span class="chip chip-warn">Faible</span></sc-if>
+          </a>
+        </sc-for>
+      </div>
+    </sc-for>
+  </div>
+
+  <a href="MEdition.dc.html" class="m-fab" aria-label="Nouvel élément"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></a>
+
+  <nav class="m-nav" aria-label="Principal">
+    <a href="MAccueil.dc.html" class="m-tab"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10.5L12 4l8 6.5V19a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1z"></path></svg>Accueil</a>
+    <a href="MCoffre.dc.html" class="m-tab" aria-current="page"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2.5"></rect><circle cx="12" cy="12" r="3.5"></circle></svg>Coffres</a>
+    <a href="MCodes.dc.html" class="m-tab"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><path d="M12 7.5V12l3 2"></path></svg>Codes</a>
+    <a href="MSante.dc.html" class="m-tab"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5.5c0 4.5-3 7.8-7 9.5-4-1.7-7-5-7-9.5V6z"></path></svg>Santé</a>
+    <a href="MParametres.dc.html" class="m-tab"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"></path><circle cx="16" cy="7" r="2"></circle><circle cx="10" cy="17" r="2"></circle></svg>Réglages</a>
+  </nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["dark","light"],"default":"dark"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const it = (name, sub, hue, weak) => ({ name: name, sub: sub, hue: hue, weak: !!weak, initial: name.charAt(0).toUpperCase() });
+    return {
+      theme: this.props.theme ?? 'dark',
+      groups: [
+        { name: 'Épinglés', items: [it('GitHub', 'glorin', 'h-ink'), it('AWS Console — compte de production principal', 'admin@infra.exemple-entreprise.fr', 'h-amber', true)] },
+        { name: 'Banque', items: [it('Boursorama', '12345678', 'h-pink'), it('Impots.gouv', '1234567890123', 'h-blue'), it('Visa Premier', '•••• 7890', 'h-indigo')] },
+        { name: 'Perso', items: [it('Amazon', 'glorin@example.com', 'h-amber', true), it('Netflix', 'famille@example.com', 'h-red', true), it('Spotify', 'glorin', 'h-green')] }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

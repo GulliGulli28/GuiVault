@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>GuiVault — coffre et fiche</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./theme.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="gv shell" data-theme="{{theme}}" style="font-family: 'Geist', system-ui, sans-serif">
+
+  <aside class="side" aria-label="Navigation">
+    <div class="brand"><img src="/_blob/b5ba6fd6f3698d6072b814fdc9c6af28" alt="" width="28" height="28"><span>GuiVault</span></div>
+    <button type="button" class="search-btn" aria-label="Rechercher partout"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg><span class="lbl grow trunc">Rechercher partout</span><span class="kbd">Ctrl K</span></button>
+    <nav class="navgroup" aria-label="Général">
+      <a href="#" class="nav"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10.5L12 4l8 6.5V19a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1z"></path></svg><span class="lbl">Accueil</span></a>
+    </nav>
+    <nav class="navgroup" aria-label="Coffres">
+      <div class="navlabel"><span>Coffres</span><button type="button" class="ibtn" aria-label="Nouveau coffre" style="width: 22px; height: 22px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button></div>
+      <a href="#" class="nav" aria-current="page"><span class="vdot" style="background: #8B8CFF"></span><span class="lbl">Personnel</span><span class="count">18</span></a>
+      <a href="#" class="nav" title="Équipe infrastructure et production"><span class="vdot" style="background: #F5A524"></span><span class="lbl">Équipe infrastructure et production</span><span class="count">42</span></a>
+      <a href="#" class="nav"><span class="vdot" style="background: #3DD68C"></span><span class="lbl">Famille</span><span class="count">7</span></a>
+    </nav>
+    <nav class="navgroup" aria-label="Outils">
+      <div class="navlabel"><span>Outils</span></div>
+      <a href="#" class="nav"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3.5"></rect><circle cx="9" cy="9" r="1.1" fill="currentColor"></circle><circle cx="15" cy="15" r="1.1" fill="currentColor"></circle><circle cx="15" cy="9" r="1.1" fill="currentColor"></circle><circle cx="9" cy="15" r="1.1" fill="currentColor"></circle></svg><span class="lbl">Générateur</span></a>
+      <a href="#" class="nav"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><path d="M12 7.5V12l3 2"></path></svg><span class="lbl">Codes 2FA</span><span class="count">4</span></a>
+      <a href="#" class="nav"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1"></path><path d="M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1"></path></svg><span class="lbl">Liens de partage</span><span class="count">3</span></a>
+    </nav>
+    <nav class="navgroup" aria-label="Sécurité">
+      <div class="navlabel"><span>Sécurité</span></div>
+      <a href="#" class="nav"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5.5c0 4.5-3 7.8-7 9.5-4-1.7-7-5-7-9.5V6z"></path><path d="M9 12l2 2 4-4"></path></svg><span class="lbl">Santé</span><span class="badge">6</span></a>
+      <a href="#" class="nav"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><circle cx="12" cy="12" r="3.5"></circle><path d="M5.9 5.9l3.6 3.6M14.5 14.5l3.6 3.6M18.1 5.9l-3.6 3.6M9.5 14.5l-3.6 3.6"></path></svg><span class="lbl">Accès d'urgence</span></a>
+    </nav>
+    <div class="side-foot">
+      <div style="display: flex; align-items: center; gap: 6px; min-width: 0">
+        <button type="button" class="account" aria-label="Compte"><span class="avatar h-indigo">GL</span><span class="stack grow"><span class="trunc" style="font-size: 13px; font-weight: 500">Guillaume Lorin</span><span class="trunc small muted">guillaume.lorin@exemple-entreprise.fr</span></span></button>
+        <a href="#" class="ibtn ibtn-bordered" aria-label="Paramètres"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"></path><circle cx="16" cy="7" r="2"></circle><circle cx="10" cy="17" r="2"></circle></svg></a>
+      </div>
+      <button type="button" class="btn btn-block"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg>Verrouiller<span class="grow"></span><span class="kbd">Ctrl L</span></button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="vault">
+      <!-- Liste -->
+      <section class="vlist" aria-label="Éléments du coffre">
+        <header style="padding: 18px 16px 12px; display: flex; flex-direction: column; gap: 12px">
+          <div style="display: flex; align-items: center; gap: 10px; min-width: 0">
+            <h1 class="trunc" style="font-size: 18px; font-weight: 600; letter-spacing: -0.015em">Personnel</h1>
+            <span class="small muted nowrap">18 éléments</span>
+            <span class="grow"></span>
+            <button type="button" class="btn btn-primary" style="height: 30px; padding: 0 10px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Nouveau</button>
+          </div>
+          <div style="display: flex; gap: 8px; min-width: 0">
+            <label class="search-btn grow" style="height: 32px; cursor: text">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+              <input type="search" placeholder="Filtrer ce coffre" aria-label="Filtrer ce coffre" style="flex: 1 1 0; min-width: 0; border: 0; background: transparent; outline: none">
+              <span class="kbd">/</span>
+            </label>
+            <button type="button" class="btn" style="color: var(--text-2)">Types<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></button>
+            <button type="button" class="ibtn ibtn-bordered" aria-label="Trier"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4v16M4 17l3 3 3-3M17 20V4M14 7l3-3 3 3"></path></svg></button>
+          </div>
+        </header>
+        <div style="flex: 1; overflow: auto; padding: 0 8px 16px; display: flex; flex-direction: column; gap: 14px">
+          <sc-for list="{{groups}}" as="group" hint-placeholder-count="3">
+            <div class="stack" style="gap: 1px">
+              <div class="group-label"><span class="trunc">{{group.name}}</span><span>·</span><span>{{group.count}}</span></div>
+              <sc-for list="{{group.items}}" as="it" hint-placeholder-count="3">
+                <a href="#" class="row" aria-current="{{it.current}}">
+                  <span class="tile {{it.hue}}">{{it.initial}}</span>
+                  <span class="stack grow"><span class="trunc row-name">{{it.name}}</span><span class="trunc row-sub">{{it.sub}}</span></span>
+                  <sc-if value="{{it.weak}}" hint-placeholder-val="{{false}}"><span class="chip chip-warn">Faible</span></sc-if>
+                  <sc-if value="{{it.totp}}" hint-placeholder-val="{{false}}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.8" stroke-linecap="round" role="img" aria-label="Code 2FA"><circle cx="12" cy="12" r="8.5"></circle><path d="M12 7.5V12l3 2"></path></svg></sc-if>
+                </a>
+              </sc-for>
+            </div>
+          </sc-for>
+        </div>
+      </section>
+
+      <!-- Fiche -->
+      <section class="vdetail" aria-label="GitHub">
+        <div class="topbar">
+          <div class="crumbs"><span class="trunc">Personnel</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg><span class="trunc">Travail</span></div>
+          <span class="lockstate hide-lg"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--ok)" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg>Verrouillage dans 14 min</span>
+          <button type="button" class="btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V3M7 8l5-5 5 5"></path><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"></path></svg>Partager</button>
+          <button type="button" class="btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"></path></svg>Modifier</button>
+          <button type="button" class="ibtn" aria-label="Plus d'actions"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg></button>
+        </div>
+
+        <div class="page" style="padding-top: 28px">
+          <div style="max-width: 1000px; display: flex; flex-direction: column; gap: 24px; min-width: 0">
+            <div style="display: flex; align-items: center; gap: 18px; min-width: 0">
+              <span class="tile tile-lg h-ink">G</span>
+              <div class="stack grow" style="gap: 4px">
+                <div style="display: flex; align-items: center; gap: 8px; min-width: 0">
+                  <h2 class="trunc" style="font-size: 24px; font-weight: 600; letter-spacing: -0.02em">GitHub</h2>
+                  <button type="button" class="ibtn" aria-label="Retirer des épinglés" style="color: #F5C04A"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8L3.5 9.7l5.9-.9z"></path></svg></button>
+                </div>
+                <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 13px; color: var(--muted)"><a href="#">github.com</a><span>·</span><span>Identifiant</span><span>·</span><span>Modifié il y a 3 jours</span></div>
+              </div>
+            </div>
+
+            <div style="display: flex; flex-wrap: wrap; gap: 8px">
+              <button type="button" class="btn btn-primary btn-lg"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"></rect><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"></path></svg>Copier le mot de passe<span class="kbd hide-lg">Ctrl C</span></button>
+              <button type="button" class="btn btn-lg">Copier l'utilisateur</button>
+              <button type="button" class="btn btn-lg">Copier le code 2FA</button>
+              <button type="button" class="btn btn-lg"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9"></path><path d="M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4"></path></svg>Ouvrir le site</button>
+            </div>
+
+            <div class="tabs" role="tablist" aria-label="Sections de la fiche">
+              <button type="button" role="tab" aria-selected="true" class="tab">Détails</button>
+              <button type="button" role="tab" aria-selected="false" class="tab">Pièces jointes</button>
+              <button type="button" role="tab" aria-selected="false" class="tab">Historique <span>3</span></button>
+              <button type="button" role="tab" aria-selected="false" class="tab">Saisie auto</button>
+            </div>
+
+            <div class="cols" style="gap: 20px">
+              <div class="col-main" style="flex-basis: 420px; gap: 16px">
+                <div class="card divide">
+                  <div class="kv"><span class="kv-k">Utilisateur</span><span class="kv-v mono trunc">glorin</span><button type="button" class="ibtn" aria-label="Copier l'utilisateur"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"></rect><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"></path></svg></button></div>
+                  <div class="kv" style="align-items: flex-start">
+                    <span class="kv-k" style="padding-top: 2px">Mot de passe</span>
+                    <span class="kv-v stack" style="gap: 8px">
+                      <span class="mono break" style="font-size: 14px; letter-spacing: 0.02em">Tr0ub<span style="color: var(--warn-text)">4</span>dor<span style="color: var(--danger-text)">&amp;</span><span style="color: var(--warn-text)">3</span>xyz<span style="color: var(--danger-text)">!</span>Kq<span style="color: var(--warn-text)">8</span>m</span>
+                      <span style="display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: 12.5px; color: var(--muted)"><span class="meter"><span class="on"></span><span class="on"></span><span class="on"></span><span class="on"></span></span>Très fort · 16 caractères · unique</span>
+                    </span>
+                    <button type="button" class="ibtn" aria-label="Masquer"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"></path><circle cx="12" cy="12" r="3"></circle></svg></button>
+                    <button type="button" class="ibtn" aria-label="Copier le mot de passe"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"></rect><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"></path></svg></button>
+                  </div>
+                  <div class="kv">
+                    <span class="kv-k">Code 2FA</span>
+                    <span class="kv-v" style="display: flex; align-items: center; gap: 12px">
+                      <span class="mono nowrap" style="font-size: 20px; font-weight: 500; letter-spacing: 0.08em">346 067</span>
+                      <svg width="22" height="22" viewBox="0 0 22 22" role="img" aria-label="18 secondes restantes"><circle cx="11" cy="11" r="8.5" fill="none" stroke="var(--line-2)" stroke-width="2.5"></circle><circle cx="11" cy="11" r="8.5" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-dasharray="32 53.4" stroke-linecap="round" transform="rotate(-90 11 11)"></circle></svg>
+                      <span class="small muted">18 s</span>
+                    </span>
+                    <button type="button" class="ibtn" aria-label="Copier le code"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"></rect><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"></path></svg></button>
+                  </div>
+                  <div class="kv"><span class="kv-k">Sites</span><span class="kv-v stack" style="gap: 4px"><a href="#" class="mono trunc">https://github.com</a><a href="#" class="mono trunc">https://github.com/organizations/exemple-entreprise/settings/security</a></span><span class="chip hide-md">Domaine</span></div>
+                </div>
+                <div class="card card-pad" style="display: flex; flex-direction: column; gap: 8px">
+                  <span class="label">Notes</span>
+                  <p class="t2 break">Compte perso. Clés SSH déclarées : laptop-2024, guiterm-wsl. Codes de récupération dans la pièce jointe du coffre Famille.</p>
+                </div>
+              </div>
+
+              <div class="col-side" style="flex-basis: 260px; gap: 16px">
+                <div class="card" style="padding: 16px; display: flex; flex-direction: column; gap: 12px">
+                  <span style="font-weight: 500">Sécurité</span>
+                  <span style="display: flex; align-items: center; gap: 9px; font-size: 13px" class="t2"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--ok)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>Utilisé nulle part ailleurs</span>
+                  <span style="display: flex; align-items: center; gap: 9px; font-size: 13px" class="t2"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--ok)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>2FA enregistrée</span>
+                  <span style="display: flex; align-items: center; gap: 9px; font-size: 13px" class="t2"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--ok)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>Absent des fuites connues</span>
+                </div>
+                <div class="card" style="padding: 16px; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px 16px; font-size: 13px">
+                  <span class="muted">Dossier</span><span class="trunc">Travail</span>
+                  <span class="muted">Étiquettes</span><span style="display: flex; flex-wrap: wrap; gap: 6px; min-width: 0"><span class="chip">dev</span><span class="chip">code</span><span class="chip">perso</span></span>
+                  <span class="muted">Créé</span><span>12 mars 2025</span>
+                  <span class="muted">Versions</span><a href="#">3 · historique</a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["dark","light"],"default":"dark"},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const it = (name, sub, hue, extra) => Object.assign({ name: name, sub: sub, hue: hue, initial: name.charAt(0).toUpperCase(), current: null, weak: false, totp: false }, extra || {});
+    return {
+      theme: this.props.theme ?? 'dark',
+      groups: [
+        { name: 'Épinglés', count: 2, items: [
+          it('GitHub', 'glorin · github.com', 'h-ink', { totp: true, current: 'true' }),
+          it('AWS Console — compte de production principal', 'admin@infra.exemple-entreprise.fr · console.aws.amazon.com', 'h-amber', { totp: true, weak: true })
+        ] },
+        { name: 'Travail', count: 4, items: [
+          it('Figma', 'glorin@example.com · figma.com', 'h-violet'),
+          it('Gitlab interne', 'g.lorin · gitlab.corp.example', 'h-orange', { weak: true }),
+          it('Slack', 'glorin@corp.example · slack.com', 'h-teal', { totp: true }),
+          it('Amex Pro', 'Amex •••• 8431', 'h-blue')
+        ] },
+        { name: 'Banque', count: 3, items: [
+          it('Boursorama', '12345678 · boursorama.com', 'h-pink'),
+          it('Impots.gouv', '1234567890123 · impots.gouv.fr', 'h-blue'),
+          it('Visa Premier', 'Visa •••• 7890', 'h-indigo')
+        ] },
+        { name: 'Perso', count: 5, items: [
+          it('Amazon', 'glorin@example.com · amazon.fr', 'h-amber', { weak: true }),
+          it('Codes Wi-Fi maison', 'Note', 'h-gray'),
+          it('Identité principale', 'Guillaume Lorin · Lyon', 'h-gray'),
+          it('Netflix', 'famille@example.com · netflix.com', 'h-red', { weak: true }),
+          it('Spotify', 'glorin · spotify.com', 'h-green', { totp: true })
+        ] }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>
