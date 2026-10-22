@@ -368,6 +368,7 @@ NSIS (`*-setup.exe`) : c'est lui que l'updater sait remplacer.
 |---|---|---|
 | [0.1.0](https://github.com/GulliGulli28/GuiVault/releases/tag/app-v0.1.0) | 21 octobre 2026 | Première version : coffre local ou serveur, saisie automatique, presse-papiers hors de l'historique Windows, verrouillage avec la session, sauvegardes du coffre local, zone de notification, import KDBX, extension reliée par l'hôte natif, mises à jour signées. Circuit de l'updater mis en place (clé, `app-updater`) |
 | [0.1.1](https://github.com/GulliGulli28/GuiVault/releases/tag/app-v0.1.1) | 21 octobre 2026 | Copier entre un coffre local et un serveur, dans les deux sens ([`TRANSFERT.md`](TRANSFERT.md)) — demande un serveur qui a `POST /vaults/{id}/import`. Première mise à jour livrée par l'updater : **éprouvée** le 21 octobre 2026 sur un vrai poste Windows — une 0.1.0 installée par NSIS l'a proposée (Paramètres › Application › Mise à jour), installée et relancée en 0.1.1 |
+| [0.2.0](https://github.com/GulliGulli28/GuiVault/releases/tag/app-v0.2.0) | 22 octobre 2026 | Refonte de l'interface (`DESIGN.md`) : thème Graphite sombre et clair, accueil, fiche avec colonne « Sécurité », palette Ctrl K, santé, liens de partage, paramètres ; accueil de l'application refait ; liste et fiche côte à côte dès 1100 px ; compteurs de l'accueil justes en coffre local |
 
 ### La clé de signature
 
