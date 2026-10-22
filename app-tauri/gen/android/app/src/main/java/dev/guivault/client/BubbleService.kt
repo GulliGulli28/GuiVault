@@ -127,7 +127,7 @@ class BubbleService : Service() {
     private fun addBubble() {
         val size = dp(60)
         val view = ImageView(this).apply {
-            setImageResource(applicationInfo.icon)
+            setImageResource(R.mipmap.ic_launcher_round)
             scaleType = ImageView.ScaleType.FIT_CENTER
             setPadding(dp(6), dp(6), dp(6), dp(6))
             background = GradientDrawable().apply {

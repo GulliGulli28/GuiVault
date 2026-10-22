@@ -1,7 +1,8 @@
 import type { PageContext } from "../App";
 import { navigate, routeHash, type Route } from "../lib/route";
 import { healthSummary, useAllItems } from "../lib/allItems";
-import { IconHome, IconPulse, IconShieldClock } from "./secret-icons";
+import { IconBubble, IconHome, IconPulse, IconShieldClock } from "./secret-icons";
+import { bubbleBridge, reduceToBubble } from "../lib/bubble";
 import { IconSettings, IconVault } from "./ui-icons";
 
 const LAST_VAULT = "guivault.lastVault";
@@ -70,6 +71,13 @@ export function MobileNav({ ctx, route }: { ctx: PageContext; route: Route }) {
           <span className="truncate">{t.label}</span>
         </a>
       ))}
+      {/* Android : se réduire en bulle, de n'importe quelle page. */}
+      {bubbleBridge() && (
+        <button onClick={() => void reduceToBubble(ctx)} className="m-tab m-tab-bubble" aria-label="Réduire en bulle" title="Réduire en bulle">
+          <IconBubble size={22} />
+          <span className="truncate">Bulle</span>
+        </button>
+      )}
     </nav>
   );
 }

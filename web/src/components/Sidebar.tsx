@@ -1,18 +1,18 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PageContext } from "../App";
 import { navigate, routeHash, type Route } from "../lib/route";
-import { createVault, type VaultView } from "../lib/session";
+import type { VaultView } from "../lib/session";
 import { healthSummary, useAllItems } from "../lib/allItems";
 import { personInitials } from "../lib/tiles";
 import { useVaultColors, vaultColor } from "../lib/vaultColors";
-import { errorMessage, supports } from "../lib/api";
+import { supports } from "../lib/api";
 import { coffreName } from "../lib/localHost";
 import { systemBridge } from "../lib/platform";
 import { ROLE_LABELS } from "../lib/types";
 import { IconDice, IconHome, IconIdentity, IconLifebuoy, IconLink, IconLogout, IconPulse, IconShieldClock, IconUsers } from "./secret-icons";
 import { IconBell, IconDatabase, IconLock, IconPlus, IconSearch, IconSettings, IconShield } from "./ui-icons";
 import { Logo } from "./Logo";
-import { Modal } from "./ui";
+import { NewVaultDialog } from "./NewVault";
 import { NARROW, TOUCH, useMediaQuery } from "../hooks/useMediaQuery";
 
 /** La barre latérale (`docs/DESIGN.md`) : l'accueil, les coffres avec leur
@@ -23,6 +23,7 @@ export function Sidebar({ ctx, route, onLogout, onLock, onSearch, width }: { ctx
   // Un coffre local (l'app) : ni invitations ni liens, pas d'e-mail — son nom.
   const local = session.local;
   const [creating, setCreating] = useState(false);
+  const closeCreating = useCallback(() => setCreating(false), []);
   const [accountMenu, setAccountMenu] = useState(false);
   const accountButton = useRef<HTMLButtonElement>(null);
   const colors = useVaultColors();
@@ -211,52 +212,7 @@ export function Sidebar({ ctx, route, onLogout, onLock, onSearch, width }: { ctx
         {list}
       </aside>
 
-      {creating && (
-        <CreateVaultDialog
-          local={!!local}
-          onClose={() => setCreating(false)}
-          onCreate={async (name) => {
-            try {
-              const v = await createVault(session, name);
-              setCreating(false);
-              await ctx.reload();
-              ctx.notify(`Vault « ${v.name} » créé.`);
-              go({ page: "vault", id: v.id });
-            } catch (e) {
-              ctx.error(errorMessage(e));
-            }
-          }}
-        />
-      )}
+      {creating && <NewVaultDialog ctx={ctx} onClose={closeCreating} />}
     </>
-  );
-}
-
-function CreateVaultDialog({ local, onClose, onCreate }: { local: boolean; onClose: () => void; onCreate: (name: string) => Promise<void> }) {
-  const [name, setName] = useState("");
-  const [busy, setBusy] = useState(false);
-  return (
-    <Modal title={local ? "Nouveau vault" : "Nouveau vault partagé"} onClose={onClose}>
-      <form
-        onSubmit={async (e) => {
-          e.preventDefault();
-          if (!name.trim()) return;
-          setBusy(true);
-          await onCreate(name.trim());
-          setBusy(false);
-        }}
-        className="space-y-3"
-      >
-        <label className="block">
-          <span className="field-label">Nom</span>
-          <input value={name} onChange={(e) => setName(e.target.value)} autoFocus placeholder={local ? "Travail" : "Équipe réseau"} className="input" />
-          <span className="help-text mt-1 block">{local ? "Chiffré comme le reste, sous sa propre clé : un vault de plus pour ranger, dans ce coffre." : "Chiffré comme le reste : le serveur ne le lit pas. Vous en êtes propriétaire ; invitez ensuite des membres depuis ses réglages."}</span>
-        </label>
-        <div className="flex justify-end gap-2">
-          <button type="button" onClick={onClose} className="btn btn-ghost">Annuler</button>
-          <button type="submit" disabled={!name.trim() || busy} className="btn btn-primary">Créer</button>
-        </div>
-      </form>
-    </Modal>
   );
 }

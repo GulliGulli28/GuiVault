@@ -4,7 +4,7 @@ import { pullSettings, startSettingsSync, stopSettingsSync } from "./lib/syncedS
 import "./lib/settingsSections";
 import { clearWebSession, loadLockMinutes, loadWebSession, saveWebSession, saveWebTokens, touchWebSession, webSessionIdle } from "./lib/persist";
 import { loadAppLock, LOCK_MESSAGES } from "./lib/appSettings";
-import { navigate, useRoute } from "./lib/route";
+import { navigate, routeHash, useRoute, type Route } from "./lib/route";
 import { acceptRollback, closeLocal, logout, refresh, wipe, type SessionState } from "./lib/session";
 import { refreshOfflineCopy } from "./lib/offline";
 import { LoginScreen } from "./components/LoginScreen";
@@ -36,6 +36,15 @@ import { PaneHandle, usePersistedPane } from "./hooks/usePersistedPane";
 
 /** Ce que chaque page reçoit : la session, et de quoi la recharger, notifier,
  * signaler une erreur. */
+/** Les pages d'un onglet mobile (`MobileNav`). */
+const TAB_PAGES = new Set<Route["page"]>(["home", "vault", "totp", "health", "more"]);
+
+/** Ce qui fait « une autre page » pour l'animation : pas l'élément ouvert
+ * dans un vault (sinon le vault se rechargerait). */
+function pageKey(r: Route): string {
+  return r.page === "vault" ? `vault:${r.id}` : routeHash(r);
+}
+
 export interface PageContext {
   session: SessionState;
   /** Recharge vaults et invitations (`/sync`) et redessine. */
@@ -349,7 +358,12 @@ export default function App({ Welcome = LoginScreen }: { Welcome?: ComponentType
         )}
         <RollbackBanner rollbacks={ctx.session.rollbacks} onAccept={(id) => { acceptRollback(ctx.session, id); setSession({ ...ctx.session }); }} />
         {route.page !== "settings" && <EmergencyBanner grants={ctx.session.emergency?.granted_by_me ?? []} onOpen={() => navigate({ page: "settings", section: "urgence" })} />}
-        {page}
+        {/* Mobile : chaque page entre en mouvement (`touch.css`) — les
+            onglets en fondu, le reste en glissant. La clé ne change pas
+            d'un élément à l'autre d'un même vault. */}
+        <div key={pageKey(effective)} className={`flex min-h-0 flex-1 flex-col ${TAB_PAGES.has(effective.page) ? "m-enter" : "m-push"}`}>
+          {page}
+        </div>
       </main>
       {narrow && <MobileNav ctx={ctx} route={effective} />}
       {search && <SearchPalette ctx={ctx} onClose={closeSearch} />}

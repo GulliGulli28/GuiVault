@@ -25,6 +25,11 @@ tag), il ne laisse qu'un artefact. Empreinte du certificat (SHA-256) :
 `4110b08feab1fdf6d033e5ac47e4f89eda10b21592c34efc77a2477b4535c109`. La
 0.2.0, elle, a été construite sur le poste et jointe à la main.
 
+**Icône** : `scripts/android/icon-foreground.py` refait le premier plan de
+l'icône adaptative depuis `logo_GuiVault.png` (62 % du carré : Android
+découpe la zone centrale) ; à relancer après un `cargo tauri icon`. La bulle
+prend `ic_launcher_round` (le logo seul) sur son disque sombre.
+
 **Signature** : la clé des APK de release est **hors du dépôt**,
 `%USERPROFILE%\.guivault-android\guivault-release.jks` (RSA 4096, alias
 `guivault`), son mot de passe dans `keystore.properties` à côté ;

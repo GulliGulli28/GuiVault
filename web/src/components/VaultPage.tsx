@@ -27,6 +27,7 @@ import { IntegrityBanner } from "./IntegrityBanner";
 import { useMerge } from "./MergeDialog";
 import { ShortcutsHelp } from "./ShortcutsHelp";
 import { ItemAside } from "./ItemAside";
+import { NewVaultDialog } from "./NewVault";
 import { putVaultItems, useAllItems } from "../lib/allItems";
 import { IconCheck, IconChevronDown, IconChevronRight, IconCopy, IconEdit, IconExternal, IconFolder, IconKeyboard, IconPlus, IconRefresh, IconSearch, IconSettings, IconTrash, IconVault } from "./ui-icons";
 import { copyText, Dropdown, formatAgo, formatWhen, Loading, Modal, useDelayed } from "./ui";
@@ -39,7 +40,7 @@ type Mode = { kind: "view" } | { kind: "edit" } | { kind: "new"; itemKind: ItemK
 
 /** Les entrées du menu « Nouveau » : les secrets d'abord, puis les entités
  * Guiterm, un trait entre les deux. */
-const NEW_KINDS: (ItemKind | "sep")[] = ["login", "note", "card", "identity", "api-key", "aws", "sep", "host", "group", "sql-connection", "key", "snippet", "runbook", "icon"];
+export const NEW_KINDS: (ItemKind | "sep")[] = ["login", "note", "card", "identity", "api-key", "aws", "sep", "host", "group", "sql-connection", "key", "snippet", "runbook", "icon"];
 
 type Filter = "all" | "favorites" | ItemKind;
 /** Les filtres proposés, dans l'ordre ; ceux sans élément sont masqués. */
@@ -101,7 +102,10 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
   }, [itemId]);
   // Créer, demandé depuis l'accueil (`#/vault/<id>/new/<genre>`).
   useEffect(() => {
-    if (create && canWrite(vault.role)) setMode({ kind: "new", itemKind: create });
+    if (!create || !canWrite(vault.role)) return;
+    // Un dossier se nomme dans la liste, à la racine.
+    if (create === "group") setNaming({ mode: "create", parentId: null });
+    else setMode({ kind: "new", itemKind: create });
   }, [create, vault.role]);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [history, setHistory] = useState(false);
@@ -116,6 +120,8 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
   const [moveTo, setMoveTo] = useState<VaultView | null>(null);
   const [newMenu, setNewMenu] = useState(false);
   const closeNewMenu = useCallback(() => setNewMenu(false), []);
+  const [newVault, setNewVault] = useState(false);
+  const closeNewVault = useCallback(() => setNewVault(false), []);
   const colors = useVaultColors();
   const newButton = useRef<HTMLButtonElement>(null);
   const touch = useMediaQuery(TOUCH);
@@ -484,7 +490,7 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
         <section
           aria-label="Éléments du vault"
           style={{ "--list-w": `${list.value}px` } as React.CSSProperties}
-          className={`relative flex min-h-0 flex-col bg-[var(--c-bg)] min-[1100px]:w-[var(--list-w)] min-[1100px]:shrink-0 ${mode.kind !== "view" || current ? "max-[1099.98px]:hidden" : "max-[1099.98px]:flex-1"}`}
+          className={`m-enter relative flex min-h-0 flex-col bg-[var(--c-bg)] min-[1100px]:w-[var(--list-w)] min-[1100px]:shrink-0 ${mode.kind !== "view" || current ? "max-[1099.98px]:hidden" : "max-[1099.98px]:flex-1"}`}
         >
           {narrow && (
             <header className="shrink-0">
@@ -512,6 +518,10 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
                           <span className="min-w-0 flex-1 truncate">{v.name}</span>
                         </button>
                       ))}
+                      <div className="menu-sep" />
+                      <button role="menuitem" onClick={() => { close(); setNewVault(true); }} className="menu-item">
+                        <IconPlus size={14} /> {ctx.session.local ? "Nouveau vault" : "Nouveau vault partagé"}
+                      </button>
                     </>
                   )}
                 </Dropdown>
@@ -630,10 +640,11 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
             <button onClick={() => setNewMenu(true)} className="m-fab" aria-label="Nouvel élément" title="Nouvel élément"><IconPlus size={24} /></button>
           )}
         </section>
+        {newVault && <NewVaultDialog ctx={ctx} onClose={closeNewVault} />}
         {narrow && newMenu && <Modal title="Nouvel élément" onClose={closeNewMenu}><div role="menu" aria-label="Nouvel élément" className="-mx-3">{kindsMenu}</div></Modal>}
 
         <div className="hidden min-[1100px]:contents"><PaneHandle onMouseDown={list.onMouseDown} /></div>
-        <section className={`flex min-h-0 flex-1 flex-col border-l border-[var(--c-border)] max-[1099.98px]:border-l-0 ${mode.kind === "view" && !current ? "max-[1099.98px]:hidden" : ""} ${list.isDragging ? "pointer-events-none select-none" : ""}`}>
+        <section className={`m-push flex min-h-0 flex-1 flex-col border-l border-[var(--c-border)] max-[1099.98px]:border-l-0 ${mode.kind === "view" && !current ? "max-[1099.98px]:hidden" : ""} ${list.isDragging ? "pointer-events-none select-none" : ""}`}>
           {stale && mode.kind !== "view" && (
             <p className="callout callout-warn m-4 mb-0">Ce vault a changé entre-temps : l'enregistrement proposera de fusionner.</p>
           )}

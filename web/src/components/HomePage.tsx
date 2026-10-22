@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type { PageContext } from "../App";
 import { supports } from "../lib/api";
 import { healthSummary, useAllItems, type VaultItem } from "../lib/allItems";
@@ -8,15 +8,15 @@ import { navigate, routeHash } from "../lib/route";
 import { coffreName } from "../lib/localHost";
 import { personInitials } from "../lib/tiles";
 import { useVaultColors, vaultColor } from "../lib/vaultColors";
-import { canWrite, ROLE_LABELS, type CustomIcon, type GuiVaultEntity } from "../lib/types";
-import { ItemTile } from "./ItemTree";
+import { canWrite, KIND_LABELS, ROLE_LABELS, type CustomIcon, type GuiVaultEntity } from "../lib/types";
+import { ItemTile, KIND_ICONS } from "./ItemTree";
+import { NEW_KINDS } from "./VaultPage";
+import { NewVaultDialog } from "./NewVault";
 import { TotpCode } from "./TotpCode";
-import { IconChevronRight, IconCopy, IconLock, IconPlus, IconSearch } from "./ui-icons";
+import { IconCheck, IconChevronDown, IconChevronRight, IconCopy, IconLock, IconPlus, IconSearch, IconVault } from "./ui-icons";
 import { Logo } from "./Logo";
-import { bubbleBridge, reduceToBubble } from "../lib/bubble";
-import { IconBubble } from "./secret-icons";
 import { NARROW, useMediaQuery } from "../hooks/useMediaQuery";
-import { copyText, formatAgo } from "./ui";
+import { copyText, Dropdown, formatAgo } from "./ui";
 
 /** Un élément tel que l'accueil le montre : son entité (nom, ligne
  * secondaire, épinglé) et de quoi l'ouvrir. */
@@ -77,7 +77,6 @@ export function HomePage({ ctx }: { ctx: PageContext }) {
         <header className="m-head">
           <Logo size={30} />
           <h1 className="m-title min-w-0 flex-1 truncate text-[22px]">{local ? name : `Bonjour ${name}`}</h1>
-          {bubbleBridge() && <button onClick={() => void reduceToBubble(ctx)} className="m-icon" aria-label="Réduire en bulle" title="Réduire en bulle"><IconBubble size={20} /></button>}
           <button onClick={ctx.lock} className="m-icon border border-[var(--c-border-strong)] bg-[var(--c-surface)]" aria-label="Verrouiller" title="Verrouiller"><IconLock size={18} /></button>
         </header>
         <div className="m-body">
@@ -150,11 +149,7 @@ export function HomePage({ ctx }: { ctx: PageContext }) {
               {!loading && <> · {total} {total > 1 ? "éléments" : "élément"}</>}
             </p>
           </div>
-          {target && (
-            <a href={routeHash({ page: "vault", id: target.id, create: "login" })} className="btn btn-primary btn-lg">
-              <IconPlus size={15} /> Nouvel élément
-            </a>
-          )}
+          {target && <NewMenu ctx={ctx} defaultVault={target.id} />}
         </header>
 
         {supports("myInvitations") && session.invitations.map((inv) => (
@@ -289,5 +284,60 @@ export function HealthBar({ total, weak, reused }: { total: number; weak: number
       {weak > 0 && <span className="bg-[var(--c-warn)] first:rounded-l last:rounded-r" style={{ flex: weak }} />}
       {reused > 0 && <span className="bg-[var(--c-danger)] first:rounded-l last:rounded-r" style={{ flex: reused }} />}
     </div>
+  );
+}
+
+/** « Nouvel élément » de l'accueil : dans quel vault (s'il y en a plusieurs
+ * où écrire), chaque type d'élément, un dossier — ou un nouveau vault. */
+function NewMenu({ ctx, defaultVault }: { ctx: PageContext; defaultVault: string }) {
+  const colors = useVaultColors();
+  const writable = ctx.session.vaults.filter((v) => canWrite(v.role));
+  const [vaultId, setVaultId] = useState(defaultVault);
+  const [creating, setCreating] = useState(false);
+  const closeCreating = useCallback(() => setCreating(false), []);
+  return (
+    <>
+      <Dropdown
+        label="Nouvel élément"
+        className="w-64"
+        trigger={({ open, toggle }) => (
+          <button onClick={toggle} aria-expanded={open} aria-haspopup="menu" className="btn btn-primary btn-lg">
+            <IconPlus size={15} /> Nouvel élément <IconChevronDown size={13} />
+          </button>
+        )}
+      >
+        {(close) => (
+          <>
+            {writable.length > 1 && (
+              <>
+                <p className="px-3.5 pb-1 pt-1.5 text-[12px] font-medium text-[var(--c-text-muted)]">Dans</p>
+                {writable.map((v) => (
+                  <button key={v.id} role="menuitemradio" aria-checked={v.id === vaultId} data-active={v.id === vaultId ? "true" : undefined} onClick={() => setVaultId(v.id)} className="menu-item">
+                    <span className="vdot" style={{ background: vaultColor(v.id, v.kind === "personal", colors) }} />
+                    <span className="min-w-0 flex-1 truncate">{v.name}</span>
+                    {v.id === vaultId && <IconCheck size={14} />}
+                  </button>
+                ))}
+                <div className="menu-sep" />
+              </>
+            )}
+            {NEW_KINDS.map((k, i) => {
+              if (k === "sep") return <div key={i} className="menu-sep" />;
+              const Icon = KIND_ICONS[k];
+              return (
+                <button key={k} role="menuitem" onClick={() => { close(); navigate({ page: "vault", id: vaultId, create: k }); }} className="menu-item">
+                  <Icon size={14} /> {k === "group" ? "Dossier" : KIND_LABELS[k].charAt(0).toUpperCase() + KIND_LABELS[k].slice(1)}
+                </button>
+              );
+            })}
+            <div className="menu-sep" />
+            <button role="menuitem" onClick={() => { close(); setCreating(true); }} className="menu-item">
+              <IconVault size={14} /> {ctx.session.local ? "Nouveau vault" : "Nouveau vault partagé"}
+            </button>
+          </>
+        )}
+      </Dropdown>
+      {creating && <NewVaultDialog ctx={ctx} onClose={closeCreating} />}
+    </>
   );
 }

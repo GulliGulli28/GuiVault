@@ -154,6 +154,17 @@ celle de `html`.
     ne l'importe pas : ses 440 px ne sont pas du mobile.
   - `PageContext` porte `search` et `lock` pour les boutons des écrans
     mobiles.
+  - Mouvements (`touch.css`, fin) : les onglets entrent en fondu, les pages
+    de second niveau glissent depuis la droite, les feuilles montent du bas ;
+    rien si le système demande moins de mouvement.
+  - Android : « Bulle » à droite de la barre d'onglets, sur toutes les pages.
+- **Écrans d'entrée, la vitrine** (`AuthShell`, `.auth-hero` dans
+  `index.css`) : aurores floues qui dérivent, grille estompée, cartes de
+  verre qui flottent (un identifiant, un code 2FA, ce que voit le serveur).
+- **Créer depuis l'accueil** : « Nouvel élément » ouvre un menu — le vault
+  de destination s'il y en a plusieurs, chaque type, un dossier
+  (`#/vault/<id>/new/group`), un nouveau vault (`NewVault.tsx`, aussi dans la
+  barre latérale et le sélecteur de vaults mobile).
 
 ## Règles d'écriture de l'interface
 

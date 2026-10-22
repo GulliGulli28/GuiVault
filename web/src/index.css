@@ -665,3 +665,165 @@ canvas:focus-visible {
     animation-duration: 0.01ms !important;
   }
 }
+
+/* ─── La vitrine des écrans d'entrée (`AuthShell`) ──────────────────────────
+   Un fond animé dans l'esprit de Raycast : trois aurores floues qui dérivent
+   lentement, une grille estompée, des cartes de verre qui flottent. Tout
+   s'arrête si le système demande moins de mouvement. */
+.auth-hero {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  flex: 1 1 480px;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 48px 40px;
+  border-left: 1px solid var(--c-border);
+  background: var(--c-bg);
+  isolation: isolate;
+}
+.aurora {
+  position: absolute;
+  inset: -20%;
+  z-index: -1;
+  filter: blur(70px);
+  opacity: 0.55;
+}
+.aurora span {
+  position: absolute;
+  width: 55%;
+  height: 55%;
+  border-radius: 50%;
+  mix-blend-mode: screen;
+}
+.aurora span:nth-child(1) {
+  left: 10%;
+  top: 8%;
+  background: radial-gradient(circle, #8b8cff 0%, transparent 65%);
+  animation: aurora-a 22s ease-in-out infinite alternate;
+}
+.aurora span:nth-child(2) {
+  right: 4%;
+  top: 30%;
+  background: radial-gradient(circle, #3b82f6 0%, transparent 65%);
+  animation: aurora-b 26s ease-in-out infinite alternate;
+}
+.aurora span:nth-child(3) {
+  left: 30%;
+  bottom: 0;
+  background: radial-gradient(circle, #d946ef 0%, transparent 65%);
+  opacity: 0.7;
+  animation: aurora-c 30s ease-in-out infinite alternate;
+}
+:root[data-mode="light"] .aurora {
+  opacity: 0.6;
+}
+:root[data-mode="light"] .aurora span {
+  mix-blend-mode: multiply;
+}
+@keyframes aurora-a {
+  to { transform: translate(28%, 22%) scale(1.15); }
+}
+@keyframes aurora-b {
+  to { transform: translate(-30%, -18%) scale(0.9); }
+}
+@keyframes aurora-c {
+  to { transform: translate(-18%, -30%) scale(1.2); }
+}
+.auth-grid {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image:
+    linear-gradient(to right, var(--c-border) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--c-border) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(ellipse at center, black 20%, transparent 72%);
+  opacity: 0.6;
+}
+.auth-title {
+  font-size: 38px;
+  font-weight: 600;
+  line-height: 1.12;
+  letter-spacing: -0.03em;
+  background: linear-gradient(180deg, var(--c-text) 30%, color-mix(in srgb, var(--c-text) 55%, transparent));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-wrap: balance;
+}
+.glass-chip {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border: 1px solid color-mix(in srgb, var(--c-text) 12%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--c-surface) 55%, transparent);
+  backdrop-filter: blur(12px);
+  color: var(--c-text-secondary);
+  font-size: 12.5px;
+}
+.pulse-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--c-ok);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--c-ok) 60%, transparent);
+  animation: pulse-dot 2.4s ease-out infinite;
+}
+@keyframes pulse-dot {
+  to { box-shadow: 0 0 0 8px transparent; }
+}
+.glass-card {
+  position: absolute;
+  padding: 16px 18px;
+  border: 1px solid color-mix(in srgb, var(--c-text) 12%, transparent);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--c-surface) 62%, transparent);
+  backdrop-filter: blur(18px) saturate(140%);
+  box-shadow: 0 24px 60px -24px rgba(0, 0, 0, 0.55), inset 0 1px 0 color-mix(in srgb, white 8%, transparent);
+  color: var(--c-text);
+  font-size: 13.5px;
+}
+.float-a { animation: float 9s ease-in-out infinite; }
+.float-b { animation: float 11s ease-in-out -3s infinite; }
+.float-c { animation: float 13s ease-in-out -6s infinite; }
+@keyframes float {
+  50% { transform: translateY(-10px); }
+}
+.ring-spin {
+  animation: spin 6s linear infinite;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.cipher {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  word-break: break-all;
+  background: linear-gradient(90deg, var(--c-text-faint) 0%, var(--c-accent-text) 50%, var(--c-text-faint) 100%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shimmer 6s linear infinite;
+}
+@keyframes shimmer {
+  to { background-position: -200% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .aurora span,
+  .float-a,
+  .float-b,
+  .float-c,
+  .ring-spin,
+  .cipher,
+  .pulse-dot {
+    animation: none;
+  }
+}
