@@ -169,7 +169,7 @@ const click = async (browser, text, timeout) => (await button(browser, text, tim
 /** Une entrée du menu du compte (pied de la barre latérale) : le compte,
  * la sécurité, se déconnecter ou fermer le coffre. */
 async function account(browser, item) {
-  const open = await browser.$("//aside//button[@aria-label='Compte']");
+  const open = await browser.$("//aside//button[@aria-label='Menu du compte']");
   await open.waitForClickable({ timeout: 10_000, timeoutMsg: "bouton du compte introuvable" });
   await open.click();
   const entry = await browser.$(`//button[@role='menuitem'][normalize-space()=${xpathText(item)}]`);
@@ -247,7 +247,8 @@ scenario("la fenêtre s'ouvre sur l'accueil", async (b) => {
 scenario("créer un coffre local : un dossier sur le disque, rien en clair", async (b) => {
   await b.execute((p) => { window.__GUIVAULT_E2E_PATH__ = p; }, coffre);
   await click(b, "Créer un coffre local");
-  await waitText(b, "Nouveau coffre : Mon coffre");
+  await waitText(b, "Nouveau coffre");
+  await waitText(b, "Mon coffre");
   await fillPasswords(b, PASSWORD, PASSWORD);
   await click(b, "Créer le coffre");
   // Argon2id à 64 Mio dans le webview : quelques secondes.
@@ -480,8 +481,9 @@ scenario("import KeePass : une vraie base .kdbx, pièce jointe comprise", async 
   // tournent sous Node.
   const kdbx = path.join(webRoot, "src", "lib", "fixtures", "kdbx", "keepass-argon2d.kdbx");
   const before = coffreOnDisk(coffre).json.vaults[0].items.length;
-  await (await b.$('button[aria-label="Importer / exporter"]')).click();
-  await waitText(b, "KeePass et KeePassXC");
+  await (await b.$('button[aria-label="Actions du vault"]')).click();
+  await (await b.$("//button[@role='menuitem'][normalize-space()='Importer ou exporter']")).click();
+  await waitText(b, "Choisir un fichier");
   const input = await b.$('input[type="file"]');
   // Masqué (sr-only) : `setValue` le viderait d'abord, ce que WebDriver
   // refuse ; envoyer un chemin à un champ de fichier, lui, est permis.
@@ -537,6 +539,8 @@ scenario("copier : le coffre vers un nouveau compte, puis le compte vers un nouv
   await fillField(b, "E-mail", email);
   await fillPasswords(b, PASSWORD);
   await click(b, "Déverrouiller");
+  await (await b.$("//a[.//span[normalize-space()='Personnel']]")).waitForClickable({ timeout: 60_000, timeoutMsg: "le compte ne s'est pas ouvert" });
+  await (await b.$("//a[.//span[normalize-space()='Personnel']]")).click();
   await b.waitUntil(async () => (await bodyText(b)).includes(SECRET), { timeout: 60_000, timeoutMsg: "la note copiée n'apparaît pas dans le compte" });
 
   // 3. Le compte → un coffre neuf : mêmes vaults, mêmes items, pièce jointe comprise.
@@ -572,6 +576,9 @@ scenario("fermer puis rouvrir : coffres récents, mauvais mot de passe refusé",
   await input.clearValue();
   await input.setValue(PASSWORD);
   await click(b, "Déverrouiller");
+  // On arrive sur l'accueil : la note se cherche dans le vault.
+  await (await b.$("//a[.//span[normalize-space()='Personnel']]")).waitForClickable({ timeout: 60_000, timeoutMsg: "le coffre ne s'est pas rouvert" });
+  await (await b.$("//a[.//span[normalize-space()='Personnel']]")).click();
   await b.waitUntil(async () => (await bodyText(b)).includes(SECRET), { timeout: 60_000, timeoutMsg: "la note n'est pas revenue après le déverrouillage" });
   await account(b, "Fermer le coffre");
   await button(b, "Créer un coffre local");
@@ -583,7 +590,7 @@ scenario("créer par-dessus un coffre existant : l'erreur de l'hôte arrive", as
   await fillPasswords(b, PASSWORD, PASSWORD);
   await click(b, "Créer le coffre");
   await waitText(b, "il y a déjà un coffre", 60_000);
-  await click(b, "Retour");
+  await click(b, "Changer");
 });
 
 scenario("se connecter à un serveur qui ne répond pas : dit clairement", async (b) => {

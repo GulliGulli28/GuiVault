@@ -418,11 +418,11 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
     <div className="flex h-full min-h-0 flex-col">
       <IntegrityBanner name={vault.name} problems={problems} canFix={canWrite(vault.role) && !emergency} nameOf={nameOf} onAccept={acceptProblems} />
 
-      <div className="flex min-h-0 flex-1 flex-col xl:flex-row">
+      <div className="flex min-h-0 flex-1 flex-col min-[1100px]:flex-row">
         <section
           aria-label="Éléments du vault"
           style={{ "--list-w": `${list.value}px` } as React.CSSProperties}
-          className={`flex min-h-0 flex-col bg-[var(--c-bg)] xl:w-[var(--list-w)] xl:shrink-0 ${mode.kind !== "view" || current ? "max-xl:hidden" : "max-xl:flex-1"}`}
+          className={`flex min-h-0 flex-col bg-[var(--c-bg)] min-[1100px]:w-[var(--list-w)] min-[1100px]:shrink-0 ${mode.kind !== "view" || current ? "max-[1099.98px]:hidden" : "max-[1099.98px]:flex-1"}`}
         >
           <header className="shrink-0 space-y-3 px-4 pb-3 pt-[18px] max-md:pl-14">
             <div className="flex min-w-0 items-center gap-2">
@@ -562,8 +562,8 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
           </div>
         </section>
 
-        <div className="hidden xl:contents"><PaneHandle onMouseDown={list.onMouseDown} /></div>
-        <section className={`flex min-h-0 flex-1 flex-col border-l border-[var(--c-border)] max-xl:border-l-0 ${mode.kind === "view" && !current ? "max-xl:hidden" : ""} ${list.isDragging ? "pointer-events-none select-none" : ""}`}>
+        <div className="hidden min-[1100px]:contents"><PaneHandle onMouseDown={list.onMouseDown} /></div>
+        <section className={`flex min-h-0 flex-1 flex-col border-l border-[var(--c-border)] max-[1099.98px]:border-l-0 ${mode.kind === "view" && !current ? "max-[1099.98px]:hidden" : ""} ${list.isDragging ? "pointer-events-none select-none" : ""}`}>
           {stale && mode.kind !== "view" && (
             <p className="callout callout-warn m-4 mb-0">Ce vault a changé entre-temps : l'enregistrement proposera de fusionner.</p>
           )}
@@ -587,7 +587,7 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
           {mode.kind === "view" && current && (
             <>
               <div className="flex min-h-[52px] shrink-0 flex-wrap items-center gap-2 border-b border-[var(--c-border)] px-5 py-2 max-md:px-3">
-                <button onClick={() => setSelected(null)} className="btn btn-ghost btn-sm xl:hidden">← Liste</button>
+                <button onClick={() => setSelected(null)} className="btn btn-ghost btn-sm min-[1100px]:hidden">← Liste</button>
                 <div className="flex min-w-0 flex-1 items-center gap-2 text-[13px] text-[var(--c-text-muted)] max-md:hidden">
                   <span className="truncate">{vault.name}</span>
                   {entity?.path && <><IconChevronRight size={12} className="shrink-0 text-[var(--c-text-faint)]" /><span className="truncate">{entity.path}</span></>}

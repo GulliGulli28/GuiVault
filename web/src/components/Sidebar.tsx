@@ -149,6 +149,7 @@ export function Sidebar({ ctx, route, onLogout, onLock, onSearch, width }: { ctx
             onClick={() => setAccountMenu((m) => !m)}
             aria-haspopup="menu"
             aria-expanded={accountMenu}
+            aria-label="Menu du compte"
             className="flex min-w-0 flex-1 items-center gap-2.5 rounded-[10px] border border-[var(--c-border)] bg-[var(--c-surface)] p-2 text-left hover:border-[var(--c-border-strong)]"
             title={local ? local.path : session.user.email}
           >

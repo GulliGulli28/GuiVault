@@ -111,6 +111,10 @@ celle de `html`.
 
 ## Dans le code
 
+- **Écrans d'entrée** : `components/AuthShell.tsx` (maquette « Connexion » :
+  formulaire à gauche, schéma à droite), pour `LoginScreen` et l'accueil de
+  l'application (`web/app/src/AppWelcome.tsx` : coffres récents, serveur,
+  ouvrir ou créer un coffre local).
 - **Gabarit de page** : `components/Page.tsx` (titre, sous-titre d'une ligne,
   actions, colonne bornée). Une ligne de réglage : `SettingRow` (`ui.tsx`).
   Une info au clic : `InfoTip` (`ui.tsx`). Un menu : `Dropdown` (`ui.tsx`).
@@ -124,7 +128,8 @@ celle de `html`.
 - **Préférences** : `DESIGN_VERSION` — des préférences d'avant la refonte
   (locales ou synchronisées) prennent une fois le fond, l'accent, la police
   et les lignes d'entité par défaut.
-- **Coffre** : liste et fiche côte à côte à partir de 1280 px, un volet à la
+- **Coffre** : liste et fiche côte à côte à partir de 1100 px (la fenêtre de
+  l'application en fait 1200), un volet à la
   fois en dessous.
 
 ## Règles d'écriture de l'interface
