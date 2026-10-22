@@ -11,8 +11,20 @@ barre de gestes, clavier) viennent de `MainActivity.kt` : l'app est « bord à
 bord » et `env(safe-area-inset-*)` vaut 0 dans la WebView ; la page les lit
 par `window.GuiVaultInsets` (`web/app/src/mobile.ts`) dans les variables
 `--inset-top` / `--inset-bottom` (`index.css`), et les icônes de la barre
-d'état suivent son thème. **Reste** : un vrai téléphone (`-Target aarch64`),
-la signature d'un APK de release.
+d'état suivent son thème. **Reste** : l'essai sur un vrai téléphone, la
+publication des APK (pas de mise à jour automatique sur Android : un APK
+signé à installer, ou un magasin).
+
+**Signature** : la clé des APK de release est **hors du dépôt**,
+`%USERPROFILE%\.guivault-android\guivault-release.jks` (RSA 4096, alias
+`guivault`), son mot de passe dans `keystore.properties` à côté ;
+`gen/android/app/build.gradle.kts` les lit s'ils existent (sinon la release
+n'est pas signée). **En garder une copie en lieu sûr** : perdue, une mise à
+jour ne pourrait plus remplacer l'application installée (Android exige la
+même clé). `scripts\android\build-apk.ps1 -Target aarch64,x86_64 -Release`
+construit un APK de release signé pour les téléphones et l'émulateur. Une
+release refuse le HTTP en clair (`usesCleartextTraffic`) : un serveur en
+HTTPS.
 
 Construire : `scripts/android-sync.sh` (WSL : construit `web/dist-app` et
 recopie le dépôt dans `%USERPROFILE%\guivault-android`), puis

@@ -14,6 +14,14 @@ val tauriProperties = Properties().apply {
     }
 }
 
+// La clé de signature des APK de release (docs/ANDROID.md) : hors du dépôt,
+// dans ~/.guivault-android/keystore.properties (storeFile, password,
+// keyAlias). Sans elle, la release n'est pas signée.
+val keystoreProperties = Properties().apply {
+    val f = File(System.getProperty("user.home"), ".guivault-android/keystore.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
+}
+
 android {
     compileSdk = 37
     namespace = "dev.guivault.client"
@@ -24,6 +32,16 @@ android {
         targetSdk = 37
         versionCode = tauriProperties.getProperty("tauri.android.versionCode", "1").toInt()
         versionName = tauriProperties.getProperty("tauri.android.versionName", "1.0")
+    }
+    if (keystoreProperties.containsKey("storeFile")) {
+        signingConfigs {
+            create("release") {
+                storeFile = file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("password")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("password")
+            }
+        }
     }
     buildTypes {
         getByName("debug") {
@@ -39,6 +57,7 @@ android {
             }
         }
         getByName("release") {
+            signingConfigs.findByName("release")?.let { signingConfig = it }
             optimization {
                enable = true
             }
