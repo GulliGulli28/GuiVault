@@ -14,14 +14,16 @@ par `window.GuiVaultInsets` (`web/app/src/mobile.ts`) dans les variables
 d'état suivent son thème. **Reste** : l'essai sur un vrai téléphone ; pas de
 mise à jour automatique sur Android (on installe l'APK suivant par-dessus).
 
-**Publier** : l'APK de release est joint à la release GitHub de l'application
-(`app-v<version>`, `docs/APP.md`), construit sur le poste — le CI ne le
-construit pas (la clé n'est pas dans GitHub). `build-apk.ps1 -Target
-aarch64,x86_64 -Release`, puis `gh release upload app-v<version>
-GuiVault_<version>_android.apk`, son empreinte ajoutée à `SHA256SUMS.txt`
-(`--clobber`) et une section « Android » dans les notes. Premier : 0.2.0
-(empreinte du certificat de signature, SHA-256 :
-`4110b08feab1fdf6d033e5ac47e4f89eda10b21592c34efc77a2477b4535c109`).
+**Publier** : comme l'application Windows — le tag `app-v<version>`
+(`docs/APP.md`, « Publier une version »). Dans `app-release.yml`, le job
+`android` (après `windows`, qui crée le brouillon) construit l'APK de release
+(arm64, x86_64), le signe avec la clé des secrets `ANDROID_KEYSTORE_BASE64`
+(le `.jks` en base64) et `ANDROID_KEYSTORE_PASSWORD`, vérifie la signature,
+l'atteste (`gh attestation verify`), et le joint au brouillon avec sa somme
+dans `SHA256SUMS.txt` et une ligne dans les notes. Lancé à la main (sans
+tag), il ne laisse qu'un artefact. Empreinte du certificat (SHA-256) :
+`4110b08feab1fdf6d033e5ac47e4f89eda10b21592c34efc77a2477b4535c109`. La
+0.2.0, elle, a été construite sur le poste et jointe à la main.
 
 **Signature** : la clé des APK de release est **hors du dépôt**,
 `%USERPROFILE%\.guivault-android\guivault-release.jks` (RSA 4096, alias
