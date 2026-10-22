@@ -13,6 +13,8 @@ import { installSystem } from "./systemBridge";
 import { installBackups } from "./backupBridge";
 import { installUpdater } from "./updaterBridge";
 import { installCoffres } from "./coffreBridge";
+import { installBubble } from "./bubbleBridge";
+import { detectMobile, isMobile } from "./mobile";
 
 // Comme l'interface web (`src/main.tsx`), sans le service worker : l'app
 // embarque déjà son interface.
@@ -22,10 +24,14 @@ setDeviceLabel("Application GuiVault");
 // Ce que l'application ajoute (saisie automatique, presse-papiers natif)
 // d'abord — quelques millisecondes : les composants regardent au rendu si
 // c'est là.
-installBackups();
-installUpdater();
-installCoffres();
-void Promise.allSettled([installAutoType(), installClipboard(), installSystem()]).finally(() => {
+// Sur mobile (Android), pas d'updater : les mises à jour passent par
+// l'installation d'un APK.
+void detectMobile().then(() => {
+  installBackups();
+  if (!isMobile()) installUpdater();
+  installCoffres();
+  return Promise.allSettled([installAutoType(), installClipboard(), installSystem(), installBubble()]);
+}).finally(() => {
   ReactDOM.createRoot(document.getElementById("root")!).render(
     <React.StrictMode>
       <App Welcome={AppWelcome} />

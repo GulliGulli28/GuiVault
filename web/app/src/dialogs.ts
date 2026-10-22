@@ -7,6 +7,7 @@
  * peut le poser — la CSP n'en admet pas d'autre que les nôtres —, et il ne
  * fait que choisir un chemin, ce que la boîte de dialogue ferait aussi. */
 import { open, save } from "@tauri-apps/plugin-dialog";
+import { coffresDir, deviceCoffres, isMobile } from "./mobile";
 
 declare global {
   interface Window {
@@ -20,9 +21,24 @@ function e2ePath(): string | null {
   return typeof p === "string" ? p : null;
 }
 
+/** Mobile : un nom libre dans le dossier des coffres de l'appareil
+ * (« Mon coffre », « Mon coffre 2 »…). */
+async function freePath(base: string): Promise<string | null> {
+  const dir = coffresDir();
+  if (!dir) return null;
+  const taken = new Set(await deviceCoffres());
+  const stem = base.replace(/\.guivault$/, "");
+  for (let i = 1; ; i++) {
+    const path = `${dir}/${i === 1 ? stem : `${stem} ${i}`}.guivault`;
+    if (!taken.has(path)) return path;
+  }
+}
+
 export async function pickCoffre(): Promise<string | null> {
   const forced = e2ePath();
   if (forced) return forced;
+  // Mobile : l'accueil liste les coffres de l'appareil, rien à choisir ici.
+  if (isMobile()) return null;
   const path = await open({ directory: true, title: "Ouvrir un coffre local" });
   return typeof path === "string" ? path : null;
 }
@@ -30,6 +46,7 @@ export async function pickCoffre(): Promise<string | null> {
 export async function pickNewCoffre(): Promise<string | null> {
   const forced = e2ePath();
   if (forced) return forced;
+  if (isMobile()) return freePath("Mon coffre");
   return save({ title: "Créer un coffre local", defaultPath: "Mon coffre.guivault" });
 }
 
@@ -37,5 +54,6 @@ export async function pickNewCoffre(): Promise<string | null> {
 export async function pickRestoreDest(defaultPath: string): Promise<string | null> {
   const forced = e2ePath();
   if (forced) return forced;
+  if (isMobile()) return freePath(defaultPath);
   return save({ title: "Ranger la copie restaurée", defaultPath });
 }

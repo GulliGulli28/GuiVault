@@ -30,7 +30,7 @@ import { MobileNav, rememberVault } from "./components/MobileNav";
 import { NARROW, useMediaQuery } from "./hooks/useMediaQuery";
 import { clearAllItems } from "./lib/allItems";
 import { AutoTypeHost } from "./components/AutoType";
-import { autoTypeBridge, systemBridge, updaterBridge } from "./lib/platform";
+import { autoTypeBridge, bubbleBridge, systemBridge, updaterBridge } from "./lib/platform";
 import { Toasts, useToasts } from "./components/ui";
 import { PaneHandle, usePersistedPane } from "./hooks/usePersistedPane";
 
@@ -254,6 +254,10 @@ export default function App({ Welcome = LoginScreen }: { Welcome?: ComponentType
 
   // La barre latérale se redimensionne à la souris, comme dans Guiterm.
   const sidebar = usePersistedPane("sidebar", { initial: 256, min: 200, max: 480, axis: "horizontal", mode: "px" });
+  // La bulle d'Android (s'il y en a une) suit l'état du coffre : grise une
+  // fois verrouillé, sans jamais rien montrer d'autre que le logo.
+  const unlocked = session !== null;
+  useEffect(() => { void bubbleBridge()?.setLocked(!unlocked).catch(() => {}); }, [unlocked]);
   // Mobile : la barre d'onglets du bas remplace la barre latérale.
   const narrow = useMediaQuery(NARROW);
   const vaultRoute = route.page === "vault" ? route.id : null;

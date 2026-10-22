@@ -172,3 +172,26 @@ export function setAutoTypeBridge(b: AutoTypeBridge | null) {
 export function autoTypeBridge(): AutoTypeBridge | null {
   return autoType;
 }
+
+/** La bulle flottante de l'application Android (`docs/ANDROID.md`) :
+ * GuiVault réduit à une bulle par-dessus les autres applications. */
+export interface BubbleBridge {
+  /** Réduit l'application en bulle. `false` : la permission « Afficher
+   * par-dessus d'autres applis » manque — l'écran d'Android qui la donne
+   * vient d'être ouvert. */
+  show(): Promise<boolean>;
+  /** La bulle grise quand le coffre est verrouillé : elle ne montre jamais
+   * rien d'autre que le logo. */
+  setLocked(locked: boolean): Promise<void>;
+}
+
+let bubble: BubbleBridge | null = null;
+
+export function setBubbleBridge(b: BubbleBridge | null) {
+  bubble = b;
+}
+
+/** `null` : pas de bulle ici (tout sauf l'application Android). */
+export function bubbleBridge(): BubbleBridge | null {
+  return bubble;
+}

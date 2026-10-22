@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { api, ApiError, errorMessage, setBaseUrl } from "../../src/lib/api";
 import { LocalBackups } from "../../src/components/LocalBackups";
 import { createLocal, openLocal, type SessionState } from "../../src/lib/session";
@@ -9,6 +9,7 @@ import { IconChevronRight, IconClose } from "../../src/components/ui-icons";
 import { tileHue, tileInitial } from "../../src/lib/tiles";
 import { pickCoffre, pickNewCoffre } from "./dialogs";
 import { tauriHost } from "./tauriHost";
+import { deviceCoffres, isMobile } from "./mobile";
 import { coffreName, forgetCoffre, lastServer, recentCoffres, rememberCoffre, rememberServer } from "./recents";
 
 type Step =
@@ -24,6 +25,10 @@ type Step =
 export function AppWelcome({ onSession }: { onSession: (s: SessionState) => void }) {
   const [step, setStep] = useState<Step>({ kind: "home" });
   const [recents, setRecents] = useState(recentCoffres);
+  // Mobile : les coffres du dossier de l'app, récents ou non.
+  const [device, setDevice] = useState<string[]>([]);
+  useEffect(() => { if (isMobile()) void deviceCoffres().then(setDevice); }, [step.kind]);
+  const listed = [...recents, ...device.filter((p) => !recents.includes(p))];
   const [error, setError] = useState<string | null>(null);
   const home = () => {
     setError(null);
@@ -50,12 +55,12 @@ export function AppWelcome({ onSession }: { onSession: (s: SessionState) => void
   if (step.kind === "create") return <CreateForm path={step.path} onBack={home} onSession={onSession} />;
 
   return (
-    <AuthShell title="Bienvenue" sub="Un serveur pour tous vos appareils, ou un coffre sur celui-ci." store={recents.length ? "local" : "server"} footer={<span>Chiffré sur cet appareil, avec ou sans serveur</span>}>
-      {recents.length > 0 && (
+    <AuthShell title="Bienvenue" sub="Un serveur pour tous vos appareils, ou un coffre sur celui-ci." store={listed.length ? "local" : "server"} footer={<span>Chiffré sur cet appareil, avec ou sans serveur</span>}>
+      {listed.length > 0 && (
         <div className="flex flex-col gap-1.5">
-          <p className="field-label">Coffres récents</p>
+          <p className="field-label">{isMobile() ? "Coffres de cet appareil" : "Coffres récents"}</p>
           <ul className="card divide-y divide-[var(--c-border)]">
-            {recents.map((path) => (
+            {listed.map((path) => (
               <li key={path} className="flex min-w-0 items-center gap-1 pr-1.5">
                 <button onClick={() => setStep({ kind: "open", path })} className="flex min-w-0 flex-1 items-center gap-3 rounded-[12px] py-2.5 pl-3 text-left hover:bg-[var(--c-sel)]" title={path}>
                   <CoffreTile path={path} />
@@ -65,17 +70,17 @@ export function AppWelcome({ onSession }: { onSession: (s: SessionState) => void
                   </span>
                   <IconChevronRight size={14} className="shrink-0 text-[var(--c-text-muted)]" />
                 </button>
-                <button onClick={() => { forgetCoffre(path); setRecents(recentCoffres()); }} className="btn btn-ghost btn-icon btn-sm shrink-0" title="Retirer de la liste" aria-label={`Retirer ${coffreName(path)} de la liste`}><IconClose size={13} /></button>
+                {!isMobile() && <button onClick={() => { forgetCoffre(path); setRecents(recentCoffres()); }} className="btn btn-ghost btn-icon btn-sm shrink-0" title="Retirer de la liste" aria-label={`Retirer ${coffreName(path)} de la liste`}><IconClose size={13} /></button>}
               </li>
             ))}
           </ul>
         </div>
       )}
       <div className="flex flex-col gap-2.5">
-        <button onClick={() => setStep({ kind: "server" })} className={`btn btn-lg w-full ${recents.length ? "btn-secondary" : "btn-primary"}`}>Se connecter à un serveur</button>
+        <button onClick={() => setStep({ kind: "server" })} className={`btn btn-lg w-full ${listed.length ? "btn-secondary" : "btn-primary"}`}>Se connecter à un serveur</button>
         <div className="flex items-center gap-3 text-[12.5px] text-[var(--c-text-muted)]"><span className="h-px flex-1 bg-[var(--c-border)]" />ou un coffre sur cet appareil<span className="h-px flex-1 bg-[var(--c-border)]" /></div>
         <div className="flex flex-wrap gap-2.5">
-          <button onClick={() => void pickExisting()} className="btn btn-secondary btn-lg min-w-[160px] flex-1">Ouvrir un coffre local</button>
+          {!isMobile() && <button onClick={() => void pickExisting()} className="btn btn-secondary btn-lg min-w-[160px] flex-1">Ouvrir un coffre local</button>}
           <button onClick={() => void pickNew()} className="btn btn-secondary btn-lg min-w-[160px] flex-1">Créer un coffre local</button>
         </div>
       </div>

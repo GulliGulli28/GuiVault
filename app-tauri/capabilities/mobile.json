@@ -1,0 +1,22 @@
+{
+  "$schema": "../gen/schemas/mobile-schema.json",
+  "identifier": "mobile",
+  "description": "Android : choisir un fichier à importer, et la bulle flottante (src/bubble.rs).",
+  "platforms": [
+    "android"
+  ],
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "core:default",
+    "dialog:allow-open",
+    "dialog:allow-save",
+    "bubble:allow-available",
+    "bubble:allow-allowed",
+    "bubble:allow-ask",
+    "bubble:allow-show",
+    "bubble:allow-hide",
+    "bubble:allow-locked"
+  ]
+}

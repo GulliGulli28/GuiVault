@@ -13,6 +13,8 @@ import { ItemTile } from "./ItemTree";
 import { TotpCode } from "./TotpCode";
 import { IconChevronRight, IconCopy, IconLock, IconPlus, IconSearch } from "./ui-icons";
 import { Logo } from "./Logo";
+import { bubbleBridge, reduceToBubble } from "../lib/bubble";
+import { IconBubble } from "./secret-icons";
 import { NARROW, useMediaQuery } from "../hooks/useMediaQuery";
 import { copyText, formatAgo } from "./ui";
 
@@ -75,6 +77,7 @@ export function HomePage({ ctx }: { ctx: PageContext }) {
         <header className="m-head">
           <Logo size={30} />
           <h1 className="m-title min-w-0 flex-1 truncate text-[22px]">{local ? name : `Bonjour ${name}`}</h1>
+          {bubbleBridge() && <button onClick={() => void reduceToBubble(ctx)} className="m-icon" aria-label="Réduire en bulle" title="Réduire en bulle"><IconBubble size={20} /></button>}
           <button onClick={ctx.lock} className="m-icon border border-[var(--c-border-strong)] bg-[var(--c-surface)]" aria-label="Verrouiller" title="Verrouiller"><IconLock size={18} /></button>
         </header>
         <div className="m-body">

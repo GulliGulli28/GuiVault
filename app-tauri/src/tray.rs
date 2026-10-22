@@ -22,7 +22,9 @@ impl CloseToTray {
     }
 }
 
-/// Ramène la fenêtre principale.
+/// Ramène la fenêtre principale (le bureau : l'instance unique, la zone de
+/// notification).
+#[cfg(desktop)]
 pub fn show_main(app: &AppHandle) {
     if let Some(w) = app.get_webview_window("main") {
         let _ = w.unminimize();

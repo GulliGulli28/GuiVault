@@ -170,6 +170,16 @@ export function IconHome({ size = 16, className }: P) {
   );
 }
 
+/** Réduire en bulle (Android) : une bulle détachée d'un cadre. */
+export function IconBubble({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <path d="M9 2.75H3.5a.75.75 0 0 0-.75.75v9a.75.75 0 0 0 .75.75h9a.75.75 0 0 0 .75-.75V8" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" />
+      <circle cx="12" cy="4" r="2.25" stroke="currentColor" strokeWidth="1.25" />
+    </svg>
+  );
+}
+
 /** Un vault partagé : deux personnes. */
 export function IconUsers({ size = 16, className }: P) {
   return (

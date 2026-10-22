@@ -14,6 +14,12 @@ edition = "2024"
 license = "MIT"
 repository = "https://github.com/GulliGulli28/GuiVault"
 
+# Une bibliothèque : le binaire du bureau (`src/main.rs`) l'appelle, Tauri
+# mobile la charge (`docs/ANDROID.md`).
+[lib]
+name = "guivault_app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
 [[bin]]
 name = "guivault-app"
 path = "src/main.rs"
@@ -22,8 +28,20 @@ path = "src/main.rs"
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = ["tray-icon"] }
+tauri = { version = "2", features = [] }
 tauri-plugin-dialog = "2"
+serde = { version = "1", features = ["derive"] }
+zeroize = "1"
+guivault-local = { path = "../crates/guivault-local" }
+serde_json = "1"
+# Même contrainte de résolution que chez Guiterm : cookie 0.18.1 (tiré par
+# tauri/wry) appelle une API de `time` que 0.3.48 a cassée. Jamais `use`ée.
+time = "=0.3.47"
+
+# Le bureau seulement (`cfg(desktop)` dans `lib.rs`) : rien de cela n'existe
+# sur Android.
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
 # La saisie automatique (`src/autotype.rs`) : le raccourci global, le texte
 # effacé de la mémoire une fois tapé.
 tauri-plugin-global-shortcut = "2"
@@ -35,13 +53,6 @@ tauri-plugin-autostart = "2"
 # contre la clé publique de `tauri.conf.json` ; relancer après installation.
 tauri-plugin-updater = { version = "2", default-features = false, features = ["rustls-tls"] }
 tauri-plugin-process = "2"
-serde = { version = "1", features = ["derive"] }
-zeroize = "1"
-guivault-local = { path = "../crates/guivault-local" }
-serde_json = "1"
-# Même contrainte de résolution que chez Guiterm : cookie 0.18.1 (tiré par
-# tauri/wry) appelle une API de `time` que 0.3.48 a cassée. Jamais `use`ée.
-time = "=0.3.47"
 
 # Taper dans une autre fenêtre (`SendInput`), savoir laquelle est au premier
 # plan : l'API Win32, déjà dans l'arbre de Tauri.

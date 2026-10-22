@@ -8,7 +8,8 @@ import { navigate, routeHash, type Route } from "../lib/route";
 import { settingsChanged } from "../lib/syncedSettings";
 import { personInitials } from "../lib/tiles";
 import { settingsCategories } from "./SettingsPage";
-import { IconDice, IconLink, IconLogout } from "./secret-icons";
+import { IconBubble, IconDice, IconLink, IconLogout } from "./secret-icons";
+import { bubbleBridge, reduceToBubble } from "../lib/bubble";
 import { IconBell, IconChevronRight, IconDatabase, IconLock } from "./ui-icons";
 
 /** Mobile : l'onglet « Réglages » (maquette `MParametres`) — le compte, le
@@ -80,6 +81,7 @@ export function MobileMenu({ ctx, onLock, onLogout }: { ctx: PageContext; onLock
         </section>
 
         <div className="m-card m-list">
+          {bubbleBridge() && <button onClick={() => void reduceToBubble(ctx)} className="m-set w-full text-left"><IconBubble size={18} className="shrink-0 text-[var(--c-text-muted)]" /><span className="flex-1">Réduire en bulle</span></button>}
           <button onClick={onLock} className="m-set w-full text-left"><IconLock size={18} className="shrink-0 text-[var(--c-text-muted)]" /><span className="flex-1">Verrouiller maintenant</span></button>
           <button onClick={onLogout} className="m-set w-full text-left text-[var(--c-danger-text)]"><IconLogout size={18} className="shrink-0" /><span className="flex-1">{local ? "Fermer le coffre" : "Se déconnecter"}</span></button>
         </div>

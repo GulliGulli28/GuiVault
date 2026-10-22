@@ -3,8 +3,29 @@
 L'application Android de GuiVault : Tauri 2 mobile, la même interface que
 le web mobile (`docs/DESIGN.md`, « Mobile »), le coffre local et le serveur
 comme sur Windows, et ce que seul Android sait faire — d'abord la **bulle
-flottante**. **En préparation** : l'environnement est en place (ci-dessous),
-le portage de `app-tauri/` n'est pas commencé.
+flottante**. **État (2026-10-22)** : l'application se construit et tourne sur
+l'émulateur (coffre local créé et ouvert), la bulle marche (réduire,
+déplacer, se ranger au bord, rouvrir d'un toucher, grise une fois
+verrouillé, fermer sur la croix). **Reste** : les marges de la barre d'état
+et de la barre de gestes (l'app est « bord à bord », `env(safe-area-inset-*)`
+vaut 0 dans la WebView : passer les insets depuis `MainActivity`), la
+connexion à un serveur depuis l'app, un vrai téléphone (`-Target aarch64`),
+la signature d'un APK de release.
+
+Construire : `scripts/android-sync.sh` (WSL : construit `web/dist-app` et
+recopie le dépôt dans `%USERPROFILE%\guivault-android`), puis
+`scripts\android\build-apk.ps1` et `scripts\android\install.ps1` dans cette
+copie. `gen/android` est versionné ; après un `cargo tauri android init`
+côté Windows, `scripts/android-sync.sh --back` le rapatrie. Code : `lib.rs`
+(point d'entrée mobile, `cfg(desktop)`), `bubble.rs`,
+`gen/android/.../BubblePlugin.kt` et `BubbleService.kt`, `web/app/src/mobile.ts`
+et `bubbleBridge.ts`.
+
+Poste : `%USERPROFILE%\.gradle\init.d\maven-central-mirror.gradle` fait passer
+Maven Central par le miroir de Google (ce réseau reçoit des 429), et
+`org.gradle.configuration-cache=false` dans `%USERPROFILE%\.gradle\gradle.properties`
+(le cache contournait le miroir). Le CLI est `cargo tauri` (installé côté
+Windows) : Gradle le rappelle tel quel, ce qui échouait avec `node tauri.js`.
 
 ## L'environnement (poste Windows, depuis WSL)
 

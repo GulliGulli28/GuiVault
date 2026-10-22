@@ -15,5 +15,10 @@
     "core:window:allow-is-minimized",
     "updater:default",
     "process:allow-restart"
+  ],
+  "platforms": [
+    "windows",
+    "linux",
+    "macOS"
   ]
 }
