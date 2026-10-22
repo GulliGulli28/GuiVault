@@ -177,6 +177,17 @@ async function account(browser, item) {
   await entry.click();
 }
 
+/** Le menu « Nouveau » de la liste du vault. Sous 1100 px, la liste et la
+ * fiche ne s'affichent pas ensemble (écran du runner Windows du CI) : on
+ * revient d'abord à la liste. */
+async function openNewMenu(browser) {
+  const back = await browser.$('button[aria-label="Retour à la liste"]');
+  if (await back.isDisplayed().catch(() => false)) await back.click();
+  const button = await browser.$("//button[contains(normalize-space(), 'Nouveau') and @aria-haspopup='menu']");
+  await button.waitForClickable({ timeout: 10_000, timeoutMsg: "bouton « Nouveau » introuvable" });
+  await button.click();
+}
+
 async function fillField(browser, label, value) {
   const el = await browser.$(`//label[span[normalize-space()=${xpathText(label)}]]//*[self::input or self::textarea]`);
   await el.waitForDisplayed({ timeout: 10_000, timeoutMsg: `champ « ${label} » introuvable` });
@@ -275,7 +286,7 @@ scenario("en local, ce qui demande un serveur n'apparaît pas", async (b) => {
 });
 
 scenario("créer une note : écrite chiffrée dans le coffre", async (b) => {
-  await (await b.$("//button[contains(normalize-space(), 'Nouveau') and @aria-haspopup='menu']")).click();
+  await openNewMenu(b);
   await (await b.$("//button[@role='menuitem'][normalize-space()='Note']")).click();
   await waitText(b, "Nouvelle note");
   await fillField(b, "Nom", SECRET);
@@ -310,7 +321,7 @@ scenario("saisie automatique : fiche, réglages, frappe réelle (Windows)", asyn
   }
 
   // Un identifiant, et son bouton sur la fiche.
-  await (await b.$("//button[contains(normalize-space(), 'Nouveau') and @aria-haspopup='menu']")).click();
+  await openNewMenu(b);
   await (await b.$("//button[@role='menuitem'][normalize-space()='Identifiant']")).click();
   await waitText(b, "Nouvel identifiant");
   await fillField(b, "Nom", "Banque en ligne");
@@ -516,10 +527,15 @@ scenario("plein écran : la mise en page tient dans la fenêtre maximisée", asy
   try {
     await b.waitUntil(async () => (await b.execute(() => window.innerWidth)) > before.width, { timeout: 5_000, timeoutMsg: "la fenêtre n'a pas grandi" }).catch(() => {});
     const overflow = () => b.execute(() => document.documentElement.scrollWidth - window.innerWidth);
+    // L'accueil compte ce que le vault vient d'écrire (pas de SSE en local) :
+    // le même nombre que l'en-tête du vault, relu à l'ouverture.
+    await (await b.$("//a[.//span[normalize-space()='Personnel']]")).click();
+    await waitText(b, "Wi-Fi maison");
+    const count = (await bodyText(b)).match(/Personnel\s+(\d+)\s+éléments/)?.[1];
+    assert(count, "le nombre d'éléments du vault n'est pas affiché");
     await (await b.$("//a[.//span[normalize-space()='Accueil']]")).click();
     await waitText(b, "Accès rapide");
-    // L'accueil compte ce que l'import vient d'écrire (pas de SSE en local).
-    await waitText(b, "1 coffre · 6 éléments");
+    await waitText(b, `1 coffre · ${count} éléments`);
     await shot(b, "plein-ecran-accueil");
     assert((await overflow()) <= 0, "l'accueil déborde en largeur");
     await (await b.$("//a[.//span[normalize-space()='Personnel']]")).click();
