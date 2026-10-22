@@ -9,6 +9,11 @@ name: Application (release)
 # l'attestation de provenance (quel workflow, quel commit) accompagnent
 # chaque installeur.
 #
+# Android (`docs/ANDROID.md`) : un APK de release (arm64, x86_64) signé par
+# la clé des secrets `ANDROID_KEYSTORE_BASE64` / `ANDROID_KEYSTORE_PASSWORD`,
+# joint au même brouillon avec son attestation — job `android`, après
+# `windows` qui crée le brouillon.
+#
 # Mises à jour (`tauri-plugin-updater`) : avec le secret
 # `TAURI_SIGNING_PRIVATE_KEY`, l'installeur NSIS est signé (`.sig`) et un
 # `latest.json` joint à la release ; `app-updater.yml` le recopie dans la
@@ -136,4 +141,103 @@ jobs:
             app-tauri/target/release/bundle/msi/*.msi
             app-tauri/target/release/bundle/nsis/*-setup.exe
             app-tauri/target/release/bundle/SHA256SUMS.txt
+          retention-days: 14
+
+  android:
+    needs: windows
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,x86_64-linux-android
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: app-tauri -> target
+          key: android
+      # `cargo tauri` : Gradle rappelle le CLI comme il a été lancé, et
+      # `cargo tauri android android-studio-script` marche de n'importe où.
+      - name: CLI Tauri
+        run: cargo install tauri-cli --version "^2" --locked
+
+      - run: npm ci --no-audit --no-fund
+        working-directory: web
+
+      # La clé de signature, là où `gen/android/app/build.gradle.kts` la
+      # cherche. Sans les secrets : un APK non signé, et on le dit.
+      - name: Clé de signature
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::warning title=APK non signé::secrets ANDROID_KEYSTORE_BASE64 / ANDROID_KEYSTORE_PASSWORD absents (docs/ANDROID.md, « Signature »)."
+            exit 0
+          fi
+          dir="$HOME/.guivault-android"
+          mkdir -p "$dir"
+          echo "$KEYSTORE_BASE64" | base64 -d > "$dir/guivault-release.jks"
+          printf 'storeFile=%s\npassword=%s\nkeyAlias=guivault\n' "$dir/guivault-release.jks" "$KEYSTORE_PASSWORD" > "$dir/keystore.properties"
+
+      # `beforeBuildCommand` construit `web/dist-app` (depuis la racine).
+      - name: APK
+        working-directory: app-tauri
+        run: |
+          export NDK_HOME="$ANDROID_NDK_LATEST_HOME"
+          cargo tauri android build --apk --target aarch64 --target x86_64
+
+      - name: Nommer et vérifier
+        id: apk
+        env:
+          SIGNED: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+        run: |
+          v=$(node -p "require('./app-tauri/tauri.conf.json').version")
+          out="GuiVault_${v}_android.apk"
+          cp app-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release.apk "$out"
+          bt=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          if [ "$SIGNED" = "true" ]; then
+            "$bt/apksigner" verify --print-certs "$out" | head -3
+          fi
+          sha256sum "$out"
+          echo "file=$out" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: ${{ steps.apk.outputs.file }}
+
+      # Dans le brouillon que `windows` vient de créer : l'APK, sa somme dans
+      # SHA256SUMS.txt, et une ligne dans les notes.
+      - name: Joindre au brouillon
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APK: ${{ steps.apk.outputs.file }}
+        run: |
+          gh release upload "$GITHUB_REF_NAME" "$APK" --clobber
+          gh release download "$GITHUB_REF_NAME" -p SHA256SUMS.txt -D sums
+          sha256sum "$APK" | sed 's/  / */' >> sums/SHA256SUMS.txt
+          gh release upload "$GITHUB_REF_NAME" sums/SHA256SUMS.txt --clobber
+          notes=$(gh release view "$GITHUB_REF_NAME" --json body -q .body)
+          gh release edit "$GITHUB_REF_NAME" --notes "$notes
+
+          Android : \`$APK\` (arm64, x86_64), à installer à la main ; serveur en HTTPS. Signé par la clé GuiVault ; vérifier : SHA256SUMS.txt ou \`gh attestation verify $APK -R ${{ github.repository }}\`."
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: guivault-app-android
+          path: ${{ steps.apk.outputs.file }}
           retention-days: 14
