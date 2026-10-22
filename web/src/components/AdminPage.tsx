@@ -3,7 +3,8 @@ import type { PageContext } from "../App";
 import { api, errorMessage } from "../lib/api";
 import type { AdminOverview, AdminUserInfo, BackupRun, BackupsStatus, RegistrationInvite } from "../lib/types";
 import { ConfirmDialog } from "./ConfirmDialog";
-import { IconTrash } from "./ui-icons";
+import { IconChevronRight, IconTrash } from "./ui-icons";
+import { navigate } from "../lib/route";
 import { Eyebrow, Field, formatWhen, InfoTip, Loading, Modal, useDelayed } from "./ui";
 
 const REGISTRATION_LABELS: Record<AdminOverview["registration"], string> = {
@@ -68,7 +69,8 @@ export function AdminPage({ ctx }: { ctx: PageContext }) {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <header className="flex min-h-[64px] shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-[var(--c-border)] px-6 py-3 max-md:pl-14">
+      <header className="flex min-h-[64px] shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-[var(--c-border)] px-6 py-3 max-md:px-3 max-md:pt-[calc(0.75rem+env(safe-area-inset-top))]">
+        <button onClick={() => navigate({ page: "more" })} className="btn btn-ghost btn-icon md:hidden" title="Retour aux réglages" aria-label="Retour aux réglages"><IconChevronRight size={14} className="rotate-180" /></button>
         <div className="min-w-0 flex-1">
           <h1 className="truncate text-[18px] font-semibold tracking-[-0.015em]">Administration</h1>
           <p className="flex items-center gap-1.5 text-[12.5px] text-[var(--c-text-muted)]">

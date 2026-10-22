@@ -24,7 +24,7 @@ import { AppSettings } from "./AppSettings";
 import { LocalBackups } from "./LocalBackups";
 import { autoTypeBridge, backupBridge, coffreBridge, systemBridge } from "../lib/platform";
 import { TransferDialog } from "./TransferDialog";
-import { IconKeyboard, IconMonitor, IconPalette, IconSettings, IconShield } from "./ui-icons";
+import { IconChevronRight, IconKeyboard, IconMonitor, IconPalette, IconSettings, IconShield } from "./ui-icons";
 import { CopyButton, Fingerprint, formatAgo, formatWhen, InfoTip, Modal, PasswordInput, SettingRow } from "./ui";
 
 /** Les catégories, avec leur nom — la colonne de gauche du panneau
@@ -53,6 +53,11 @@ const SUBTITLES: Record<SettingsSection, string> = {
 /** Les paramètres : l'apparence (la même page que dans Guiterm), le compte
  * — empreinte à faire vérifier, mot de passe maître, second facteur —, les
  * sessions et le journal. */
+/** Les catégories que ce transport et cette plateforme proposent. */
+export function settingsCategories() {
+  return CATEGORIES.filter((c) => (c.key !== "urgence" || supports("emergency")) && (c.key !== "sessions" || supports("sessions")) && (c.key !== "saisie" || !!autoTypeBridge()) && (c.key !== "application" || !!systemBridge()));
+}
+
 export function SettingsPage({ ctx, section }: { ctx: PageContext; section: SettingsSection }) {
   const { session } = ctx;
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -73,7 +78,7 @@ export function SettingsPage({ ctx, section }: { ctx: PageContext; section: Sett
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(reload, []);
 
-  const categories = CATEGORIES.filter((c) => (c.key !== "urgence" || supports("emergency")) && (c.key !== "sessions" || supports("sessions")) && (c.key !== "saisie" || !!autoTypeBridge()) && (c.key !== "application" || !!systemBridge()));
+  const categories = settingsCategories();
   const current = categories.find((c) => c.key === section) ?? categories[0];
   const local = session.local;
   const who = local ? coffreName(local.path) : session.user.email;
@@ -82,7 +87,7 @@ export function SettingsPage({ ctx, section }: { ctx: PageContext; section: Sett
     <div className="flex h-full min-h-0 max-md:flex-col">
       {/* Les catégories : une colonne à gauche, une rangée au-dessus quand
           la fenêtre est étroite. */}
-      <nav aria-label="Catégories" className="flex shrink-0 gap-0.5 border-[var(--c-border)] bg-[var(--c-bg)] px-3 py-5 max-md:overflow-x-auto max-md:border-b max-md:py-2.5 max-md:pl-14 md:w-[232px] md:flex-col md:border-r">
+      <nav aria-label="Catégories" className="flex shrink-0 gap-0.5 border-[var(--c-border)] bg-[var(--c-bg)] px-3 py-5 max-md:hidden md:w-[232px] md:flex-col md:border-r">
         <p className="px-2.5 pb-3 text-[18px] font-semibold tracking-[-0.015em] max-md:hidden">Paramètres</p>
         {categories.map((c) => {
           const active = current.key === c.key;
@@ -103,8 +108,12 @@ export function SettingsPage({ ctx, section }: { ctx: PageContext; section: Sett
       </nav>
 
       <div className="sidebar-scroll min-w-0 flex-1 overflow-y-auto">
-        <div className="flex max-w-[780px] flex-col gap-8 px-12 pb-14 pt-10 max-md:px-4 max-md:pt-6">
+        <div className="flex max-w-[780px] flex-col gap-8 px-12 pb-14 pt-10 max-md:gap-6 max-md:px-4 max-md:pt-[calc(1rem+env(safe-area-inset-top))]">
           <header>
+            {/* Mobile : les catégories sont dans l'onglet « Réglages ». */}
+            <button onClick={() => navigate({ page: "more" })} className="-ml-1 mb-2 flex min-h-[36px] items-center gap-1 text-[15px] text-[var(--c-accent-text)] md:hidden">
+              <IconChevronRight size={16} className="rotate-180" /> Réglages
+            </button>
             <h1 className="page-title">{current.label}</h1>
             <p className="page-sub">{SUBTITLES[current.key]}</p>
           </header>

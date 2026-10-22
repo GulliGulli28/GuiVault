@@ -68,7 +68,7 @@ function Body({ ctx, vault }: { ctx: PageContext; vault: VaultView }) {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <header className="flex min-h-[64px] shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-[var(--c-border)] px-6 py-3 max-md:pl-14">
+      <header className="flex min-h-[64px] shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-[var(--c-border)] px-6 py-3 max-md:px-3 max-md:pt-[calc(0.75rem+env(safe-area-inset-top))]">
         <button onClick={() => navigate({ page: "vault", id: vault.id })} className="btn btn-ghost btn-icon" title={`Retour à ${vault.name}`} aria-label={`Retour à ${vault.name}`}><IconChevronRight size={14} className="rotate-180" /></button>
         <div className="min-w-0 flex-1">
           <h1 className="truncate text-[18px] font-semibold tracking-[-0.015em]">Corbeille</h1>

@@ -66,11 +66,13 @@ export function FormShell({ title, onSave, onCancel, children, saveLabel = "Enre
   };
   return (
     <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
-      <div className="flex min-h-[52px] shrink-0 items-center justify-between gap-2 border-b border-[var(--c-border)] px-5 py-2 max-md:px-3">
-        <h2 className="min-w-0 truncate text-[15px] font-semibold text-[var(--c-text)]">{title}</h2>
+      {/* Mobile (maquette `MEdition`) : Annuler · titre · Enregistrer. */}
+      <div className="flex min-h-[52px] shrink-0 items-center justify-between gap-2 border-b border-[var(--c-border)] px-5 py-2 max-md:min-h-[60px] max-md:px-3">
+        <button type="button" onClick={onCancel} className="shrink-0 px-1 text-[15px] text-[var(--c-accent-text)] md:hidden">Annuler</button>
+        <h2 className="min-w-0 truncate text-[15px] font-semibold text-[var(--c-text)] max-md:flex-1 max-md:text-center max-md:text-[17px]">{title}</h2>
         <div className="flex shrink-0 gap-2">
-          <button type="button" onClick={onCancel} className="btn btn-ghost">Annuler</button>
-          <button type="submit" disabled={busy} className="btn btn-primary">{busy ? "Enregistrement…" : saveLabel}</button>
+          <button type="button" onClick={onCancel} className="btn btn-ghost max-md:hidden">Annuler</button>
+          <button type="submit" disabled={busy} className="btn btn-primary max-md:h-[38px] max-md:rounded-xl max-md:text-[15px]">{busy ? "Enregistrement…" : saveLabel}</button>
         </div>
       </div>
       <div className="sidebar-scroll min-h-0 flex-1 overflow-y-auto px-8 pb-10 pt-6 max-md:px-4">

@@ -1,5 +1,5 @@
 /** Un routeur minuscule sur le fragment : `#/vault/<id>`,
- * `#/vault/<id>/item/<id>`, `#/vault/<id>/new/<genre>` (créer, depuis l'accueil), `#/vault/<id>/settings`, `#/vault/<id>/tools`, `#/vault/<id>/trash`, `#/settings/<section>`,
+ * `#/vault/<id>/item/<id>`, `#/vault/<id>/new/<genre>` (créer, depuis l'accueil), `#/vault/<id>/settings`, `#/vault/<id>/tools`, `#/vault/<id>/trash`, `#/settings/<section>`, `#/more`,
  * `#/invitations`, `#/generator`, `#/totp`, `#/sends`, `#/health`, `#/admin`, et `#/send/<id>/<secret>`
  * — un lien de partage, ouvert sans compte (le secret reste dans le
  * fragment, le serveur ne le voit jamais). `#/account` d'avant mène au
@@ -14,6 +14,9 @@ export type Route =
   | { page: "vault-tools"; id: string }
   | { page: "vault-trash"; id: string }
   | { page: "settings"; section: SettingsSection }
+  /** Mobile : l'onglet « Réglages » (compte, sécurité, outils) ; au bureau,
+   * les paramètres. */
+  | { page: "more" }
   | { page: "invitations" }
   | { page: "generator" }
   | { page: "totp" }
@@ -39,6 +42,7 @@ export function parseRoute(hash: string): Route {
   }
   if (parts[0] === "account") return { page: "settings", section: "compte" };
   if (parts[0] === "settings") return { page: "settings", section: SECTIONS.find((s) => s === parts[1]) ?? "apparence" };
+  if (parts[0] === "more") return { page: "more" };
   if (parts[0] === "invitations") return { page: "invitations" };
   if (parts[0] === "generator") return { page: "generator" };
   if (parts[0] === "totp") return { page: "totp" };
@@ -57,6 +61,7 @@ export function routeHash(r: Route): string {
     case "vault-tools": return `#/vault/${r.id}/tools`;
     case "vault-trash": return `#/vault/${r.id}/trash`;
     case "settings": return `#/settings/${r.section}`;
+    case "more": return "#/more";
     case "invitations": return "#/invitations";
     case "generator": return "#/generator";
     case "totp": return "#/totp";

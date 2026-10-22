@@ -16,23 +16,25 @@ export function AuthShell({ title, sub, footer, store = "server", children }: {
   return (
     <div className="flex min-h-full flex-wrap bg-[var(--c-bg2)]">
       <section className="flex min-h-[100dvh] min-w-0 flex-[1_1_480px] flex-col px-8 py-7 max-sm:px-5">
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2.5 max-md:hidden">
           {/* Gris tant qu'on n'est pas connecté — comme l'icône de l'extension. */}
           <Logo size={28} locked />
           <span className="text-[16px] font-semibold">GuiVault</span>
         </div>
 
-        <div className="flex flex-1 items-center justify-center py-10">
-          <div className="flex w-full max-w-[380px] flex-col gap-5">
-            <div className="min-w-0">
-              <h1 className="break-words text-[30px] font-semibold leading-tight tracking-[-0.025em]">{title}</h1>
+        <div className="flex flex-1 items-center justify-center py-10 max-md:items-start max-md:pb-6 max-md:pt-[calc(2.5rem+env(safe-area-inset-top))]">
+          <div className="flex w-full max-w-[380px] flex-col gap-5 max-md:gap-6">
+            {/* Mobile (maquette `MConnexion`) : le logo en grand, centré. */}
+            <div className="min-w-0 max-md:flex max-md:flex-col max-md:items-center max-md:gap-3.5 max-md:text-center">
+              <span className="md:hidden"><Logo size={72} locked /></span>
+              <h1 className="break-words text-[30px] font-semibold leading-tight tracking-[-0.025em] max-md:text-[28px]">{title}</h1>
               <p className="page-sub">{sub}</p>
             </div>
             {children}
           </div>
         </div>
 
-        {footer && <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[12.5px] text-[var(--c-text-muted)]">{footer}</div>}
+        {footer && <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[12.5px] text-[var(--c-text-muted)] max-md:pb-[env(safe-area-inset-bottom)] max-md:text-[14px]">{footer}</div>}
       </section>
 
       {/* Ce que voit qui : l'explication, en schéma. */}

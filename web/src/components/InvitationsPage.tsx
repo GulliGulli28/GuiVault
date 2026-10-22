@@ -29,7 +29,7 @@ export function InvitationsPage({ ctx }: { ctx: PageContext }) {
   };
 
   return (
-    <Page title="Invitations" sub={session.invitations.length ? `${session.invitations.length} en attente` : undefined} width="max-w-[760px]">
+    <Page title="Invitations" sub={session.invitations.length ? `${session.invitations.length} en attente` : undefined} width="max-w-[760px]" mobileBack={{ label: "Accueil", route: { page: "home" } }}>
       {session.invitations.length === 0 ? (
         <div className="card empty text-[13.5px] text-[var(--c-text-muted)]">Aucune invitation en attente.</div>
       ) : (

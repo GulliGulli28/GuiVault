@@ -271,12 +271,14 @@ export function SettingRow({ title, desc, children, htmlFor }: { title: ReactNod
 /** Un bouton qui ouvre un menu sous lui ; Échap ou un clic ailleurs le
  * referme. `trigger` reçoit l'état et de quoi basculer ; `children` reçoit
  * de quoi refermer après un choix. */
-export function Dropdown({ trigger, children, align = "right", className = "w-56", label }: {
+export function Dropdown({ trigger, children, align = "right", className = "w-56", label, wrapperClassName = "" }: {
   trigger: (p: { open: boolean; toggle: () => void }) => ReactNode;
   children: (close: () => void) => ReactNode;
   align?: "left" | "right";
   className?: string;
   label?: string;
+  /** Le conteneur du bouton (`min-w-0 flex-1` pour qu'il prenne la place). */
+  wrapperClassName?: string;
 }) {
   const [open, setOpen] = useState(false);
   const close = useCallback(() => setOpen(false), []);
@@ -291,7 +293,7 @@ export function Dropdown({ trigger, children, align = "right", className = "w-56
     return () => window.removeEventListener("keydown", onKey, true);
   }, [open]);
   return (
-    <div className="relative">
+    <div className={`relative ${wrapperClassName}`}>
       {trigger({ open, toggle: () => setOpen((o) => !o) })}
       {open && (
         <>

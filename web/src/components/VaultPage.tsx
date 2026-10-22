@@ -29,9 +29,9 @@ import { ShortcutsHelp } from "./ShortcutsHelp";
 import { ItemAside } from "./ItemAside";
 import { putVaultItems, useAllItems } from "../lib/allItems";
 import { IconCheck, IconChevronDown, IconChevronRight, IconCopy, IconEdit, IconExternal, IconFolder, IconKeyboard, IconPlus, IconRefresh, IconSearch, IconSettings, IconTrash, IconVault } from "./ui-icons";
-import { copyText, Dropdown, formatAgo, formatWhen, Loading, useDelayed } from "./ui";
+import { copyText, Dropdown, formatAgo, formatWhen, Loading, Modal, useDelayed } from "./ui";
 import { PaneHandle, usePersistedPane } from "../hooks/usePersistedPane";
-import { TOUCH, useMediaQuery } from "../hooks/useMediaQuery";
+import { NARROW, TOUCH, useMediaQuery } from "../hooks/useMediaQuery";
 
 /** `groupId` : le dossier où créer (bouton « + » d'un dossier) ; absent, le
  * dossier de l'élément sélectionné. */
@@ -115,9 +115,11 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
   const emergency = vault.emergency;
   const [moveTo, setMoveTo] = useState<VaultView | null>(null);
   const [newMenu, setNewMenu] = useState(false);
+  const closeNewMenu = useCallback(() => setNewMenu(false), []);
   const colors = useVaultColors();
   const newButton = useRef<HTMLButtonElement>(null);
   const touch = useMediaQuery(TOUCH);
+  const narrow = useMediaQuery(NARROW);
   // Le menu « Nouveau » se referme à Échap, et rend le focus à son bouton.
   useEffect(() => {
     if (!newMenu) return;
@@ -419,6 +421,61 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
     void totpCode(params).then((code) => copyValue({ label: "Code 2FA", value: code }));
   };
 
+  const vaultMenu = (
+    <Dropdown
+      label="Le vault"
+      className="w-60"
+      trigger={({ open, toggle }) => <button onClick={toggle} aria-expanded={open} aria-haspopup="menu" className="btn btn-ghost btn-icon" title="Le vault : couleur, corbeille, import, réglages" aria-label="Actions du vault"><IconDots size={16} /></button>}
+    >
+      {(close) => (
+        <>
+          <div className="px-3.5 pb-2 pt-1.5">
+            <p className="mb-2 text-[12px] font-medium text-[var(--c-text-muted)]">Couleur</p>
+            <div className="flex flex-wrap gap-1.5">
+              {VAULT_COLORS.map((c) => {
+                const on = vaultColorName(vault.id, vault.kind === "personal", colors) === c;
+                return <button key={c} onClick={() => setVaultColor(vault.id, c)} aria-pressed={on} title={ACCENT_COLORS[c].label} aria-label={`Couleur ${ACCENT_COLORS[c].label}`} className={`h-5 w-5 rounded-full ${on ? "ring-2 ring-[var(--c-text)] ring-offset-2 ring-offset-[var(--c-raised)]" : ""}`} style={{ background: ACCENT_COLORS[c].c500 }} />;
+              })}
+            </div>
+          </div>
+          <div className="menu-sep" />
+          <button role="menuitem" className="menu-item" onClick={() => { close(); void load(); }}><IconRefresh size={14} /> Recharger</button>
+          <button role="menuitem" className="menu-item" onClick={() => { close(); navigate({ page: "vault-tools", id: vault.id }); }}><IconTools size={14} /> {emergency ? "Exporter" : "Importer ou exporter"}</button>
+          {!emergency && <button role="menuitem" className="menu-item" onClick={() => { close(); navigate({ page: "vault-trash", id: vault.id }); }}><IconTrash size={14} /> Corbeille</button>}
+          {!emergency && <button role="menuitem" className="menu-item" onClick={() => { close(); navigate({ page: "vault-settings", id: vault.id }); }}><IconSettings size={14} /> Membres et réglages</button>}
+          <button role="menuitem" className="menu-item" onClick={() => { close(); setHelp(true); }}><IconKeyboard size={14} /> Raccourcis clavier</button>
+        </>
+      )}
+    </Dropdown>
+  );
+  const sortMenu = (
+    <Dropdown
+      label="Trier"
+      className="w-52"
+      trigger={({ open, toggle }) => <button onClick={toggle} aria-expanded={open} aria-haspopup="menu" className="btn btn-secondary btn-icon" title={`Trier : ${SORT_LABELS[sort]}`} aria-label="Trier"><IconSort size={15} /></button>}
+    >
+      {(close) => (Object.keys(SORT_LABELS) as SortMode[]).map((m) => (
+        <button key={m} role="menuitemradio" aria-checked={sort === m} data-active={sort === m ? "true" : undefined} onClick={() => { setSort(m); close(); }} className="menu-item">
+          <span className="flex-1">{SORT_LABELS[m]}</span>
+          {sort === m && <IconCheck size={14} />}
+        </button>
+      ))}
+    </Dropdown>
+  );
+  const kindsMenu = (
+    <div className="flex flex-col py-1">
+      {NEW_KINDS.map((k, i) => {
+        if (k === "sep") return <div key={i} className="menu-sep" />;
+        const Icon = KIND_ICONS[k];
+        return (
+          <button key={k} role="menuitem" onClick={() => { setNewMenu(false); if (k === "group") { setQuery(""); setFilter("all"); setNaming({ mode: "create", parentId: selectedGroupId }); } else setMode({ kind: "new", itemKind: k }); }} className="menu-item">
+            <Icon size={14} /> {capitalize(KIND_LABELS[k])}
+          </button>
+        );
+      })}
+    </div>
+  );
+
   return (
     <div className="flex h-full min-h-0 flex-col">
       <IntegrityBanner name={vault.name} problems={problems} canFix={canWrite(vault.role) && !emergency} nameOf={nameOf} onAccept={acceptProblems} />
@@ -427,56 +484,71 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
         <section
           aria-label="Éléments du vault"
           style={{ "--list-w": `${list.value}px` } as React.CSSProperties}
-          className={`flex min-h-0 flex-col bg-[var(--c-bg)] min-[1100px]:w-[var(--list-w)] min-[1100px]:shrink-0 ${mode.kind !== "view" || current ? "max-[1099.98px]:hidden" : "max-[1099.98px]:flex-1"}`}
+          className={`relative flex min-h-0 flex-col bg-[var(--c-bg)] min-[1100px]:w-[var(--list-w)] min-[1100px]:shrink-0 ${mode.kind !== "view" || current ? "max-[1099.98px]:hidden" : "max-[1099.98px]:flex-1"}`}
         >
-          <header className="shrink-0 space-y-3 px-4 pb-3 pt-[18px] max-md:pl-14">
+          {narrow && (
+            <header className="shrink-0">
+              {/* Mobile (maquette `MCoffre`) : le nom du vault ouvre la liste
+                  des vaults ; « + » flottant pour créer. */}
+              <div className="m-head">
+                <Dropdown
+                  label="Coffres"
+                  align="left"
+                  className="w-72"
+                  wrapperClassName="flex min-w-0 flex-1"
+                  trigger={({ open, toggle }) => (
+                    <button onClick={toggle} aria-expanded={open} aria-haspopup="menu" className="flex min-w-0 max-w-full items-center gap-2 text-left">
+                      <span className="vdot h-2.5 w-2.5 shrink-0" style={{ background: vaultColor(vault.id, vault.kind === "personal", colors) }} />
+                      <span className="m-title min-w-0 truncate">{vault.name}</span>
+                      <IconChevronDown size={18} className="shrink-0 text-[var(--c-text-muted)]" />
+                    </button>
+                  )}
+                >
+                  {(close) => (
+                    <>
+                      {[...ctx.session.vaults, ...ctx.session.emergencyVaults].map((v) => (
+                        <button key={v.id} role="menuitemradio" aria-checked={v.id === vault.id} data-active={v.id === vault.id ? "true" : undefined} onClick={() => { close(); navigate({ page: "vault", id: v.id }); }} className="menu-item">
+                          <span className="vdot" style={{ background: vaultColor(v.id, v.kind === "personal", colors) }} />
+                          <span className="min-w-0 flex-1 truncate">{v.name}</span>
+                        </button>
+                      ))}
+                    </>
+                  )}
+                </Dropdown>
+                {sortMenu}
+                {vaultMenu}
+              </div>
+              <div className="flex flex-col gap-3 px-4 pb-2.5">
+                <label className="m-search">
+                  <IconSearch size={18} />
+                  <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Filtrer ce coffre" aria-label="Filtrer ce vault" />
+                </label>
+                {entities.length > 0 && (
+                  <div className="m-chips" role="tablist" aria-label="Type d'élément">
+                    {FILTERS.filter((f) => f === "all" || (counts[f] ?? 0) > 0).map((f) => (
+                      <button key={f} role="tab" aria-selected={filter === f} onClick={() => setFilter(f)} className="m-chip">
+                        {f === "all" ? "Tout" : filterLabel(f)}{f === "all" && <span className="opacity-70">{counts.all}</span>}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </header>
+          )}
+          <header className="shrink-0 space-y-3 px-4 pb-3 pt-[18px] max-md:hidden">
             <div className="flex min-w-0 items-center gap-2">
               <span className="vdot h-2.5 w-2.5" style={{ background: vaultColor(vault.id, vault.kind === "personal", colors) }} />
               <h1 className="min-w-0 truncate text-[18px] font-semibold tracking-[-0.015em] text-[var(--c-text)]" title={vault.name}>{vault.name}</h1>
               <span className="shrink-0 whitespace-nowrap text-[12.5px] text-[var(--c-text-muted)]" title={`Révision ${vault.revision}`}>{items ? `${entities.filter((e) => e.kind !== "group" && e.kind !== "icon").length} éléments` : ""}</span>
               <span className="flex-1" />
-              <Dropdown
-                label="Le vault"
-                className="w-60"
-                trigger={({ open, toggle }) => <button onClick={toggle} aria-expanded={open} aria-haspopup="menu" className="btn btn-ghost btn-icon" title="Le vault : couleur, corbeille, import, réglages" aria-label="Actions du vault"><IconDots size={16} /></button>}
-              >
-                {(close) => (
-                  <>
-                    <div className="px-3.5 pb-2 pt-1.5">
-                      <p className="mb-2 text-[12px] font-medium text-[var(--c-text-muted)]">Couleur</p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {VAULT_COLORS.map((c) => {
-                          const on = vaultColorName(vault.id, vault.kind === "personal", colors) === c;
-                          return <button key={c} onClick={() => setVaultColor(vault.id, c)} aria-pressed={on} title={ACCENT_COLORS[c].label} aria-label={`Couleur ${ACCENT_COLORS[c].label}`} className={`h-5 w-5 rounded-full ${on ? "ring-2 ring-[var(--c-text)] ring-offset-2 ring-offset-[var(--c-raised)]" : ""}`} style={{ background: ACCENT_COLORS[c].c500 }} />;
-                        })}
-                      </div>
-                    </div>
-                    <div className="menu-sep" />
-                    <button role="menuitem" className="menu-item" onClick={() => { close(); void load(); }}><IconRefresh size={14} /> Recharger</button>
-                    <button role="menuitem" className="menu-item" onClick={() => { close(); navigate({ page: "vault-tools", id: vault.id }); }}><IconTools size={14} /> {emergency ? "Exporter" : "Importer ou exporter"}</button>
-                    {!emergency && <button role="menuitem" className="menu-item" onClick={() => { close(); navigate({ page: "vault-trash", id: vault.id }); }}><IconTrash size={14} /> Corbeille</button>}
-                    {!emergency && <button role="menuitem" className="menu-item" onClick={() => { close(); navigate({ page: "vault-settings", id: vault.id }); }}><IconSettings size={14} /> Membres et réglages</button>}
-                    <button role="menuitem" className="menu-item" onClick={() => { close(); setHelp(true); }}><IconKeyboard size={14} /> Raccourcis clavier</button>
-                  </>
-                )}
-              </Dropdown>
+              {vaultMenu}
               {writable && (
                 <div className="relative">
                   <button ref={newButton} onClick={() => setNewMenu((m) => !m)} className="btn btn-primary" aria-haspopup="menu" aria-expanded={newMenu}><IconPlus size={14} /> Nouveau</button>
                   {newMenu && (
                     <>
                       <div className="fixed inset-0 z-10" onClick={() => setNewMenu(false)} />
-                      <div className="popover absolute right-0 z-20 mt-1.5 w-52 py-1" role="menu" aria-label="Nouvel élément">
-                        {NEW_KINDS.map((k, i) => {
-                          if (k === "sep") return <div key={i} className="menu-sep" />;
-                          const Icon = KIND_ICONS[k];
-                          return (
-                            <button key={k} role="menuitem" onClick={() => { setNewMenu(false); if (k === "group") { setQuery(""); setFilter("all"); setNaming({ mode: "create", parentId: selectedGroupId }); } else setMode({ kind: "new", itemKind: k }); }} className="menu-item">
-                              <Icon size={14} /> {capitalize(KIND_LABELS[k])}
-                            </button>
-                          );
-                        })}
-                      </div>
+                      <div className="popover absolute right-0 z-20 mt-1.5 w-52" role="menu" aria-label="Nouvel élément">{kindsMenu}</div>
                     </>
                   )}
                 </div>
@@ -525,24 +597,13 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
                   ))}
                 </Dropdown>
               )}
-              <Dropdown
-                label="Trier"
-                className="w-52"
-                trigger={({ open, toggle }) => <button onClick={toggle} aria-expanded={open} aria-haspopup="menu" className="btn btn-secondary btn-icon" title={`Trier : ${SORT_LABELS[sort]}`} aria-label="Trier"><IconSort size={15} /></button>}
-              >
-                {(close) => (Object.keys(SORT_LABELS) as SortMode[]).map((m) => (
-                  <button key={m} role="menuitemradio" aria-checked={sort === m} data-active={sort === m ? "true" : undefined} onClick={() => { setSort(m); close(); }} className="menu-item">
-                    <span className="flex-1">{SORT_LABELS[m]}</span>
-                    {sort === m && <IconCheck size={14} />}
-                  </button>
-                ))}
-              </Dropdown>
+              {sortMenu}
               {writable && (
                 <button onClick={() => { setQuery(""); setFilter("all"); setNaming({ mode: "create", parentId: null }); }} className="btn btn-secondary btn-icon shrink-0 max-sm:hidden" title="Nouveau dossier (à la racine ; le bouton d'un dossier en crée un dedans)" aria-label="Nouveau dossier"><IconFolderPlus size={15} /></button>
               )}
             </div>
           </header>
-          <div className="sidebar-scroll -mx-1 min-h-0 flex-1 overflow-y-auto px-3 pb-4">
+          <div className="m-tree sidebar-scroll -mx-1 min-h-0 flex-1 overflow-y-auto px-3 pb-4 max-md:mx-0 max-md:px-2 max-md:pb-24">
             {items === null ? (slow ? <Loading /> : null) : (
               <ItemTree
                 entities={filtered}
@@ -565,7 +626,11 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
               </div>
             )}
           </div>
+          {narrow && writable && (
+            <button onClick={() => setNewMenu(true)} className="m-fab" aria-label="Nouvel élément" title="Nouvel élément"><IconPlus size={24} /></button>
+          )}
         </section>
+        {narrow && newMenu && <Modal title="Nouvel élément" onClose={closeNewMenu}><div role="menu" aria-label="Nouvel élément" className="-mx-3">{kindsMenu}</div></Modal>}
 
         <div className="hidden min-[1100px]:contents"><PaneHandle onMouseDown={list.onMouseDown} /></div>
         <section className={`flex min-h-0 flex-1 flex-col border-l border-[var(--c-border)] max-[1099.98px]:border-l-0 ${mode.kind === "view" && !current ? "max-[1099.98px]:hidden" : ""} ${list.isDragging ? "pointer-events-none select-none" : ""}`}>
@@ -592,12 +657,11 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
           {mode.kind === "view" && current && (
             <>
               <div className="flex min-h-[52px] shrink-0 flex-wrap items-center gap-2 border-b border-[var(--c-border)] px-5 py-2 max-md:px-3">
-                <button onClick={() => setSelected(null)} className="btn btn-ghost btn-sm min-[1100px]:hidden">← Liste</button>
-                <div className="flex min-w-0 flex-1 items-center gap-2 text-[13px] text-[var(--c-text-muted)] max-md:hidden">
+                <button onClick={() => setSelected(null)} className="btn btn-ghost btn-sm min-[1100px]:hidden max-md:-ml-1 max-md:h-11 max-md:w-11 max-md:px-0" aria-label="Retour à la liste"><IconChevronRight size={14} className="rotate-180 max-md:h-5 max-md:w-5" /><span className="max-md:hidden">Liste</span></button>
+                <div className="flex min-w-0 flex-1 items-center gap-2 text-[13px] text-[var(--c-text-muted)] max-md:text-[14px]">
                   <span className="truncate">{vault.name}</span>
                   {entity?.path && <><IconChevronRight size={12} className="shrink-0 text-[var(--c-text-faint)]" /><span className="truncate">{entity.path}</span></>}
                 </div>
-                <span className="flex-1 md:hidden" />
                 {current.ok && current.payload.kind === "login" && autoTypeBridge() && (() => {
                   const login = current.payload.login;
                   return (
@@ -632,17 +696,18 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
                   {alerts.has(current.id) && <p className="callout callout-danger">{capitalize(alerts.get(current.id)!)} : ne vous y fiez pas avant de l'avoir vérifié.</p>}
                   {current.ok ? (
                     <>
-                      <div className="flex min-w-0 items-center gap-4">
-                        {entity && <ItemTile entity={entity} customIcons={index.icons} size={56} />}
-                        <div className="flex min-w-0 flex-1 flex-col gap-1">
-                          <div className="flex min-w-0 items-center gap-1.5">
-                            <h2 className="min-w-0 truncate text-[24px] font-semibold tracking-[-0.02em] text-[var(--c-text)]" title={payloadName(current.payload)}>{payloadName(current.payload) || "(sans nom)"}</h2>
+                      {/* Mobile (maquette `MFiche`) : centré, la tuile en grand. */}
+                      <div className="flex min-w-0 items-center gap-4 max-md:flex-col max-md:gap-2.5 max-md:text-center">
+                        {entity && <ItemTile entity={entity} customIcons={index.icons} size={narrow ? 72 : 56} />}
+                        <div className="flex min-w-0 flex-1 flex-col gap-1 max-md:w-full max-md:items-center">
+                          <div className="flex min-w-0 items-center gap-1.5 max-md:max-w-full">
+                            <h2 className="min-w-0 truncate text-[24px] font-semibold tracking-[-0.02em] text-[var(--c-text)] max-md:line-clamp-2 max-md:whitespace-normal" title={payloadName(current.payload)}>{payloadName(current.payload) || "(sans nom)"}</h2>
                             {writable && isSecretItem && (() => {
                               const fav = !!(payloadEntity(current.payload).favorite);
                               return <button onClick={() => void toggleFavorite()} aria-pressed={fav} className="btn btn-ghost btn-icon shrink-0" style={{ color: fav ? "#f5c04a" : undefined }} title={fav ? "Retirer des épinglés" : "Épingler"} aria-label={fav ? "Retirer des épinglés" : "Épingler"}><IconStar size={17} filled={fav} /></button>;
                             })()}
                           </div>
-                          <p className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-[13px] text-[var(--c-text-muted)]">
+                          <p className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-[13px] text-[var(--c-text-muted)] max-md:justify-center max-md:text-[14px]">
                             {current.payload.kind === "login" && current.payload.login.uris[0]?.uri && <><a href={current.payload.login.uris[0].uri} target="_blank" rel="noopener noreferrer" className="max-w-[260px] truncate">{uriHost(current.payload.login.uris[0].uri)}</a><span>·</span></>}
                             <span>{capitalize(KIND_LABELS[current.payload.kind])}</span>
                             <span>·</span>
@@ -658,11 +723,12 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
                         const site = p.kind === "login" ? p.login.uris[0]?.uri : null;
                         if (!secret && !user && !totp && !site) return null;
                         return (
-                          <div className="flex flex-wrap gap-2">
-                            {secret && <button onClick={() => copyValue(secret)} className="btn btn-primary btn-lg"><IconCopy size={15} /> Copier {withArticle(secret.label)}{!touch && <span className="kbd">C</span>}</button>}
-                            {user && <button onClick={() => copyValue(user)} className="btn btn-secondary btn-lg"><IconCopy size={15} /> Copier {withArticle(user.label)}</button>}
-                            {totp && <button onClick={() => copyTotp(totp)} className="btn btn-secondary btn-lg"><IconShieldClock size={15} /> Copier le code 2FA</button>}
-                            {site && /^https?:\/\//i.test(site) && <a href={site} target="_blank" rel="noopener noreferrer" className="btn btn-secondary btn-lg hover:no-underline"><IconExternal size={15} /> Ouvrir le site</a>}
+                          <div className="flex flex-wrap gap-2 max-md:flex-nowrap">
+                            {secret && <button onClick={() => copyValue(secret)} className="btn btn-primary btn-lg max-md:h-[50px] max-md:min-w-0 max-md:flex-1 max-md:rounded-[14px] max-md:text-[15px]"><IconCopy size={15} /> <span className="truncate">Copier {withArticle(secret.label)}</span>{!touch && <span className="kbd">C</span>}</button>}
+                            {/* Mobile : l'utilisateur et le code se copient depuis leur ligne. */}
+                            {user && <button onClick={() => copyValue(user)} className="btn btn-secondary btn-lg max-md:hidden"><IconCopy size={15} /> Copier {withArticle(user.label)}</button>}
+                            {totp && <button onClick={() => copyTotp(totp)} className="btn btn-secondary btn-lg max-md:hidden"><IconShieldClock size={15} /> Copier le code 2FA</button>}
+                            {site && /^https?:\/\//i.test(site) && <a href={site} target="_blank" rel="noopener noreferrer" className="btn btn-secondary btn-lg hover:no-underline max-md:h-[50px] max-md:w-[50px] max-md:rounded-[14px] max-md:px-0" aria-label="Ouvrir le site"><IconExternal size={15} /> <span className="max-md:hidden">Ouvrir le site</span></a>}
                           </div>
                         );
                       })()}

@@ -4,7 +4,8 @@ import { CopyButton } from "./ui";
 
 /** Le code TOTP courant d'un identifiant, avec le temps qui reste avant le
  * suivant. Recalculé chaque seconde ; le secret ne quitte pas la page. */
-export function TotpCode({ secret, compact }: { secret: string; compact?: boolean }) {
+/** `size="lg"` : le code en grand (mobile, maquettes `MAccueil`, `MCodes`). */
+export function TotpCode({ secret, compact, size }: { secret: string; compact?: boolean; size?: "lg" }) {
   const params = parseTotp(secret);
   const [code, setCode] = useState<string>("");
   const [remaining, setRemaining] = useState(0);
@@ -31,8 +32,8 @@ export function TotpCode({ secret, compact }: { secret: string; compact?: boolea
   const fraction = remaining / params.period;
   return (
     <span className="flex items-center gap-2">
-      <span className={`font-mono tabular-nums text-[var(--c-text)] ${compact ? "text-[12px]" : "text-[15px] tracking-[0.12em]"}`}>{pretty || "…"}</span>
-      <span className="relative inline-block h-3.5 w-3.5" title={`${remaining} s`}>
+      <span className={`whitespace-nowrap font-mono tabular-nums text-[var(--c-text)] ${size === "lg" ? "text-[22px] font-medium tracking-[0.06em]" : compact ? "text-[12px]" : "text-[15px] tracking-[0.12em]"}`}>{pretty || "…"}</span>
+      <span className={`relative inline-block shrink-0 ${size === "lg" ? "h-5 w-5" : "h-3.5 w-3.5"}`} title={`${remaining} s`}>
         <svg viewBox="0 0 20 20" className="h-full w-full -rotate-90">
           <circle cx="10" cy="10" r="8" fill="none" stroke="var(--c-border)" strokeWidth="3" />
           <circle cx="10" cy="10" r="8" fill="none" stroke={remaining <= 5 ? "var(--c-warn)" : "var(--c-accent)"} strokeWidth="3" strokeDasharray={`${fraction * 50.27} 50.27`} />

@@ -9,7 +9,8 @@ import { tileHue, tileInitial } from "../lib/tiles";
 import { HealthBar } from "./HomePage";
 import { Page } from "./Page";
 import { IconInfo } from "./secret-icons";
-import { IconCheck, IconSearch } from "./ui-icons";
+import { IconCheck, IconChevronRight, IconSearch } from "./ui-icons";
+import { NARROW, useMediaQuery } from "../hooks/useMediaQuery";
 import { Loading, useDelayed } from "./ui";
 
 /** Le rapport de santé : ce qui mérite d'être changé dans le coffre, calculé
@@ -125,6 +126,7 @@ export function HealthPage({ ctx }: { ctx: PageContext }) {
 
   return (
     <Page
+      mobileBack={null}
       title="Santé du coffre"
       sub={
         <span className="relative inline-flex flex-wrap items-center gap-1.5">
@@ -232,6 +234,21 @@ function IssueRow({ issue }: { issue: Issue }) {
   const name = payloadName(p) || KIND_LABELS[p.kind];
   const chip = CHIPS[issue.kind];
   const open = () => navigate({ page: "vault", id: issue.entry.vault.id, item: issue.entry.item.id });
+  const narrow = useMediaQuery(NARROW);
+  if (narrow) {
+    // Mobile (maquette `MSante`) : la ligne entière ouvre l'élément.
+    return (
+      <button onClick={open} className="flex w-full min-w-0 items-start gap-3.5 px-4 py-3 text-left active:bg-[var(--c-hover)]">
+        <span className="tile shrink-0" style={{ "--tile-size": "40px", "--tile-h": tileHue(name) } as React.CSSProperties}>{tileInitial(name)}</span>
+        <span className="flex min-w-0 flex-1 flex-col gap-1">
+          <span className="truncate font-medium">{name}</span>
+          <span className="line-clamp-2 text-[14px] text-[var(--c-text-muted)]">{issue.detail}</span>
+          <span><span className={`tag ${chip.tone}`}>{chip.label}</span></span>
+        </span>
+        <IconChevronRight size={16} className="mt-3 shrink-0 text-[var(--c-text-faint)]" />
+      </button>
+    );
+  }
   return (
     <div className="flex min-w-0 flex-wrap items-center gap-x-3.5 gap-y-2 px-[18px] py-3.5 hover:bg-[var(--c-hover)]">
       <span className="tile" style={{ "--tile-size": "36px", "--tile-h": tileHue(name) } as React.CSSProperties}>{tileInitial(name)}</span>

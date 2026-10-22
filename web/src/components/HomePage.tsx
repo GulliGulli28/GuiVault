@@ -11,7 +11,9 @@ import { useVaultColors, vaultColor } from "../lib/vaultColors";
 import { canWrite, ROLE_LABELS, type CustomIcon, type GuiVaultEntity } from "../lib/types";
 import { ItemTile } from "./ItemTree";
 import { TotpCode } from "./TotpCode";
-import { IconChevronRight, IconCopy, IconPlus } from "./ui-icons";
+import { IconChevronRight, IconCopy, IconLock, IconPlus, IconSearch } from "./ui-icons";
+import { Logo } from "./Logo";
+import { NARROW, useMediaQuery } from "../hooks/useMediaQuery";
 import { copyText, formatAgo } from "./ui";
 
 /** Un élément tel que l'accueil le montre : son entité (nom, ligne
@@ -65,10 +67,78 @@ export function HomePage({ ctx }: { ctx: PageContext }) {
   const target = session.vaults.find((v) => v.kind === "personal" && canWrite(v.role)) ?? session.vaults.find((v) => canWrite(v.role));
   const open = (e: HomeEntry) => navigate({ page: "vault", id: e.vault.id, item: e.item.id });
   const name = local ? coffreName(local.path) : firstName(session.user.email);
+  const narrow = useMediaQuery(NARROW);
+
+  if (narrow) {
+    return (
+      <div className="m-page">
+        <header className="m-head">
+          <Logo size={30} />
+          <h1 className="m-title min-w-0 flex-1 truncate text-[22px]">{local ? name : `Bonjour ${name}`}</h1>
+          <button onClick={ctx.lock} className="m-icon border border-[var(--c-border-strong)] bg-[var(--c-surface)]" aria-label="Verrouiller" title="Verrouiller"><IconLock size={18} /></button>
+        </header>
+        <div className="m-body">
+          <button onClick={ctx.search} className="m-search text-left">
+            <IconSearch size={18} />
+            <span className="min-w-0 flex-1 truncate">Rechercher dans {session.vaults.length > 1 ? `${session.vaults.length} coffres` : "le coffre"}</span>
+          </button>
+          {supports("myInvitations") && session.invitations.map((inv) => (
+            <div key={inv.id} className="m-card flex min-w-0 items-center gap-3 px-3.5 py-3">
+              <span className="tile shrink-0 rounded-full" style={{ "--tile-size": "36px", "--tile-h": 25 } as React.CSSProperties}>{personInitials(inv.inviter_email)}</span>
+              <p className="clamp-2 min-w-0 flex-1 text-[14px]"><b className="font-semibold">{inv.inviter_email}</b> vous invite dans un vault partagé</p>
+              <a href={routeHash({ page: "invitations" })} className="m-btn m-btn-primary h-10 px-3.5 text-[14px]">Voir</a>
+            </div>
+          ))}
+          <section className="flex flex-col gap-2.5" aria-labelledby="m-quick">
+            <h2 id="m-quick" className="text-[17px] font-semibold">Accès rapide</h2>
+            {quick.length === 0 ? (
+              <div className="m-card px-4 py-8 text-center text-[14px] text-[var(--c-text-muted)]">{loading ? "Lecture des coffres…" : "Rien à montrer pour l'instant."}</div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2.5">
+                {quick.map((e) => (
+                  <a key={`${e.vault.id}-${e.item.id}`} href={routeHash({ page: "vault", id: e.vault.id, item: e.item.id })} className="m-card flex min-w-0 flex-col gap-2.5 p-3.5 text-[var(--c-text)] hover:no-underline">
+                    <ItemTile entity={e.entity} customIcons={e.icons} size={36} />
+                    <span className="flex min-w-0 flex-col">
+                      <span className="truncate font-semibold">{e.entity.name}</span>
+                      <span className="truncate text-[13px] text-[var(--c-text-muted)]">{e.entity.subtitle ?? e.vault.name}</span>
+                    </span>
+                  </a>
+                ))}
+              </div>
+            )}
+          </section>
+          {codes.length > 0 && (
+            <section className="m-card px-4 py-1.5" aria-labelledby="m-otp">
+              <div className="flex min-h-[48px] items-center gap-2.5">
+                <h2 id="m-otp" className="min-w-0 flex-1 text-[17px] font-semibold">Codes 2FA</h2>
+                <a href={routeHash({ page: "totp" })} className="text-[14px]">Tout voir</a>
+              </div>
+              <div className="m-list">
+                {codes.map((e) => (
+                  <div key={`${e.vault.id}-${e.item.id}`} className="flex min-h-[56px] min-w-0 items-center gap-3">
+                    <span className="min-w-0 flex-1 truncate font-medium">{e.entity.name}</span>
+                    {e.item.payload.kind === "login" && e.item.payload.login.totp && <TotpCode secret={e.item.payload.login.totp} size="lg" />}
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+          <a href={routeHash({ page: "health" })} className="m-card flex min-w-0 items-center gap-3.5 px-4 py-3.5 text-[var(--c-text)] hover:no-underline">
+            <span className="whitespace-nowrap"><span className="text-[26px] font-semibold">{loading ? "…" : health.score}</span><span className="text-[var(--c-text-muted)]"> /100</span></span>
+            <span className="flex min-w-0 flex-1 flex-col">
+              <span className="font-medium">Santé</span>
+              <span className={`truncate text-[13px] ${health.issues ? "text-[var(--c-warn-text)]" : "text-[var(--c-text-muted)]"}`}>{health.issues ? `${health.issues} ${health.issues > 1 ? "éléments à corriger" : "élément à corriger"}` : "Rien à corriger"}</span>
+            </span>
+            <IconChevronRight size={16} className="shrink-0 text-[var(--c-text-faint)]" />
+          </a>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="mx-auto flex max-w-[1320px] flex-col gap-7 px-10 py-8 max-md:px-4 max-md:pt-14">
+      <div className="mx-auto flex max-w-[1320px] flex-col gap-7 px-10 py-8 max-md:px-4">
         <header className="flex flex-wrap items-end gap-4">
           <div className="min-w-[240px] flex-1">
             <h1 className="page-title truncate">{local ? name : `Bonjour ${name}`}</h1>

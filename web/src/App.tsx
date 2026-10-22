@@ -25,6 +25,9 @@ import { SendsPage } from "./components/SendsPage";
 import { AdminPage } from "./components/AdminPage";
 import { HealthPage } from "./components/HealthPage";
 import { HomePage } from "./components/HomePage";
+import { MobileMenu } from "./components/MobileMenu";
+import { MobileNav, rememberVault } from "./components/MobileNav";
+import { NARROW, useMediaQuery } from "./hooks/useMediaQuery";
 import { clearAllItems } from "./lib/allItems";
 import { AutoTypeHost } from "./components/AutoType";
 import { autoTypeBridge, systemBridge, updaterBridge } from "./lib/platform";
@@ -42,6 +45,10 @@ export interface PageContext {
   /** Incrémenté quand le serveur signale qu'un vault a changé (SSE) — la
    * page du vault recharge ses items. */
   vaultTicks: Record<string, number>;
+  /** La recherche globale (Ctrl K) ; en mobile, plein écran. */
+  search: () => void;
+  /** Verrouiller à la main. */
+  lock: () => void;
 }
 
 /** `Welcome` : l'écran sans session — la connexion au serveur qui sert la
@@ -247,8 +254,12 @@ export default function App({ Welcome = LoginScreen }: { Welcome?: ComponentType
 
   // La barre latérale se redimensionne à la souris, comme dans Guiterm.
   const sidebar = usePersistedPane("sidebar", { initial: 256, min: 200, max: 480, axis: "horizontal", mode: "px" });
+  // Mobile : la barre d'onglets du bas remplace la barre latérale.
+  const narrow = useMediaQuery(NARROW);
+  const vaultRoute = route.page === "vault" ? route.id : null;
+  useEffect(() => { if (vaultRoute) rememberVault(vaultRoute); }, [vaultRoute]);
 
-  const ctx = useMemo<PageContext | null>(() => (session ? { session, reload, notify, error, vaultTicks } : null), [session, reload, notify, error, vaultTicks]);
+  const ctx = useMemo<PageContext | null>(() => (session ? { session, reload, notify, error, vaultTicks, search: openSearch, lock: lockByHand } : null), [session, reload, notify, error, vaultTicks, openSearch, lockByHand]);
 
   // Un lien de partage s'ouvre sans compte, et hors de l'application.
   if (route.page === "send") {
@@ -286,6 +297,9 @@ export default function App({ Welcome = LoginScreen }: { Welcome?: ComponentType
     case "settings":
       page = <SettingsPage ctx={ctx} section={effective.section} />;
       break;
+    case "more":
+      page = narrow ? <MobileMenu ctx={ctx} onLock={lockByHand} onLogout={() => void onLogout()} /> : <SettingsPage ctx={ctx} section="apparence" />;
+      break;
     case "vault-tools":
       page = <ToolsPage key={effective.id} ctx={ctx} vaultId={effective.id} />;
       break;
@@ -315,10 +329,10 @@ export default function App({ Welcome = LoginScreen }: { Welcome?: ComponentType
   }
 
   return (
-    <div className="flex h-full w-full overflow-hidden bg-[var(--c-bg)] text-[var(--c-text)]">
-      <Sidebar ctx={ctx} route={effective} onLogout={onLogout} onLock={lockByHand} onSearch={openSearch} width={sidebar.value} />
-      <PaneHandle onMouseDown={sidebar.onMouseDown} />
-      <main className={`flex min-w-0 flex-1 flex-col overflow-hidden bg-[var(--c-bg2)] ${sidebar.isDragging ? "pointer-events-none select-none" : ""}`}>
+    <div className={`flex h-full w-full overflow-hidden bg-[var(--c-bg)] text-[var(--c-text)] ${narrow ? "flex-col" : ""}`}>
+      {!narrow && <Sidebar ctx={ctx} route={effective} onLogout={onLogout} onLock={lockByHand} onSearch={openSearch} width={sidebar.value} />}
+      {!narrow && <PaneHandle onMouseDown={sidebar.onMouseDown} />}
+      <main className={`flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[var(--c-bg2)] ${sidebar.isDragging ? "pointer-events-none select-none" : ""}`}>
         {ctx.session.offline && (
           <div role="status" className="shrink-0 px-4 pt-3">
             <div className="callout callout-warn flex flex-wrap items-center gap-3 text-[12.5px]">
@@ -333,6 +347,7 @@ export default function App({ Welcome = LoginScreen }: { Welcome?: ComponentType
         {route.page !== "settings" && <EmergencyBanner grants={ctx.session.emergency?.granted_by_me ?? []} onOpen={() => navigate({ page: "settings", section: "urgence" })} />}
         {page}
       </main>
+      {narrow && <MobileNav ctx={ctx} route={effective} />}
       {search && <SearchPalette ctx={ctx} onClose={closeSearch} />}
       {autoTypeBridge() && <AutoTypeHost ctx={ctx} />}
       <Toasts toasts={toasts} onDismiss={dismiss} />

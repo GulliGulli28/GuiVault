@@ -88,7 +88,9 @@ il ne déchiffre rien : la user key reste sous la clé que seule la PRF donne).
   sert aux libellés (nom du coffre au lieu de l'e-mail, « Fermer le coffre »).
 - `web/` — l'interface web, Vite + React 19 + TypeScript + Tailwind 3.
   **Refonte (2026-10-21) : on se sépare de la charte de Guiterm.** Faite
-  pour le web et l'extension, pas encore pour le mobile. Maquettes, jetons,
+  pour le web, l'extension et le mobile (le web sous 768 px : barre
+  d'onglets `MobileNav`, onglet « Réglages » = `#/more` / `MobileMenu`,
+  styles `m-*` dans `src/touch.css`). Maquettes, jetons,
   briques (`Page`, `SettingRow`, `InfoTip`, `ItemTile`) et règles (pas de
   paragraphes, troncature, responsive) dans `docs/DESIGN.md` et
   `docs/design/canvas/` ; tout nouvel écran suit ce design. `src/index.css`

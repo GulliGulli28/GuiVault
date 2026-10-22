@@ -7,9 +7,9 @@ refaite — socle (`web/src/index.css`, `lib/preferences.ts`, police Geist
 embarquée par `src/fonts.ts`), barre latérale, accueil, coffre et fiche,
 palette, santé, liens de partage, paramètres, connexion, formulaires,
 import/export, réglages du vault, et l'extension (popup et interface
-injectée). Restent : le mobile, et quelques écrans propres à l'application
-(saisie automatique, réglages du poste) qui n'ont eu que des textes
-raccourcis.
+injectée), et le mobile (le web sous 768 px). Restent quelques écrans
+propres à l'application (saisie automatique, réglages du poste) qui n'ont
+eu que des textes raccourcis.
 
 ## Maquettes
 
@@ -54,7 +54,8 @@ pour que quelqu'un d'autre puisse les ouvrir.
 - **Mobile** : 11 écrans (déverrouiller, accueil, coffre, fiche, recherche,
   nouvel élément, codes 2FA, générateur, santé, partage par lien,
   réglages). La barre d'onglets du bas contient Accueil, Coffres, Codes,
-  Santé et Réglages. Le mobile n'est pas encore implémenté.
+  Santé et Réglages. Implémenté le 2026-10-22 dans le web (sous 768 px) ;
+  voir « Dans le code ».
 
 ## Extension de navigateur
 
@@ -136,6 +137,23 @@ celle de `html`.
 - **Coffre** : liste et fiche côte à côte à partir de 1100 px (la fenêtre de
   l'application en fait 1200), un volet à la
   fois en dessous.
+
+- **Mobile** (sous 768 px, `NARROW` de `hooks/useMediaQuery.ts`) :
+  - `App.tsx` remplace la barre latérale par `components/MobileNav.tsx` ;
+    l'onglet « Coffres » rouvre le dernier vault ouvert.
+  - L'onglet « Réglages » est la route `#/more` (`components/MobileMenu.tsx` :
+    compte, thème, catégories des paramètres, outils, verrouiller ou se
+    déconnecter). Au bureau, `#/more` mène aux paramètres.
+  - Les pages sans onglet ont un retour en haut (`Page`, prop `mobileBack`).
+  - L'accueil, les codes 2FA, la liste du coffre (puces, « + » flottant,
+    sélecteur de vault dans le titre), la fiche (centrée) et les lignes de
+    la santé ont leur mise en page mobile dans leur composant.
+  - Les fenêtres (`.modal`) deviennent des feuilles qui montent du bas, et
+    la palette passe en plein écran.
+  - Styles dans `src/touch.css` (classes `m-*`). Le popup de l'extension
+    ne l'importe pas : ses 440 px ne sont pas du mobile.
+  - `PageContext` porte `search` et `lock` pour les boutons des écrans
+    mobiles.
 
 ## Règles d'écriture de l'interface
 
