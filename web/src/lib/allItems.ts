@@ -28,16 +28,24 @@ export function clearAllItems() {
   emit();
 }
 
+/** Ce que la page d'un vault vient de lire : plus frais que la révision que
+ * la session connaît quand rien ne la pousse (coffre local, pas de SSE). */
+export function putVaultItems(vaultId: string, revision: number, items: DecodedItem[]) {
+  const have = store.get(vaultId);
+  if (have && have.revision > revision) return;
+  store.set(vaultId, { revision, items });
+  emit();
+}
+
 function refresh(v: VaultView, onError: (m: string) => void): Promise<void> {
   const have = store.get(v.id);
-  if (have && have.revision === v.revision) return Promise.resolve();
+  if (have && have.revision >= v.revision) return Promise.resolve();
   const key = `${v.id}:${v.revision}`;
   let p = pending.get(key);
   if (!p) {
     p = loadItems(v)
       .then((page) => {
-        store.set(v.id, { revision: v.revision, items: page.items });
-        emit();
+        putVaultItems(v.id, page.revision, page.items);
       })
       .catch((e) => onError(`${v.name} : ${errorMessage(e)}`))
       .finally(() => pending.delete(key));

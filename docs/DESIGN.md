@@ -123,11 +123,16 @@ celle de `html`.
 - **Couleur d'un vault** : `lib/vaultColors.ts`, préférence de l'utilisateur
   (section synchronisée `vaultColors`), réglée depuis le menu « … » du vault
   ou ses réglages.
-- **Éléments de tous les vaults** (accueil, compteurs de la barre) :
-  `lib/allItems.ts` (`useAllItems`, `healthSummary`), effacés avec la session.
+- **Éléments de tous les vaults** (accueil, compteurs de la barre, colonne
+  « Sécurité ») : `lib/allItems.ts` (`useAllItems`, `healthSummary`), effacés
+  avec la session ; la page d'un vault y verse ce qu'elle lit
+  (`putVaultItems`), seule nouvelle d'une écriture en coffre local.
 - **Préférences** : `DESIGN_VERSION` — des préférences d'avant la refonte
   (locales ou synchronisées) prennent une fois le fond, l'accent, la police
   et les lignes d'entité par défaut.
+- **Fiche** : à partir de 1500 px, la colonne « Sécurité » à droite
+  (`components/ItemAside.tsx` : force, réutilisation, 2FA, âge du mot de
+  passe, puis dossier, tags et versions) ; en dessous, sous la fiche.
 - **Coffre** : liste et fiche côte à côte à partir de 1100 px (la fenêtre de
   l'application en fait 1200), un volet à la
   fois en dessous.

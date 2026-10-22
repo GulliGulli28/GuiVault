@@ -389,8 +389,9 @@ coffre, ce que le mode local masque, créer une note, la saisie automatique
 (bouton de la fiche, réglages, et une **vraie frappe** `SendInput` — dans
 GuiVault lui-même, jamais dans une fenêtre de la personne qui lance les
 tests ; ○ « ignoré » si la fenêtre n'a pas le premier plan, ou sous Linux
-où l'on vérifie que rien n'en est montré), fermer et rouvrir (coffres
-récents, mauvais mot de passe), une erreur de l'hôte (`local_exists`), un
+où l'on vérifie que rien n'en est montré), la fenêtre maximisée (rien ne
+déborde, captures `plein-ecran-*.png` à regarder après un changement
+d'interface), fermer et rouvrir (coffres récents, mauvais mot de passe), une erreur de l'hôte (`local_exists`), un
 serveur qui ne répond pas. Sous Linux, l'interface est construite puis
 servie par `vite preview` (le serveur de dev rechargeait la page en
 découvrant ses dépendances, cache froid). Le scénario du presse-papiers lit

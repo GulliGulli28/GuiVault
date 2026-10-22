@@ -68,7 +68,7 @@ export function HomePage({ ctx }: { ctx: PageContext }) {
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="mx-auto flex max-w-[1120px] flex-col gap-7 px-10 py-8 max-md:px-4 max-md:pt-14">
+      <div className="mx-auto flex max-w-[1320px] flex-col gap-7 px-10 py-8 max-md:px-4 max-md:pt-14">
         <header className="flex flex-wrap items-end gap-4">
           <div className="min-w-[240px] flex-1">
             <h1 className="page-title truncate">{local ? name : `Bonjour ${name}`}</h1>
@@ -104,7 +104,7 @@ export function HomePage({ ctx }: { ctx: PageContext }) {
               {quick.length === 0 ? (
                 <div className="card px-5 py-8 text-center text-[13px] text-[var(--c-text-muted)]">{loading ? "Lecture des coffres…" : "Rien à montrer pour l'instant."}</div>
               ) : (
-                <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-2.5">
+                <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-2.5">
                   {quick.map((e) => {
                     const secret = primarySecret(e.item.payload);
                     return (

@@ -26,6 +26,8 @@ import { AttachmentsPanel } from "./AttachmentsPanel";
 import { IntegrityBanner } from "./IntegrityBanner";
 import { useMerge } from "./MergeDialog";
 import { ShortcutsHelp } from "./ShortcutsHelp";
+import { ItemAside } from "./ItemAside";
+import { putVaultItems, useAllItems } from "../lib/allItems";
 import { IconCheck, IconChevronDown, IconChevronRight, IconCopy, IconEdit, IconExternal, IconFolder, IconKeyboard, IconPlus, IconRefresh, IconSearch, IconSettings, IconTrash, IconVault } from "./ui-icons";
 import { copyText, Dropdown, formatAgo, formatWhen, Loading, useDelayed } from "./ui";
 import { PaneHandle, usePersistedPane } from "../hooks/usePersistedPane";
@@ -68,6 +70,8 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
    * vault est en lecture seule d'ici (`IntegrityError`). */
   const [problems, setProblems] = useState<ManifestProblem[]>([]);
   const [loading, setLoading] = useState(true);
+  // Tous les vaults : la colonne « Sécurité » cherche les réutilisations.
+  const { items: everything } = useAllItems(ctx.session, ctx.error);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
   const [selected, setSelected] = useState<string | null>(itemId ?? null);
@@ -155,6 +159,7 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
       for (const it of page.items) if (it.ok) names.current.set(it.id, payloadName(it.payload));
       setItems(page.items);
       setProblems(page.problems);
+      putVaultItems(vaultRef.current.id, page.revision, page.items);
     } catch (e) {
       ctxRef.current.error(errorMessage(e));
     } finally {
@@ -623,7 +628,7 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
                 </Dropdown>
               </div>
               <div className="sidebar-scroll min-h-0 flex-1 overflow-y-auto px-8 pb-10 pt-7 max-md:px-4 max-md:pt-5">
-                <div className="flex max-w-[860px] flex-col gap-6">
+                <div className="flex max-w-[1180px] flex-col gap-6">
                   {alerts.has(current.id) && <p className="callout callout-danger">{capitalize(alerts.get(current.id)!)} : ne vous y fiez pas avant de l'avoir vérifié.</p>}
                   {current.ok ? (
                     <>
@@ -661,10 +666,16 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
                           </div>
                         );
                       })()}
-                      <ItemView payload={current.payload} index={index} />
-                      {isSecret(current.payload) && (
-                        <AttachmentsPanel key={current.id} vault={vault} item={current} writable={writable} offline={!!ctx.session.offline} session={ctx.session} onChanged={() => void load()} notify={ctx.notify} error={ctx.error} />
-                      )}
+                      {/* Large : la colonne « Sécurité » à droite ; sinon sous la fiche. */}
+                      <div className="grid items-start gap-6 min-[1500px]:grid-cols-[minmax(0,1fr)_300px]">
+                        <div className="flex min-w-0 flex-col gap-6">
+                          <ItemView payload={current.payload} index={index} withoutOrganisation />
+                          {isSecret(current.payload) && (
+                            <AttachmentsPanel key={current.id} vault={vault} item={current} writable={writable} offline={!!ctx.session.offline} session={ctx.session} onChanged={() => void load()} notify={ctx.notify} error={ctx.error} />
+                          )}
+                        </div>
+                        <ItemAside vault={vault} item={current} index={index} all={everything} onHistory={emergency ? undefined : () => setHistory(true)} />
+                      </div>
                     </>
                   ) : (
                     <p className="callout callout-danger">Impossible de déchiffrer cet élément : {current.error}. Il a peut-être été chiffré avec une clé de vault antérieure, ou altéré.</p>

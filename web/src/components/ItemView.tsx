@@ -15,7 +15,10 @@ import { ACTION_LABELS, APPROVAL_LABELS, ON_FAILURE_LABELS } from "./forms/Runbo
 /** La fiche d'une entité, en lecture : ce que Guiterm montre dans ses
  * panneaux, secrets masqués et copiables. `shared` : reçue par un lien de
  * partage — sans le rangement (dossier, tags) de qui l'a envoyée. */
-export function ItemView({ payload, index, shared }: { payload: Payload; index: VaultIndex; shared?: boolean }) {
+export function ItemView({ payload, index, shared, withoutOrganisation }: { payload: Payload; index: VaultIndex; shared?: boolean; withoutOrganisation?: boolean }) {
+  // Dossier et tags : ni pour un lien de partage, ni quand la fiche les
+  // montre à côté (`ItemAside`).
+  const organisation = !shared && !withoutOrganisation;
   const groups = new Map(index.groups.map((g) => [g.id, g]));
   const hostLabel = (id: string | null | undefined) => (id ? index.hosts.find((h) => h.id === id)?.label ?? `hôte inconnu (${id.slice(0, 8)})` : null);
 
@@ -36,11 +39,17 @@ export function ItemView({ payload, index, shared }: { payload: Payload; index: 
             {h.jumpVia.length > 0 && <Row label="Relais">{h.jumpVia.map((id) => hostLabel(id)).join(" → ")}</Row>}
             {h.proxyCommand && <Row label="ProxyCommand" mono>{h.proxyCommand}</Row>}
           </Section>
-          <Section title="Organisation">
-            <Row label="Dossier">{h.groupId ? groupPath(groups, h.groupId) || <Muted>dossier inconnu</Muted> : <Muted>racine</Muted>}</Row>
-            <Row label="Tags"><Tags tags={h.tags} /></Row>
-            {h.icon && <Row label="Icône"><IconCell iconId={h.icon} index={index} /></Row>}
-          </Section>
+          {organisation ? (
+            <Section title="Organisation">
+              <Row label="Dossier">{h.groupId ? groupPath(groups, h.groupId) || <Muted>dossier inconnu</Muted> : <Muted>racine</Muted>}</Row>
+              <Row label="Tags"><Tags tags={h.tags} /></Row>
+              {h.icon && <Row label="Icône"><IconCell iconId={h.icon} index={index} /></Row>}
+            </Section>
+          ) : h.icon && (
+            <Section title="Icône">
+              <Row label="Icône"><IconCell iconId={h.icon} index={index} /></Row>
+            </Section>
+          )}
           {(h.startupSnippets.length > 0 || h.envVars.length > 0 || h.keepaliveIntervalSecs || h.agentForward || (h.persistentShell && h.persistentShell !== "off")) && (
             <Section title="Session">
               {h.startupSnippets.length > 0 && <Row label="Au démarrage">{h.startupSnippets.map((id) => index.snippets.find((sn) => sn.id === id)?.name ?? id.slice(0, 8)).join(", ")}</Row>}
@@ -111,10 +120,12 @@ export function ItemView({ payload, index, shared }: { payload: Payload; index: 
             {describeSql(cnx, index).map(([label, value, mono]) => <Row key={label} label={label} mono={mono}>{value}</Row>)}
             {payload.password != null && <Row label="Mot de passe"><SecretValue value={payload.password} /></Row>}
           </Section>
-          <Section title="Organisation">
-            <Row label="Dossier">{cnx.groupId ? groupPath(groups, cnx.groupId) || <Muted>dossier inconnu</Muted> : <Muted>racine</Muted>}</Row>
-            <Row label="Tags"><Tags tags={cnx.tags} /></Row>
-          </Section>
+          {organisation && (
+            <Section title="Organisation">
+              <Row label="Dossier">{cnx.groupId ? groupPath(groups, cnx.groupId) || <Muted>dossier inconnu</Muted> : <Muted>racine</Muted>}</Row>
+              <Row label="Tags"><Tags tags={cnx.tags} /></Row>
+            </Section>
+          )}
         </div>
       );
     }
@@ -154,7 +165,7 @@ export function ItemView({ payload, index, shared }: { payload: Payload; index: 
               </Row>
             )}
           </Section>
-          <SecretCommon base={l} groups={groups} shared={shared} />
+          <SecretCommon base={l} groups={groups} organisation={organisation} />
           {l.passkeys.length > 0 && (
             <Section title="Passkeys">
               {l.passkeys.map((k) => (
@@ -178,7 +189,7 @@ export function ItemView({ payload, index, shared }: { payload: Payload; index: 
       return (
         <div className="space-y-6">
           <pre className="card whitespace-pre-wrap break-words p-3 font-sans text-[13.5px] leading-relaxed text-[var(--c-text)]">{n.content || <Muted>(vide)</Muted>}</pre>
-          <SecretCommon base={n} groups={groups} shared={shared} withoutNotes />
+          <SecretCommon base={n} groups={groups} organisation={organisation} withoutNotes />
         </div>
       );
     }
@@ -192,7 +203,7 @@ export function ItemView({ payload, index, shared }: { payload: Payload; index: 
             <Row label="Expiration"><Copyable value={[cd.expMonth, cd.expYear].filter(Boolean).join(" / ")} mono /></Row>
             <Row label="Code">{cd.code ? <SecretValue value={cd.code} /> : <Muted>—</Muted>}</Row>
           </Section>
-          <SecretCommon base={cd} groups={groups} shared={shared} />
+          <SecretCommon base={cd} groups={groups} organisation={organisation} />
         </div>
       );
     }
@@ -218,7 +229,7 @@ export function ItemView({ payload, index, shared }: { payload: Payload; index: 
             <Row label="Passeport">{i.passportNumber ? <SecretValue value={i.passportNumber} /> : <Muted>—</Muted>}</Row>
             <Row label="Permis">{i.licenseNumber ? <SecretValue value={i.licenseNumber} /> : <Muted>—</Muted>}</Row>
           </Section>
-          <SecretCommon base={i} groups={groups} shared={shared} />
+          <SecretCommon base={i} groups={groups} organisation={organisation} />
         </div>
       );
     }
@@ -268,7 +279,7 @@ export function ItemView({ payload, index, shared }: { payload: Payload; index: 
               </>
             )}
           </section>
-          <SecretCommon base={a} groups={groups} shared={shared} />
+          <SecretCommon base={a} groups={groups} organisation={organisation} />
         </div>
       );
     }
@@ -284,7 +295,7 @@ export function ItemView({ payload, index, shared }: { payload: Payload; index: 
             {k.scopes && <Row label="Portée">{k.scopes}</Row>}
             <Row label="Expiration">{k.expiresAt ? <span className={expired ? "text-[var(--c-danger)]" : ""}>{k.expiresAt}{expired ? " — expirée" : ""}</span> : <Muted>aucune</Muted>}</Row>
           </Section>
-          <SecretCommon base={k} groups={groups} shared={shared} />
+          <SecretCommon base={k} groups={groups} organisation={organisation} />
         </div>
       );
     }
@@ -324,7 +335,7 @@ export function ItemView({ payload, index, shared }: { payload: Payload; index: 
 
 /** Dossier, tags, notes et champs personnalisés : le pied de fiche de
  * tous les secrets. */
-function SecretCommon({ base, groups, withoutNotes, shared }: { base: SecretBase; groups: Map<string, import("../lib/types").Group>; withoutNotes?: boolean; shared?: boolean }) {
+function SecretCommon({ base, groups, withoutNotes, organisation }: { base: SecretBase; groups: Map<string, import("../lib/types").Group>; withoutNotes?: boolean; organisation: boolean }) {
   return (
     <>
       {!withoutNotes && base.notes && (
@@ -337,7 +348,7 @@ function SecretCommon({ base, groups, withoutNotes, shared }: { base: SecretBase
           {base.fields.map((f, i) => <Row key={i} label={f.name || "(sans nom)"}><FieldValue field={f} /></Row>)}
         </Section>
       )}
-      {!shared && (
+      {organisation && (
         <Section title="Organisation">
           <Row label="Dossier">{base.groupId ? groupPath(groups, base.groupId) || <Muted>dossier inconnu</Muted> : <Muted>racine</Muted>}</Row>
           <Row label="Tags"><Tags tags={base.tags} /></Row>

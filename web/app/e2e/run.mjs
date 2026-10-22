@@ -503,6 +503,37 @@ scenario("import KeePass : une vraie base .kdbx, pièce jointe comprise", async 
   await waitText(b, "Wi-Fi maison");
 });
 
+scenario("plein écran : la mise en page tient dans la fenêtre maximisée", async (b) => {
+  // La fenêtre s'ouvre en 1200 × 780 ; maximisée, l'espace se répartit
+  // autrement (liste, fiche et colonne « Sécurité »). Captures dans
+  // `.output/plein-ecran-*.png`, à regarder après un changement d'interface.
+  const before = await b.getWindowRect();
+  try {
+    await b.maximizeWindow();
+  } catch (e) {
+    return `ignoré : la fenêtre ne se maximise pas ici (${e instanceof Error ? e.message.split("\n")[0] : e})`;
+  }
+  try {
+    await b.waitUntil(async () => (await b.execute(() => window.innerWidth)) > before.width, { timeout: 5_000, timeoutMsg: "la fenêtre n'a pas grandi" }).catch(() => {});
+    const overflow = () => b.execute(() => document.documentElement.scrollWidth - window.innerWidth);
+    await (await b.$("//a[.//span[normalize-space()='Accueil']]")).click();
+    await waitText(b, "Accès rapide");
+    // L'accueil compte ce que l'import vient d'écrire (pas de SSE en local).
+    await waitText(b, "1 coffre · 6 éléments");
+    await shot(b, "plein-ecran-accueil");
+    assert((await overflow()) <= 0, "l'accueil déborde en largeur");
+    await (await b.$("//a[.//span[normalize-space()='Personnel']]")).click();
+    await (await b.$("//main//span[normalize-space()='GitHub']")).click();
+    await waitText(b, "Copier le mot de passe");
+    await shot(b, "plein-ecran-fiche");
+    assert((await overflow()) <= 0, "la fiche déborde en largeur");
+    const wide = await b.execute(() => window.innerWidth >= 1500);
+    if (wide) await waitText(b, "Sécurité");
+  } finally {
+    await b.setWindowRect(before.x, before.y, before.width, before.height).catch(() => {});
+  }
+});
+
 /** Un vrai serveur GuiVault (inscription ouverte) : `GUIVAULT_E2E_SERVER`,
  * posé par le CI (`ci.yml`, job app) ; sans lui, le scénario est ignoré. */
 const e2eServer = process.env.GUIVAULT_E2E_SERVER;
