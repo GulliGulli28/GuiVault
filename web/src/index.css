@@ -110,6 +110,14 @@
   --shadow-lg: 0 18px 48px rgba(23, 24, 27, 0.16), 0 0 0 1px var(--c-border);
 }
 
+/* Les marges du système (encoche, barre d'état, barre de gestes, clavier) :
+   `env()` dans un navigateur ; l'application Android les pose elle-même
+   (`web/app/src/mobile.ts`), sa WebView ne les donnant pas. */
+:root {
+  --inset-top: env(safe-area-inset-top, 0px);
+  --inset-bottom: env(safe-area-inset-bottom, 0px);
+}
+
 html {
   font-family: var(--font-ui);
   font-size: 13.5px;

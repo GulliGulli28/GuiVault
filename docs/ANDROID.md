@@ -6,10 +6,12 @@ comme sur Windows, et ce que seul Android sait faire — d'abord la **bulle
 flottante**. **État (2026-10-22)** : l'application se construit et tourne sur
 l'émulateur (coffre local créé et ouvert), la bulle marche (réduire,
 déplacer, se ranger au bord, rouvrir d'un toucher, grise une fois
-verrouillé, fermer sur la croix). **Reste** : les marges de la barre d'état
-et de la barre de gestes (l'app est « bord à bord », `env(safe-area-inset-*)`
-vaut 0 dans la WebView : passer les insets depuis `MainActivity`), la
-connexion à un serveur depuis l'app, un vrai téléphone (`-Target aarch64`),
+verrouillé, fermer sur la croix). Les marges du système (barre d'état,
+barre de gestes, clavier) viennent de `MainActivity.kt` : l'app est « bord à
+bord » et `env(safe-area-inset-*)` vaut 0 dans la WebView ; la page les lit
+par `window.GuiVaultInsets` (`web/app/src/mobile.ts`) dans les variables
+`--inset-top` / `--inset-bottom` (`index.css`), et les icônes de la barre
+d'état suivent son thème. **Reste** : un vrai téléphone (`-Target aarch64`),
 la signature d'un APK de release.
 
 Construire : `scripts/android-sync.sh` (WSL : construit `web/dist-app` et
@@ -24,7 +26,10 @@ et `bubbleBridge.ts`.
 Poste : `%USERPROFILE%\.gradle\init.d\maven-central-mirror.gradle` fait passer
 Maven Central par le miroir de Google (ce réseau reçoit des 429), et
 `org.gradle.configuration-cache=false` dans `%USERPROFILE%\.gradle\gradle.properties`
-(le cache contournait le miroir). Le CLI est `cargo tauri` (installé côté
+(le cache contournait le miroir), avec `org.gradle.daemon=false` et
+`kotlin.compiler.execution.strategy=in-process` (un démon survivant gardait
+ouverte la sortie lue depuis WSL). L'émulateur : `scripts\android\emulator.ps1`
+(il s'arrête parfois faute de mémoire pendant une construction). Le CLI est `cargo tauri` (installé côté
 Windows) : Gradle le rappelle tel quel, ce qui échouait avec `node tauri.js`.
 
 ## L'environnement (poste Windows, depuis WSL)

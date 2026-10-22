@@ -108,7 +108,7 @@ export function SettingsPage({ ctx, section }: { ctx: PageContext; section: Sett
       </nav>
 
       <div className="sidebar-scroll min-w-0 flex-1 overflow-y-auto">
-        <div className="flex max-w-[780px] flex-col gap-8 px-12 pb-14 pt-10 max-md:gap-6 max-md:px-4 max-md:pt-[calc(1rem+env(safe-area-inset-top))]">
+        <div className="flex max-w-[780px] flex-col gap-8 px-12 pb-14 pt-10 max-md:gap-6 max-md:px-4 max-md:pt-[calc(1rem+var(--inset-top))]">
           <header>
             {/* Mobile : les catégories sont dans l'onglet « Réglages ». */}
             <button onClick={() => navigate({ page: "more" })} className="-ml-1 mb-2 flex min-h-[36px] items-center gap-1 text-[15px] text-[var(--c-accent-text)] md:hidden">

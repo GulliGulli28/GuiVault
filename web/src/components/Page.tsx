@@ -20,7 +20,7 @@ export function Page({ title, sub, actions, back, mobileBack = { label: "Réglag
   const up = back ?? mobileBack;
   return (
     <div className="sidebar-scroll h-full min-h-0 overflow-y-auto">
-      <div className={`mx-auto flex min-w-0 flex-col gap-7 px-10 pb-12 pt-8 max-md:gap-5 max-md:px-4 max-md:pt-[calc(1rem+env(safe-area-inset-top))] ${width}`}>
+      <div className={`mx-auto flex min-w-0 flex-col gap-7 px-10 pb-12 pt-8 max-md:gap-5 max-md:px-4 max-md:pt-[calc(1rem+var(--inset-top))] ${width}`}>
         <header className="flex min-w-0 flex-wrap items-end gap-x-4 gap-y-3">
           <div className="min-w-[220px] flex-1">
             {up && (

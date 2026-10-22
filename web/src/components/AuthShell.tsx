@@ -22,7 +22,7 @@ export function AuthShell({ title, sub, footer, store = "server", children }: {
           <span className="text-[16px] font-semibold">GuiVault</span>
         </div>
 
-        <div className="flex flex-1 items-center justify-center py-10 max-md:items-start max-md:pb-6 max-md:pt-[calc(2.5rem+env(safe-area-inset-top))]">
+        <div className="flex flex-1 items-center justify-center py-10 max-md:items-start max-md:pb-6 max-md:pt-[calc(2.5rem+var(--inset-top))]">
           <div className="flex w-full max-w-[380px] flex-col gap-5 max-md:gap-6">
             {/* Mobile (maquette `MConnexion`) : le logo en grand, centré. */}
             <div className="min-w-0 max-md:flex max-md:flex-col max-md:items-center max-md:gap-3.5 max-md:text-center">
@@ -34,7 +34,7 @@ export function AuthShell({ title, sub, footer, store = "server", children }: {
           </div>
         </div>
 
-        {footer && <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[12.5px] text-[var(--c-text-muted)] max-md:pb-[env(safe-area-inset-bottom)] max-md:text-[14px]">{footer}</div>}
+        {footer && <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[12.5px] text-[var(--c-text-muted)] max-md:pb-[var(--inset-bottom)] max-md:text-[14px]">{footer}</div>}
       </section>
 
       {/* Ce que voit qui : l'explication, en schéma. */}

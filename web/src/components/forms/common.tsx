@@ -67,7 +67,7 @@ export function FormShell({ title, onSave, onCancel, children, saveLabel = "Enre
   return (
     <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
       {/* Mobile (maquette `MEdition`) : Annuler · titre · Enregistrer. */}
-      <div className="flex min-h-[52px] shrink-0 items-center justify-between gap-2 border-b border-[var(--c-border)] px-5 py-2 max-md:min-h-[60px] max-md:px-3">
+      <div className="flex min-h-[52px] shrink-0 items-center justify-between gap-2 border-b border-[var(--c-border)] px-5 py-2 max-md:min-h-[60px] max-md:px-3 max-md:pt-[calc(0.5rem+var(--inset-top))]">
         <button type="button" onClick={onCancel} className="shrink-0 px-1 text-[15px] text-[var(--c-accent-text)] md:hidden">Annuler</button>
         <h2 className="min-w-0 truncate text-[15px] font-semibold text-[var(--c-text)] max-md:flex-1 max-md:text-center max-md:text-[17px]">{title}</h2>
         <div className="flex shrink-0 gap-2">

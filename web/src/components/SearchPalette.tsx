@@ -149,7 +149,7 @@ export function SearchPalette({ ctx, onClose }: { ctx: PageContext; onClose: () 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-[rgba(5,6,8,0.55)] px-4 pt-[12vh] max-md:bg-[var(--c-bg)] max-md:p-0" onClick={onClose}>
       {/* Mobile : plein écran (maquette `MRecherche`). */}
-      <div ref={ref} {...dialogProps} className="modal palette w-full max-w-[660px] overflow-hidden max-md:flex max-md:h-full max-md:max-w-none max-md:flex-col max-md:rounded-none max-md:bg-[var(--c-bg)] max-md:shadow-none max-md:pt-[env(safe-area-inset-top)]" onClick={(e) => e.stopPropagation()}>
+      <div ref={ref} {...dialogProps} className="modal palette w-full max-w-[660px] overflow-hidden max-md:flex max-md:h-full max-md:max-w-none max-md:flex-col max-md:rounded-none max-md:bg-[var(--c-bg)] max-md:shadow-none max-md:pt-[var(--inset-top)]" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-3 border-b border-[var(--c-border)] px-[18px] max-md:gap-2.5 max-md:border-b-0 max-md:px-4 max-md:pb-2 max-md:pt-3.5">
           <span className="font-mono text-[18px] leading-none text-[var(--c-accent)]" aria-hidden="true">›</span>
           <input
@@ -175,7 +175,7 @@ export function SearchPalette({ ctx, onClose }: { ctx: PageContext; onClose: () 
           {loading ? <span className="shrink-0 text-[12px] text-[var(--c-text-muted)]">Lecture…</span> : <span className="tag max-md:hidden">Tous les vaults</span>}
           <span className="kbd [@media(pointer:coarse)]:hidden">Échap</span>
         </div>
-        <div className="sidebar-scroll max-h-[55vh] overflow-y-auto p-1.5 max-md:max-h-none max-md:min-h-0 max-md:flex-1 max-md:px-2.5 max-md:pb-[calc(1rem+env(safe-area-inset-bottom))]" role="listbox" aria-label="Résultats">
+        <div className="sidebar-scroll max-h-[55vh] overflow-y-auto p-1.5 max-md:max-h-none max-md:min-h-0 max-md:flex-1 max-md:px-2.5 max-md:pb-[calc(1rem+var(--inset-bottom))]" role="listbox" aria-label="Résultats">
           {results.length === 0 && <p className="px-4 py-8 text-center text-[13px] text-[var(--c-text-muted)]">{loading ? "Lecture des vaults…" : "Aucun résultat"}</p>}
           {results.map((e, i) => (
             <div key={e.key}>

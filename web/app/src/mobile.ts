@@ -25,3 +25,36 @@ export function coffresDir(): string | null {
 export function deviceCoffres(): Promise<string[]> {
   return dir ? invoke<string[]>("local_list", { dir }).catch(() => []) : Promise.resolve([]);
 }
+
+declare global {
+  interface Window {
+    /** Posé par `MainActivity.kt` (Android) : les marges du système en px CSS. */
+    GuiVaultInsets?: { get(): string; setDark(dark: boolean): void };
+  }
+}
+
+/** Android : la WebView ne donne pas `env(safe-area-inset-*)` à une
+ * application bord à bord ; `MainActivity.kt` les expose, et prévient
+ * (`guivault-insets`) quand elles changent — rotation, clavier. */
+export function installInsets(): void {
+  const bridge = window.GuiVaultInsets;
+  if (!bridge) return;
+  const apply = () => {
+    try {
+      const i = JSON.parse(bridge.get()) as { top: number; bottom: number };
+      const root = document.documentElement.style;
+      root.setProperty("--inset-top", `${i.top}px`);
+      root.setProperty("--inset-bottom", `${i.bottom}px`);
+    } catch {
+      // Rien de lisible : on garde les marges du navigateur.
+    }
+  };
+  apply();
+  window.addEventListener("guivault-insets", apply);
+  // Les icônes de la barre d'état suivent le thème de la page
+  // (`data-mode`, posé par `applyPreferences`).
+  const root = document.documentElement;
+  const mode = () => bridge.setDark(root.dataset.mode !== "light");
+  mode();
+  new MutationObserver(mode).observe(root, { attributes: true, attributeFilter: ["data-mode"] });
+}

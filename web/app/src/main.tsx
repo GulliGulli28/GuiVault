@@ -14,7 +14,7 @@ import { installBackups } from "./backupBridge";
 import { installUpdater } from "./updaterBridge";
 import { installCoffres } from "./coffreBridge";
 import { installBubble } from "./bubbleBridge";
-import { detectMobile, isMobile } from "./mobile";
+import { detectMobile, installInsets, isMobile } from "./mobile";
 
 // Comme l'interface web (`src/main.tsx`), sans le service worker : l'app
 // embarque déjà son interface.
@@ -26,6 +26,7 @@ setDeviceLabel("Application GuiVault");
 // c'est là.
 // Sur mobile (Android), pas d'updater : les mises à jour passent par
 // l'installation d'un APK.
+installInsets();
 void detectMobile().then(() => {
   installBackups();
   if (!isMobile()) installUpdater();

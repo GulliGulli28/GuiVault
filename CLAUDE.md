@@ -87,6 +87,13 @@ il ne déchiffre rien : la user key reste sous la clé que seule la PRF donne).
   dépôt, `latest.json` servi par la pré-release `app-updater`). Ce qu'un
   coffre local n'a pas se masque par `supports(méthode)` ; `session.local`
   sert aux libellés (nom du coffre au lieu de l'e-mail, « Fermer le coffre »).
+  **Android** (`docs/ANDROID.md`) : le crate est une bibliothèque (`lib.rs`,
+  `mobile_entry_point`), ce qui n'existe qu'au bureau est sous
+  `cfg(desktop)` ; `gen/android` est versionné (Kotlin de la bulle :
+  `BubblePlugin.kt`, `BubbleService.kt`, marges : `MainActivity.kt`) ; on
+  construit depuis une copie Windows (`scripts/android-sync.sh`,
+  `scripts/android/*.ps1`). Côté interface : `web/app/src/mobile.ts`
+  (`isMobile`, coffres de l'appareil, marges), `bubbleBridge.ts`.
 - `web/` — l'interface web, Vite + React 19 + TypeScript + Tailwind 3.
   **Refonte (2026-10-21) : on se sépare de la charte de Guiterm.** Faite
   pour le web, l'extension et le mobile (le web sous 768 px : barre

@@ -656,7 +656,7 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
           )}
           {mode.kind === "view" && current && (
             <>
-              <div className="flex min-h-[52px] shrink-0 flex-wrap items-center gap-2 border-b border-[var(--c-border)] px-5 py-2 max-md:px-3">
+              <div className="flex min-h-[52px] shrink-0 flex-wrap items-center gap-2 border-b border-[var(--c-border)] px-5 py-2 max-md:px-3 max-md:pt-[calc(0.5rem+var(--inset-top))]">
                 <button onClick={() => setSelected(null)} className="btn btn-ghost btn-sm min-[1100px]:hidden max-md:-ml-1 max-md:h-11 max-md:w-11 max-md:px-0" aria-label="Retour à la liste"><IconChevronRight size={14} className="rotate-180 max-md:h-5 max-md:w-5" /><span className="max-md:hidden">Liste</span></button>
                 <div className="flex min-w-0 flex-1 items-center gap-2 text-[13px] text-[var(--c-text-muted)] max-md:text-[14px]">
                   <span className="truncate">{vault.name}</span>
