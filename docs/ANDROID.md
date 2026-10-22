@@ -11,9 +11,17 @@ barre de gestes, clavier) viennent de `MainActivity.kt` : l'app est « bord à
 bord » et `env(safe-area-inset-*)` vaut 0 dans la WebView ; la page les lit
 par `window.GuiVaultInsets` (`web/app/src/mobile.ts`) dans les variables
 `--inset-top` / `--inset-bottom` (`index.css`), et les icônes de la barre
-d'état suivent son thème. **Reste** : l'essai sur un vrai téléphone, la
-publication des APK (pas de mise à jour automatique sur Android : un APK
-signé à installer, ou un magasin).
+d'état suivent son thème. **Reste** : l'essai sur un vrai téléphone ; pas de
+mise à jour automatique sur Android (on installe l'APK suivant par-dessus).
+
+**Publier** : l'APK de release est joint à la release GitHub de l'application
+(`app-v<version>`, `docs/APP.md`), construit sur le poste — le CI ne le
+construit pas (la clé n'est pas dans GitHub). `build-apk.ps1 -Target
+aarch64,x86_64 -Release`, puis `gh release upload app-v<version>
+GuiVault_<version>_android.apk`, son empreinte ajoutée à `SHA256SUMS.txt`
+(`--clobber`) et une section « Android » dans les notes. Premier : 0.2.0
+(empreinte du certificat de signature, SHA-256 :
+`4110b08feab1fdf6d033e5ac47e4f89eda10b21592c34efc77a2477b4535c109`).
 
 **Signature** : la clé des APK de release est **hors du dépôt**,
 `%USERPROFILE%\.guivault-android\guivault-release.jks` (RSA 4096, alias
