@@ -25,6 +25,14 @@ tag), il ne laisse qu'un artefact. Empreinte du certificat (SHA-256) :
 `4110b08feab1fdf6d033e5ac47e4f89eda10b21592c34efc77a2477b4535c109`. La
 0.2.0, elle, a été construite sur le poste et jointe à la main.
 
+**Bulle automatique** : en quittant l'application (accueil, récentes, une
+autre appli ouverte d'ici), `MainActivity.onUserLeaveHint` lance la bulle si
+le réglage le veut (`BubbleService.autoEnabled`, préférences Android, activé
+par défaut ; commande `auto` du plugin) et que la permission est donnée —
+l'activité est encore au premier plan, ce qu'exige Android 12+ pour un
+service au premier plan. Les liens vers un site s'ouvrent dans le navigateur
+du téléphone (`tauri-plugin-opener`, `web/app/src/links.ts`).
+
 **Icône** : `scripts/android/icon-foreground.py` refait le premier plan de
 l'icône adaptative depuis `logo_GuiVault.png` (62 % du carré : Android
 découpe la zone centrale) ; à relancer après un `cargo tauri icon`. La bulle

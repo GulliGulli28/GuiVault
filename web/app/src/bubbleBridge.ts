@@ -18,5 +18,7 @@ export async function installBubble(): Promise<void> {
       return true;
     },
     setLocked: (locked) => invoke<void>("plugin:bubble|locked", { locked }),
+    auto: (enabled) => invoke<{ enabled: boolean; allowed: boolean }>("plugin:bubble|auto", enabled === undefined ? {} : { enabled }),
+    ask: () => invoke<void>("plugin:bubble|ask"),
   });
 }

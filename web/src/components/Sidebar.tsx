@@ -9,8 +9,8 @@ import { supports } from "../lib/api";
 import { coffreName } from "../lib/localHost";
 import { systemBridge } from "../lib/platform";
 import { ROLE_LABELS } from "../lib/types";
-import { IconDice, IconHome, IconIdentity, IconLifebuoy, IconLink, IconLogout, IconPulse, IconShieldClock, IconUsers } from "./secret-icons";
-import { IconBell, IconDatabase, IconLock, IconPlus, IconSearch, IconSettings, IconShield } from "./ui-icons";
+import { IconDice, IconHome, IconLifebuoy, IconLink, IconLogout, IconPulse, IconShieldClock, IconUsers } from "./secret-icons";
+import { IconBell, IconDatabase, IconLock, IconPlus, IconSearch, IconSettings } from "./ui-icons";
 import { Logo } from "./Logo";
 import { NewVaultDialog } from "./NewVault";
 import { NARROW, TOUCH, useMediaQuery } from "../hooks/useMediaQuery";
@@ -24,8 +24,6 @@ export function Sidebar({ ctx, route, onLogout, onLock, onSearch, width }: { ctx
   const local = session.local;
   const [creating, setCreating] = useState(false);
   const closeCreating = useCallback(() => setCreating(false), []);
-  const [accountMenu, setAccountMenu] = useState(false);
-  const accountButton = useRef<HTMLButtonElement>(null);
   const colors = useVaultColors();
   const { items, counts } = useAllItems(session, ctx.error);
   const totpCount = useMemo(() => items.filter((x) => x.item.payload.kind === "login" && x.item.payload.login.totp).length, [items]);
@@ -144,47 +142,30 @@ export function Sidebar({ ctx, route, onLogout, onLock, onSearch, width }: { ctx
       </div>
 
       <div className="flex flex-col gap-2">
-        <div className="relative flex min-w-0 items-center gap-1.5">
-          <button
-            ref={accountButton}
-            onClick={() => setAccountMenu((m) => !m)}
-            aria-haspopup="menu"
-            aria-expanded={accountMenu}
-            aria-label="Menu du compte"
-            className="flex min-w-0 flex-1 items-center gap-2.5 rounded-[10px] border border-[var(--c-border)] bg-[var(--c-surface)] p-2 text-left hover:border-[var(--c-border-strong)]"
-            title={local ? local.path : session.user.email}
-          >
-            <span className="tile h-[30px] w-[30px] rounded-full text-[12px]" style={{ "--tile-h": 238 } as React.CSSProperties}>{personInitials(name)}</span>
-            <span className="flex min-w-0 flex-1 flex-col leading-tight">
-              <span className="truncate text-[13px] font-medium text-[var(--c-text)]">{name}</span>
-              <span className="truncate text-[12px] text-[var(--c-text-muted)]">{local ? "Coffre local" : "Compte"}</span>
-            </span>
+        {/* Le compte (ou le coffre local) : un clic mène aux paramètres. */}
+        <a
+          href={routeHash({ page: "settings", section: "compte" })}
+          onClick={(e) => { e.preventDefault(); go({ page: "settings", section: "compte" }); }}
+          data-active={route.page === "settings" ? "true" : undefined}
+          aria-label="Paramètres"
+          className={`flex min-w-0 items-center gap-2.5 rounded-[10px] border p-2 text-left hover:no-underline ${route.page === "settings" ? "border-[var(--c-accent)] bg-[var(--c-sel)]" : "border-[var(--c-border)] bg-[var(--c-surface)] hover:border-[var(--c-border-strong)]"}`}
+          title={`${local ? local.path : session.user.email} · Paramètres`}
+        >
+          <span className="tile h-[30px] w-[30px] rounded-full text-[12px]" style={{ "--tile-h": 238 } as React.CSSProperties}>{personInitials(name)}</span>
+          <span className="flex min-w-0 flex-1 flex-col leading-tight">
+            <span className="truncate text-[13px] font-medium text-[var(--c-text)]">{name}</span>
+            <span className="truncate text-[12px] text-[var(--c-text-muted)]">{local ? "Coffre local" : "Compte"} · paramètres</span>
+          </span>
+          <IconSettings size={15} className="shrink-0 text-[var(--c-text-muted)]" />
+        </a>
+        <div className="flex min-w-0 gap-1.5">
+          <button onClick={onLock} className="btn btn-secondary min-w-0 flex-1" title="Verrouiller maintenant">
+            <IconLock size={14} /> Verrouiller<span className="flex-1" />{!touch && systemBridge() && <span className="kbd">Ctrl L</span>}
           </button>
-          <a
-            href={routeHash({ page: "settings", section: "apparence" })}
-            onClick={(e) => { e.preventDefault(); go({ page: "settings", section: "apparence" }); }}
-            data-active={route.page === "settings" ? "true" : undefined}
-            className={`btn btn-icon shrink-0 ${route.page === "settings" ? "btn-toggled" : "btn-secondary"}`}
-            title="Paramètres"
-            aria-label="Paramètres"
-          >
-            <IconSettings size={15} />
-          </a>
-          {accountMenu && (
-            <>
-              <div className="fixed inset-0 z-10" onClick={() => setAccountMenu(false)} />
-              <div className="popover absolute bottom-full left-0 z-20 mb-1.5 w-full py-1" role="menu">
-                <button role="menuitem" className="menu-item" onClick={() => { setAccountMenu(false); go({ page: "settings", section: "compte" }); }}><IconIdentity size={14} /> {local ? "Coffre local" : "Compte"}</button>
-                <button role="menuitem" className="menu-item" onClick={() => { setAccountMenu(false); go({ page: "settings", section: "securite" }); }}><IconShield size={14} /> Sécurité</button>
-                <div className="menu-sep" />
-                <button role="menuitem" className="menu-item text-[var(--c-danger-text)]" onClick={() => { setAccountMenu(false); onLogout(); }}><IconLogout size={14} /> {local ? "Fermer le coffre" : "Se déconnecter"}</button>
-              </div>
-            </>
-          )}
+          <button onClick={onLogout} className="btn btn-secondary btn-icon shrink-0 hover:text-[var(--c-danger-text)]" title={local ? "Fermer le coffre" : "Se déconnecter"} aria-label={local ? "Fermer le coffre" : "Se déconnecter"}>
+            <IconLogout size={15} />
+          </button>
         </div>
-        <button onClick={onLock} className="btn btn-secondary w-full" title="Verrouiller maintenant">
-          <IconLock size={14} /> Verrouiller<span className="flex-1" />{!touch && systemBridge() && <span className="kbd">Ctrl L</span>}
-        </button>
       </div>
     </div>
   );

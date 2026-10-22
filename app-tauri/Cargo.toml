@@ -30,6 +30,9 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 tauri = { version = "2", features = [] }
 tauri-plugin-dialog = "2"
+# Ouvrir un site dans le navigateur du système (pas dans la WebView de
+# l'app, où il casserait les marges sous Android).
+tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
 zeroize = "1"
 guivault-local = { path = "../crates/guivault-local" }

@@ -26,7 +26,7 @@ import { AdminPage } from "./components/AdminPage";
 import { HealthPage } from "./components/HealthPage";
 import { HomePage } from "./components/HomePage";
 import { MobileMenu } from "./components/MobileMenu";
-import { MobileNav, rememberVault } from "./components/MobileNav";
+import { MobileNav, mobileTabs, rememberVault, tabOf } from "./components/MobileNav";
 import { NARROW, useMediaQuery } from "./hooks/useMediaQuery";
 import { clearAllItems } from "./lib/allItems";
 import { AutoTypeHost } from "./components/AutoType";
@@ -37,7 +37,20 @@ import { PaneHandle, usePersistedPane } from "./hooks/usePersistedPane";
 /** Ce que chaque page reçoit : la session, et de quoi la recharger, notifier,
  * signaler une erreur. */
 /** Les pages d'un onglet mobile (`MobileNav`). */
-const TAB_PAGES = new Set<Route["page"]>(["home", "vault", "totp", "health", "more"]);
+const TAB_PAGES = new Set<Route["page"]>(["home", "vault", "totp", "health", "generator", "more"]);
+
+/** Un geste qui peut changer d'onglet : pas depuis un bord (le geste
+ * « retour » d'Android), ni depuis un champ, un curseur, une rangée qui
+ * défile de côté, une fiche ouverte ou une fenêtre. */
+function swipeable(target: EventTarget, x: number): boolean {
+  if (x < 24 || x > window.innerWidth - 24) return false;
+  for (let el = target as HTMLElement | null; el && el !== document.body; el = el.parentElement) {
+    if (el.matches("input, textarea, select, [role=slider], [data-noswipe], .modal")) return false;
+    const style = getComputedStyle(el);
+    if ((style.overflowX === "auto" || style.overflowX === "scroll") && el.scrollWidth > el.clientWidth) return false;
+  }
+  return true;
+}
 
 /** Ce qui fait « une autre page » pour l'animation : pas l'élément ouvert
  * dans un vault (sinon le vault se rechargerait). */
@@ -272,7 +285,30 @@ export default function App({ Welcome = LoginScreen }: { Welcome?: ComponentType
   const vaultRoute = route.page === "vault" ? route.id : null;
   useEffect(() => { if (vaultRoute) rememberVault(vaultRoute); }, [vaultRoute]);
 
+  // Mobile : glisser à gauche ou à droite passe à l'onglet voisin.
+  const swipeStart = useRef<{ x: number; y: number; t: number } | null>(null);
+  const [swipe, setSwipe] = useState<{ key: string; dir: "next" | "prev" }>({ key: "", dir: "next" });
+  const onSwipeStart = useCallback((e: React.TouchEvent) => {
+    const t = e.touches[0];
+    swipeStart.current = e.touches.length === 1 && swipeable(e.target, t.clientX) ? { x: t.clientX, y: t.clientY, t: Date.now() } : null;
+  }, []);
   const ctx = useMemo<PageContext | null>(() => (session ? { session, reload, notify, error, vaultTicks, search: openSearch, lock: lockByHand } : null), [session, reload, notify, error, vaultTicks, openSearch, lockByHand]);
+
+  const onSwipeEnd = (e: React.TouchEvent) => {
+    const start = swipeStart.current;
+    swipeStart.current = null;
+    if (!start || !ctx || !TAB_PAGES.has(route.page)) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - start.x;
+    const dy = t.clientY - start.y;
+    if (Math.abs(dx) < 70 || Math.abs(dx) < 2 * Math.abs(dy) || Date.now() - start.t > 700) return;
+    const tabs = mobileTabs(ctx).filter((x) => x.route);
+    const i = tabs.findIndex((x) => x.key === tabOf(route));
+    const next = tabs[i + (dx < 0 ? 1 : -1)];
+    if (i < 0 || !next?.route) return;
+    setSwipe({ key: pageKey(next.route), dir: dx < 0 ? "next" : "prev" });
+    navigate(next.route);
+  };
 
   // Un lien de partage s'ouvre sans compte, et hors de l'application.
   if (route.page === "send") {
@@ -285,7 +321,7 @@ export default function App({ Welcome = LoginScreen }: { Welcome?: ComponentType
 
   if (!ctx) {
     return (
-      <div className="h-full overflow-y-auto bg-[var(--c-bg)] text-[var(--c-text)]">
+      <div className="app-root h-full overflow-y-auto bg-[var(--c-bg)] text-[var(--c-text)]">
         <Welcome onSession={(s) => { const t = currentTokens(); if (t) saveWebSession(s, t); setSession(s); navigate({ page: "home" }); if (!s.offline) void refreshOfflineCopy(s).catch(() => {}); }} />
         <Toasts toasts={toasts} onDismiss={dismiss} />
       </div>
@@ -342,7 +378,7 @@ export default function App({ Welcome = LoginScreen }: { Welcome?: ComponentType
   }
 
   return (
-    <div className={`flex h-full w-full overflow-hidden bg-[var(--c-bg)] text-[var(--c-text)] ${narrow ? "flex-col" : ""}`}>
+    <div className={`app-root flex h-full w-full overflow-hidden bg-[var(--c-bg)] text-[var(--c-text)] ${narrow ? "flex-col" : ""}`}>
       {!narrow && <Sidebar ctx={ctx} route={effective} onLogout={onLogout} onLock={lockByHand} onSearch={openSearch} width={sidebar.value} />}
       {!narrow && <PaneHandle onMouseDown={sidebar.onMouseDown} />}
       <main className={`flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[var(--c-bg2)] ${sidebar.isDragging ? "pointer-events-none select-none" : ""}`}>
@@ -361,7 +397,12 @@ export default function App({ Welcome = LoginScreen }: { Welcome?: ComponentType
         {/* Mobile : chaque page entre en mouvement (`touch.css`) — les
             onglets en fondu, le reste en glissant. La clé ne change pas
             d'un élément à l'autre d'un même vault. */}
-        <div key={pageKey(effective)} className={`flex min-h-0 flex-1 flex-col ${TAB_PAGES.has(effective.page) ? "m-enter" : "m-push"}`}>
+        <div
+          key={pageKey(effective)}
+          className={`flex min-h-0 flex-1 flex-col ${swipe.key === pageKey(effective) ? (swipe.dir === "next" ? "m-from-right" : "m-from-left") : TAB_PAGES.has(effective.page) ? "m-enter" : "m-push"}`}
+          onTouchStart={narrow ? onSwipeStart : undefined}
+          onTouchEnd={narrow ? onSwipeEnd : undefined}
+        >
           {page}
         </div>
       </main>

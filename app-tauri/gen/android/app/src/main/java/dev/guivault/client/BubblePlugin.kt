@@ -3,7 +3,6 @@ package dev.guivault.client
 import android.app.Activity
 import android.content.Intent
 import android.net.Uri
-import android.os.Build
 import android.provider.Settings
 import app.tauri.annotation.Command
 import app.tauri.annotation.InvokeArg
@@ -15,6 +14,11 @@ import app.tauri.plugin.Plugin
 @InvokeArg
 class LockedArgs {
     var locked: Boolean = true
+}
+
+@InvokeArg
+class AutoArgs {
+    var enabled: Boolean? = null
 }
 
 /**
@@ -52,8 +56,7 @@ class BubblePlugin(private val activity: Activity) : Plugin(activity) {
             invoke.reject("La permission « Afficher par-dessus d'autres applis » manque.")
             return
         }
-        val intent = Intent(activity, BubbleService::class.java).putExtra(BubbleService.EXTRA_LOCKED, BubbleService.locked)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) activity.startForegroundService(intent) else activity.startService(intent)
+        BubbleService.start(activity)
         activity.moveTaskToBack(true)
         invoke.resolve()
     }
@@ -70,6 +73,19 @@ class BubblePlugin(private val activity: Activity) : Plugin(activity) {
         val args = invoke.parseArgs(LockedArgs::class.java)
         BubbleService.setLocked(args.locked)
         invoke.resolve()
+    }
+
+    /** Se réduire en bulle en quittant l'application : lit le réglage, ou le
+     * pose (`enabled`). Rend aussi si la permission est donnée. */
+    @Command
+    fun auto(invoke: Invoke) {
+        val args = invoke.parseArgs(AutoArgs::class.java)
+        args.enabled?.let { BubbleService.setAutoEnabled(activity, it) }
+        invoke.resolve(
+            JSObject()
+                .put("enabled", BubbleService.autoEnabled(activity))
+                .put("allowed", Settings.canDrawOverlays(activity)),
+        )
     }
 
     /** GuiVault revient au premier plan (par la bulle ou autrement) : plus

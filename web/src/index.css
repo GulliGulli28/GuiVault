@@ -116,6 +116,8 @@
 :root {
   --inset-top: env(safe-area-inset-top, 0px);
   --inset-bottom: env(safe-area-inset-bottom, 0px);
+  /* Le clavier virtuel : 0 dans un navigateur, qui se redimensionne lui-même. */
+  --inset-ime: 0px;
 }
 
 html {

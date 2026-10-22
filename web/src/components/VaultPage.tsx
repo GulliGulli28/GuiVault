@@ -28,6 +28,7 @@ import { useMerge } from "./MergeDialog";
 import { ShortcutsHelp } from "./ShortcutsHelp";
 import { ItemAside } from "./ItemAside";
 import { NewVaultDialog } from "./NewVault";
+import { BubbleButton } from "./BubbleButton";
 import { putVaultItems, useAllItems } from "../lib/allItems";
 import { IconCheck, IconChevronDown, IconChevronRight, IconCopy, IconEdit, IconExternal, IconFolder, IconKeyboard, IconPlus, IconRefresh, IconSearch, IconSettings, IconTrash, IconVault } from "./ui-icons";
 import { copyText, Dropdown, formatAgo, formatWhen, Loading, Modal, useDelayed } from "./ui";
@@ -525,6 +526,7 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
                     </>
                   )}
                 </Dropdown>
+                <BubbleButton ctx={ctx} />
                 {sortMenu}
                 {vaultMenu}
               </div>
@@ -629,12 +631,6 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
                 {...(writable && sort === "name" ? { folderActions, naming, onName: (n: string) => void submitFolderName(n), onNameCancel: () => setNaming(null), onMove: (id: string, folderId: string | null) => void moveToFolder(id, folderId) } : {})}
               />
             )}
-            {items !== null && entities.length === 0 && writable && (
-              <div className="flex flex-wrap justify-center gap-2 px-2 pb-4">
-                <button onClick={() => setMode({ kind: "new", itemKind: "login" })} className="btn btn-primary"><IconPlus size={14} /> Nouvel identifiant</button>
-                <button onClick={() => navigate({ page: "vault-tools", id: vault.id })} className="btn btn-secondary">Importer</button>
-              </div>
-            )}
           </div>
           {narrow && writable && (
             <button onClick={() => setNewMenu(true)} className="m-fab" aria-label="Nouvel élément" title="Nouvel élément"><IconPlus size={24} /></button>
@@ -644,7 +640,7 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
         {narrow && newMenu && <Modal title="Nouvel élément" onClose={closeNewMenu}><div role="menu" aria-label="Nouvel élément" className="-mx-3">{kindsMenu}</div></Modal>}
 
         <div className="hidden min-[1100px]:contents"><PaneHandle onMouseDown={list.onMouseDown} /></div>
-        <section className={`m-push flex min-h-0 flex-1 flex-col border-l border-[var(--c-border)] max-[1099.98px]:border-l-0 ${mode.kind === "view" && !current ? "max-[1099.98px]:hidden" : ""} ${list.isDragging ? "pointer-events-none select-none" : ""}`}>
+        <section data-noswipe className={`m-push flex min-h-0 flex-1 flex-col border-l border-[var(--c-border)] max-[1099.98px]:border-l-0 ${mode.kind === "view" && !current ? "max-[1099.98px]:hidden" : ""} ${list.isDragging ? "pointer-events-none select-none" : ""}`}>
           {stale && mode.kind !== "view" && (
             <p className="callout callout-warn m-4 mb-0">Ce vault a changé entre-temps : l'enregistrement proposera de fusionner.</p>
           )}

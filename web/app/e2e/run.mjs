@@ -166,15 +166,15 @@ async function button(browser, text, timeout = 10_000) {
 
 const click = async (browser, text, timeout) => (await button(browser, text, timeout)).click();
 
-/** Une entrée du menu du compte (pied de la barre latérale) : le compte,
- * la sécurité, se déconnecter ou fermer le coffre. */
+/** Le pied de la barre latérale : la zone du compte mène aux paramètres
+ * (« Compte », « Coffre local »), le bouton à côté de « Verrouiller » se
+ * déconnecte ou ferme le coffre. */
 async function account(browser, item) {
-  const open = await browser.$("//aside//button[@aria-label='Menu du compte']");
-  await open.waitForClickable({ timeout: 10_000, timeoutMsg: "bouton du compte introuvable" });
-  await open.click();
-  const entry = await browser.$(`//button[@role='menuitem'][normalize-space()=${xpathText(item)}]`);
-  await entry.waitForClickable({ timeout: 10_000, timeoutMsg: `« ${item} » introuvable dans le menu du compte` });
-  await entry.click();
+  const el = item === "Compte" || item === "Coffre local"
+    ? await browser.$("//aside//a[@aria-label='Paramètres']")
+    : await browser.$(`//aside//button[@aria-label=${xpathText(item)}]`);
+  await el.waitForClickable({ timeout: 10_000, timeoutMsg: `« ${item} » introuvable en pied de barre latérale` });
+  await el.click();
 }
 
 /** Le menu « Nouveau » de la liste du vault. Sous 1100 px, la liste et la

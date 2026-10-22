@@ -17,6 +17,8 @@
     "bubble:allow-ask",
     "bubble:allow-show",
     "bubble:allow-hide",
-    "bubble:allow-locked"
+    "bubble:allow-locked",
+    "bubble:allow-auto",
+    "opener:default"
   ]
 }

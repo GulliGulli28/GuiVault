@@ -183,6 +183,11 @@ export interface BubbleBridge {
   /** La bulle grise quand le coffre est verrouillé : elle ne montre jamais
    * rien d'autre que le logo. */
   setLocked(locked: boolean): Promise<void>;
+  /** Se réduire en bulle en quittant l'application : le réglage (le pose si
+   * `enabled` est donné), et si la permission est donnée. */
+  auto(enabled?: boolean): Promise<{ enabled: boolean; allowed: boolean }>;
+  /** Ouvre l'écran d'Android qui donne la permission. */
+  ask(): Promise<void>;
 }
 
 let bubble: BubbleBridge | null = null;

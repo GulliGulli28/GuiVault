@@ -6,6 +6,7 @@ import { Page } from "./Page";
 import { TotpList, type TotpEntry } from "./TotpList";
 import { Loading, useDelayed } from "./ui";
 import { TotpCode } from "./TotpCode";
+import { BubbleButton } from "./BubbleButton";
 import { IconSearch } from "./ui-icons";
 import { tileHue, tileInitial } from "../lib/tiles";
 import { NARROW, useMediaQuery } from "../hooks/useMediaQuery";
@@ -56,7 +57,7 @@ export function TotpPage({ ctx }: { ctx: PageContext }) {
       .sort((a, b) => a.login.name.localeCompare(b.login.name));
     return (
       <div className="m-page">
-        <header className="m-head"><h1 className="m-title min-w-0 flex-1 truncate">Codes 2FA</h1></header>
+        <header className="m-head"><h1 className="m-title min-w-0 flex-1 truncate">Codes 2FA</h1><BubbleButton ctx={ctx} /></header>
         <div className="shrink-0 px-4 pb-2.5">
           <label className="m-search"><IconSearch size={18} /><input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Rechercher un code" aria-label="Rechercher un code" /></label>
         </div>
@@ -78,7 +79,7 @@ export function TotpPage({ ctx }: { ctx: PageContext }) {
   }
 
   return (
-    <Page title="Codes 2FA" sub={entries ? `${entries.filter((e) => e.login.totp).length} codes · cliquez pour copier` : undefined} width="max-w-[760px]" mobileBack={null}>
+    <Page title="Codes 2FA" sub={entries ? `${entries.filter((e) => e.login.totp).length} codes · cliquez pour copier` : undefined} width="max-w-[760px]" align="left" mobileBack={null}>
       {entries === null ? (slow ? <Loading /> : null) : <TotpList entries={entries} onRemove={ctx.session.vaults.some((v) => v.role !== "reader") ? remove : undefined} />}
     </Page>
   );

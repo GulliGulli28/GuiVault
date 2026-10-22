@@ -1,6 +1,7 @@
 package dev.guivault.client
 
 import android.os.Bundle
+import android.provider.Settings
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import androidx.activity.enableEdgeToEdge
@@ -11,11 +12,19 @@ import androidx.core.view.WindowInsetsCompat
 class MainActivity : TauriActivity() {
   /** Les marges du système, en px CSS : la WebView ne les donne pas à la page
    * (`env(safe-area-inset-*)` vaut 0) dans une application bord à bord. */
-  @Volatile private var insets = "{\"top\":0,\"bottom\":0}"
+  @Volatile private var insets = "{\"top\":0,\"bottom\":0,\"ime\":0}"
 
   override fun onCreate(savedInstanceState: Bundle?) {
     enableEdgeToEdge()
     super.onCreate(savedInstanceState)
+  }
+
+  /** On quitte l'application (accueil, récentes, une autre appli ouverte
+   * d'ici) : la bulle, si le réglage le veut et que la permission est
+   * donnée. L'activité est encore au premier plan à cet instant. */
+  override fun onUserLeaveHint() {
+    super.onUserLeaveHint()
+    if (BubbleService.autoEnabled(this) && Settings.canDrawOverlays(this)) BubbleService.start(this)
   }
 
   override fun onWebViewCreate(webView: WebView) {
@@ -38,10 +47,10 @@ class MainActivity : TauriActivity() {
     }, "GuiVaultInsets")
     ViewCompat.setOnApplyWindowInsetsListener(webView) { view, all ->
       val bars = all.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
-      // Clavier ouvert : le bas remonte au-dessus de lui.
+      // Le clavier à part : la page se raccourcit, les onglets se cachent.
       val ime = all.getInsets(WindowInsetsCompat.Type.ime())
       val d = resources.displayMetrics.density
-      insets = "{\"top\":${bars.top / d},\"bottom\":${maxOf(bars.bottom, ime.bottom) / d}}"
+      insets = "{\"top\":${bars.top / d},\"bottom\":${bars.bottom / d},\"ime\":${ime.bottom / d}}"
       (view as WebView).post { view.evaluateJavascript("window.dispatchEvent(new Event('guivault-insets'))", null) }
       all
     }

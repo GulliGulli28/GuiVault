@@ -51,6 +51,30 @@ class BubbleService : Service() {
             locked = value
             current?.let { s -> s.bubble?.post { s.paint() } }
         }
+
+        private const val PREFS = "guivault_bubble"
+        private const val AUTO = "auto"
+
+        /** Se réduire en bulle en quittant l'application : activé par défaut,
+         * réglé dans l'onglet Réglages (`BubblePlugin.auto`). */
+        fun autoEnabled(context: Context): Boolean =
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(AUTO, true)
+
+        fun setAutoEnabled(context: Context, enabled: Boolean) {
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(AUTO, enabled).apply()
+        }
+
+        /** Montre la bulle (le service au premier plan). Appelé tant que
+         * l'activité est encore au premier plan : Android 12+ refuse de
+         * lancer un service au premier plan depuis l'arrière-plan. */
+        fun start(context: Context) {
+            val intent = Intent(context, BubbleService::class.java).putExtra(EXTRA_LOCKED, locked)
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) context.startForegroundService(intent) else context.startService(intent)
+            } catch (e: Exception) {
+                // Refusé par le système : pas de bulle cette fois.
+            }
+        }
     }
 
     private lateinit var windows: WindowManager
@@ -73,6 +97,12 @@ class BubbleService : Service() {
         goForeground()
         if (bubble == null) addBubble() else paint()
         return START_NOT_STICKY
+    }
+
+    /** L'application balayée des récentes : la bulle s'en va avec elle. */
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        stopSelf()
+        super.onTaskRemoved(rootIntent)
     }
 
     override fun onDestroy() {

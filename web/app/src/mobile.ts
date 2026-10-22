@@ -41,10 +41,14 @@ export function installInsets(): void {
   if (!bridge) return;
   const apply = () => {
     try {
-      const i = JSON.parse(bridge.get()) as { top: number; bottom: number };
-      const root = document.documentElement.style;
-      root.setProperty("--inset-top", `${i.top}px`);
-      root.setProperty("--inset-bottom", `${i.bottom}px`);
+      const i = JSON.parse(bridge.get()) as { top: number; bottom: number; ime?: number };
+      const root = document.documentElement;
+      root.style.setProperty("--inset-top", `${i.top}px`);
+      root.style.setProperty("--inset-bottom", `${i.bottom}px`);
+      root.style.setProperty("--inset-ime", `${i.ime ?? 0}px`);
+      // Clavier ouvert : `touch.css` cache les onglets.
+      if ((i.ime ?? 0) > 0) root.dataset.ime = "";
+      else delete root.dataset.ime;
     } catch {
       // Rien de lisible : on garde les marges du navigateur.
     }

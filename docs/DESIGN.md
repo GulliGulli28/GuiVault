@@ -117,7 +117,8 @@ celle de `html`.
   l'application (`web/app/src/AppWelcome.tsx` : coffres récents, serveur,
   ouvrir ou créer un coffre local).
 - **Gabarit de page** : `components/Page.tsx` (titre, sous-titre d'une ligne,
-  actions, colonne bornée). Une ligne de réglage : `SettingRow` (`ui.tsx`).
+  actions, colonne bornée, centrée — ou contre la barre latérale avec
+  `align="left"` : générateur, codes 2FA). Une ligne de réglage : `SettingRow` (`ui.tsx`).
   Une info au clic : `InfoTip` (`ui.tsx`). Un menu : `Dropdown` (`ui.tsx`).
 - **Tuiles** : `ItemTile` (`ItemTree.tsx`) — l'icône choisie, sinon l'initiale
   sur une teinte tirée du nom (`lib/tiles.ts`, classe `.tile`).
@@ -157,10 +158,21 @@ celle de `html`.
   - Mouvements (`touch.css`, fin) : les onglets entrent en fondu, les pages
     de second niveau glissent depuis la droite, les feuilles montent du bas ;
     rien si le système demande moins de mouvement.
-  - Android : « Bulle » à droite de la barre d'onglets, sur toutes les pages.
+  - Onglets : Accueil, Coffres, Codes, Santé, Générateur, Réglages
+    (`mobileTabs`, `MobileNav.tsx`) ; glisser à gauche ou à droite passe à
+    l'onglet voisin (`App.tsx`, pas depuis un bord, un champ, une rangée qui
+    défile ni une fiche ouverte).
+  - Android : la bulle vient d'elle-même en quittant l'application (réglage
+    « Bulle » de l'onglet Réglages) ; coupé, un bouton en haut à droite des
+    pages (`BubbleButton`).
+  - Clavier ouvert (application Android) : `--inset-ime` raccourcit la page,
+    pose les feuilles au-dessus de lui, et cache les onglets.
 - **Écrans d'entrée, la vitrine** (`AuthShell`, `.auth-hero` dans
   `index.css`) : aurores floues qui dérivent, grille estompée, cartes de
   verre qui flottent (un identifiant, un code 2FA, ce que voit le serveur).
+- **Pied de la barre latérale** : la zone du compte (ou du coffre local) mène
+  aux paramètres ; à côté de « Verrouiller », se déconnecter (fermer le
+  coffre).
 - **Créer depuis l'accueil** : « Nouvel élément » ouvre un menu — le vault
   de destination s'il y en a plusieurs, chaque type, un dossier
   (`#/vault/<id>/new/group`), un nouveau vault (`NewVault.tsx`, aussi dans la

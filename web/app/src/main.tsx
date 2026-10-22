@@ -14,6 +14,7 @@ import { installBackups } from "./backupBridge";
 import { installUpdater } from "./updaterBridge";
 import { installCoffres } from "./coffreBridge";
 import { installBubble } from "./bubbleBridge";
+import { installExternalLinks } from "./links";
 import { detectMobile, installInsets, isMobile } from "./mobile";
 
 // Comme l'interface web (`src/main.tsx`), sans le service worker : l'app
@@ -27,11 +28,14 @@ setDeviceLabel("Application GuiVault");
 // Sur mobile (Android), pas d'updater : les mises à jour passent par
 // l'installation d'un APK.
 installInsets();
+installExternalLinks();
 void detectMobile().then(() => {
   installBackups();
   if (!isMobile()) installUpdater();
   installCoffres();
-  return Promise.allSettled([installAutoType(), installClipboard(), installSystem(), installBubble()]);
+  // Le pont système (verrou de session, zone de notification, démarrage,
+  // extension) n'a pas de sens sur Android : pas de catégorie « Application ».
+  return Promise.allSettled([installAutoType(), installClipboard(), isMobile() ? Promise.resolve() : installSystem(), installBubble()]);
 }).finally(() => {
   ReactDOM.createRoot(document.getElementById("root")!).render(
     <React.StrictMode>

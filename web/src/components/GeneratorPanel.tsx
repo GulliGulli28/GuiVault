@@ -241,7 +241,7 @@ function Check({ label, checked, onChange }: { label: string; checked: boolean; 
 
 export function GeneratorPage() {
   return (
-    <Page title="Générateur" sub="Mots de passe, phrases de passe et clés SSH, générés ici." width="max-w-[680px]">
+    <Page title="Générateur" sub="Mots de passe, phrases de passe et clés SSH, générés ici." width="max-w-[760px]" align="left" mobileBack={null}>
       <GeneratorPanel />
     </Page>
   );

@@ -15,6 +15,7 @@ import { NewVaultDialog } from "./NewVault";
 import { TotpCode } from "./TotpCode";
 import { IconCheck, IconChevronDown, IconChevronRight, IconCopy, IconLock, IconPlus, IconSearch, IconVault } from "./ui-icons";
 import { Logo } from "./Logo";
+import { BubbleButton } from "./BubbleButton";
 import { NARROW, useMediaQuery } from "../hooks/useMediaQuery";
 import { copyText, Dropdown, formatAgo } from "./ui";
 
@@ -77,6 +78,7 @@ export function HomePage({ ctx }: { ctx: PageContext }) {
         <header className="m-head">
           <Logo size={30} />
           <h1 className="m-title min-w-0 flex-1 truncate text-[22px]">{local ? name : `Bonjour ${name}`}</h1>
+          <BubbleButton ctx={ctx} />
           <button onClick={ctx.lock} className="m-icon border border-[var(--c-border-strong)] bg-[var(--c-surface)]" aria-label="Verrouiller" title="Verrouiller"><IconLock size={18} /></button>
         </header>
         <div className="m-body">

@@ -1,8 +1,7 @@
 import type { PageContext } from "../App";
 import { navigate, routeHash, type Route } from "../lib/route";
 import { healthSummary, useAllItems } from "../lib/allItems";
-import { IconBubble, IconHome, IconPulse, IconShieldClock } from "./secret-icons";
-import { bubbleBridge, reduceToBubble } from "../lib/bubble";
+import { IconDice, IconHome, IconPulse, IconShieldClock } from "./secret-icons";
 import { IconSettings, IconVault } from "./ui-icons";
 
 const LAST_VAULT = "guivault.lastVault";
@@ -36,24 +35,41 @@ function tabOf(route: Route): string {
     case "vault": case "vault-settings": case "vault-tools": case "vault-trash": case "invitations": return "vaults";
     case "totp": return "codes";
     case "health": return "health";
+    case "generator": return "generator";
     default: return "more";
   }
 }
+
+export interface MobileTab {
+  key: string;
+  label: string;
+  route: Route | null;
+  icon: React.ReactNode;
+  badge?: number;
+}
+
+/** Les onglets, dans l'ordre (la barre, et le glissement d'un onglet à
+ * l'autre dans `App`). */
+export function mobileTabs(ctx: PageContext, issues = 0): MobileTab[] {
+  return [
+    { key: "home", label: "Accueil", route: { page: "home" }, icon: <IconHome size={22} /> },
+    { key: "vaults", label: "Coffres", route: vaultTab(ctx), icon: <IconVault size={22} /> },
+    { key: "codes", label: "Codes", route: { page: "totp" }, icon: <IconShieldClock size={22} /> },
+    { key: "health", label: "Santé", route: { page: "health" }, icon: <IconPulse size={22} />, badge: issues },
+    { key: "generator", label: "Générateur", route: { page: "generator" }, icon: <IconDice size={22} /> },
+    { key: "more", label: "Réglages", route: { page: "more" }, icon: <IconSettings size={22} /> },
+  ];
+}
+
+export { tabOf };
 
 /** Mobile (`docs/DESIGN.md`) : la barre d'onglets du bas, à la place de la
  * barre latérale — Accueil, Coffres, Codes, Santé, Réglages. */
 export function MobileNav({ ctx, route }: { ctx: PageContext; route: Route }) {
   const { items } = useAllItems(ctx.session, ctx.error);
   const issues = healthSummary(items).issues;
-  const vaults = vaultTab(ctx);
   const active = tabOf(route);
-  const tabs: { key: string; label: string; route: Route | null; icon: React.ReactNode; badge?: number }[] = [
-    { key: "home", label: "Accueil", route: { page: "home" }, icon: <IconHome size={22} /> },
-    { key: "vaults", label: "Coffres", route: vaults, icon: <IconVault size={22} /> },
-    { key: "codes", label: "Codes", route: { page: "totp" }, icon: <IconShieldClock size={22} /> },
-    { key: "health", label: "Santé", route: { page: "health" }, icon: <IconPulse size={22} />, badge: issues },
-    { key: "more", label: "Réglages", route: { page: "more" }, icon: <IconSettings size={22} /> },
-  ];
+  const tabs = mobileTabs(ctx, issues);
   return (
     <nav aria-label="Principal" className="m-nav">
       {tabs.map((t) => t.route && (
@@ -71,13 +87,6 @@ export function MobileNav({ ctx, route }: { ctx: PageContext; route: Route }) {
           <span className="truncate">{t.label}</span>
         </a>
       ))}
-      {/* Android : se réduire en bulle, de n'importe quelle page. */}
-      {bubbleBridge() && (
-        <button onClick={() => void reduceToBubble(ctx)} className="m-tab m-tab-bubble" aria-label="Réduire en bulle" title="Réduire en bulle">
-          <IconBubble size={22} />
-          <span className="truncate">Bulle</span>
-        </button>
-      )}
     </nav>
   );
 }
