@@ -1615,7 +1615,7 @@ dependencies = [
 
 [[package]]
 name = "guivault-app"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "guivault-local",
  "serde",
