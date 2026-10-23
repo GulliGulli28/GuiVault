@@ -1,4 +1,10 @@
 target
+# Les sorties de l'app (Tauri, Gradle) : des dizaines de Go, inutiles au serveur.
+app-tauri/target
+app-tauri/gen/android/app/build
+app-tauri/gen/android/.gradle
+web/dist-app
+web/dist-extension
 .git
 .env
 docs
