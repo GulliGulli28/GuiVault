@@ -29,7 +29,7 @@ coché ci-dessous avec où il vit dans le code.
 1. **Manifeste de vault authentifié** (§0) : tout est écrit — serveur, web
    (alerte comprise), extension, vecteurs d'interop, `gv` et Guiterm ; reste
    l'**activation** (`AUTO_ENABLE_MANIFEST`), une fois ce Guiterm publié.
-   La liste exacte : [`MANIFESTE.md`](MANIFESTE.md), « Ce qui reste ».
+   La liste exacte : [`MANIFESTE.md`](MANIFESTE.md), « Ce qui reste, dans l'ordre ».
 2. **Android, ne pas perdre un coffre local** (§6) : il vit dans le dossier
    privé de l'app, que la désinstallation efface ; ni export ni import de
    fichier. Puis décider de la sauvegarde Google (`allowBackup`).
@@ -43,7 +43,8 @@ coché ci-dessous avec où il vit dans le code.
    l'extension (§2), `reprompt`, doublons, premier lancement guidé (§1),
    petites écritures qui rechargent sur un conflit (§4), écrans propres à
    l'application qui n'ont eu que des textes raccourcis dans la refonte
-   (`DESIGN.md`, « État »).
+   (`DESIGN.md`, « État »), `gv` et Guiterm sur un coffre local
+   (`APP.md`).
 
 ## 0. Sécurité face à un serveur malveillant
 
