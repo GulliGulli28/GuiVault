@@ -2,7 +2,7 @@
  * et les opérations qui combinent l'API et la cryptographie (l'équivalent de
  * `account.rs` + `sharing.rs` + la partie chiffrement de `sync.rs` dans
  * Guiterm). Tout vit en mémoire : recharger la page, c'est se reconnecter. */
-import { api, ApiError, setTokens, setTransport, supports } from "./api";
+import { api, ApiError, currentTokens, setTokens, setTransport, supports } from "./api";
 import { fromBase64, toBase64, utf8, uuid, randomBytes } from "./bytes";
 import * as c from "./crypto";
 import { fingerprint as fingerprintOf, type UnlockedAccount } from "./crypto";
@@ -274,6 +274,56 @@ export async function openLocal(host: LocalHost, path: string, password: string)
     await host.close().catch(() => {});
     throw e;
   }
+}
+
+/** Ouvre le coffre local de `path` avec sa user key elle-même — rendue par
+ * la biométrie de l'app (`biometric.ts`). L'enveloppe de la clé privée la
+ * vérifie : une clé qui ne va pas à ce coffre ne l'ouvre pas. */
+export async function openLocalWithUserKey(host: LocalHost, path: string, userKey: Uint8Array): Promise<SessionState> {
+  await localOpen(host, path);
+  try {
+    const a = await localAccount(host);
+    let account: UnlockedAccount;
+    try {
+      account = c.unlockAccountWithUserKey(userKey, unb64(a.protected_private_key));
+    } catch {
+      throw new Error("Cette clé n'ouvre plus ce coffre : utilisez le mot de passe maître.");
+    }
+    const blobs: AccountBlobs = { kdf: a.kdf, kdf_salt: a.kdf_salt, protected_user_key: a.protected_user_key, protected_private_key: a.protected_private_key };
+    return await startLocal(host, path, account, blobs);
+  } catch (e) {
+    await host.close().catch(() => {});
+    throw e;
+  }
+}
+
+/** Rouvre un compte du serveur verrouillé — les jetons sont encore là — avec
+ * sa user key (biométrie de l'app) : pas de nouvelle connexion, la session
+ * du serveur continue. */
+export async function resumeWithUserKey(userKey: Uint8Array, blobs: AccountBlobs): Promise<SessionState> {
+  if (!currentTokens()) throw new Error("La session du serveur est fermée : utilisez le mot de passe maître.");
+  const user = await api.me();
+  let account: UnlockedAccount;
+  try {
+    account = c.unlockAccountWithUserKey(userKey, unb64(blobs.protected_private_key));
+  } catch {
+    throw new Error("Cette clé n'ouvre plus ce compte : utilisez le mot de passe maître.");
+  }
+  return openSession(user, account, blobs);
+}
+
+/** Ce qui vient d'être verrouillé (pas fermé) : l'accueil de l'app y revient
+ * tout droit, prêt à le rouvrir. Un coffre local, ou un compte du serveur
+ * (ses jetons restent, `App.lockNow`). */
+export type LockedTarget = { kind: "local"; path: string } | { kind: "server"; userId: string; email: string };
+let locked: LockedTarget | null = null;
+
+export function rememberLocked(state: SessionState | null): void {
+  locked = !state || state.offline ? null : state.local ? { kind: "local", path: state.local.path } : { kind: "server", userId: state.user.id, email: state.user.email };
+}
+
+export function lockedTarget(): LockedTarget | null {
+  return locked;
 }
 
 async function startLocal(host: LocalHost, path: string, account: UnlockedAccount, blobs: AccountBlobs): Promise<SessionState> {

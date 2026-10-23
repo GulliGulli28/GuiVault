@@ -324,9 +324,9 @@
 }
 
 /* ─── Mouvements (mobile) ─────────────────────────────────────────────────
-   Changer d'onglet : la page monte en fondu. Ouvrir une page de second
-   niveau (fiche, réglage, outil) : elle glisse depuis la droite. Une feuille
-   monte du bas. Une animation rejoue quand un élément réapparaît (de
+   Entre pages, c'est `MobilePager` (animations Web, rien ici). Dans un
+   coffre, la fiche glisse depuis la droite et la liste revient de la gauche,
+   sur la courbe d'iOS. Une feuille monte du bas. Une animation rejoue quand un élément réapparaît (de
    `display: none`) : la liste et la fiche du coffre n'ont rien d'autre à
    faire. `translate` plutôt que `transform`, que les feuilles fixent ; et
    `backwards`, jamais `both` : un `translate` gardé après la fin ferait de la
@@ -334,20 +334,13 @@
    contre elle — raccourcie par le clavier — et non contre l'écran. */
 @media (max-width: 767px) {
   .m-enter {
-    animation: m-enter 220ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+    animation: m-back 340ms cubic-bezier(0.32, 0.72, 0, 1) backwards;
   }
   .m-push {
-    animation: m-push 260ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
-  }
-  /* Un onglet atteint en glissant arrive du côté du geste. */
-  .m-from-right {
-    animation: m-from-right 240ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
-  }
-  .m-from-left {
-    animation: m-from-left 240ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+    animation: m-push 400ms cubic-bezier(0.32, 0.72, 0, 1) backwards;
   }
   .modal:not(.palette) {
-    animation: m-sheet 280ms cubic-bezier(0.2, 0.9, 0.2, 1) backwards;
+    animation: m-sheet 380ms cubic-bezier(0.32, 0.72, 0, 1) backwards;
   }
   .modal.palette {
     animation: m-enter 200ms ease-out backwards;
@@ -367,13 +360,10 @@
   from { opacity: 0; translate: 0 10px; }
 }
 @keyframes m-push {
-  from { opacity: 0.4; translate: 32px 0; }
+  from { opacity: 0; translate: 36% 0; }
 }
-@keyframes m-from-right {
-  from { opacity: 0.3; translate: 60px 0; }
-}
-@keyframes m-from-left {
-  from { opacity: 0.3; translate: -60px 0; }
+@keyframes m-back {
+  from { opacity: 0; translate: -18% 0; }
 }
 @keyframes m-sheet {
   from { translate: 0 100%; }
@@ -387,8 +377,6 @@
 @media (prefers-reduced-motion: reduce) {
   .m-enter,
   .m-push,
-  .m-from-right,
-  .m-from-left,
   .modal,
   .popover,
   .m-tab svg {

@@ -61,6 +61,14 @@ class BubblePlugin(private val activity: Activity) : Plugin(activity) {
         invoke.resolve()
     }
 
+    /** Où la bulle va apparaître (son centre, px CSS) : l'interface y fait
+     * converger son animation avant de se réduire. */
+    @Command
+    fun anchor(invoke: Invoke) {
+        val (x, y) = BubbleService.anchor(activity)
+        invoke.resolve(JSObject().put("x", x.toDouble()).put("y", y.toDouble()))
+    }
+
     @Command
     fun hide(invoke: Invoke) {
         activity.stopService(Intent(activity, BubbleService::class.java))

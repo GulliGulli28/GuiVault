@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/mobile-schema.json",
   "identifier": "mobile",
-  "description": "Android : choisir un fichier à importer, et la bulle flottante (src/bubble.rs).",
+  "description": "Android : choisir un fichier à importer, la bulle flottante (src/bubble.rs) et le déverrouillage biométrique (src/biometric.rs).",
   "platforms": [
     "android"
   ],
@@ -19,6 +19,13 @@
     "bubble:allow-hide",
     "bubble:allow-locked",
     "bubble:allow-auto",
+    "bubble:allow-anchor",
+    "biometric:allow-status",
+    "biometric:allow-state",
+    "biometric:allow-enable",
+    "biometric:allow-unlock",
+    "biometric:allow-touch",
+    "biometric:allow-disable",
     "opener:default"
   ]
 }

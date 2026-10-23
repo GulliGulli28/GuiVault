@@ -240,3 +240,16 @@ export function IconFolderPlus({ size = 16, className }: P) {
     </svg>
   );
 }
+
+/** Le déverrouillage biométrique (Android) : une empreinte. */
+export function IconFingerprint({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <path d="M3.4 5.2A5.25 5.25 0 0 1 13.2 6.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+      <path d="M2.75 8.6c.2-.7.35-1.3.6-1.9M13.3 8.4c0 1.3-.2 2.5-.6 3.6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+      <path d="M5.1 12.9c.6-1.3 1-2.8 1-4.4a1.9 1.9 0 0 1 3.8 0c0 2-.4 3.8-1.1 5.3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+      <path d="M4.1 10.9c.3-.8.5-1.6.5-2.4a3.4 3.4 0 0 1 6.8 0c0 .8-.1 1.6-.2 2.3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+      <path d="M8 8.5c0 2.2-.5 4.2-1.4 5.8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+    </svg>
+  );
+}

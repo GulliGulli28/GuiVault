@@ -34,9 +34,9 @@ coché ci-dessous avec où il vit dans le code.
    privé de l'app, que la désinstallation efface ; ni export ni import de
    fichier. Puis décider de la sauvegarde Google (`allowBackup`).
    [`ANDROID.md`](ANDROID.md), « Ce qui reste ».
-3. **Android, l'essai sur un vrai téléphone**, puis **déverrouillage
-   biométrique** et **service de remplissage** — sans eux l'app Android
-   reste une visionneuse (§6).
+3. **Android, l'essai sur un vrai téléphone** (biométrie comprise), puis le
+   **service de remplissage** — sans lui l'app Android reste une
+   visionneuse (§6).
 4. **Windows** (§6) : signature de code (SmartScreen), mises à jour pour
    une installation MSI, Windows Hello, agent SSH.
 5. **Le reste des cases vides**, au choix : 2FA WebAuthn et passkey dans
@@ -374,8 +374,11 @@ L gros.
 - [ ] **Exporter / importer un coffre local** (M) : par le sélecteur de
   documents d'Android ; aujourd'hui, désinstaller efface les coffres de
   l'appareil. Et décider de la sauvegarde Google (`allowBackup`, S).
-- [ ] **Déverrouillage biométrique** (M) : la user key sous une clé du
-  Keystore ; conception crypto à part, comme Windows Hello.
+- [x] **Déverrouillage biométrique** (M) : la user key sous une clé du
+  Keystore, empreinte ou visage de classe 3 à chaque usage ; mot de passe
+  après un redémarrage et tous les 14 jours — [`ANDROID.md`](ANDROID.md),
+  « Déverrouillage biométrique ». Windows Hello pourra suivre le même
+  schéma (`BiometricBridge`).
 - [ ] **Service de remplissage Android** (L, KeePassDX, Bitwarden) — sans
   lui, l'app Android ne remplit rien en dehors d'elle-même.
 - [ ] `FLAG_SECURE`, presse-papiers marqué sensible (S).

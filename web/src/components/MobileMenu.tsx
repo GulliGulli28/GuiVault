@@ -11,6 +11,8 @@ import { settingsCategories } from "./SettingsPage";
 import { IconBubble, IconLink, IconLogout } from "./secret-icons";
 import { reduceToBubble, useAutoBubble } from "../lib/bubble";
 import { BubbleButton } from "./BubbleButton";
+import { BiometricSetting } from "./BiometricSetting";
+import { biometricBridge } from "../lib/biometric";
 import { IconBell, IconChevronRight, IconDatabase, IconLock } from "./ui-icons";
 
 /** Mobile : l'onglet « Réglages » (maquette `MParametres`) — le compte, le
@@ -71,6 +73,15 @@ export function MobileMenu({ ctx, onLock, onLogout }: { ctx: PageContext; onLock
             ))}
           </div>
         </section>
+
+        {biometricBridge() && !session.offline && (
+          <section className="flex flex-col gap-2">
+            <h2 className="m-section">Déverrouillage</h2>
+            <div className="m-card m-list">
+              <BiometricSetting ctx={ctx} mobile />
+            </div>
+          </section>
+        )}
 
         {auto.state && (
           <section className="flex flex-col gap-2">

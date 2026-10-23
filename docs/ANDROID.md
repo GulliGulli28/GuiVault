@@ -3,11 +3,12 @@
 L'application Android de GuiVault : Tauri 2 mobile, la même interface que
 le web mobile (`docs/DESIGN.md`, « Mobile »), le coffre local et le serveur
 comme sur Windows, et ce que seul Android sait faire — d'abord la **bulle
-flottante**. **État (2026-10-23, version 0.2.2)** : l'application est publiée avec
+flottante**. **État (2026-10-23, version 0.3.0)** : l'application est publiée avec
 chaque release (APK signé par le CI) ; coffre local et serveur, toutes les
 pages en mise en page mobile, onglets au doigt, bulle (réduire, déplacer,
 se ranger au bord, rouvrir d'un toucher, grise une fois verrouillé, fermer
-sur la croix ; automatique en quittant l'application, réglable). Les marges
+sur la croix ; automatique en quittant l'application, réglable),
+déverrouillage biométrique. Les marges
 du système (barre d'état, barre de gestes, clavier) viennent de
 `MainActivity.kt` : l'app est « bord à bord » et `env(safe-area-inset-*)`
 vaut 0 dans la WebView ; la page les lit par `window.GuiVaultInsets`
@@ -155,11 +156,11 @@ ce qui manque, du plus pressant au plus confortable.
 
 **Sécurité et confort**
 
-- [ ] **Déverrouillage biométrique** : la user key sous une clé du Keystore
-  Android (`setUserAuthenticationRequired`), libérée par l'empreinte ou le
-  visage ; le mot de passe maître reste demandé après un redémarrage ou au
-  bout d'un délai. Conception crypto à part, comme Windows Hello
-  (`ROADMAP.md`, §6).
+- [x] **Déverrouillage biométrique** : voir « Déverrouillage biométrique »,
+  plus bas. Reste : le proposer de lui-même après un déverrouillage par mot
+  de passe, et, pour un compte du serveur, survivre à un redémarrage de
+  l'application (garder le jeton de rafraîchissement sur l'appareil, comme
+  Bitwarden).
 - [ ] **Service de remplissage Android** (`AutofillService`, comme KeePassDX
   et Bitwarden) : remplir les autres applications et Chrome. Le plus gros
   morceau, et ce qui donne son intérêt à l'app.
@@ -185,6 +186,43 @@ ce qui manque, du plus pressant au plus confortable.
 - [ ] Tablettes et paysage : l'interface passe au bureau au-delà de
   768 px ; jamais regardé sur une tablette.
 
+## Déverrouillage biométrique
+
+Paramètres › Sécurité (et l'onglet Réglages, « Déverrouillage ») :
+« Déverrouiller par biométrie », pour le coffre local ou le compte ouvert.
+
+- **Ce qui est gardé** : la user key et le compte enveloppé
+  (`AccountBlobs`, déjà chiffré), en JSON, chiffrés en AES-256-GCM sous une
+  clé du **Keystore Android** (`guivault.biometric`) :
+  `setUserAuthenticationRequired`, une authentification **biométrique forte**
+  (classe 3) **à chaque usage** (`setUserAuthenticationParameters(0,
+  AUTH_BIOMETRIC_STRONG)`, `CryptoObject`), détruite si les empreintes
+  changent (`setInvalidatedByBiometricEnrollment`) — tout est alors oublié
+  et le mot de passe redemandé. Le chiffré et son IV sont dans les
+  préférences privées de l'app (`guivault_biometric`), un par coffre
+  (`local:<chemin>`, `server:<url>:<id du compte>`). Rien ne part au
+  serveur ; la règle n°1 n'est pas touchée.
+- **Le mot de passe maître reste demandé** après un redémarrage du
+  téléphone (`Settings.Global.BOOT_COUNT` retenu à chaque déverrouillage
+  par mot de passe) et au bout de 14 jours sans lui ; l'invite n'est alors
+  même pas montrée, l'écran le dit.
+- **Coffre local** : se rouvre aussi après avoir quitté l'application
+  (`session.openLocalWithUserKey`). **Compte du serveur** : tant que sa
+  session est ouverte — un verrouillage (à la main, inactivité) garde les
+  jetons, l'écran « Déverrouiller » du compte rouvre sans nouvelle
+  connexion (`session.resumeWithUserKey`) ; après un redémarrage de
+  l'application, le mot de passe.
+- **L'écran** : après un verrouillage, l'accueil rouvre directement le
+  coffre ou le compte verrouillé (`session.lockedTarget`), et l'invite
+  s'ouvre d'elle-même ; « Mot de passe maître » la ferme.
+- Code : `BiometricPlugin.kt`, `src/biometric.rs`,
+  `web/app/src/biometricBridge.ts`, `web/src/lib/biometric.ts`,
+  `components/BiometricSetting.tsx`, `AppWelcome.tsx` (`UnlockForm`,
+  `ServerLocked`).
+- Émulateur : un code de verrouillage (`adb shell locksettings set-pin
+  1234`), une empreinte enregistrée dans les réglages, puis `adb emu finger
+  touch 1` pour poser le doigt.
+
 ## La bulle flottante
 
 Réduire GuiVault à une bulle qui flotte au-dessus des autres applications,
@@ -198,6 +236,14 @@ bas la ferme.
   notification. Permission « Afficher par-dessus d'autres applis »
   (`SYSTEM_ALERT_WINDOW`), demandée une fois par l'écran des réglages
   d'Android (`ACTION_MANAGE_OVERLAY_PERMISSION`).
+- **Mouvements** (`BubbleService.kt`, ressorts de `androidx.dynamicanimation`) :
+  elle naît en rebondissant depuis le bord, s'enfonce sous le doigt, se lance
+  d'un geste vers un bord (la vitesse du doigt compte), retient sa place
+  d'une fois sur l'autre ; la croix monte dans un voile et **aimante** la
+  bulle (vibration), qui s'y engouffre. Un toucher rouvre GuiVault qui
+  **grandit depuis la bulle** (`ActivityOptions.makeScaleUpAnimation`).
+  Côté page (`bubbleBridge.ts`) : « Réduire en bulle » la fait se détacher
+  vers la bulle avant de passer la main ; au retour, elle se pose.
 - **Pas l'API « Bubbles »** d'Android 11+ : elle est réservée aux
   conversations (notification `MessagingStyle` + raccourci), c'est elle que
   Messenger utilise aujourd'hui ; un gestionnaire de mots de passe n'y a pas

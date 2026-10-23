@@ -428,8 +428,11 @@ scenario("presse-papiers : hors de l'historique Windows, effacé à l'échéance
   }
 });
 
-async function unlockFromRecents(b) {
-  await (await b.$(`//button[.//span[normalize-space()='Mon coffre']]`)).click();
+/** Rouvre « Mon coffre ». `locked` : il vient d'être verrouillé (pas fermé),
+ * l'accueil ouvre alors directement son déverrouillage (`lockedTarget`). */
+async function unlockFromRecents(b, { locked = false } = {}) {
+  if (locked) await waitText(b, "Le coffre se déchiffre ici");
+  else await (await b.$(`//button[.//span[normalize-space()='Mon coffre']]`)).click();
   await fillPasswords(b, PASSWORD);
   await click(b, "Déverrouiller");
   await b.waitUntil(async () => (await sidebarText(b)).includes("Personnel"), { timeout: 60_000, timeoutMsg: "le coffre ne s'est pas rouvert" });
@@ -466,8 +469,8 @@ scenario("verrouillage : le signal du système verrouille, réglages Application
   // ne se presse pas dans un test : il verrouillerait la vraie session).
   await invoke(b, "plugin:event|emit", { event: "system-lock", payload: "session" });
   await waitText(b, "Verrouillé : la session Windows a été verrouillée.");
-  await button(b, "Créer un coffre local");
-  await unlockFromRecents(b);
+  // Verrouillé, pas fermé : l'accueil rouvre directement ce coffre.
+  await unlockFromRecents(b, { locked: true });
 });
 
 scenario("sauvegardes : prises avant d'écrire, une copie s'ouvre à part", async (b) => {

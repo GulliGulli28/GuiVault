@@ -15,6 +15,7 @@ import { forgetCounters } from "../lib/manifestCounters";
 import type { AuditEntry, Session } from "../lib/types";
 import { AppearanceSettings, SettingsSyncToggle } from "./AppearanceSettings";
 import { PasskeySettings } from "./PasskeySettings";
+import { BiometricSetting } from "./BiometricSetting";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { AuditList } from "./VaultSettings";
 import { IconIdentity, IconLifebuoy } from "./secret-icons";
@@ -204,6 +205,7 @@ export function SettingsPage({ ctx, section }: { ctx: PageContext; section: Sett
                       {LOCK_CHOICES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
                     </select>
                   </SettingRow>
+                  <BiometricSetting ctx={ctx} />
                   <ClipboardSetting />
                 </div>
               </section>

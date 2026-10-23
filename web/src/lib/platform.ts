@@ -200,3 +200,39 @@ export function setBubbleBridge(b: BubbleBridge | null) {
 export function bubbleBridge(): BubbleBridge | null {
   return bubble;
 }
+
+/** Pourquoi le mot de passe maître est demandé malgré la biométrie : le
+ * téléphone a redémarré, ou il n'a pas servi depuis trop longtemps. */
+export type BiometricPasswordReason = "reboot" | "age";
+
+/** Ce que rend une invite biométrique. `cancel` : on a choisi le mot de
+ * passe ; `invalidated` : les empreintes ont changé, tout est oublié. */
+export type BiometricOutcome<T> =
+  | ({ ok: true } & T)
+  | { ok: false; reason: "cancel" | "lockout" | "password" | "invalidated" | "none" | "error"; message?: string };
+
+/** Le déverrouillage par empreinte ou visage de l'application Android
+ * (`BiometricPlugin.kt`) : un secret (la user key) chiffré sous une clé du
+ * Keystore qui ne sert qu'après une authentification biométrique forte. */
+export interface BiometricBridge {
+  status(): Promise<"ready" | "not-enrolled" | "unavailable">;
+  state(id: string): Promise<{ enabled: boolean; password?: BiometricPasswordReason }>;
+  /** Montre l'invite, puis range `secret` (base64) pour `id`. */
+  enable(id: string, secret: string): Promise<BiometricOutcome<object>>;
+  /** Montre l'invite, rend le secret de `id`. */
+  unlock(id: string, subtitle?: string): Promise<BiometricOutcome<{ secret: string }>>;
+  /** Le mot de passe vient d'ouvrir `id` : le délai repart. */
+  touch(id: string): Promise<void>;
+  disable(id: string): Promise<void>;
+}
+
+let biometric: BiometricBridge | null = null;
+
+export function setBiometricBridge(b: BiometricBridge | null) {
+  biometric = b;
+}
+
+/** `null` : pas de biométrie ici (tout sauf l'application Android). */
+export function biometricBridge(): BiometricBridge | null {
+  return biometric;
+}

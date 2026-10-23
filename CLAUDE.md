@@ -90,15 +90,18 @@ il ne déchiffre rien : la user key reste sous la clé que seule la PRF donne).
   **Android** (`docs/ANDROID.md`) : le crate est une bibliothèque (`lib.rs`,
   `mobile_entry_point`), ce qui n'existe qu'au bureau est sous
   `cfg(desktop)` ; `gen/android` est versionné (Kotlin de la bulle :
-  `BubblePlugin.kt`, `BubbleService.kt`, marges : `MainActivity.kt`) ; on
+  `BubblePlugin.kt`, `BubbleService.kt`, de la biométrie :
+  `BiometricPlugin.kt`, marges : `MainActivity.kt`) ; on
   construit depuis une copie Windows (`scripts/android-sync.sh`,
   `scripts/android/*.ps1`). Côté interface : `web/app/src/mobile.ts`
-  (`isMobile`, coffres de l'appareil, marges), `bubbleBridge.ts`.
+  (`isMobile`, coffres de l'appareil, marges), `bubbleBridge.ts`,
+  `biometricBridge.ts` (→ `src/lib/biometric.ts`, `BiometricSetting`).
 - `web/` — l'interface web, Vite + React 19 + TypeScript + Tailwind 3.
   **Refonte (2026-10-21) : on se sépare de la charte de Guiterm.** Faite
   pour le web, l'extension et le mobile (le web sous 768 px : barre
   d'onglets `MobileNav`, onglet « Réglages » = `#/more` / `MobileMenu`,
-  styles `m-*` dans `src/touch.css`). Maquettes, jetons,
+  styles `m-*` dans `src/touch.css`, transitions et glisser entre onglets
+  dans `MobilePager.tsx`). Maquettes, jetons,
   briques (`Page`, `SettingRow`, `InfoTip`, `ItemTile`) et règles (pas de
   paragraphes, troncature, responsive) dans `docs/DESIGN.md` et
   `docs/design/canvas/` ; tout nouvel écran suit ce design. `src/index.css`

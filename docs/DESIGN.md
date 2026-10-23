@@ -155,13 +155,23 @@ celle de `html`.
     ne l'importe pas : ses 440 px ne sont pas du mobile.
   - `PageContext` porte `search` et `lock` pour les boutons des écrans
     mobiles.
-  - Mouvements (`touch.css`, fin) : les onglets entrent en fondu, les pages
-    de second niveau glissent depuis la droite, les feuilles montent du bas ;
-    rien si le système demande moins de mouvement.
+  - Mouvements : `MobilePager.tsx` entre les pages (animations Web) — entre
+    onglets, la page **suit le doigt** et l'onglet voisin glisse avec elle,
+    relâchée au-delà d'un tiers ou d'un coup rapide elle part, sinon revient
+    sur un ressort, élastique au bout de la rangée ; toucher un onglet : glissé
+    court et fondu, du côté de l'onglet ; une page de second niveau s'empile
+    par la droite sur la précédente qui recule (courbe d'iOS), le retour fait
+    l'inverse. La page qui part reste montée le temps de l'animation (même
+    instance, défilement gardé). `touch.css` (fin) : la fiche d'un coffre, la
+    liste qui revient, les feuilles qui montent du bas. Rien si le système
+    demande moins de mouvement.
   - Onglets : Accueil, Coffres, Codes, Santé, Générateur, Réglages
-    (`mobileTabs`, `MobileNav.tsx`) ; glisser à gauche ou à droite passe à
-    l'onglet voisin (`App.tsx`, pas depuis un bord, un champ, une rangée qui
-    défile ni une fiche ouverte).
+    (`mobileTabs`, `MobileNav.tsx`) ; le geste ne part ni d'un bord, ni d'un
+    champ, ni d'une fiche ouverte, et laisse une rangée qui défile de côté
+    (`.tabs`) défiler jusqu'au bout. Une page ne doit **jamais déborder en
+    largeur** (`Page` coupe `overflow-x`) : texte agrandi par Android, écran
+    de 360 px — pas de `min-w-[…]` sans `flex-basis`, pas de `whitespace-nowrap`
+    sur un texte long.
   - Android : la bulle vient d'elle-même en quittant l'application (réglage
     « Bulle » de l'onglet Réglages) ; coupé, un bouton en haut à droite des
     pages (`BubbleButton`).

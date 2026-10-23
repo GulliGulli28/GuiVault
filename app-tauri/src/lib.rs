@@ -10,10 +10,12 @@
 //! Une bibliothèque pour Android (`docs/ANDROID.md`) : `main.rs` au bureau,
 //! `mobile_entry_point` sur mobile. Ce qui n'existe qu'au bureau (zone de
 //! notification, raccourci global, instance unique, démarrage automatique,
-//! mises à jour) est sous `cfg(desktop)` ; la bulle (`bubble.rs`) sous
-//! Android.
+//! mises à jour) est sous `cfg(desktop)` ; la bulle (`bubble.rs`) et le
+//! déverrouillage biométrique (`biometric.rs`) sous Android.
 
 mod autotype;
+#[cfg(target_os = "android")]
+mod biometric;
 mod browser;
 #[cfg(target_os = "android")]
 mod bubble;
@@ -410,7 +412,7 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build());
     #[cfg(target_os = "android")]
-    let builder = builder.plugin(bubble::init());
+    let builder = builder.plugin(bubble::init()).plugin(biometric::init());
     let builder = builder
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())

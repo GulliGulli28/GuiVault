@@ -154,7 +154,7 @@ export function HealthPage({ ctx }: { ctx: PageContext }) {
         <>
           <section aria-label="Score" className="card flex flex-wrap items-center gap-x-8 gap-y-5 px-7 py-6 max-sm:px-5">
             <div className="whitespace-nowrap"><span className="text-[56px] font-semibold leading-none tracking-[-0.04em]">{bad.score}</span><span className="text-[16px] text-[var(--c-text-muted)]"> / 100</span></div>
-            <div className="flex min-w-[240px] flex-1 flex-col gap-3">
+            <div className="flex min-w-0 flex-[1_1_240px] flex-col gap-3">
               <HealthBar total={report.secrets.length} weak={bad.weak} reused={bad.reused} />
               <div className="flex flex-wrap gap-x-5 gap-y-1.5 text-[13px] text-[var(--c-text-secondary)]">
                 <Legend color="var(--c-ok)">{bad.healthy} sains</Legend>
@@ -164,7 +164,7 @@ export function HealthPage({ ctx }: { ctx: PageContext }) {
               </div>
             </div>
             {next && (
-              <div className="flex min-w-[200px] flex-col gap-0.5 border-l border-[var(--c-border)] pl-7 max-sm:border-l-0 max-sm:pl-0">
+              <div className="flex min-w-0 flex-[1_1_200px] flex-col gap-0.5 border-l border-[var(--c-border)] pl-7 max-sm:border-l-0 max-sm:pl-0">
                 <span className="text-[13px] text-[var(--c-text-muted)]">Le plus utile maintenant</span>
                 <span className="text-[15px] font-medium">{next}</span>
               </div>
@@ -190,9 +190,9 @@ export function HealthPage({ ctx }: { ctx: PageContext }) {
               </div>
             )}
             <div className="flex flex-wrap gap-2.5">
-              {report.old.length === 0 && <span className="pill"><IconCheck size={15} /> Aucun mot de passe de plus d'un an</span>}
-              {report.expiring.length === 0 && <span className="pill"><IconCheck size={15} /> Rien n'expire ce mois</span>}
-              {lookupsOff && <span className="pill">{lookupsOff} : fuites et sites 2FA indisponibles</span>}
+              {report.old.length === 0 && <span className="pill max-w-full whitespace-normal"><IconCheck size={15} /> Aucun mot de passe de plus d'un an</span>}
+              {report.expiring.length === 0 && <span className="pill max-w-full whitespace-normal"><IconCheck size={15} /> Rien n'expire ce mois</span>}
+              {lookupsOff && <span className="pill max-w-full whitespace-normal">{lookupsOff} : fuites et sites 2FA indisponibles</span>}
             </div>
           </section>
         </>

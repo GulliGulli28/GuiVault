@@ -5,7 +5,7 @@ import "./lib/settingsSections";
 import { clearWebSession, loadLockMinutes, loadWebSession, saveWebSession, saveWebTokens, touchWebSession, webSessionIdle } from "./lib/persist";
 import { loadAppLock, LOCK_MESSAGES } from "./lib/appSettings";
 import { navigate, routeHash, useRoute, type Route } from "./lib/route";
-import { acceptRollback, closeLocal, logout, refresh, wipe, type SessionState } from "./lib/session";
+import { acceptRollback, closeLocal, logout, refresh, rememberLocked, wipe, type SessionState } from "./lib/session";
 import { refreshOfflineCopy } from "./lib/offline";
 import { LoginScreen } from "./components/LoginScreen";
 import { Sidebar } from "./components/Sidebar";
@@ -26,6 +26,7 @@ import { AdminPage } from "./components/AdminPage";
 import { HealthPage } from "./components/HealthPage";
 import { HomePage } from "./components/HomePage";
 import { MobileMenu } from "./components/MobileMenu";
+import { MobilePager } from "./components/MobilePager";
 import { MobileNav, mobileTabs, rememberVault, tabOf } from "./components/MobileNav";
 import { NARROW, useMediaQuery } from "./hooks/useMediaQuery";
 import { clearAllItems } from "./lib/allItems";
@@ -39,23 +40,16 @@ import { PaneHandle, usePersistedPane } from "./hooks/usePersistedPane";
 /** Les pages d'un onglet mobile (`MobileNav`). */
 const TAB_PAGES = new Set<Route["page"]>(["home", "vault", "totp", "health", "generator", "more"]);
 
-/** Un geste qui peut changer d'onglet : pas depuis un bord (le geste
- * « retour » d'Android), ni depuis un champ, un curseur, une rangée qui
- * défile de côté, une fiche ouverte ou une fenêtre. */
-function swipeable(target: EventTarget, x: number): boolean {
-  if (x < 24 || x > window.innerWidth - 24) return false;
-  for (let el = target as HTMLElement | null; el && el !== document.body; el = el.parentElement) {
-    if (el.matches("input, textarea, select, [role=slider], [data-noswipe], .modal")) return false;
-    const style = getComputedStyle(el);
-    if ((style.overflowX === "auto" || style.overflowX === "scroll") && el.scrollWidth > el.clientWidth) return false;
-  }
-  return true;
-}
-
 /** Ce qui fait « une autre page » pour l'animation : pas l'élément ouvert
  * dans un vault (sinon le vault se rechargerait). */
 function pageKey(r: Route): string {
   return r.page === "vault" ? `vault:${r.id}` : routeHash(r);
+}
+
+/** Mobile : une page d'onglet (0), ou une page ouverte depuis elle — elle
+ * s'empile par-dessus (`MobilePager`). */
+function routeDepth(r: Route): number {
+  return TAB_PAGES.has(r.page) ? 0 : 1;
 }
 
 export interface PageContext {
@@ -156,6 +150,7 @@ export default function App({ Welcome = LoginScreen }: { Welcome?: ComponentType
     const s = sessionRef.current;
     if (!s) return;
     clearWebSession();
+    rememberLocked(s);
     if (s.local) void closeLocal();
     wipe(s);
     setSession(null);
@@ -239,6 +234,7 @@ export default function App({ Welcome = LoginScreen }: { Welcome?: ComponentType
       // Le serveur ne répond plus ? La session locale s'efface quand même.
     }
     clearWebSession();
+    rememberLocked(null);
     if (s) wipe(s);
     setSession(null);
     navigate({ page: "home" });
@@ -285,30 +281,10 @@ export default function App({ Welcome = LoginScreen }: { Welcome?: ComponentType
   const vaultRoute = route.page === "vault" ? route.id : null;
   useEffect(() => { if (vaultRoute) rememberVault(vaultRoute); }, [vaultRoute]);
 
-  // Mobile : glisser à gauche ou à droite passe à l'onglet voisin.
-  const swipeStart = useRef<{ x: number; y: number; t: number } | null>(null);
-  const [swipe, setSwipe] = useState<{ key: string; dir: "next" | "prev" }>({ key: "", dir: "next" });
-  const onSwipeStart = useCallback((e: React.TouchEvent) => {
-    const t = e.touches[0];
-    swipeStart.current = e.touches.length === 1 && swipeable(e.target, t.clientX) ? { x: t.clientX, y: t.clientY, t: Date.now() } : null;
-  }, []);
   const ctx = useMemo<PageContext | null>(() => (session ? { session, reload, notify, error, vaultTicks, search: openSearch, lock: lockByHand } : null), [session, reload, notify, error, vaultTicks, openSearch, lockByHand]);
-
-  const onSwipeEnd = (e: React.TouchEvent) => {
-    const start = swipeStart.current;
-    swipeStart.current = null;
-    if (!start || !ctx || !TAB_PAGES.has(route.page)) return;
-    const t = e.changedTouches[0];
-    const dx = t.clientX - start.x;
-    const dy = t.clientY - start.y;
-    if (Math.abs(dx) < 70 || Math.abs(dx) < 2 * Math.abs(dy) || Date.now() - start.t > 700) return;
-    const tabs = mobileTabs(ctx).filter((x) => x.route);
-    const i = tabs.findIndex((x) => x.key === tabOf(route));
-    const next = tabs[i + (dx < 0 ? 1 : -1)];
-    if (i < 0 || !next?.route) return;
-    setSwipe({ key: pageKey(next.route), dir: dx < 0 ? "next" : "prev" });
-    navigate(next.route);
-  };
+  // Mobile : les onglets, dans l'ordre de la barre, pour glisser de l'un à
+  // l'autre.
+  const pagerTabs = useMemo(() => (ctx ? mobileTabs(ctx).flatMap((t) => (t.route ? [{ key: t.key, route: t.route }] : [])) : []), [ctx]);
 
   // Un lien de partage s'ouvre sans compte, et hors de l'application.
   if (route.page === "send") {
@@ -330,52 +306,41 @@ export default function App({ Welcome = LoginScreen }: { Welcome?: ComponentType
 
   const effective = route;
 
-  let page;
-  if (booting) {
-    page = <p className="p-6 text-[12.5px] text-[var(--c-text-muted)]">Reprise de la session…</p>;
-  } else switch (effective.page) {
-    case "home":
-      page = <HomePage ctx={ctx} />;
-      break;
-    case "vault":
-      page = <VaultPage key={effective.id} ctx={ctx} vaultId={effective.id} itemId={effective.item} create={effective.create} />;
-      break;
-    case "vault-settings":
-      page = <VaultSettings key={effective.id} ctx={ctx} vaultId={effective.id} />;
-      break;
-    case "settings":
-      page = <SettingsPage ctx={ctx} section={effective.section} />;
-      break;
-    case "more":
-      page = narrow ? <MobileMenu ctx={ctx} onLock={lockByHand} onLogout={() => void onLogout()} /> : <SettingsPage ctx={ctx} section="apparence" />;
-      break;
-    case "vault-tools":
-      page = <ToolsPage key={effective.id} ctx={ctx} vaultId={effective.id} />;
-      break;
-    case "vault-trash":
-      page = <TrashPage key={effective.id} ctx={ctx} vaultId={effective.id} />;
-      break;
-    case "invitations":
-      page = <InvitationsPage ctx={ctx} />;
-      break;
-    case "generator":
-      page = <GeneratorPage />;
-      break;
-    case "totp":
-      page = <TotpPage ctx={ctx} />;
-      break;
-    case "sends":
-      page = <SendsPage ctx={ctx} />;
-      break;
-    case "health":
-      page = <HealthPage ctx={ctx} />;
-      break;
-    case "admin":
-      page = <AdminPage ctx={ctx} />;
-      break;
-    default:
-      page = <p className="p-6 text-[12.5px] text-[var(--c-text-muted)]">Aucun vault.</p>;
-  }
+  const renderPage = (r: Route) => {
+    if (booting) {
+      return <p className="p-6 text-[12.5px] text-[var(--c-text-muted)]">Reprise de la session…</p>;
+    }
+    switch (r.page) {
+      case "home":
+        return <HomePage ctx={ctx} />;
+      case "vault":
+        return <VaultPage key={r.id} ctx={ctx} vaultId={r.id} itemId={r.item} create={r.create} />;
+      case "vault-settings":
+        return <VaultSettings key={r.id} ctx={ctx} vaultId={r.id} />;
+      case "settings":
+        return <SettingsPage ctx={ctx} section={r.section} />;
+      case "more":
+        return narrow ? <MobileMenu ctx={ctx} onLock={lockByHand} onLogout={() => void onLogout()} /> : <SettingsPage ctx={ctx} section="apparence" />;
+      case "vault-tools":
+        return <ToolsPage key={r.id} ctx={ctx} vaultId={r.id} />;
+      case "vault-trash":
+        return <TrashPage key={r.id} ctx={ctx} vaultId={r.id} />;
+      case "invitations":
+        return <InvitationsPage ctx={ctx} />;
+      case "generator":
+        return <GeneratorPage />;
+      case "totp":
+        return <TotpPage ctx={ctx} />;
+      case "sends":
+        return <SendsPage ctx={ctx} />;
+      case "health":
+        return <HealthPage ctx={ctx} />;
+      case "admin":
+        return <AdminPage ctx={ctx} />;
+      default:
+        return <p className="p-6 text-[12.5px] text-[var(--c-text-muted)]">Aucun vault.</p>;
+    }
+  };
 
   return (
     <div className={`app-root flex h-full w-full overflow-hidden bg-[var(--c-bg)] text-[var(--c-text)] ${narrow ? "flex-col" : ""}`}>
@@ -394,17 +359,14 @@ export default function App({ Welcome = LoginScreen }: { Welcome?: ComponentType
         )}
         <RollbackBanner rollbacks={ctx.session.rollbacks} onAccept={(id) => { acceptRollback(ctx.session, id); setSession({ ...ctx.session }); }} />
         {route.page !== "settings" && <EmergencyBanner grants={ctx.session.emergency?.granted_by_me ?? []} onOpen={() => navigate({ page: "settings", section: "urgence" })} />}
-        {/* Mobile : chaque page entre en mouvement (`touch.css`) — les
-            onglets en fondu, le reste en glissant. La clé ne change pas
-            d'un élément à l'autre d'un même vault. */}
-        <div
-          key={pageKey(effective)}
-          className={`flex min-h-0 flex-1 flex-col ${swipe.key === pageKey(effective) ? (swipe.dir === "next" ? "m-from-right" : "m-from-left") : TAB_PAGES.has(effective.page) ? "m-enter" : "m-push"}`}
-          onTouchStart={narrow ? onSwipeStart : undefined}
-          onTouchEnd={narrow ? onSwipeEnd : undefined}
-        >
-          {page}
-        </div>
+        {/* Mobile : les pages glissent comme dans une application native
+            (`MobilePager`) ; la clé ne change pas d'un élément à l'autre
+            d'un même vault. */}
+        {narrow ? (
+          <MobilePager route={effective} pageKey={pageKey} render={renderPage} tabs={pagerTabs} tabKey={tabOf} depth={routeDepth} />
+        ) : (
+          <div key={pageKey(effective)} className="flex min-h-0 flex-1 flex-col">{renderPage(effective)}</div>
+        )}
       </main>
       {narrow && <MobileNav ctx={ctx} route={effective} />}
       {search && <SearchPalette ctx={ctx} onClose={closeSearch} />}
