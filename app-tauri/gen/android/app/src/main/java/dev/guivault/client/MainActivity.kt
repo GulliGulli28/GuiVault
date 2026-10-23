@@ -24,7 +24,11 @@ class MainActivity : TauriActivity() {
    * donnée. L'activité est encore au premier plan à cet instant. */
   override fun onUserLeaveHint() {
     super.onUserLeaveHint()
-    if (BubbleService.autoEnabled(this) && Settings.canDrawOverlays(this)) BubbleService.start(this)
+    if (BubbleService.autoEnabled(this) && Settings.canDrawOverlays(this)) {
+      // L'image de la fenêtre : la rouvrir depuis la bulle la fera grandir.
+      BubbleService.capture(this)
+      BubbleService.start(this)
+    }
   }
 
   override fun onWebViewCreate(webView: WebView) {

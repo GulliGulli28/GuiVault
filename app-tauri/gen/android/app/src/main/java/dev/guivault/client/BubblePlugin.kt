@@ -49,24 +49,18 @@ class BubblePlugin(private val activity: Activity) : Plugin(activity) {
         invoke.resolve()
     }
 
-    /** Réduit l'application : la bulle apparaît, GuiVault passe derrière. */
+    /** Réduit l'application : elle rétrécit jusqu'à la bulle qui apparaît,
+     * et passe derrière (`BubbleService.collapse`). */
     @Command
     fun show(invoke: Invoke) {
         if (!Settings.canDrawOverlays(activity)) {
             invoke.reject("La permission « Afficher par-dessus d'autres applis » manque.")
             return
         }
-        BubbleService.start(activity)
-        activity.moveTaskToBack(true)
-        invoke.resolve()
-    }
-
-    /** Où la bulle va apparaître (son centre, px CSS) : l'interface y fait
-     * converger son animation avant de se réduire. */
-    @Command
-    fun anchor(invoke: Invoke) {
-        val (x, y) = BubbleService.anchor(activity)
-        invoke.resolve(JSObject().put("x", x.toDouble()).put("y", y.toDouble()))
+        activity.runOnUiThread {
+            BubbleService.collapse(activity) { activity.moveTaskToBack(true) }
+            invoke.resolve()
+        }
     }
 
     @Command
@@ -97,9 +91,9 @@ class BubblePlugin(private val activity: Activity) : Plugin(activity) {
     }
 
     /** GuiVault revient au premier plan (par la bulle ou autrement) : plus
-     * de bulle. */
+     * de bulle — l'image qui a grandi depuis elle s'efface d'abord. */
     override fun onResume() {
         super.onResume()
-        activity.stopService(Intent(activity, BubbleService::class.java))
+        BubbleService.appResumed(activity)
     }
 }

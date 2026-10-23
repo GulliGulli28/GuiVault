@@ -19,7 +19,6 @@
     "bubble:allow-hide",
     "bubble:allow-locked",
     "bubble:allow-auto",
-    "bubble:allow-anchor",
     "biometric:allow-status",
     "biometric:allow-state",
     "biometric:allow-enable",

@@ -14,7 +14,6 @@ fn main() {
                     "hide",
                     "locked",
                     "auto",
-                    "anchor",
                 ]),
             )
             .plugin(

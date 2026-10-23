@@ -240,10 +240,21 @@ bas la ferme.
   elle naît en rebondissant depuis le bord, s'enfonce sous le doigt, se lance
   d'un geste vers un bord (la vitesse du doigt compte), retient sa place
   d'une fois sur l'autre ; la croix monte dans un voile et **aimante** la
-  bulle (vibration), qui s'y engouffre. Un toucher rouvre GuiVault qui
-  **grandit depuis la bulle** (`ActivityOptions.makeScaleUpAnimation`).
-  Côté page (`bubbleBridge.ts`) : « Réduire en bulle » la fait se détacher
-  vers la bulle avant de passer la main ; au retour, elle se pose.
+  bulle (vibration), qui s'y engouffre.
+- **Entre la bulle et le plein écran** : Android n'accorde pas d'animation
+  propre à une tâche qu'un service ramène au premier plan
+  (`makeScaleUpAnimation` y est ignorée) ; c'est donc la bulle qui anime.
+  En quittant l'application, une image de sa fenêtre (`PixelCopy`,
+  `BubbleService.capture`) ; au toucher, cette image grandit depuis la
+  bulle jusqu'au plein écran (ressort, coins arrondis, l'autre application
+  s'assombrit), puis GuiVault revient dessous et l'image s'efface une fois
+  sa fenêtre dessinée et l'animation du système finie. « Réduire en bulle »
+  fait l'inverse (`collapse`) : l'image couvre l'écran, l'application passe
+  derrière, l'image rétrécit jusqu'à la bulle. La fenêtre de l'image prend
+  les touchers le temps de l'animation : une superposition qui les laisse
+  passer, Android 12+ la rend translucide (opacité plafonnée à 0,8).
+  **Verrouillé, aucune image n'est gardée** (`setLocked` l'efface) : c'est
+  le logo qui grandit, sur le fond de l'application.
 - **Pas l'API « Bubbles »** d'Android 11+ : elle est réservée aux
   conversations (notification `MessagingStyle` + raccourci), c'est elle que
   Messenger utilise aujourd'hui ; un gestionnaire de mots de passe n'y a pas

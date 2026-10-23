@@ -1,6 +1,7 @@
 package dev.guivault.client
 
 import android.animation.ValueAnimator
+import android.app.Activity
 import android.app.ActivityOptions
 import android.app.Notification
 import android.app.NotificationChannel
@@ -10,19 +11,30 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.graphics.Bitmap
+import android.graphics.BitmapShader
+import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
+import android.graphics.Matrix
+import android.graphics.Paint
 import android.graphics.PixelFormat
 import android.graphics.Rect
+import android.graphics.RectF
+import android.graphics.Shader
 import android.graphics.drawable.GradientDrawable
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.view.Gravity
 import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
+import android.view.PixelCopy
 import android.view.VelocityTracker
 import android.view.View
+import android.view.ViewTreeObserver
 import android.view.WindowManager
 import android.view.animation.PathInterpolator
 import android.widget.FrameLayout
@@ -34,15 +46,25 @@ import androidx.dynamicanimation.animation.SpringAnimation
 import androidx.dynamicanimation.animation.SpringForce
 import kotlin.math.abs
 import kotlin.math.hypot
+import kotlin.math.max
+import kotlin.math.min
 
 /**
  * La bulle elle-même : une fenêtre de superposition (`TYPE_APPLICATION_OVERLAY`)
  * tenue par un service au premier plan, comme les « chat heads » de
  * Messenger. Tout bouge sur des ressorts (`SpringAnimation`) : elle arrive en
  * rebondissant, se lance d'un geste vers un bord, se laisse aimanter par la
- * croix du bas qui la ferme ; un toucher rouvre GuiVault, qui s'agrandit
- * depuis elle. Elle retient sa place (bord et hauteur) d'une fois sur
- * l'autre. Elle ne montre que le logo — gris quand le coffre est verrouillé.
+ * croix du bas qui la ferme. Elle retient sa place (bord et hauteur) d'une
+ * fois sur l'autre. Elle ne montre que le logo — gris quand le coffre est
+ * verrouillé.
+ *
+ * Entre la bulle et le plein écran, c'est elle qui anime (Android n'accorde
+ * pas d'animation propre à une tâche ramenée au premier plan par un
+ * service) : une image de la fenêtre de GuiVault, prise en la quittant
+ * ([capture]), grandit depuis la bulle par-dessus l'autre application, puis
+ * la vraie fenêtre prend sa place dessous ; « Réduire en bulle » fait
+ * l'inverse ([collapse]). Verrouillé, aucune image n'est gardée : c'est le
+ * logo qui grandit, sur le fond de l'application.
  */
 class BubbleService : Service() {
 
@@ -60,7 +82,77 @@ class BubbleService : Service() {
         fun setLocked(value: Boolean) {
             val changed = locked != value
             locked = value
+            // Une image d'un coffre ouvert ne survit pas au verrouillage.
+            if (value) snapshot = null
             if (changed) current?.let { s -> s.bubble?.post { s.paint(animate = true) } }
+        }
+
+        private const val EXTRA_COLLAPSE = "collapse"
+
+        /** La dernière image de la fenêtre de GuiVault, et où elle était sur
+         * l'écran ; jamais gardée coffre verrouillé. */
+        @Volatile
+        private var snapshot: Bitmap? = null
+        private val snapshotAt = RectF()
+        /** Le fond de l'application (pris sur l'image), pour grandir sans elle. */
+        private var backdrop = Color.parseColor("#101115")
+        /** Ce que fait le plugin une fois l'écran couvert : passer derrière. */
+        private var afterCover: (() -> Unit)? = null
+
+        /** Photographie la fenêtre de l'activité, puis `then` (fil principal),
+         * qu'une image ait été prise ou non. */
+        fun capture(activity: Activity, then: () -> Unit = {}) {
+            val decor = activity.window.decorView
+            val w = decor.width
+            val h = decor.height
+            if (locked || w == 0 || h == 0 || Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+                snapshot = null
+                then()
+                return
+            }
+            val at = IntArray(2)
+            decor.getLocationOnScreen(at)
+            val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+            try {
+                PixelCopy.request(activity.window, bitmap, { result ->
+                    if (result == PixelCopy.SUCCESS && !locked) {
+                        // La fenêtre est translucide (bulle) : l'image, elle, est pleine.
+                        bitmap.setHasAlpha(false)
+                        snapshot = bitmap
+                        snapshotAt.set(at[0].toFloat(), at[1].toFloat(), (at[0] + w).toFloat(), (at[1] + h).toFloat())
+                        backdrop = bitmap.getPixel(w / 2, h - 1) or 0xFF000000.toInt()
+                    } else {
+                        snapshot = null
+                    }
+                    then()
+                }, Handler(Looper.getMainLooper()))
+            } catch (e: Exception) {
+                snapshot = null
+                then()
+            }
+        }
+
+        /** « Réduire en bulle » : l'application rétrécit jusqu'à la bulle.
+         * `goBack` (passer derrière) est appelé une fois l'écran couvert par
+         * son image, pour que l'animation du système ne se voie pas. */
+        fun collapse(activity: Activity, goBack: () -> Unit) {
+            capture(activity) {
+                if (snapshot == null) {
+                    start(activity)
+                    goBack()
+                } else {
+                    afterCover = goBack
+                    start(activity, collapse = true)
+                }
+            }
+        }
+
+        /** GuiVault revient au premier plan : si la bulle l'a ouvert en
+         * grandissant, son image s'efface sur la vraie fenêtre ; sinon, plus
+         * de bulle. */
+        fun appResumed(activity: Activity) {
+            val s = current
+            if (s != null && s.opening) s.finishOpen(activity.window.decorView) else activity.stopService(Intent(activity, BubbleService::class.java))
         }
 
         private const val PREFS = "guivault_bubble"
@@ -86,8 +178,8 @@ class BubbleService : Service() {
         /** Montre la bulle (le service au premier plan). Appelé tant que
          * l'activité est encore au premier plan : Android 12+ refuse de
          * lancer un service au premier plan depuis l'arrière-plan. */
-        fun start(context: Context) {
-            val intent = Intent(context, BubbleService::class.java).putExtra(EXTRA_LOCKED, locked)
+        fun start(context: Context, collapse: Boolean = false) {
+            val intent = Intent(context, BubbleService::class.java).putExtra(EXTRA_LOCKED, locked).putExtra(EXTRA_COLLAPSE, collapse)
             try {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) context.startForegroundService(intent) else context.startService(intent)
             } catch (e: Exception) {
@@ -119,15 +211,6 @@ class BubbleService : Service() {
             val y = prefs.getInt(Y, s.height() / 3).coerceIn((48 * d).toInt(), s.height() - win - (96 * d).toInt())
             return x to y
         }
-
-        /** Le centre de la bulle à venir, en px CSS (la WebView couvre tout
-         * l'écran) : l'interface y fait converger son animation. */
-        fun anchor(context: Context): Pair<Float, Float> {
-            val d = context.resources.displayMetrics.density
-            val half = (SIZE_DP / 2 + MARGIN_DP) * d
-            val (x, y) = restingSpot(context)
-            return (x + half) / d to (y + half) / d
-        }
     }
 
     private lateinit var windows: WindowManager
@@ -143,6 +226,10 @@ class BubbleService : Service() {
     private var springY: SpringAnimation? = null
     private var saturation = 1f
     private var leaving = false
+    /** L'image qui grandit ou rétrécit entre la bulle et le plein écran. */
+    private var morph: MorphView? = null
+    /** La bulle a rouvert GuiVault, dont la fenêtre n'est pas encore là. */
+    private var opening = false
 
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
     private fun dpf(v: Float) = v * resources.displayMetrics.density
@@ -157,8 +244,10 @@ class BubbleService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         intent?.let { locked = it.getBooleanExtra(EXTRA_LOCKED, locked) }
+        val collapse = intent?.getBooleanExtra(EXTRA_COLLAPSE, false) == true
         goForeground()
-        if (frame == null) addBubble() else paint(animate = false)
+        if (frame == null) addBubble(pop = !collapse) else paint(animate = false)
+        if (collapse) collapseFromApp()
         return START_NOT_STICKY
     }
 
@@ -173,6 +262,8 @@ class BubbleService : Service() {
         springY?.cancel()
         frame?.let { runCatching { windows.removeView(it) } }
         target?.let { runCatching { windows.removeView(it) } }
+        morph?.let { runCatching { windows.removeView(it) } }
+        morph = null
         frame = null
         bubble = null
         target = null
@@ -230,7 +321,7 @@ class BubbleService : Service() {
     private fun springOn(v: View, prop: DynamicAnimation.ViewProperty, to: Float, stiffness: Float, damping: Float) =
         SpringAnimation(v, prop, to).apply { spring.setStiffness(stiffness).setDampingRatio(damping) }
 
-    private fun addBubble() {
+    private fun addBubble(pop: Boolean = true) {
         val win = dp(SIZE_DP + 2 * MARGIN_DP)
         val view = ImageView(this).apply {
             setImageResource(R.mipmap.ic_launcher_round)
@@ -253,8 +344,9 @@ class BubbleService : Service() {
         val fromRight = x > screen(this).width() / 2
         params = overlayParams(win, win).apply {
             gravity = Gravity.TOP or Gravity.START
-            // Elle arrive du bord, en rebondissant jusqu'à sa place.
-            this.x = if (fromRight) x + dp(36) else x - dp(36)
+            // Elle arrive du bord, en rebondissant jusqu'à sa place — ou y est
+            // déjà, si elle naît de l'application qui rétrécit.
+            this.x = if (!pop) x else if (fromRight) x + dp(36) else x - dp(36)
             this.y = y
         }
         box.setOnTouchListener(Drag())
@@ -264,9 +356,11 @@ class BubbleService : Service() {
         bubble = view
         saturation = if (locked) 0f else 1f
         paint(animate = false)
+        view.alpha = 0f
+        // Elle naîtra de l'application qui rétrécit (`collapseFromApp`).
+        if (!pop) return
         view.scaleX = 0f
         view.scaleY = 0f
-        view.alpha = 0f
         springOn(view, DynamicAnimation.SCALE_X, 1f, 380f, 0.55f).setStartVelocity(2f).start()
         springOn(view, DynamicAnimation.SCALE_Y, 1f, 380f, 0.55f).setStartVelocity(2f).start()
         springOn(view, DynamicAnimation.ALPHA, if (locked) 0.88f else 1f, 600f, 1f).start()
@@ -511,22 +605,183 @@ class BubbleService : Service() {
             .start()
     }
 
-    /** Un toucher : GuiVault revient en grandissant depuis la bulle, qui
-     * s'efface dans le même mouvement (le plugin retire le service à la
-     * reprise). */
+    // ─── Entre la bulle et le plein écran ───────────────────────────────────
+
+    /** La bulle sur l'écran (px). */
+    private fun bubbleRect(): RectF {
+        val m = dp(MARGIN_DP).toFloat()
+        val size = dp(SIZE_DP).toFloat()
+        return RectF(params.x + m, params.y + m, params.x + m + size, params.y + m + size)
+    }
+
+    /** La fenêtre de l'image : tout l'écran. Elle prend les touchers le temps
+     * de l'animation — une superposition qui les laisse passer, Android la
+     * rend translucide (au plus 0,8 d'opacité, Android 12+). Capturable comme
+     * la fenêtre de GuiVault elle-même (le jour où elle prend `FLAG_SECURE`,
+     * l'image le prend aussi). */
+    private fun addMorph(p: Float): MorphView {
+        morph?.let { runCatching { windows.removeView(it) } }
+        val s = screen(this)
+        val full = RectF(0f, 0f, s.width().toFloat(), s.height().toFloat())
+        val view = MorphView(snapshot, bubbleRect(), if (snapshot != null) RectF(snapshotAt) else full)
+        view.p = p
+        val lp = overlayParams(s.width(), s.height()).apply {
+            gravity = Gravity.TOP or Gravity.START
+        }
+        windows.addView(view, lp)
+        morph = view
+        return view
+    }
+
+    private fun animateMorph(view: MorphView, to: Float, stiffness: Float, damping: Float, end: () -> Unit) {
+        SpringAnimation(FloatValueHolder(view.p)).apply {
+            spring = SpringForce(to).setStiffness(stiffness).setDampingRatio(damping)
+            setMinimumVisibleChange(0.001f)
+            addUpdateListener { _, v, _ -> view.p = v }
+            addEndListener { _, canceled, _, _ -> if (!canceled) end() }
+            start()
+        }
+    }
+
+    /** Un toucher : l'image de GuiVault grandit depuis la bulle jusqu'au
+     * plein écran, puis l'application revient dessous, sans animation du
+     * système ; [finishOpen] efface l'image quand elle est là. */
     private fun open() {
         leaving = true
-        val v = bubble
-        val options = v?.let { ActivityOptions.makeScaleUpAnimation(it, 0, 0, it.width, it.height).toBundle() }
-        try {
-            startActivity(launchIntent(), options)
-        } catch (e: Exception) {
-            startActivity(launchIntent())
+        opening = true
+        val view = addMorph(0f)
+        bubble?.alpha = 0f
+        animateMorph(view, 1f, 300f, 0.86f) {
+            val options = ActivityOptions.makeCustomAnimation(this, 0, 0).toBundle()
+            try {
+                startActivity(launchIntent(), options)
+            } catch (e: Exception) {
+                startActivity(launchIntent())
+            }
+            // L'application ne revient pas ? On ne reste pas couvert.
+            view.postDelayed({ if (opening) finishOpen(null) }, 3000)
         }
-        if (v == null) return stopSelf()
-        v.animate().scaleX(1.25f).scaleY(1.25f).alpha(0f).setDuration(200)
-            .setInterpolator(PathInterpolator(0.2f, 0f, 0f, 1f))
-            .withEndAction { stopSelf() }
-            .start()
+    }
+
+    /** La fenêtre de GuiVault est revenue : l'image s'efface sur elle — une
+     * fois cette fenêtre dessinée et l'animation du système finie dessous
+     * (`decor` : sa vue racine ; `null` : tout de suite). */
+    fun finishOpen(decor: View?) {
+        if (!opening) return
+        opening = false
+        val view = morph ?: return stopSelf()
+        val fade = Runnable { view.animate().alpha(0f).setDuration(200).withEndAction { stopSelf() }.start() }
+        if (decor == null) {
+            fade.run()
+            return
+        }
+        val observer = decor.viewTreeObserver
+        observer.addOnDrawListener(object : ViewTreeObserver.OnDrawListener {
+            private var seen = false
+
+            override fun onDraw() {
+                if (seen) return
+                seen = true
+                // Un écouteur ne se retire pas pendant le dessin.
+                decor.post { if (observer.isAlive) observer.removeOnDrawListener(this) }
+                view.postDelayed(fade, 350)
+            }
+        })
+        decor.invalidate()
+    }
+
+    /** « Réduire en bulle » : l'image couvre l'écran, GuiVault passe
+     * derrière, puis l'image rétrécit jusqu'à la bulle, qui prend le relais. */
+    private fun collapseFromApp() {
+        val goBack = afterCover
+        afterCover = null
+        if (snapshot == null) {
+            goBack?.invoke()
+            revealBubble()
+            return
+        }
+        leaving = true
+        val view = addMorph(1f)
+        view.post {
+            goBack?.invoke()
+            view.postDelayed({
+                animateMorph(view, 0f, 240f, 0.9f) {
+                    revealBubble()
+                    morph = null
+                    runCatching { windows.removeView(view) }
+                    leaving = false
+                }
+            }, 70)
+        }
+    }
+
+    /** La bulle apparaît là où l'image s'est posée. */
+    private fun revealBubble() {
+        val v = bubble ?: return
+        v.scaleX = 0.92f
+        v.scaleY = 0.92f
+        v.alpha = if (locked) 0.88f else 1f
+        springOn(v, DynamicAnimation.SCALE_X, 1f, 600f, 0.5f).start()
+        springOn(v, DynamicAnimation.SCALE_Y, 1f, 600f, 0.5f).start()
+    }
+
+    /** L'image entre la bulle (`p` = 0, un disque avec le logo) et sa place
+     * en plein écran (`p` = 1), recadrée sans déformation ; l'application
+     * de derrière s'assombrit à mesure. */
+    private inner class MorphView(private val snap: Bitmap?, private val from: RectF, private val to: RectF) : View(this@BubbleService) {
+        var p = 0f
+            set(value) {
+                field = value
+                invalidate()
+            }
+        private val r = RectF()
+        private val fill = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+        private val shader = snap?.let { BitmapShader(it, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP) }
+        private val fit = Matrix()
+        private val dim = Paint().apply { color = Color.BLACK }
+        private val backing = Paint(Paint.ANTI_ALIAS_FLAG)
+        private val disk = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#17181D") }
+        private val logo = getDrawable(R.mipmap.ic_launcher_round)?.mutate()?.apply {
+            if (locked) colorFilter = ColorMatrixColorFilter(ColorMatrix().apply { setSaturation(0f) })
+        }
+
+        private fun lerp(a: Float, b: Float, t: Float) = a + (b - a) * t
+
+        override fun onDraw(c: Canvas) {
+            val t = p
+            val k = t.coerceIn(0f, 1f)
+            dim.alpha = (k * 0.3f * 255).toInt()
+            c.drawRect(0f, 0f, width.toFloat(), height.toFloat(), dim)
+            r.set(lerp(from.left, to.left, t), lerp(from.top, to.top, t), lerp(from.right, to.right, t), lerp(from.bottom, to.bottom, t))
+            val radius = lerp(from.width() / 2f, 0f, k)
+            if (snap != null && shader != null) {
+                val s = max(r.width() / snap.width, r.height() / snap.height)
+                fit.setScale(s, s)
+                fit.postTranslate(r.centerX() - snap.width * s / 2f, r.centerY() - snap.height * s / 2f)
+                shader.setLocalMatrix(fit)
+                fill.shader = shader
+            } else {
+                fill.shader = null
+                fill.color = backdrop
+            }
+            if (fill.shader != null) {
+                // Sous l'image, le fond de l'application : rien ne transparaît.
+                backing.color = backdrop
+                c.drawRoundRect(r, radius, radius, backing)
+            }
+            c.drawRoundRect(r, radius, radius, fill)
+            // Le logo de la bulle s'efface dans le premier tiers du trajet.
+            val a = (1f - k / 0.35f).coerceIn(0f, 1f)
+            if (a > 0f) {
+                disk.alpha = (a * 255).toInt()
+                c.drawRoundRect(r, radius, radius, disk)
+                logo?.let {
+                    val side = min(r.width(), r.height()) * 0.8f
+                    it.setBounds((r.centerX() - side / 2).toInt(), (r.centerY() - side / 2).toInt(), (r.centerX() + side / 2).toInt(), (r.centerY() + side / 2).toInt())
+                    it.alpha = (a * 255).toInt()
+                    it.draw(c)
+                }
+            }
+        }
     }
 }
