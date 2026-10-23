@@ -3,16 +3,17 @@
 L'application Android de GuiVault : Tauri 2 mobile, la même interface que
 le web mobile (`docs/DESIGN.md`, « Mobile »), le coffre local et le serveur
 comme sur Windows, et ce que seul Android sait faire — d'abord la **bulle
-flottante**. **État (2026-10-22)** : l'application se construit et tourne sur
-l'émulateur (coffre local créé et ouvert), la bulle marche (réduire,
-déplacer, se ranger au bord, rouvrir d'un toucher, grise une fois
-verrouillé, fermer sur la croix). Les marges du système (barre d'état,
-barre de gestes, clavier) viennent de `MainActivity.kt` : l'app est « bord à
-bord » et `env(safe-area-inset-*)` vaut 0 dans la WebView ; la page les lit
-par `window.GuiVaultInsets` (`web/app/src/mobile.ts`) dans les variables
-`--inset-top` / `--inset-bottom` (`index.css`), et les icônes de la barre
-d'état suivent son thème. **Reste** : l'essai sur un vrai téléphone ; pas de
-mise à jour automatique sur Android (on installe l'APK suivant par-dessus).
+flottante**. **État (2026-10-23, version 0.2.2)** : l'application est publiée avec
+chaque release (APK signé par le CI) ; coffre local et serveur, toutes les
+pages en mise en page mobile, onglets au doigt, bulle (réduire, déplacer,
+se ranger au bord, rouvrir d'un toucher, grise une fois verrouillé, fermer
+sur la croix ; automatique en quittant l'application, réglable). Les marges
+du système (barre d'état, barre de gestes, clavier) viennent de
+`MainActivity.kt` : l'app est « bord à bord » et `env(safe-area-inset-*)`
+vaut 0 dans la WebView ; la page les lit par `window.GuiVaultInsets`
+(`web/app/src/mobile.ts`) dans les variables `--inset-top`,
+`--inset-bottom` et `--inset-ime` (`index.css`), et les icônes de la barre
+d'état suivent son thème. Ce qui manque : « Ce qui reste », plus bas.
 
 **Publier** : comme l'application Windows — le tag `app-v<version>`
 (`docs/APP.md`, « Publier une version »). Dans `app-release.yml`, le job
@@ -119,21 +120,70 @@ contexte sécurisé. Pour le piloter (Playwright, comme le reste) :
 Vérifié le 2026-10-22 : déverrouillage (Argon2id compris, ~15 s sur
 l'émulateur), coffre et fiche en Chrome 133 / Android 16.
 
-## La suite : l'application
+## Ce qui reste
 
-1. **Portage de `app-tauri/`** : `tauri android init`, crate en `lib`
-   (`mobile_entry_point`) ; ce qui n'existe qu'au bureau passe sous
-   `cfg(desktop)` — zone de notification, raccourci global, instance
-   unique, démarrage automatique, updater, hôte natif de l'extension,
-   saisie automatique, presse-papiers Windows. Le coffre local
-   (`guivault-local`) dans le dossier de données de l'app ; ouvrir ou créer
-   un coffre par le sélecteur de documents d'Android.
-2. **Mobile d'abord** : l'interface est celle du web sous 768 px ; les ponts
-   (`lib/platform.ts`) disent ce que l'application Android sait faire.
-3. **Plus tard** : déverrouillage biométrique (la clé du coffre sous une clé
-   du Keystore, déverrouillée par l'empreinte), remplissage dans les autres
-   applications (service Autofill d'Android), `FLAG_SECURE` contre les
-   captures.
+Vérifié jusqu'ici sur l'émulateur (Android 16, Pixel 9) : ce qui suit est
+ce qui manque, du plus pressant au plus confortable.
+
+**À vérifier**
+
+- [ ] **Sur un vrai téléphone** : clavier et feuilles (`--inset-ime`), bulle
+  automatique en quittant, liens vers le navigateur, gestes entre onglets,
+  Argon2id (≈ 15 s sur l'émulateur : à mesurer sur un milieu de gamme).
+- [ ] **Bulle en ouvrant un lien** : « Visiter le site » quitte l'app vers le
+  navigateur, et la bulle apparaît (`onUserLeaveHint`). Cohérent avec « en
+  quittant l'application » ; à garder ou à écarter pour ce cas (retenir un
+  drapeau dans `links.ts` avant d'ouvrir, que `MainActivity` lirait).
+
+**Les données du coffre local**
+
+- [ ] **Sortir un coffre de l'appareil, en faire entrer un** : les coffres
+  vivent dans le dossier privé de l'app (`local_dir`) ; pas de sélecteur
+  de documents (`pickCoffre` rend `null` sur mobile). Désinstaller
+  l'application les efface. Aujourd'hui, seule la copie vers un serveur
+  (`TRANSFERT.md`) les met à l'abri. Piste : exporter / importer
+  `coffre.json` (et ses pièces jointes) par le Storage Access Framework
+  (`ACTION_CREATE_DOCUMENT` / `ACTION_OPEN_DOCUMENT`), dans le plugin
+  Kotlin.
+- [ ] **Sauvegarde Android** (`android:allowBackup`, sauvegarde Google) :
+  décider. Le coffre n'y part que chiffré (la règle n°1 tient), mais une
+  copie dans le cloud de Google n'est pas ce qu'attend qui choisit un
+  coffre local. Soit l'exclure (`dataExtractionRules`), soit le dire.
+- [ ] Les sauvegardes automatiques du coffre local (`LocalBackups`) : à
+  vérifier sur Android (la restauration crée une copie dans le dossier de
+  l'app, `pickRestoreDest`).
+
+**Sécurité et confort**
+
+- [ ] **Déverrouillage biométrique** : la user key sous une clé du Keystore
+  Android (`setUserAuthenticationRequired`), libérée par l'empreinte ou le
+  visage ; le mot de passe maître reste demandé après un redémarrage ou au
+  bout d'un délai. Conception crypto à part, comme Windows Hello
+  (`ROADMAP.md`, §6).
+- [ ] **Service de remplissage Android** (`AutofillService`, comme KeePassDX
+  et Bitwarden) : remplir les autres applications et Chrome. Le plus gros
+  morceau, et ce qui donne son intérêt à l'app.
+- [ ] **`FLAG_SECURE`** : ni captures d'écran ni aperçu dans les
+  applications récentes tant qu'un coffre est ouvert (réglable, il gêne
+  les captures voulues).
+- [ ] **Presse-papiers** : marquer ce qui est copié comme sensible
+  (`ClipDescription.EXTRA_IS_SENSITIVE`, Android 13+ : pas d'aperçu dans la
+  notification du système) ; l'effacement au bout du délai passe déjà par
+  `lib/clipboard.ts`.
+- [ ] **Panneau sur la bulle** (recherche, codes 2FA) : à peser, voir
+  « La bulle flottante ».
+
+**Distribution**
+
+- [ ] **Mises à jour** : pas d'updater sur Android ; on installe l'APK
+  suivant par-dessus (même clé). Piste : signaler une version plus récente
+  (lire `latest.json` d'`app-updater`) et ouvrir la release, sans
+  installer soi-même.
+- [ ] Un APK par architecture (aujourd'hui universel arm64 + x86_64, ~2×
+  plus lourd) ; F-Droid ou le Play Store seulement si on le décide
+  (`SYSTEM_ALERT_WINDOW` y est examinée de près).
+- [ ] Tablettes et paysage : l'interface passe au bureau au-delà de
+  768 px ; jamais regardé sur une tablette.
 
 ## La bulle flottante
 

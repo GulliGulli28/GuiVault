@@ -465,5 +465,6 @@ ce port bloque aussi le Windows d'à côté (relayé par `wslrelay.exe`).
 6. Copier entre un coffre local et un serveur ([`TRANSFERT.md`](TRANSFERT.md)) :
    fait ; son scénario E2E tourne contre un vrai serveur quand
    `GUIVAULT_E2E_SERVER` est posé (job `app` du CI).
-7. Plus tard : Android ; `gv` sur un coffre local ; Guiterm sur un coffre
-   local.
+7. Android : fait (0.2.0, APK signé par le CI depuis la 0.2.1) —
+   [`ANDROID.md`](ANDROID.md), ce qui reste y est listé.
+8. Plus tard : `gv` sur un coffre local ; Guiterm sur un coffre local.

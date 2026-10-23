@@ -9,7 +9,7 @@ l'auto-hébergement sans fonctions « premium »).
 Chaque piste respecte la règle n°1 (`CLAUDE.md`) : le serveur ne garde que
 des blobs qu'il ne sait pas lire. Cocher au fur et à mesure.
 
-## État (21 octobre 2026)
+## État (23 octobre 2026)
 
 **Fait** : tout le §0 sauf le manifeste authentifié (plancher et
 paramètres Argon2id épinglés, retour en arrière détecté, enveloppes
@@ -18,29 +18,32 @@ effacé, historique et corbeille, copie hors ligne, recherche globale
 (Ctrl+K), raccourcis, tri, **fusion des conflits**, CLI `gv`, **remplissage fiable** de l'extension
 (shadow DOM, cadres, corpus rejoué en CI), **agent SSH dans Guiterm** ; dans le §2 : **accès d'urgence**,
 **liens de partage**, **rapport de santé** (web), **pièces jointes** et
-**connexion par passkey**. Chaque point est coché ci-dessous avec où il
-vit dans le code.
+**connexion par passkey** ; dans le §6 : l'**application Windows** (0.1 puis
+0.2, mises à jour signées) et l'**application Android** (APK signé par le
+CI à chaque release, bulle flottante). L'interface entière est **refaite**
+(`DESIGN.md`, octobre 2026 : web, extension, mobile). Chaque point est
+coché ci-dessous avec où il vit dans le code.
 
-**Ensuite, dans cet ordre** — du plus demandé ou du plus exposé au plus
-confortable :
+**Ce qui reste, par ordre de priorité** (chaque ligne renvoie au détail) :
 
-1. **Manifeste de vault authentifié** (§0) : **en cours** — serveur, web
-   (alerte comprise), extension, vecteurs d'interop, `gv` et Guiterm faits ;
-   reste l'activation, une fois ce Guiterm publié. La liste exacte, dans l'ordre :
-   [`MANIFESTE.md`](MANIFESTE.md), « Ce qui reste ».
-2. ~~**Conflits (409)**~~ (§4) : fait — fusion champ par champ. L'exploitation
-   (§5) et le mobile sont faits aussi ; la suite est à choisir parmi les
-   cases encore vides ci-dessous.
-3. **Application** (§6, 21 octobre 2026) : l'app Windows (coffre local ou
-   serveur, installeurs, saisie automatique) est faite, et le poste avec —
-   presse-papiers hors de l'historique Windows, verrouillage avec la
-   session, sauvegardes du coffre local, zone de notification — l'import
-   KDBX, l'extension reliée à l'application, les **mises à jour signées**
-   (0.1.0 puis 0.1.1 publiées, [`APP.md`](APP.md), « Mises à jour ») et la
-   **copie entre un coffre local et un serveur** ([`TRANSFERT.md`](TRANSFERT.md)).
-   Ensuite, au choix : agent SSH Windows, Windows Hello (reporté), ou les
-   petites pistes (feuille de secours, fuites sans serveur, mode portable).
-   Android en dernier, ou sur demande.
+1. **Manifeste de vault authentifié** (§0) : tout est écrit — serveur, web
+   (alerte comprise), extension, vecteurs d'interop, `gv` et Guiterm ; reste
+   l'**activation** (`AUTO_ENABLE_MANIFEST`), une fois ce Guiterm publié.
+   La liste exacte : [`MANIFESTE.md`](MANIFESTE.md), « Ce qui reste ».
+2. **Android, ne pas perdre un coffre local** (§6) : il vit dans le dossier
+   privé de l'app, que la désinstallation efface ; ni export ni import de
+   fichier. Puis décider de la sauvegarde Google (`allowBackup`).
+   [`ANDROID.md`](ANDROID.md), « Ce qui reste ».
+3. **Android, l'essai sur un vrai téléphone**, puis **déverrouillage
+   biométrique** et **service de remplissage** — sans eux l'app Android
+   reste une visionneuse (§6).
+4. **Windows** (§6) : signature de code (SmartScreen), mises à jour pour
+   une installation MSI, Windows Hello, agent SSH.
+5. **Le reste des cases vides**, au choix : 2FA WebAuthn et passkey dans
+   l'extension (§2), `reprompt`, doublons, premier lancement guidé (§1),
+   petites écritures qui rechargent sur un conflit (§4), écrans propres à
+   l'application qui n'ont eu que des textes raccourcis dans la refonte
+   (`DESIGN.md`, « État »).
 
 ## 0. Sécurité face à un serveur malveillant
 
@@ -221,8 +224,10 @@ paramètres ou formats anciens.
   (ni focus ni lecteur d'écran), en-têtes qui laissent la place au bouton
   Menu, deux notifications au plus sur petit écran, menu « Nouveau » à
   Échap. **PWA installable** (`manifest.webmanifest`, icônes 192/512 et
-  masquable ; Chrome la juge installable). Pas d'app native : la PWA et la
-  copie hors ligne couvrent consultation, copie, TOTP et liens reçus.
+  masquable ; Chrome la juge installable). **Refait** en octobre 2026
+  (`DESIGN.md`, « Mobile ») : barre d'onglets, feuilles qui montent du bas,
+  gestes entre onglets, mouvements ; c'est aussi l'interface de
+  l'application Android (§6).
 - [x] **Conflits (409)** : fusion champ par champ au lieu d'un
   rechargement qui perdait la saisie. Le refus joint la version du serveur
   (`RevisionConflict.current`) ; `lib/merge.ts` fusionne à trois versions
@@ -356,12 +361,27 @@ L gros.
 - [ ] **Fuites sans serveur** (S) : depuis l'app, k-anonymat direct, en
   option, pour un coffre local.
 
-**Android** — en dernier, ou quand ce sera demandé
+**Android** ([`ANDROID.md`](ANDROID.md))
 
-- [ ] L'application Android (même projet Tauri, une cible de plus ;
-  identifiant `dev.guivault.client`).
-- [ ] **Service de remplissage Android** (L, KeePassDX, Bitwarden) et
-  déverrouillage biométrique — sans eux, l'app Android n'a pas d'intérêt.
+- [x] **L'application Android** (même projet Tauri, `dev.guivault.client`) :
+  coffre local ou serveur, l'interface mobile du web, APK signé, attesté et
+  joint à chaque release par le CI (depuis la 0.2.1).
+- [x] **Bulle flottante** à la Messenger : réduire, déplacer, rouvrir ;
+  automatique en quittant l'application (réglable), aucun secret affiché.
+- [ ] **Essai sur un vrai téléphone** (S) — tout n'a été vu que sur
+  l'émulateur.
+- [ ] **Exporter / importer un coffre local** (M) : par le sélecteur de
+  documents d'Android ; aujourd'hui, désinstaller efface les coffres de
+  l'appareil. Et décider de la sauvegarde Google (`allowBackup`, S).
+- [ ] **Déverrouillage biométrique** (M) : la user key sous une clé du
+  Keystore ; conception crypto à part, comme Windows Hello.
+- [ ] **Service de remplissage Android** (L, KeePassDX, Bitwarden) — sans
+  lui, l'app Android ne remplit rien en dehors d'elle-même.
+- [ ] `FLAG_SECURE`, presse-papiers marqué sensible (S).
+- [ ] **Signaler une nouvelle version** (S) : pas d'updater sur Android ;
+  lire `latest.json` et ouvrir la release.
+- [ ] Panneau sur la bulle (recherche, codes 2FA) — à peser : il montrerait
+  des secrets par-dessus une autre application.
 
 ## Sources
 
