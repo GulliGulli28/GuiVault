@@ -3,12 +3,13 @@
 L'application Android de GuiVault : Tauri 2 mobile, la même interface que
 le web mobile (`docs/DESIGN.md`, « Mobile »), le coffre local et le serveur
 comme sur Windows, et ce que seul Android sait faire — d'abord la **bulle
-flottante**. **État (2026-10-23, version 0.3.0)** : l'application est publiée avec
+flottante**. **État (2026-10-24, version 0.4.0)** : l'application est publiée avec
 chaque release (APK signé par le CI) ; coffre local et serveur, toutes les
 pages en mise en page mobile, onglets au doigt, bulle (réduire, déplacer,
 se ranger au bord, rouvrir d'un toucher, grise une fois verrouillé, fermer
 sur la croix ; automatique en quittant l'application, réglable),
-déverrouillage biométrique. Les marges
+déverrouillage biométrique, remplissage des autres applications
+([`REMPLISSAGE.md`](REMPLISSAGE.md)). Les marges
 du système (barre d'état, barre de gestes, clavier) viennent de
 `MainActivity.kt` : l'app est « bord à bord » et `env(safe-area-inset-*)`
 vaut 0 dans la WebView ; la page les lit par `window.GuiVaultInsets`
