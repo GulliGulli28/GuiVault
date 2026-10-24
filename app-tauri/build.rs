@@ -1,7 +1,7 @@
 fn main() {
-    // La bulle et la biométrie d'Android (`src/bubble.rs`, `src/biometric.rs`) :
-    // des plugins de l'app elle-même, dont les commandes Kotlin ont leurs
-    // permissions (`bubble:allow-…`, `biometric:allow-…`).
+    // La bulle, la biométrie et le remplissage d'Android (`src/bubble.rs`,
+    // `src/biometric.rs`, `src/autofill.rs`) : des plugins de l'app elle-même,
+    // dont les commandes Kotlin ont leurs permissions (`bubble:allow-…`…).
     tauri_build::try_build(
         tauri_build::Attributes::new()
             .plugin(
@@ -15,6 +15,11 @@ fn main() {
                     "locked",
                     "auto",
                 ]),
+            )
+            .plugin(
+                "autofill",
+                tauri_build::InlinedPlugin::new()
+                    .commands(&["status", "request", "disable", "update", "clear", "forget", "password"]),
             )
             .plugin(
                 "biometric",

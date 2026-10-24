@@ -16,6 +16,7 @@ import type { AuditEntry, Session } from "../lib/types";
 import { AppearanceSettings, SettingsSyncToggle } from "./AppearanceSettings";
 import { PasskeySettings } from "./PasskeySettings";
 import { BiometricSetting } from "./BiometricSetting";
+import { AutofillSetting } from "./AutofillSetting";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { AuditList } from "./VaultSettings";
 import { IconIdentity, IconLifebuoy } from "./secret-icons";
@@ -206,6 +207,7 @@ export function SettingsPage({ ctx, section }: { ctx: PageContext; section: Sett
                     </select>
                   </SettingRow>
                   <BiometricSetting ctx={ctx} />
+                  <AutofillSetting ctx={ctx} />
                   <ClipboardSetting />
                 </div>
               </section>

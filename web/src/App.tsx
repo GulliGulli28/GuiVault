@@ -31,7 +31,8 @@ import { MobileNav, mobileTabs, rememberVault, tabOf } from "./components/Mobile
 import { NARROW, useMediaQuery } from "./hooks/useMediaQuery";
 import { clearAllItems } from "./lib/allItems";
 import { AutoTypeHost } from "./components/AutoType";
-import { autoTypeBridge, bubbleBridge, systemBridge, updaterBridge } from "./lib/platform";
+import { autofillBridge, autoTypeBridge, bubbleBridge, systemBridge, updaterBridge } from "./lib/platform";
+import { AutofillFeeder } from "./components/AutofillSetting";
 import { Toasts, useToasts } from "./components/ui";
 import { PaneHandle, usePersistedPane } from "./hooks/usePersistedPane";
 
@@ -235,6 +236,8 @@ export default function App({ Welcome = LoginScreen }: { Welcome?: ComponentType
     }
     clearWebSession();
     rememberLocked(null);
+    // Se déconnecter, fermer le coffre : le remplissage l'oublie aussi.
+    void autofillBridge()?.forget().catch(() => {});
     if (s) wipe(s);
     setSession(null);
     navigate({ page: "home" });
@@ -276,6 +279,8 @@ export default function App({ Welcome = LoginScreen }: { Welcome?: ComponentType
   // fois verrouillé, sans jamais rien montrer d'autre que le logo.
   const unlocked = session !== null;
   useEffect(() => { void bubbleBridge()?.setLocked(!unlocked).catch(() => {}); }, [unlocked]);
+  // Le remplissage d'Android : verrouillé, plus rien en clair dans son index.
+  useEffect(() => { if (!unlocked) void autofillBridge()?.clear().catch(() => {}); }, [unlocked]);
   // Mobile : la barre d'onglets du bas remplace la barre latérale.
   const narrow = useMediaQuery(NARROW);
   const vaultRoute = route.page === "vault" ? route.id : null;
@@ -371,6 +376,7 @@ export default function App({ Welcome = LoginScreen }: { Welcome?: ComponentType
       {narrow && <MobileNav ctx={ctx} route={effective} />}
       {search && <SearchPalette ctx={ctx} onClose={closeSearch} />}
       {autoTypeBridge() && <AutoTypeHost ctx={ctx} />}
+      {autofillBridge() && <AutofillFeeder ctx={ctx} />}
       <Toasts toasts={toasts} onDismiss={dismiss} />
     </div>
   );

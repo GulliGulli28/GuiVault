@@ -236,3 +236,44 @@ export function setBiometricBridge(b: BiometricBridge | null) {
 export function biometricBridge(): BiometricBridge | null {
   return biometric;
 }
+
+/** L'index du remplissage : les identifiants du coffre ouvert, tels que le
+ * service de remplissage d'Android les propose (`lib/autofill.ts`). */
+export interface AutofillIndex {
+  v: 1;
+  /** Le coffre ou le compte (ce que la feuille de remplissage nomme). */
+  label: string;
+  entries: { id: string; name: string; vault: string; username: string; password: string; uris: { uri: string; match: string | null }[] }[];
+}
+
+/** Le remplissage automatique de l'application Android (`AutofillPlugin.kt`,
+ * `docs/REMPLISSAGE.md`). */
+export interface AutofillBridge {
+  /** `enabled` : GuiVault est le service de remplissage choisi ;
+   * `biometric` : l'index se garde chiffré, l'application fermée remplit
+   * encore après une empreinte. */
+  status(): Promise<{ supported: boolean; enabled: boolean; biometric: boolean }>;
+  /** L'écran d'Android qui propose de choisir GuiVault. */
+  request(): Promise<void>;
+  /** Ne plus être le service choisi ; l'index s'efface. */
+  disable(): Promise<void>;
+  /** Le coffre ouvert : son index (en mémoire, et chiffré sur le disque). */
+  update(index: AutofillIndex): Promise<void>;
+  /** Verrouillé : plus rien en clair (le fichier chiffré reste). */
+  clear(): Promise<void>;
+  /** Déconnecté, coffre fermé : tout s'efface. */
+  forget(): Promise<void>;
+  /** Le mot de passe maître vient d'ouvrir un coffre (le délai repart). */
+  passwordUsed(): Promise<void>;
+}
+
+let autofill: AutofillBridge | null = null;
+
+export function setAutofillBridge(b: AutofillBridge | null) {
+  autofill = b;
+}
+
+/** `null` : pas de remplissage ici (tout sauf l'application Android). */
+export function autofillBridge(): AutofillBridge | null {
+  return autofill;
+}

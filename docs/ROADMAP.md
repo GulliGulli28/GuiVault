@@ -34,9 +34,10 @@ coché ci-dessous avec où il vit dans le code.
    privé de l'app, que la désinstallation efface ; ni export ni import de
    fichier. Puis décider de la sauvegarde Google (`allowBackup`).
    [`ANDROID.md`](ANDROID.md), « Ce qui reste ».
-3. **Android, l'essai sur un vrai téléphone** (biométrie comprise), puis le
-   **service de remplissage** — sans lui l'app Android reste une
-   visionneuse (§6).
+3. **Android, l'essai sur un vrai téléphone** (biométrie et remplissage
+   compris), puis la suite du remplissage : enregistrer après une
+   connexion, passkeys par le Credential Manager (§6,
+   [`REMPLISSAGE.md`](REMPLISSAGE.md)).
 4. **Windows** (§6) : signature de code (SmartScreen), mises à jour pour
    une installation MSI, Windows Hello, agent SSH.
 5. **Le reste des cases vides**, au choix : 2FA WebAuthn et passkey dans
@@ -379,8 +380,11 @@ L gros.
   après un redémarrage et tous les 14 jours — [`ANDROID.md`](ANDROID.md),
   « Déverrouillage biométrique ». Windows Hello pourra suivre le même
   schéma (`BiometricBridge`).
-- [ ] **Service de remplissage Android** (L, KeePassDX, Bitwarden) — sans
-  lui, l'app Android ne remplit rien en dehors d'elle-même.
+- [x] **Service de remplissage Android** (L, KeePassDX, Bitwarden) : les
+  autres applications et Chrome, index chiffré sous une clé du Keystore
+  (empreinte), associations liées au certificat de l'application —
+  [`REMPLISSAGE.md`](REMPLISSAGE.md). Reste : enregistrer après une
+  connexion, code 2FA, Credential Manager.
 - [ ] `FLAG_SECURE`, presse-papiers marqué sensible (S).
 - [ ] **Signaler une nouvelle version** (S) : pas d'updater sur Android ;
   lire `latest.json` et ouvrir la release.

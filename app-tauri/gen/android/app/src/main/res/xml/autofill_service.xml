@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Le service de remplissage (GuiVaultAutofillService, docs/REMPLISSAGE.md) :
+     suggestions dans la barre du clavier, et le mode de compatibilité pour
+     les navigateurs qui ne parlent pas encore au système de remplissage
+     (Android lit alors la page par l'accessibilité et donne son domaine). -->
+<autofill-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:settingsActivity="dev.guivault.client.MainActivity"
+    android:supportsInlineSuggestions="true">
+    <compatibility-package android:name="com.android.chrome" android:maxLongVersionCode="10000000000" />
+    <compatibility-package android:name="com.chrome.beta" android:maxLongVersionCode="10000000000" />
+    <compatibility-package android:name="com.chrome.dev" android:maxLongVersionCode="10000000000" />
+    <compatibility-package android:name="org.chromium.chrome" android:maxLongVersionCode="10000000000" />
+    <compatibility-package android:name="com.brave.browser" android:maxLongVersionCode="10000000000" />
+    <compatibility-package android:name="com.microsoft.emmx" android:maxLongVersionCode="10000000000" />
+    <compatibility-package android:name="com.sec.android.app.sbrowser" android:maxLongVersionCode="10000000000" />
+    <compatibility-package android:name="com.vivaldi.browser" android:maxLongVersionCode="10000000000" />
+    <compatibility-package android:name="com.opera.browser" android:maxLongVersionCode="10000000000" />
+    <compatibility-package android:name="com.duckduckgo.mobile.android" android:maxLongVersionCode="10000000000" />
+    <compatibility-package android:name="com.kiwibrowser.browser" android:maxLongVersionCode="10000000000" />
+</autofill-service>

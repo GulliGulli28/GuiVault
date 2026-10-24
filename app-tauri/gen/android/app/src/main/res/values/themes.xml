@@ -3,4 +3,14 @@
     <style name="Theme.guivault_app" parent="Theme.Material3.DayNight.NoActionBar">
         <!-- Customize your theme here. -->
     </style>
+    <!-- L'écran du remplissage (AutofillActivity) : transparent, la feuille
+         se dessine au bas, par-dessus l'application qui demande. -->
+    <style name="Theme.GuiVault.Fill" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowAnimationStyle">@null</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
 </resources>

@@ -97,6 +97,8 @@ dependencies {
     // Déverrouillage biométrique (BiometricPlugin.kt) et ressorts de la bulle
     // (BubbleService.kt).
     implementation("androidx.biometric:biometric:1.1.0")
+    // Suggestions dans la barre du clavier (AutofillForm.inline).
+    implementation("androidx.autofill:autofill:1.1.0")
     implementation("androidx.dynamicanimation:dynamicanimation:1.0.0")
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.4")

@@ -10,6 +10,10 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Le déverrouillage par empreinte ou visage (BiometricPlugin.kt). -->
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+    <!-- Le remplissage (AutofillIndex.kt) lit le certificat de signature de
+         l'application qui demande : Android 11+ cache sinon les autres
+         paquets. -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
 
     <!-- AndroidTV support -->
     <uses-feature android:name="android.software.leanback" android:required="false" />
@@ -41,6 +45,27 @@
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="Bulle flottante qui rouvre l'application au toucher, à la manière des têtes de discussion" />
         </service>
+
+        <!-- Le remplissage automatique (docs/REMPLISSAGE.md). -->
+        <service
+            android:name=".GuiVaultAutofillService"
+            android:exported="true"
+            android:label="GuiVault"
+            android:permission="android.permission.BIND_AUTOFILL_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.autofill.AutofillService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.autofill"
+                android:resource="@xml/autofill_service" />
+        </service>
+        <activity
+            android:name=".AutofillActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:taskAffinity=""
+            android:theme="@style/Theme.GuiVault.Fill"
+            android:windowSoftInputMode="adjustResize" />
 
         <provider
           android:name="androidx.core.content.FileProvider"

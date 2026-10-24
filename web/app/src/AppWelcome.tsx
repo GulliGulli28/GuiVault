@@ -4,6 +4,7 @@ import { LocalBackups } from "../../src/components/LocalBackups";
 import { createLocal, lockedTarget, openLocal, type SessionState } from "../../src/lib/session";
 import { localBiometricId, serverBiometricId, touchBiometric, unlockLocalWithBiometric, unlockServerWithBiometric, useAutoPrompt, useBiometricState } from "../../src/lib/biometric";
 import { IconFingerprint } from "../../src/components/secret-icons";
+import { autofillBridge } from "../../src/lib/platform";
 import { AuthShell } from "../../src/components/AuthShell";
 import { LoginScreen } from "../../src/components/LoginScreen";
 import { InfoTip, PasswordInput } from "../../src/components/ui";
@@ -36,8 +37,9 @@ function firstStep(): Step {
  * un coffre local. Prend la place de `LoginScreen` dans `App`. */
 export function AppWelcome({ onSession: done }: { onSession: (s: SessionState) => void }) {
   const [step, setStep] = useState<Step>(firstStep);
-  // Ouvert par le mot de passe : le délai de la biométrie repart.
-  const onSession = useCallback((s: SessionState) => { touchBiometric(s); done(s); }, [done]);
+  // Ouvert par le mot de passe : le délai de la biométrie (et du
+  // remplissage, qui suit les mêmes règles) repart.
+  const onSession = useCallback((s: SessionState) => { touchBiometric(s); void autofillBridge()?.passwordUsed().catch(() => {}); done(s); }, [done]);
   const [recents, setRecents] = useState(recentCoffres);
   // Mobile : les coffres du dossier de l'app, récents ou non.
   const [device, setDevice] = useState<string[]>([]);

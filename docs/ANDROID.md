@@ -161,9 +161,11 @@ ce qui manque, du plus pressant au plus confortable.
   de passe, et, pour un compte du serveur, survivre à un redémarrage de
   l'application (garder le jeton de rafraîchissement sur l'appareil, comme
   Bitwarden).
-- [ ] **Service de remplissage Android** (`AutofillService`, comme KeePassDX
-  et Bitwarden) : remplir les autres applications et Chrome. Le plus gros
-  morceau, et ce qui donne son intérêt à l'app.
+- [x] **Service de remplissage Android** (`AutofillService`, comme KeePassDX
+  et Bitwarden) : les identifiants dans les autres applications et dans
+  Chrome, sous le champ ou dans la barre du clavier ; coffre verrouillé,
+  une empreinte — [`REMPLISSAGE.md`](REMPLISSAGE.md), qui liste la suite
+  (enregistrer après une connexion, code 2FA, Credential Manager).
 - [ ] **`FLAG_SECURE`** : ni captures d'écran ni aperçu dans les
   applications récentes tant qu'un coffre est ouvert (réglable, il gêne
   les captures voulues).

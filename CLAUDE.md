@@ -91,11 +91,15 @@ il ne déchiffre rien : la user key reste sous la clé que seule la PRF donne).
   `mobile_entry_point`), ce qui n'existe qu'au bureau est sous
   `cfg(desktop)` ; `gen/android` est versionné (Kotlin de la bulle :
   `BubblePlugin.kt`, `BubbleService.kt`, de la biométrie :
-  `BiometricPlugin.kt`, marges : `MainActivity.kt`) ; on
+  `BiometricPlugin.kt`, du remplissage des autres applications :
+  `GuiVaultAutofillService.kt`, `AutofillIndex.kt`, `AutofillActivity.kt` —
+  `docs/REMPLISSAGE.md`, marges : `MainActivity.kt`) ; on
   construit depuis une copie Windows (`scripts/android-sync.sh`,
   `scripts/android/*.ps1`). Côté interface : `web/app/src/mobile.ts`
   (`isMobile`, coffres de l'appareil, marges), `bubbleBridge.ts`,
-  `biometricBridge.ts` (→ `src/lib/biometric.ts`, `BiometricSetting`).
+  `biometricBridge.ts` (→ `src/lib/biometric.ts`, `BiometricSetting`),
+  `autofillBridge.ts` (→ `src/lib/autofill.ts`, `AutofillSetting` dont
+  `AutofillFeeder`, qui confie l'index du coffre ouvert).
 - `web/` — l'interface web, Vite + React 19 + TypeScript + Tailwind 3.
   **Refonte (2026-10-21) : on se sépare de la charte de Guiterm.** Faite
   pour le web, l'extension et le mobile (le web sous 768 px : barre
