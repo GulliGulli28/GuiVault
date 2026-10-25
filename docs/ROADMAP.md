@@ -451,12 +451,13 @@ Le README le dit en tête ; chaque case cochée y retire une ligne.
     test `gv_recovers_without_a_server` : sauvegarde d'un vrai serveur relue
     une fois le serveur éteint et sa base effacée). L'export chiffré se lit
     aussi en Rust (`export_key`, vecteur d'interop écrit par le web) ;
-  - [ ] `CONTRIBUTING.md` (comment construire, tester, ce qui ne se
-    négocie pas : la règle n°1, les formats), et un second mainteneur qui
-    sache publier une version.
-- [ ] **Promesse écrite « aucune fonction payante »** dans le README : ce qui
-  est dans le logiciel libre y reste ; seul se vend ce qui n'est pas du
-  code (§8).
+  - [x] [`CONTRIBUTING.md`](../CONTRIBUTING.md) : ce qui ne se négocie pas
+    (règle n°1, formats, interop, pas de crypto maison, pas de payant),
+    construire et tester, ce qu'on attend d'une pull request, publier ;
+  - [ ] un **second mainteneur** qui sache publier une version (accès au
+    dépôt, à la clé de signature des mises à jour, au keystore Android).
+- [x] **Promesse écrite « aucune fonction payante »** dans le README
+  (« Pourquoi GuiVault », point 4) et dans `CONTRIBUTING.md`.
 
 ## 8. L'offre
 

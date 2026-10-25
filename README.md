@@ -67,7 +67,9 @@ même auteur.
    logiciel libre et auto-hébergé.
 4. **Tout, sans palier payant.** Pièces jointes, accès d'urgence, liens de
    partage (texte, élément ou fichier), TOTP, rapport de santé, passkeys :
-   ni licence, ni « premium ».
+   ni licence, ni « premium ». **C'est un engagement** : ce qui entre dans
+   le logiciel libre y reste, pour tout le monde ; s'il se vend un jour
+   quelque chose, ce sera du service (hébergement, support), pas du code.
 5. **Un serveur qu'on exploite sereinement.** Une image Docker, un binaire
    Rust, PostgreSQL. Des sauvegardes automatiques **restaurées dans une
    base d'essai** à chaque fois, pour prouver qu'elles marchent ; une
@@ -504,6 +506,12 @@ la compilation des deux côtés au lieu de diverger.
 | [`PASSKEYS.md`](docs/PASSKEYS.md) · [`PIECES-JOINTES.md`](docs/PIECES-JOINTES.md) · [`TRANSFERT.md`](docs/TRANSFERT.md) · [`MANIFESTE.md`](docs/MANIFESTE.md) | Conceptions détaillées |
 | [`DESIGN.md`](docs/DESIGN.md) | Charte et règles de l'interface |
 | [`ROADMAP.md`](docs/ROADMAP.md) | Ce qui est fait, ce qui reste |
+
+## Contribuer
+
+Issues et pull requests bienvenues, en français ou en anglais : les règles
+qui ne se négocient pas, comment construire et tester, ce qu'on attend
+d'une contribution — [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## Signaler une vulnérabilité
 
