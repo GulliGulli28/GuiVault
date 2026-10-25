@@ -47,6 +47,22 @@ export function clipboardBridge(): ClipboardBridge | null {
   return clipboard;
 }
 
+/** L'écran de l'application (Android) : le cacher aux captures et à
+ * l'aperçu des applications récentes (`FLAG_SECURE`, `MainActivity.kt`). */
+export interface ScreenBridge {
+  setSecure(on: boolean): void;
+}
+
+let screen: ScreenBridge | null = null;
+
+export function setScreenBridge(b: ScreenBridge | null) {
+  screen = b;
+}
+
+export function screenBridge(): ScreenBridge | null {
+  return screen;
+}
+
 /** Ce que le système dit à l'application : quand verrouiller, et depuis
  * combien de temps l'ordinateur est inactif (`app-tauri/src/system.rs`). */
 export interface SystemBridge {
@@ -174,8 +190,12 @@ export interface UpdaterBridge {
    * ce que la release annonce (égale à l'installée : à jour ; plus ancienne :
    * la dernière publication n'y est pas encore visible). */
   check(): Promise<{ update: AvailableUpdate | null; advertised: string | null }>;
-  /** Télécharge, vérifie la signature, installe et relance. */
+  /** Télécharge, vérifie la signature, installe et relance — ou, `external`,
+   * ouvre la page de la version (Android : pas d'updater, on installe l'APK
+   * suivant par-dessus). */
   install(onProgress?: (done: number, total: number | null) => void): Promise<void>;
+  /** Pas d'installation ici : `install` ouvre la page de téléchargement. */
+  external?: boolean;
 }
 
 let updater: UpdaterBridge | null = null;

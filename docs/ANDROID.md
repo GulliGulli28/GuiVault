@@ -160,22 +160,31 @@ ce qui manque, du plus pressant au plus confortable.
   Chrome, sous le champ ou dans la barre du clavier ; coffre verrouillé,
   une empreinte — [`REMPLISSAGE.md`](REMPLISSAGE.md), qui liste la suite
   (enregistrer après une connexion, code 2FA, Credential Manager).
-- [ ] **`FLAG_SECURE`** : ni captures d'écran ni aperçu dans les
-  applications récentes tant qu'un coffre est ouvert (réglable, il gêne
-  les captures voulues).
-- [ ] **Presse-papiers** : marquer ce qui est copié comme sensible
-  (`ClipDescription.EXTRA_IS_SENSITIVE`, Android 13+ : pas d'aperçu dans la
-  notification du système) ; l'effacement au bout du délai passe déjà par
-  `lib/clipboard.ts`.
+- [x] **`FLAG_SECURE`** : ni capture d'écran ni aperçu dans les
+  applications récentes tant qu'un coffre est ouvert ; Réglages › Écran
+  « Cacher aux captures », activé par défaut (il gêne les captures
+  voulues). `MainActivity.kt` (interface `GuiVaultAndroid.setSecure`),
+  `web/app/src/android.ts` (`ScreenBridge`), posé par `App` à l'ouverture et
+  à la fermeture de la session.
+- [x] **Presse-papiers** : ce qui est copié est marqué sensible
+  (`ClipDescription.EXTRA_IS_SENSITIVE` : pas d'aperçu dans l'avis du
+  système, Android 13+) et effacé par l'application à l'échéance réglée,
+  s'il est encore le nôtre (`GuiVaultAndroid.copySecret`, le
+  `ClipboardBridge` d'Android). En arrière-plan, Android interdit de relire
+  le presse-papiers : rien n'est alors effacé plutôt que de risquer
+  d'effacer autre chose (Android 13+ le vide de lui-même au bout d'une
+  heure).
 - [ ] **Panneau sur la bulle** (recherche, codes 2FA) : à peser, voir
   « La bulle flottante ».
 
 **Distribution**
 
-- [ ] **Mises à jour** : pas d'updater sur Android ; on installe l'APK
-  suivant par-dessus (même clé). Piste : signaler une version plus récente
-  (lire `latest.json` d'`app-updater`) et ouvrir la release, sans
-  installer soi-même.
+- [x] **Mises à jour** : pas d'updater sur Android ; on installe l'APK
+  suivant par-dessus (même clé). L'application **signale** une version plus
+  récente — notification au démarrage, et Réglages › Mise à jour — en
+  lisant les releases `app-v*` publiées sur l'API publique de GitHub
+  (`src/lib/version.ts`, `installUpdateNotice`), et « Télécharger » ouvre
+  la page de la version (APK, somme, attestation) dans le navigateur.
 - [ ] Un APK par architecture (aujourd'hui universel arm64 + x86_64, ~2×
   plus lourd) ; F-Droid ou le Play Store seulement si on le décide
   (`SYSTEM_ALERT_WINDOW` y est examinée de près).

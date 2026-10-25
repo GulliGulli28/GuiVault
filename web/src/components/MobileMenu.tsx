@@ -16,6 +16,9 @@ import { AutofillSetting } from "./AutofillSetting";
 import { autofillBridge } from "../lib/autofill";
 import { biometricBridge } from "../lib/biometric";
 import { IconBell, IconChevronRight, IconDatabase, IconLock } from "./ui-icons";
+import { screenBridge, updaterBridge } from "../lib/platform";
+import { loadSecureScreen, saveSecureScreen } from "../lib/appSettings";
+import { AppUpdates } from "./AppUpdates";
 
 /** Mobile : l'onglet « Réglages » (maquette `MParametres`) — le compte, le
  * thème, les catégories des paramètres, les outils qui n'ont pas d'onglet,
@@ -25,6 +28,12 @@ export function MobileMenu({ ctx, onLock, onLogout }: { ctx: PageContext; onLock
   const local = session.local;
   const who = local ? coffreName(local.path) : session.user.email;
   const auto = useAutoBubble();
+  const [secure, setSecure] = useState(loadSecureScreen);
+  const toggleSecure = () => {
+    saveSecureScreen(!secure);
+    screenBridge()?.setSecure(!secure);
+    setSecure(!secure);
+  };
   const [mode, setMode] = useState<ColorModeChoice>(() => loadPreferences().colorMode);
   const setColorMode = (m: ColorModeChoice) => {
     const next = { ...loadPreferences(), colorMode: m };
@@ -118,6 +127,23 @@ export function MobileMenu({ ctx, onLock, onLogout }: { ctx: PageContext; onLock
             </div>
           </section>
         )}
+
+        {screenBridge() && (
+          <section className="flex flex-col gap-2">
+            <h2 className="m-section">Écran</h2>
+            <div className="m-card m-list">
+              <div className="m-set">
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span>Cacher aux captures</span>
+                  <span className="text-[13px] text-[var(--c-text-muted)]">Ni capture d'écran, ni aperçu dans les applications récentes</span>
+                </span>
+                <button type="button" role="switch" aria-checked={secure} aria-label="Cacher l'écran aux captures" onClick={toggleSecure} className="switch" />
+              </div>
+            </div>
+          </section>
+        )}
+
+        {updaterBridge()?.external && <AppUpdates />}
 
         <section className="flex flex-col gap-2">
           <h2 className="m-section">Paramètres</h2>

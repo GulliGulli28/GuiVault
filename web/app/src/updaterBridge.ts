@@ -7,7 +7,9 @@ import { getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { check, type Update } from "@tauri-apps/plugin-updater";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { setUpdaterBridge } from "../../src/lib/platform";
+import { latestAppRelease, newer, type GithubRelease } from "../../src/lib/version";
 
 // Un mandataire peut garder un `latest.json` en cache : on le lui interdit.
 const noCache = { headers: { "Cache-Control": "no-cache", Pragma: "no-cache" } };
@@ -39,6 +41,37 @@ export function installUpdater() {
         }
       });
       await relaunch();
+    },
+  });
+}
+
+/** Android : pas d'updater (on installe l'APK suivant par-dessus, même
+ * clé). On dit seulement qu'une version plus récente est publiée — lue sur
+ * l'API publique de GitHub (les releases `app-v*` publiées) — et on ouvre sa
+ * page, où sont l'APK, sa somme et son attestation. */
+const RELEASES = "https://api.github.com/repos/GulliGulli28/GuiVault/releases?per_page=30";
+
+export function installUpdateNotice() {
+  let page: string | null = null;
+  setUpdaterBridge({
+    version: () => getVersion(),
+    installer: async () => null,
+    external: true,
+    async check() {
+      const res = await fetch(RELEASES, { headers: { Accept: "application/vnd.github+json" }, cache: "no-store" });
+      if (!res.ok) throw new Error(`GitHub répond ${res.status}`);
+      const releases = (await res.json()) as GithubRelease[];
+      const latest = latestAppRelease(releases);
+      if (!latest) return { update: null, advertised: null };
+      const version = latest.tag_name.slice("app-v".length);
+      const current = await getVersion();
+      if (!newer(version, current)) return { update: null, advertised: version };
+      page = latest.html_url;
+      return { update: { version, notes: latest.body, date: latest.published_at }, advertised: version };
+    },
+    async install() {
+      if (!page) throw new Error("Aucune version à télécharger : vérifiez d'abord.");
+      await openUrl(page);
     },
   });
 }

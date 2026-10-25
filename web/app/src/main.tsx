@@ -11,7 +11,7 @@ import { installAutoType } from "./autotypeBridge";
 import { installClipboard } from "./clipboardBridge";
 import { installSystem } from "./systemBridge";
 import { installBackups } from "./backupBridge";
-import { installUpdater } from "./updaterBridge";
+import { installUpdateNotice, installUpdater } from "./updaterBridge";
 import { installCoffres } from "./coffreBridge";
 import { installCoffreFiles } from "./coffreFileBridge";
 import { installBubble } from "./bubbleBridge";
@@ -19,6 +19,7 @@ import { installBiometric } from "./biometricBridge";
 import { installAutofill } from "./autofillBridge";
 import { installExternalLinks } from "./links";
 import { detectMobile, installInsets, isMobile } from "./mobile";
+import { installAndroid } from "./android";
 
 // Comme l'interface web (`src/main.tsx`), sans le service worker : l'app
 // embarque déjà son interface.
@@ -31,10 +32,12 @@ setDeviceLabel("Application GuiVault");
 // Sur mobile (Android), pas d'updater : les mises à jour passent par
 // l'installation d'un APK.
 installInsets();
+installAndroid();
 installExternalLinks();
 void detectMobile().then(() => {
   installBackups();
-  if (!isMobile()) installUpdater();
+  if (isMobile()) installUpdateNotice();
+  else installUpdater();
   installCoffres();
   installCoffreFiles();
   // Le pont système (verrou de session, zone de notification, démarrage,

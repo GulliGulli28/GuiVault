@@ -40,6 +40,11 @@ export function AppUpdates() {
     }
   };
   const install = async () => {
+    // Android : la page de la version s'ouvre dans le navigateur.
+    if (bridge.external) {
+      await bridge.install().catch((e) => setStatus({ kind: "error", message: errorMessage(e) }));
+      return;
+    }
     setStatus({ kind: "installing", done: 0, total: null });
     try {
       await bridge.install((done, total) => setStatus({ kind: "installing", done, total }));
@@ -71,7 +76,7 @@ export function AppUpdates() {
               Version <span className="font-mono">{status.update.version}</span> disponible{status.update.date ? ` (publiée le ${new Date(status.update.date).toLocaleDateString("fr-FR")})` : ""}.
             </p>
             {status.update.notes && <pre className="max-h-40 overflow-y-auto whitespace-pre-wrap rounded-md bg-[var(--c-bg3)] p-2 text-[11.5px] text-[var(--c-text-secondary)]">{status.update.notes}</pre>}
-            <button onClick={() => void install()} className="btn btn-primary btn-sm">Installer et redémarrer</button>
+            <button onClick={() => void install()} className="btn btn-primary btn-sm">{bridge.external ? "Télécharger" : "Installer et redémarrer"}</button>
           </div>
         )}
         {status.kind === "installing" && (
@@ -81,7 +86,7 @@ export function AppUpdates() {
         )}
         {status.kind === "error" && <p className="callout callout-danger">Mise à jour : {status.message}</p>}
       </div>
-      <p className="help-text">Publiées sur GitHub · installées seulement si signées par GuiVault.</p>
+      <p className="help-text">{bridge.external ? "Publiées sur GitHub · l'APK s'installe par-dessus, signé de la même clé." : "Publiées sur GitHub · installées seulement si signées par GuiVault."}</p>
     </section>
   );
 }

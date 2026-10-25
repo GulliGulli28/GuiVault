@@ -80,3 +80,24 @@ export const LOCK_MESSAGES: Record<LockReason, string> = {
   zone: "Verrouillé : GuiVault est passé dans la zone de notification.",
   menu: "Verrouillé depuis la zone de notification.",
 };
+
+/** Android : cacher l'écran aux captures et à l'aperçu des applications
+ * récentes tant qu'un coffre est ouvert (`ScreenBridge`). Activé par défaut ;
+ * il gêne les captures voulues, d'où le réglage. */
+const SCREEN_KEY = "guivault.app.secureScreen";
+
+export function loadSecureScreen(): boolean {
+  try {
+    return localStorage.getItem(SCREEN_KEY) !== "false";
+  } catch {
+    return true;
+  }
+}
+
+export function saveSecureScreen(on: boolean) {
+  try {
+    localStorage.setItem(SCREEN_KEY, on ? "true" : "false");
+  } catch {
+    // stockage indisponible : le réglage vaut pour cette fois
+  }
+}

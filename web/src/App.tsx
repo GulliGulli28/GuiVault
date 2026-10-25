@@ -32,7 +32,8 @@ import { MobileNav, mobileTabs, rememberVault, tabOf } from "./components/Mobile
 import { NARROW, useMediaQuery } from "./hooks/useMediaQuery";
 import { clearAllItems } from "./lib/allItems";
 import { AutoTypeHost } from "./components/AutoType";
-import { autofillBridge, autoTypeBridge, bubbleBridge, systemBridge, updaterBridge } from "./lib/platform";
+import { autofillBridge, autoTypeBridge, bubbleBridge, screenBridge, systemBridge, updaterBridge } from "./lib/platform";
+import { loadSecureScreen } from "./lib/appSettings";
 import { AutofillFeeder } from "./components/AutofillSetting";
 import { Toasts, useToasts } from "./components/ui";
 import { PaneHandle, usePersistedPane } from "./hooks/usePersistedPane";
@@ -106,11 +107,17 @@ export default function App({ Welcome = LoginScreen }: { Welcome?: ComponentType
     if (!updater) return;
     const t = setTimeout(() => {
       updater.check().then(({ update }) => {
-        if (update) notify(`Mise à jour disponible : ${update.version} — Paramètres › Application.`);
+        if (update) notify(`Mise à jour disponible : ${update.version} — ${updater.external ? "Réglages" : "Paramètres › Application"}.`);
       }).catch(() => {});
     }, 8000);
     return () => clearTimeout(t);
   }, [notify]);
+
+  // Android : l'écran se cache aux captures tant qu'un coffre est ouvert.
+  const sessionOpen = session !== null;
+  useEffect(() => {
+    screenBridge()?.setSecure(sessionOpen && loadSecureScreen());
+  }, [sessionOpen]);
 
   // Le jeton n'est plus accepté et n'a pas pu être rafraîchi : retour à la
   // connexion, en le disant.
