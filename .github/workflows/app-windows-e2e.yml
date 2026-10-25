@@ -22,20 +22,20 @@ jobs:
   e2e:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: app-tauri -> target
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: web/package-lock.json
       - id: tauri-driver-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cargo/bin/tauri-driver.exe
           key: tauri-driver-2.0.6-${{ runner.os }}
@@ -85,7 +85,7 @@ jobs:
           "--- tauri-driver :"
           Get-Content "web\app\e2e\.output\driver.log" -ErrorAction SilentlyContinue | Select-Object -Last 40
       - if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: app-e2e-windows
           path: web/app/e2e/.output
