@@ -24,7 +24,10 @@ CI à chaque release, bulle flottante). L'interface entière est **refaite**
 (`DESIGN.md`, octobre 2026 : web, extension, mobile). Chaque point est
 coché ci-dessous avec où il vit dans le code.
 
-**Ce qui reste, par ordre de priorité** (chaque ligne renvoie au détail) :
+**Ce qui reste, par ordre de priorité** (chaque ligne renvoie au détail).
+En parallèle, la **confiance et la distribution** (§7 : audit, image signée,
+stores, politique de sécurité, survivre au projet) puis l'**offre** (§8) :
+c'est ce qui sépare un projet solide d'un outil qu'on recommande.
 
 1. **Manifeste de vault authentifié** (§0) : tout est écrit — serveur, web
    (alerte comprise), extension, vecteurs d'interop, `gv` et Guiterm ; reste
@@ -422,6 +425,42 @@ Le README le dit en tête ; chaque case cochée y retire une ligne.
   devient ici), pour les relecteurs.
 - [ ] **Version 1.0 du serveur et des formats**, avec une promesse écrite de
   compatibilité et un journal des changements.
+- [ ] **Survivre au projet** — l'objection n°1 face à un seul développeur
+  (« et si vous arrêtez ? ») :
+  - [ ] **spécification des formats** publiée (`docs/FORMATS.md`) : de
+    quoi réécrire un client à partir de la seule doc — dérivations, octets
+    de version, AAD, enveloppes, exports, coffre local ;
+  - [ ] **récupération sans serveur** : ouvrir un coffre local, un export
+    chiffré ou une sauvegarde du serveur avec le seul mot de passe maître,
+    et tout ressortir en clair (`gv recover`), sans réseau ni serveur ;
+  - [ ] `CONTRIBUTING.md` (comment construire, tester, ce qui ne se
+    négocie pas : la règle n°1, les formats), et un second mainteneur qui
+    sache publier une version.
+- [ ] **Promesse écrite « aucune fonction payante »** dans le README : ce qui
+  est dans le logiciel libre y reste ; seul se vend ce qui n'est pas du
+  code (§8).
+
+## 8. L'offre
+
+Le créneau (README, « GuiVault face aux autres ») : le coffre auto-hébergé
+des gens qui administrent des machines, local ou serveur, conçu contre un
+serveur compromis. Premier public : les structures françaises attentives à
+la souveraineté — collectivités, PME, infogérants, santé, enseignement —
+pour qui une interface en français et un hébergement chez soi sont des
+atouts, pas des manques. Rien ici ne retire une fonction au logiciel libre.
+
+- [ ] **Une page de présentation** (domaine à soi) : le pitch, la
+  comparaison honnête, la sécurité en une page, les téléchargements avec
+  leurs sommes et attestations.
+- [ ] **Instance hébergée en France** pour qui ne veut pas héberger : même
+  binaire, l'opérateur ne voit que ce que voit tout serveur GuiVault.
+  Prérequis : l'audit (§7) et le manifeste activé.
+- [ ] **Installation et support** pour PME et infogérants : déploiement,
+  reprise des coffres existants (Bitwarden, KeePass), formation.
+- [ ] **Contrat de maintenance** avec un délai d'engagement sur les failles
+  (correctif publié, versions maintenues — la politique de sécurité du §7).
+- [ ] **Import 1Password et Proton Pass** dédiés (aujourd'hui un CSV
+  générique) : la migration est le premier geste d'un nouveau client.
 
 ## Sources
 
