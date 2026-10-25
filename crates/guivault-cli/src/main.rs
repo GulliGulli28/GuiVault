@@ -1,5 +1,6 @@
 //! `gv` — voir `gv help` et `docs/CLI.md`.
 use anyhow::{Context, Result, anyhow, bail};
+use guivault_cli::recover::{self, Source};
 use guivault_cli::store::Home;
 use guivault_cli::vault::Opened;
 use guivault_cli::{Prompt, SecretRef};
@@ -28,6 +29,11 @@ const HELP: &str = "gv — le coffre GuiVault en ligne de commande
   gv aws credential-process <accès|réf>      pour `credential_process` dans ~/.aws/config
   gv git-credential get                      credential helper Git
                                              (git config --global credential.helper '!gv git-credential')
+
+  gv recover <source> [--email E] [--out DOSSIER] [--password-stdin]
+                                             tout ressortir en clair, sans serveur ni réseau : d'un
+                                             coffre local (son dossier), d'une sauvegarde du serveur
+                                             (.jsonl.gz, avec --email) ou d'un export chiffré
 
 Références : gv://<vault>/<élément>[/<champ>] — noms ou ids, %20 pour une espace ;
 champ par défaut : le secret (mot de passe, secret d'une clé d'API, clé AWS…).
@@ -365,6 +371,52 @@ fn run() -> Result<ExitCode> {
             {
                 print!("{out}");
             }
+        }
+        "recover" => {
+            let a = parse(args, &["--email", "--out"], &["--password-stdin"])?;
+            let [path] = a.rest.as_slice() else {
+                bail!("gv recover <coffre local | sauvegarde .jsonl.gz | export.json> [--email E] [--out DOSSIER]");
+            };
+            let source = Source::detect(std::path::Path::new(path))?;
+            let email = a.opt("--email");
+            if matches!(source, Source::Backup(_)) && email.is_none() {
+                bail!("une sauvegarde du serveur contient tous les comptes : précisez --email");
+            }
+            let plain_export = matches!(source, Source::Export(_))
+                && std::fs::read_to_string(path).is_ok_and(|t| t.contains("\"guivault-export\""));
+            let password = if plain_export {
+                None
+            } else if a.flag("--password-stdin") {
+                let mut line = String::new();
+                std::io::stdin().read_line(&mut line)?;
+                Some(line.trim_end_matches(['\r', '\n']).to_string())
+            } else {
+                Some(Terminal.password(&source.password_prompt(email))?)
+            };
+            let pw = password.as_deref().unwrap_or_default();
+            let rec = match &source {
+                Source::Local(dir) => recover::from_local(dir, pw)?,
+                Source::Backup(file) => recover::from_backup(file, email.unwrap_or_default(), pw)?,
+                Source::Export(file) => recover::from_export(file, password.as_deref())?,
+            };
+            for w in &rec.warnings {
+                eprintln!("gv : {w}");
+            }
+            let out = a.opt("--out").map(std::path::PathBuf::from).unwrap_or_else(|| {
+                std::path::PathBuf::from(format!(
+                    "guivault-recover-{}",
+                    chrono::Local::now().format("%Y%m%d-%H%M%S")
+                ))
+            });
+            recover::write(&rec, &out)?;
+            eprintln!(
+                "{} vault(s), {} élément(s), {} pièce(s) jointe(s) → {}",
+                rec.vaults.len(),
+                rec.item_count(),
+                rec.file_count(),
+                out.display()
+            );
+            eprintln!("En clair : importez les .json (Outils › Importer) puis effacez ce dossier.");
         }
         other => bail!("commande inconnue : {other} (gv help)"),
     }

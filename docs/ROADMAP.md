@@ -430,12 +430,18 @@ Le README le dit en tête ; chaque case cochée y retire une ligne.
   compatibilité et un journal des changements.
 - [ ] **Survivre au projet** — l'objection n°1 face à un seul développeur
   (« et si vous arrêtez ? ») :
-  - [ ] **spécification des formats** publiée (`docs/FORMATS.md`) : de
-    quoi réécrire un client à partir de la seule doc — dérivations, octets
-    de version, AAD, enveloppes, exports, coffre local ;
-  - [ ] **récupération sans serveur** : ouvrir un coffre local, un export
-    chiffré ou une sauvegarde du serveur avec le seul mot de passe maître,
-    et tout ressortir en clair (`gv recover`), sans réseau ni serveur ;
+  - [x] **spécification des formats** : [`FORMATS.md`](FORMATS.md) —
+    dérivations, octets de version, AAD, enveloppes, manifeste, pièces
+    jointes, coffre local, sauvegarde du serveur, exports, et un engagement
+    de compatibilité ;
+  - [x] **récupération sans serveur** : `gv recover` ouvre un coffre local,
+    une sauvegarde du serveur (`--email`) ou un export avec le seul mot de
+    passe, et écrit un export en clair par vault et les pièces jointes
+    déchiffrées, sans réseau ([`CLI.md`](CLI.md), « Récupération » ;
+    `recover.rs` écrit à partir de `FORMATS.md`, sans `guivault-local` ;
+    test `gv_recovers_without_a_server` : sauvegarde d'un vrai serveur relue
+    une fois le serveur éteint et sa base effacée). L'export chiffré se lit
+    aussi en Rust (`export_key`, vecteur d'interop écrit par le web) ;
   - [ ] `CONTRIBUTING.md` (comment construire, tester, ce qui ne se
     négocie pas : la règle n°1, les formats), et un second mainteneur qui
     sache publier une version.

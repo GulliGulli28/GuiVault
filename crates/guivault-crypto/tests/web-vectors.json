@@ -14,65 +14,65 @@
     "key": "0505050505050505050505050505050505050505050505050505050505050505",
     "aad": "ctx-web",
     "plaintext": "from the browser",
-    "blob": "01f30433693f407a8359fa4b3a09ab3a61760a3f16e58a4c18926f93ebee36c60de8b5da3dea3c0baf81a55814219c05f9c416e66afe8e7ea1"
+    "blob": "0132a340a8473e3f98199f11fef912645d74fa4e6eebeccb7c40eab37361bc67f977fa79da3951e6e8699c4382832623bd403518eafb5e9ad4"
   },
   "sealed_box": {
-    "private": "a48fa9a1ed29571f26236cf62b24f6110379cce8b853f0e5616f053935f03623",
-    "public": "76a404469cc3b324c169a1f64317cc9b0dde8bb90f69a5d6d4545247b75b1244",
-    "fingerprint": "8e6d-da39-56f9-e03f-7877-275d-0050-76e9",
+    "private": "8f88fa826b53f7b572a48edbe0cd48469caa26baa99e84a9db0014f40378ca80",
+    "public": "8112134083b5ebc1ed660da6573cb96360688f311c90de4fe34b6cc969cf7756",
+    "fingerprint": "94bb-7d7e-73fe-fb76-f4be-53c4-80c4-6b0e",
     "plaintext": "sealed by the browser",
-    "blob": "0174ed81842c6b5ee3c910e0f03533aca78be0b91a4495ddcae376071a72ae7e641719bb891347b497ab4abb480a384ca91c5f7d55d5d1e69ad100fc33ee5f8ed5b836ef56b7"
+    "blob": "01cf0e0cbedad7c84b826bc638891baa2c94c0f4305345aa5bc9d290776123342b0085d4148bd69fc4a3ee23a3ce4a8a1f9fb1f2ceedb1f8b1fe1669881e293473ca33d3caa4"
   },
   "vault_envelope": {
-    "sender_public": "3d17f0935d063b4b86e8f55f97470fbfc01218b3b8e77d374e5a6f8af82c9c7b",
-    "recipient_private": "a48fa9a1ed29571f26236cf62b24f6110379cce8b853f0e5616f053935f03623",
-    "vault_id": "0b19b47e-6442-4ebe-80ca-e16f39f33f0a",
+    "sender_public": "482d1e72919bb6e2304d6e86551029c7b017f1f7d5e932f10828dab9ee524925",
+    "recipient_private": "8f88fa826b53f7b572a48edbe0cd48469caa26baa99e84a9db0014f40378ca80",
+    "vault_id": "1c995e5c-bb62-4062-9153-de2869d27327",
     "vault_key": "0606060606060606060606060606060606060606060606060606060606060606",
-    "blob": "023d17f0935d063b4b86e8f55f97470fbfc01218b3b8e77d374e5a6f8af82c9c7b0150fdb3ad7ce98b70fde8f3d554ec459a31c0475a567be562035735a4c6ddc40e348982112497b50a5fcd92c2a485f343ac3800efe9a5a024bba5293c735a4130dd2ac460397b0197",
-    "emergency_blob": "023d17f0935d063b4b86e8f55f97470fbfc01218b3b8e77d374e5a6f8af82c9c7b01cf1104f8407535a63f57c708b09b131f219e0115d36247a86efbfaa91894a71b63f07611067361d01df31dc48dcc586ca37913e4423155c3adb6f4c24e1a6fcfdad134c07d4ba3fe"
+    "blob": "02482d1e72919bb6e2304d6e86551029c7b017f1f7d5e932f10828dab9ee524925011e25155073c4fbaec833ad1a33de795e9c61b117b932243c96f0ab5e36a17e7f463d10deabd46aca121a913a09ec830d53ba8affd435896807a04aafb67cb6907e49ddc775ff2235",
+    "emergency_blob": "02482d1e72919bb6e2304d6e86551029c7b017f1f7d5e932f10828dab9ee524925019a149b70b7d805ac05e8c4388123aee3c528ed4b803ed96094c742f00837144bf248ef279f79974beae6f99a25174b41c374fb8749367af8e5744d096002937670c9727e39703627"
   },
   "send": {
-    "secret": "6978b77cd8fd82b64df7f7771f389bf8",
-    "id": "855ef745-e699-40f7-b2df-256b053ebcdd",
+    "secret": "fe5e2ebb7baeabf7a20f6b72bc1981a7",
+    "id": "c22864ec-8676-47da-bb49-d984cdb044ef",
     "plaintext": "partagé depuis le navigateur",
-    "access_hash": "1b38edd9019d0675a9a4c55671b3f844511caa598f578ab7de61b9f770a458fa",
-    "blob": "011e067f5e9dcfdf883f3a7c4fba68a7239f797be1efdca8e043217a9d4e6d2a6632a1e5e07ec1950a4dc2b934fc8413bb3f853a9ed639650cf921df89f505cda41c46cb3a04",
+    "access_hash": "c3afa2ea8790ba4710da410076b4a9a22b2edc27d3be008f49ec731b27105c4f",
+    "blob": "01248b0890176973184d099414ddebbf320c5673b3b289ceca6e732ef64ae19447d6e2c838379c721fd17e6eaadd3abb1c1d0c755ebc6d9cc027ff6e64c976075d3b929c7ce1",
     "password": "lien du navigateur",
-    "password_salt": "a7ea28999ff30ab97d6897a85b7ecf2b",
+    "password_salt": "2d9e0af8d962edb28e0831aa9ad3fcc4",
     "password_kdf": {
       "m_cost": 19456,
       "t_cost": 2,
       "p_cost": 1
     },
-    "locked_access_hash": "e184595f714cba82ff50bb86a0cab926d52793c376cef4bd18f63101f308d94e",
-    "locked_blob": "011aafe0abcea6722f00f9058e714031e1dacc94de5d0ee0d5424e61e654221b032dae77c1ff7667e79f54379e480e7848080023f5fb9bbd2d1467d6c9c144478f6381aeb5c1",
+    "locked_access_hash": "2c8a9c23ffe10108846389acb553573ce43f9e1059d02e533f579f777847e037",
+    "locked_blob": "0159c9258397f64a721a348c4eb7ece3db73e5f73c80d22d7d0836ed8bc35fd486a67d328d1750315a0eb2972b84dc5bc7fa6fc102618896bbca8e9da3cddc0f7e71e52d8999",
     "owner_key": "0808080808080808080808080808080808080808080808080808080808080808",
     "owner_plaintext": "{\"name\":\"Clé\"}",
-    "owner_blob": "010c63aae79e7ec7b32266529d446eee9d2a6e52f72cb10a17704ce8813b0282c70f13be327bd76e51ade9a252f2c4b008dd6f6636086688",
+    "owner_blob": "0170fb5b88c0bb49b021164dc2f166987519c74be47f108be1f1e67caf0809eaf56173e0dd96da9a7a202e5c54079f3b106b9276b98fa4d2",
     "file_chunks": [
       {
         "index": 0,
         "last": false,
         "plaintext": "du navigateur",
-        "blob": "01bd56778710e4de5595f23a378dedb3a659aae214bb63bba748789c183316e156e7f53cb58bd68867fa7d33ac1c566f71f9156be20c"
+        "blob": "01d52d7b9f66300ebbd99832d0ff5ad47fe4c73baf5b57f8629ac3fb7158d2e5d44f0aa93819ed0bbccf4c2971c830238fc3715900d5"
       },
       {
         "index": 1,
         "last": true,
         "plaintext": "fin",
-        "blob": "01b3b36d838c64408de2b5d675f7cb68c13039deec7fc3bf7c27cd878adaa280b3311c77330fae346d80979a"
+        "blob": "01242a4e9de3b0db3551388a5f8fa4aeab3e2fbac762ea720f7b162caf6ab42b0ac17a3464d4bba6b6a23ce1"
       }
     ]
   },
   "item": {
     "vault_key": "0606060606060606060606060606060606060606060606060606060606060606",
-    "vault_id": "0b19b47e-6442-4ebe-80ca-e16f39f33f0a",
-    "item_id": "919b5c97-b34f-4283-b669-1691f27390fb",
+    "vault_id": "1c995e5c-bb62-4062-9153-de2869d27327",
+    "item_id": "fc4b951b-aba7-42dc-9520-93989eeb5c42",
     "item_type": "snippet",
     "plaintext": "{\"kind\":\"snippet\"}",
-    "blob": "012b67b9f61039addcd930001c689f8630b12171f89e8b8da2dd13bc312776596552812cc710c033861ee8678fd8c25c33eb30bc52a09a5abcfbfe",
+    "blob": "01a76ea9297364546be7d31e8a2070bcf007502370929717d9f90228dce2385850f1cb469713089da3250f74de0f58bf4963ab3d2e89703f10a5ad",
     "name": "Équipe réseau",
-    "name_blob": "0192559058d3e45b809c0e3f85df9bdb2a88a9b97a5f1a921680b00db59ba22d339cd5607f821e11708c10df70d510381b3f4665eb2b66fb"
+    "name_blob": "01d7406c47cc43f8608bbf55bf57bc349602fe828fe13e94595cc7667f78a8d0d46c0c1c1ca77fcb9720d850ef46a41dbdd9b0d096ef71d4"
   },
   "passkey": {
     "prf_salt": "b72069e23678841981a772a2dc9d149817e65105f61165f48c2078d336e28cf6",
@@ -80,38 +80,42 @@
     "key": "8e0e472cdc4f5adeda3aed4f57aeb9bd94e1d5c7f816d81a02ed61cb4cebc6ac",
     "credential_id": "62726f777365722d63726564656e7469616c",
     "user_key": "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c",
-    "blob": "01fc613495f73ea2636b972ed95dd44600b9c9bbf8cd04513d1fb2a955b87f5d3dcde9f68f887a16a046a054faafed84d9d7a0fba56318598973e61f374ba19cfb9f2388d2b10c4dd4"
+    "blob": "01db196dcbb2bb4539502907444e9b7c09b9f12a6f4ece4eb7514a2d9ec657cff7322b7213b8081b2048997cc936f084f07d1501c57ae557a937581eed6baadda8ef3e2ef88c1e735a"
   },
   "attachment": {
     "key": "0505050505050505050505050505050505050505050505050505050505050505",
-    "id": "919b5c97-b34f-4283-b669-1691f27390fb",
+    "id": "fc4b951b-aba7-42dc-9520-93989eeb5c42",
     "chunks": [
       {
         "index": 0,
         "last": false,
         "plaintext": "du navigateur",
-        "blob": "017a5a0984ee1d806ae95380d9ed425869c321f46c4aa0a06eec00ebec5ba0ea7f51d6c939f45f3dcb4aba57e8bbfb25e236e40e211d"
+        "blob": "01347fa95b63f48a120f28d0ff3884366eb8aa37b21593759ac0872c0893a905c94113545873c70e27396b07ab5e757cb1babd42af9a"
       },
       {
         "index": 1,
         "last": true,
         "plaintext": " — fin",
-        "blob": "016105e8d1d6acb0108f9c34c2c6fb418f74ccfea1d2408e8f4381bbc70fd8f03275264b801ce28332a0b7a28f866daebc"
+        "blob": "01235ad06225354f7bedeaaa7445873e7bd816f6627677b3990e88d99bd615eddb51f2649e63029e4eb8911351ef35d1ac"
       }
     ]
   },
+  "export": {
+    "password": "export du navigateur",
+    "document": "{\n  \"format\": \"guivault-export-encrypted\",\n  \"version\": 1,\n  \"kdf\": {\n    \"m_cost\": 65536,\n    \"t_cost\": 3,\n    \"p_cost\": 1\n  },\n  \"kdf_salt\": \"7lgH3vWkaOsxGDBqN1eOCA==\",\n  \"blob\": \"AWy77iMJsLADQocos3M1AZDpBFAjnEndfFxfUsHUrjmMZlEBc2p92GPMR7E/dNgKZjUKIGVRy9IzFwvf14J/oXnXUVmRNUqFX5uMQLhe7XvQ3Q1gyw8NpxmLMwVNeZ5EIy+hlg4kUdcnS22RJUBG/mIPpY5UqqX1KSsXfRr4UVIhJjJWHBGv/QMsgTCy/b2w6ErNeeAps1RfQV77N9kqo1h23/jA0XRnoxxcbxkooR2wMPvMtBt7Y1KJ78nxQtXz44mQRO79Gnu3gPWE+LI4j2+TxyziCBabII4duLHcIeWqaxpFX4Iut4QObasaCZFnNZHhp0CAH8UN7PeQloz7p3PT3o6F8fr1aKWwpb6ujnflhsStr5fEaWo1598xOj5pt2lRCW1kriee6xcJ/2b5SA1aL5MMFtyaxNQKT83Qwjz0PEeXctb8BPFD/lLcpzM9N/hJP/XG4IU9RNfwoYH9GO6fmGR+pXqotzxw6MvH+HHticDILRNU0EPOL6Cy520v7oh+VmkoUBei9K19DEFKspq9wBQ2j+B3N5rHQR2X3mgnZAmLKmhRiJA0t/D3YQQVjeOyW19kxT1p\"\n}"
+  },
   "manifest": {
     "vault_key": "0606060606060606060606060606060606060606060606060606060606060606",
-    "vault_id": "0b19b47e-6442-4ebe-80ca-e16f39f33f0a",
+    "vault_id": "1c995e5c-bb62-4062-9153-de2869d27327",
     "counter": 7,
     "items": {
-      "919b5c97-b34f-4283-b669-1691f27390fb": "0j1lzSmmidfCTRsUKW6MqA_2ONheSrFG1VUe6NQR7uk",
-      "9d0bf46d-502a-424b-b1dd-1559c39f67db": "ungWv48Bz-pBQUDeXa4iI7ADYaOWF3qctBD_YfIAFa0"
+      "fc4b951b-aba7-42dc-9520-93989eeb5c42": "uuRVBNH-9I6V75Ufba8OsF9qB1AviYe_reBJOXRdgUw",
+      "73270e95-8cce-4734-b745-7d59bac71874": "ungWv48Bz-pBQUDeXa4iI7ADYaOWF3qctBD_YfIAFa0"
     },
-    "blob": "019aad77487c13663e5889ee8370acb69f68d49e10a7f9d1e29755e3d24cd299f0cbaaac2a92b8edbec42bf4e26416da908ee77962cf611438b540b2e70949449ff1a342e680871182dfbdd4ce04d2a37621f40d2f39edabb9072b685c133e0b65813431e4cbf07003178110709fb21e5bc01c52eb213dde7ee266cb165a1f0e4c568b30ecc158c4c0033a31b5a8f180587fcad090d44a0199b5874e0a9b5bde43c1497d818730e753dbc0e4d956476eb2c2251273c75abcd977db58c45783301007a28fe702b6a8a5958c14d1402c67e14b61b856ff60cd3332958015b98d0658c7c57f511fc6132e1568aa082c3a1d",
-    "item_id": "919b5c97-b34f-4283-b669-1691f27390fb",
-    "item_blob": "012b67b9f61039addcd930001c689f8630b12171f89e8b8da2dd13bc312776596552812cc710c033861ee8678fd8c25c33eb30bc52a09a5abcfbfe",
-    "other_id": "9d0bf46d-502a-424b-b1dd-1559c39f67db",
+    "blob": "01eeefcffe95a198b9fdd81878171107632ed6c63f708abd87b2dae371eb6bc0fa4301d26ff961f26b2e8b105cfd37825685122e6fb5bafaf4b29a256c984bd1e2c43b6a43a3fd14fc413afce241ae46d85952e501227f04a2e0935a8699dc547d38fe2335b5bf1b218a07ed24192ac019f14664b2d8857ad26f719b05d8fdf95e4495cb43408a3fcf0d9c6ce341fa6b1917e515fbcc6490fb1aa21f3356a638b3db43464fabf9632cabe956699b80f3f78bf16f3b342cb35bfc396288cf4310aa7019402b00317057bdc08ca8ba1bb0dfc8fd78e8c5bedcb9f2f59044439a0f3397a2742eb6191e79986e80e5c89832",
+    "item_id": "fc4b951b-aba7-42dc-9520-93989eeb5c42",
+    "item_blob": "01a76ea9297364546be7d31e8a2070bcf007502370929717d9f90228dce2385850f1cb469713089da3250f74de0f58bf4963ab3d2e89703f10a5ad",
+    "other_id": "73270e95-8cce-4734-b745-7d59bac71874",
     "other_ciphertext": "616263"
   }
 }

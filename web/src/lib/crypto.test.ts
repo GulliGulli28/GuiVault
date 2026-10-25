@@ -9,6 +9,7 @@ import { fromHex, randomBytes, toHex, utf8, uuid } from "./bytes";
 import * as c from "./crypto";
 import { itemDigest, manifestOf, openManifest, sealManifest, verifyManifest } from "./manifest";
 import vectors from "./crypto.vectors.json";
+import { exportEncrypted } from "./exporters";
 
 describe("guivault-crypto interop", () => {
   it("dérive les mêmes clés qu'Argon2id + HKDF côté Rust", async () => {
@@ -207,6 +208,11 @@ describe("guivault-crypto interop", () => {
           index, last, plaintext,
           blob: toHex(c.sealAttachmentChunk(key, itemId, index as number, last as boolean, utf8.encode(plaintext as string))),
         })),
+      },
+      // Le vrai chemin de l'export « protégé par mot de passe » (Outils › Exporter).
+      export: {
+        password: "export du navigateur",
+        document: await exportEncrypted({ id: vaultId, name: "Équipe réseau" }, [{ kind: "note", note: { id: itemId, name: "Note exportée", content: "contenu" } } as never], "export du navigateur"),
       },
       manifest: {
         vault_key: toHex(vaultKey), vault_id: vaultId, counter: manifest.counter, items: manifest.items,

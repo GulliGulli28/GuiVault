@@ -28,6 +28,7 @@ gv get gv://Personnel/GitHub/password
 | `gv attachment get <réf \| élément> [pièce jointe] [--vault V] [-o fichier \| -]` | la télécharge et la déchiffre : par défaut un fichier à son nom dans le dossier courant (`0600`, jamais par-dessus un existant), `-o -` sur la sortie ; `gv://vault/élément/pièce jointe` marche aussi |
 | `gv aws credential-process <accès \| réf>` | le JSON attendu par `credential_process` (accès AWS par clés) |
 | `gv git-credential get` | credential helper Git |
+| `gv recover <source> [--email E] [--out DOSSIER] [--password-stdin]` | tout ressortir en clair **sans serveur ni réseau**, d'un coffre local, d'une sauvegarde du serveur ou d'un export — voir « Récupération » |
 
 Sans `GUIVAULT_SESSION`, une commande qui lit demande le mot de passe
 maître si un terminal est là.
@@ -125,3 +126,39 @@ acte »), où un membre qui écrit réécrit le manifeste. Après une
 restauration connue du serveur, `gv sync --accept` fait des manifestes
 servis la référence de ce poste (les écarts d'éléments, eux, restent
 jusqu'à la réécriture).
+
+## Récupération
+
+`gv recover` ne parle à aucun serveur et n'a besoin d'aucune session :
+seulement d'un fichier et d'un mot de passe. C'est la sortie de secours si
+le serveur est perdu, si GuiVault n'est plus maintenu, ou pour vérifier
+qu'une sauvegarde contient bien ce qu'on croit. Les formats qu'il lit sont
+décrits dans [`FORMATS.md`](FORMATS.md) ; le code
+(`crates/guivault-cli/src/recover.rs`) n'utilise que `guivault-crypto`.
+
+```bash
+gv recover ~/GuiVault/Maison                                     # un coffre local (son dossier)
+gv recover guivault-20261025-….jsonl.gz --email vous@example.com  # une sauvegarde du serveur
+gv recover export-chiffré.json --out ./récupéré                   # un export protégé par mot de passe
+```
+
+| Source | Reconnue à | Mot de passe |
+|---|---|---|
+| Coffre local | un dossier avec `coffre.json` | le mot de passe maître du coffre |
+| Sauvegarde du serveur (`guivault backup`) | le gzip | le mot de passe maître du compte `--email` ; seuls ses vaults sont relus |
+| Export JSON | `"format": "guivault-export-encrypted"` (ou `guivault-export`, en clair : sans mot de passe) | celui de l'export |
+
+Le résultat est un dossier (`--out`, par défaut `guivault-recover-<date>`,
+refusé s'il existe et n'est pas vide), en `0700`, fichiers en `0600` :
+
+- `<vault>.json` par vault — un export GuiVault **en clair**, réimportable
+  par Outils › Importer (ou relu par `gv recover` lui-même) ;
+- `<vault>/<élément>/<fichier>` — les pièces jointes déchiffrées (pas
+  dans un export chiffré, qui n'en contient pas).
+
+Les manifestes sont vérifiés comme à chaque lecture : un écart est signalé,
+la récupération continue. Un élément ou un fichier qui ne s'ouvre pas est
+nommé sur la sortie d'erreur, le reste est écrit. `--password-stdin` lit le
+mot de passe sur la première ligne de l'entrée standard (scripts, tests).
+**Le dossier est en clair** : importez-le puis effacez-le.
+

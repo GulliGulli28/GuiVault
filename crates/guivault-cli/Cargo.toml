@@ -26,8 +26,11 @@ totp-rs = { version = "5", features = ["otpauth"] }
 # Le mot de passe maître sans écho, sur le terminal (pas sur la sortie :
 # `eval "$(gv unlock)"` ne doit capturer que l'export).
 rpassword = "7"
+# Les sauvegardes du serveur (`gv recover`) sont des .jsonl.gz.
+flate2 = "1"
 
 [dev-dependencies]
 guivault-server = { path = "../guivault-server" }
+guivault-local = { path = "../guivault-local" }
 tokio.workspace = true
 sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "tls-rustls", "postgres"] }

@@ -184,3 +184,24 @@ fn opens_browser_send_link() {
         assert!(open_send_chunk(&keys, id, index, last, &h(&c["blob"])).is_err());
     }
 }
+
+#[test]
+fn opens_browser_encrypted_export() {
+    use base64::Engine;
+    let v = &vectors()["export"];
+    let doc: Value = serde_json::from_str(v["document"].as_str().unwrap()).unwrap();
+    assert_eq!(doc["format"], "guivault-export-encrypted");
+    let b64 = |x: &Value| {
+        base64::engine::general_purpose::STANDARD
+            .decode(x.as_str().unwrap())
+            .unwrap()
+    };
+    let params: KdfParams = serde_json::from_value(doc["kdf"].clone()).unwrap();
+    let key = export_key(v["password"].as_str().unwrap(), &b64(&doc["kdf_salt"]), params).unwrap();
+    let plain: Value = serde_json::from_slice(&open(&key, &b64(&doc["blob"]), AAD_EXPORT).unwrap()).unwrap();
+    assert_eq!(plain["format"], "guivault-export");
+    assert_eq!(plain["vault"]["name"], "Équipe réseau");
+    assert_eq!(plain["items"][0]["note"]["content"], "contenu");
+    let wrong = export_key("pas le bon", &b64(&doc["kdf_salt"]), params).unwrap();
+    assert!(open(&wrong, &b64(&doc["blob"]), AAD_EXPORT).is_err());
+}

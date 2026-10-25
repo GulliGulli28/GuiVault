@@ -9,6 +9,7 @@
 //! il a plus de cinq minutes — ou pas, si le serveur ne répond pas : un
 //! secret se lit alors depuis le cache.
 pub mod api;
+pub mod recover;
 pub mod store;
 pub mod vault;
 

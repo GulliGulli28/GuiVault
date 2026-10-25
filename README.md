@@ -85,7 +85,7 @@ même auteur.
 | **Extension** ([`EXTENSION.md`](docs/EXTENSION.md)) | Remplissage en un clic ou depuis le champ — composants web (shadow DOM) et cadres compris, sans jamais remettre le mot de passe d'un site à un cadre tiers —, codes TOTP, passkeys, générateur ; face à un serveur ou au coffre local de l'application | Chrome, Edge, Firefox ≥ 115 ; à charger non empaquetée |
 | **Application Windows** ([`APP.md`](docs/APP.md)) | Coffre local ou serveur ; saisie automatique à la KeePass, presse-papiers hors de l'historique Windows, verrouillage avec la session, zone de notification, sauvegardes du coffre local, import KeePass (KDBX), mises à jour signées | MSI et NSIS dans les [releases `app-v*`](https://github.com/GulliGulli28/GuiVault/releases) |
 | **Application Android** ([`ANDROID.md`](docs/ANDROID.md)) | Coffre local ou serveur ; déverrouillage biométrique, remplissage des autres applications et de Chrome ([`REMPLISSAGE.md`](docs/REMPLISSAGE.md)), bulle flottante | APK signé et attesté, joint aux mêmes releases ; vu sur émulateur seulement |
-| **`gv`** ([`CLI.md`](docs/CLI.md)) | Secrets par référence, `gv run`, AWS, Git, pièces jointes ; cache chiffré lisible sans le serveur | À compiler (`cargo build --release -p guivault-cli`) |
+| **`gv`** ([`CLI.md`](docs/CLI.md)) | Secrets par référence, `gv run`, AWS, Git, pièces jointes ; cache chiffré lisible sans le serveur ; `gv recover` : tout ressortir d'une sauvegarde, d'un coffre local ou d'un export, sans serveur | À compiler (`cargo build --release -p guivault-cli`) |
 | **Guiterm** | Client SSH : hôtes, clés, snippets et connexions synchronisés, agent SSH adossé au coffre | Dépôt à part |
 
 Tous lisent les mêmes blobs : des vecteurs générés par le Rust et relus par
@@ -160,6 +160,10 @@ user key ─▶ clé privée X25519 ─▶ clés de vault (une enveloppe par mem
   IP des sessions — jamais un nom, un site, un identifiant ou un secret.
 - **Changer de mot de passe** ne re-chiffre que la user key ; un mot de
   passe maître perdu est **irrécupérable**, par construction.
+- **Vos données ne dépendent pas du projet** : les formats sont décrits
+  octet par octet ([`docs/FORMATS.md`](docs/FORMATS.md)), et `gv recover`
+  ressort tout en clair d'une sauvegarde du serveur, d'un coffre local ou
+  d'un export, avec le seul mot de passe et sans serveur.
 
 Le modèle de menace complet — ce qui est couvert, comment, et ce qui ne
 l'est pas — est dans [`docs/SECURITY.md`](docs/SECURITY.md) ; la hiérarchie
@@ -474,6 +478,7 @@ la compilation des deux côtés au lieu de diverger.
 | Document | Contenu |
 |---|---|
 | [`ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Fonctionnement, hiérarchie de clés, synchronisation |
+| [`FORMATS.md`](docs/FORMATS.md) | Les formats, octet par octet : de quoi relire ses données sans GuiVault |
 | [`SECURITY.md`](docs/SECURITY.md) | Modèle de menace : couvert, assumé, limites |
 | [`API.md`](docs/API.md) | Routes et codes d'erreur |
 | [`ITEMS.md`](docs/ITEMS.md) | Formats des éléments, import et export |

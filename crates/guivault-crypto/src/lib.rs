@@ -687,6 +687,21 @@ pub fn open_user_settings(user_key: &SymmetricKey, blob: &[u8]) -> Result<Vec<u8
     open(user_key, blob, AAD_USER_SETTINGS)
 }
 
+// ─── Exports chiffrés ───────────────────────────────────────────────────────
+
+/// AAD du blob d'un export protégé par mot de passe (le JSON
+/// `guivault-export-encrypted` des clients, `docs/FORMATS.md`).
+pub const AAD_EXPORT: &[u8] = b"guivault/v1/export";
+
+/// La clé d'un export protégé par mot de passe : Argon2id (mêmes bornes que
+/// le mot de passe maître — les paramètres viennent du fichier) puis HKDF
+/// sous son propre libellé, pour qu'un export et un compte au même mot de
+/// passe n'aient pas la même clé. Écrit par `web/src/lib/exporters.ts`.
+pub fn export_key(password: &str, salt: &[u8], params: KdfParams) -> Result<SymmetricKey, CryptoError> {
+    let master = MasterKey::derive(password, salt, params)?;
+    Ok(SymmetricKey(master.expand(AAD_EXPORT)))
+}
+
 // ─── Partage éphémère (liens) ───────────────────────────────────────────────
 
 /// Octets de secret d'un lien de partage. Ils voyagent dans le fragment de

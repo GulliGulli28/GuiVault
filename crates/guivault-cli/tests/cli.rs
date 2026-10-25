@@ -698,3 +698,249 @@ fn gv_downloads_attachments() {
 
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// `gv recover` : ce qu'on récupère d'une sauvegarde du serveur une fois le
+/// serveur éteint et sa base effacée, d'un coffre local, d'un export — avec
+/// le seul mot de passe.
+#[test]
+fn gv_recovers_without_a_server() {
+    use guivault_cli::recover;
+    let Some(server) = Server::start() else {
+        return;
+    };
+    let dir = std::env::temp_dir().join(format!("gv-recover-{}", Uuid::new_v4().simple()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let (email, pw) = ("dora@t.io", "cli master password");
+    let (key, vid, token) = seed(&server, email, pw);
+    // Un autre compte sur le même serveur : la sauvegarde le contient aussi.
+    seed(&server, "eve@t.io", "un autre mot de passe");
+
+    // Une note avec une pièce jointe de deux morceaux.
+    let http = reqwest::blocking::Client::new();
+    let note = Uuid::new_v4();
+    let put = |body: Value, base: Option<i64>| -> Item {
+        let ct = gc::seal_item(
+            &key,
+            &vid.to_string(),
+            &note.to_string(),
+            "note",
+            body.to_string().as_bytes(),
+        )
+        .unwrap();
+        let res = http
+            .put(server.api(&format!("/vaults/{vid}/items/{note}")))
+            .bearer_auth(&token)
+            .json(&PutItemRequest {
+                item_type: "note".into(),
+                ciphertext: ct,
+                base_revision: base,
+                manifest: None,
+            })
+            .send()
+            .unwrap();
+        assert!(res.status().is_success());
+        res.json().unwrap()
+    };
+    let first = put(
+        json!({ "kind": "note", "note": { "id": note, "name": "Contrat" } }),
+        None,
+    );
+    let scan: Vec<u8> = (0..3 * 512 * 1024).map(|i| (i % 251) as u8).collect();
+    let a = attach(&server, &token, vid, note, "scan/1.pdf", &scan);
+    put(
+        json!({ "kind": "note", "note": { "id": note, "name": "Contrat", "content": "voir le scan", "attachments": [a] } }),
+        Some(first.revision),
+    );
+
+    // La sauvegarde, puis plus de serveur ni de base.
+    let backup = dir.join("guivault-test.jsonl.gz");
+    let mut url = url::Url::parse(&server.admin_url).unwrap();
+    url.set_path(&server.db_name);
+    server.rt.block_on(async {
+        let pool = sqlx::PgPool::connect(url.as_str()).await.unwrap();
+        guivault_server::backup::create_file(&pool, &backup).await.unwrap();
+    });
+    drop(server);
+
+    assert_eq!(
+        recover::Source::detect(&backup).unwrap(),
+        recover::Source::Backup(backup.clone())
+    );
+    let err = recover::from_backup(&backup, email, "pas le bon")
+        .err()
+        .unwrap()
+        .to_string();
+    assert!(err.contains("mot de passe incorrect"), "{err}");
+    let err = recover::from_backup(&backup, "nobody@t.io", pw)
+        .err()
+        .unwrap()
+        .to_string();
+    assert!(err.contains("aucun compte"), "{err}");
+    let rec = recover::from_backup(&backup, "DORA@t.io", pw).unwrap();
+    assert!(rec.warnings.is_empty(), "{:?}", rec.warnings);
+    assert_eq!(rec.vaults.len(), 1, "seulement les vaults de ce compte");
+    assert_eq!(rec.vaults[0].name, "Personnel");
+    assert_eq!(rec.item_count(), 8);
+    assert_eq!(rec.vaults[0].files.len(), 1);
+    assert_eq!(rec.vaults[0].files[0].data, scan);
+
+    // Le dossier : un export réimportable, la pièce jointe à côté.
+    let out = dir.join("sortie");
+    recover::write(&rec, &out).unwrap();
+    let doc: Value = serde_json::from_str(&std::fs::read_to_string(out.join("Personnel.json")).unwrap()).unwrap();
+    assert_eq!(doc["format"], "guivault-export");
+    let items = doc["items"].as_array().unwrap();
+    assert!(items.iter().any(|i| i["login"]["password"] == "gh-pass"));
+    let contrat = items.iter().find(|i| i["note"]["name"] == "Contrat").unwrap();
+    assert!(
+        contrat["note"].get("attachments").is_none(),
+        "pas de clé de fichier dans l'export"
+    );
+    assert_eq!(
+        std::fs::read(out.join("Personnel").join("Contrat").join("scan_1.pdf")).unwrap(),
+        scan
+    );
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mode = |p: &std::path::Path| std::fs::metadata(p).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode(&out), 0o700);
+        assert_eq!(mode(&out.join("Personnel.json")), 0o600);
+    }
+    assert!(
+        recover::write(&rec, &out).is_err(),
+        "jamais par-dessus un dossier rempli"
+    );
+
+    // Le binaire, mot de passe sur l'entrée standard.
+    let gv = |args: &[&str], stdin: &str| {
+        use std::io::Write;
+        let mut child = std::process::Command::new(env!("CARGO_BIN_EXE_gv"))
+            .args(args)
+            .current_dir(&dir)
+            .env("GV_HOME", dir.join("home"))
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+            .unwrap();
+        child.stdin.take().unwrap().write_all(stdin.as_bytes()).unwrap();
+        let out = child.wait_with_output().unwrap();
+        (out.status.success(), String::from_utf8_lossy(&out.stderr).to_string())
+    };
+    let backup_arg = backup.to_str().unwrap();
+    let (ok, err) = gv(&["recover", backup_arg, "--password-stdin"], &format!("{pw}\n"));
+    assert!(!ok && err.contains("--email"), "{err}");
+    let (ok, err) = gv(
+        &[
+            "recover",
+            backup_arg,
+            "--email",
+            email,
+            "--password-stdin",
+            "--out",
+            "cli",
+        ],
+        &format!("{pw}\n"),
+    );
+    assert!(ok, "{err}");
+    assert!(err.contains("8 élément(s), 1 pièce(s) jointe(s)"), "{err}");
+    assert!(dir.join("cli").join("Personnel.json").is_file());
+
+    // Un export en clair se relit sans mot de passe ; un export chiffré
+    // (tel que l'interface l'écrit) avec le sien.
+    let (ok, err) = gv(&["recover", "cli/Personnel.json", "--out", "relu"], "");
+    assert!(ok, "{err}");
+    let salt = gc::random_salt();
+    let kdf = gc::KdfParams {
+        m_cost: 19_456,
+        t_cost: 2,
+        p_cost: 1,
+    };
+    let export_key = gc::export_key("mot de passe d'export", &salt, kdf).unwrap();
+    use base64::Engine;
+    let b64 = |b: &[u8]| base64::engine::general_purpose::STANDARD.encode(b);
+    let encrypted = json!({
+        "format": "guivault-export-encrypted", "version": 1, "kdf": kdf, "kdf_salt": b64(&salt),
+        "blob": b64(&gc::seal(&export_key, doc.to_string().as_bytes(), gc::AAD_EXPORT).unwrap()),
+    });
+    let export_path = dir.join("export.json");
+    std::fs::write(&export_path, encrypted.to_string()).unwrap();
+    assert!(recover::from_export(&export_path, Some("faux")).is_err());
+    let rec = recover::from_export(&export_path, Some("mot de passe d'export")).unwrap();
+    assert_eq!(rec.item_count(), 8);
+
+    // Un coffre local : le même contenu, dans un dossier.
+    let coffre = dir.join("coffre");
+    let (material, account) = gc::create_account("coffre pw").unwrap();
+    let lvid = Uuid::new_v4();
+    let lkey = gc::SymmetricKey::random();
+    let store = guivault_local::LocalVault::create(
+        &coffre,
+        guivault_local::NewCoffre {
+            account: guivault_local::LocalAccount::from(&material),
+            personal: CreateVaultRequest {
+                id: lvid,
+                name_enc: gc::seal_vault_name(&lkey, &lvid.to_string(), "Maison").unwrap(),
+                wrapped_vault_key: gc::wrap_vault_key(
+                    &account.keypair,
+                    &account.keypair.public,
+                    &lvid.to_string(),
+                    &lkey,
+                )
+                .unwrap(),
+            },
+        },
+    )
+    .unwrap();
+    let item = Uuid::new_v4();
+    let put_local = |body: Value, base: Option<i64>| -> Item {
+        let ct = gc::seal_item(
+            &lkey,
+            &lvid.to_string(),
+            &item.to_string(),
+            "login",
+            body.to_string().as_bytes(),
+        )
+        .unwrap();
+        let req = PutItemRequest {
+            item_type: "login".into(),
+            ciphertext: ct,
+            base_revision: base,
+            manifest: None,
+        };
+        store.put_item(lvid, item, req).unwrap().0
+    };
+    let first = put_local(
+        json!({ "kind": "login", "login": { "id": item, "name": "Wi-Fi" } }),
+        None,
+    );
+    let att_key = gc::SymmetricKey::random();
+    let att = Uuid::new_v4();
+    let chunks = gc::seal_attachment(&att_key, &att.to_string(), b"le fichier").unwrap();
+    let req = CreateAttachmentRequest {
+        id: att,
+        item_id: item,
+        size: chunks.iter().map(Vec::len).sum::<usize>() as i64,
+        chunks: chunks.len() as i32,
+    };
+    store.create_attachment(lvid, req).unwrap();
+    store.put_chunk(lvid, att, 0, &chunks[0]).unwrap();
+    store.complete_attachment(lvid, att).unwrap();
+    put_local(
+        json!({ "kind": "login", "login": { "id": item, "name": "Wi-Fi", "password": "wifi-pass",
+            "attachments": [{ "id": att, "name": "box.txt", "size": 10, "key": b64(att_key.as_bytes()) }] } }),
+        Some(first.revision),
+    );
+    assert_eq!(
+        recover::Source::detect(&coffre).unwrap(),
+        recover::Source::Local(coffre.clone())
+    );
+    assert!(recover::from_local(&coffre, "faux").is_err());
+    let rec = recover::from_local(&coffre, "coffre pw").unwrap();
+    assert_eq!(rec.vaults[0].name, "Maison");
+    assert_eq!(rec.vaults[0].items[0]["login"]["password"], "wifi-pass");
+    assert_eq!(rec.vaults[0].files[0].data, b"le fichier");
+
+    let _ = std::fs::remove_dir_all(&dir);
+}

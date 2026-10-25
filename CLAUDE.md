@@ -3,7 +3,8 @@
 Serveur de coffre zero-knowledge pour Guiterm (`~/gui-termius`, même auteur,
 même stack : Rust 2024 / axum / sqlx / PostgreSQL, rustls uniquement). Voir
 `README.md`, `docs/ARCHITECTURE.md` (fonctionnement), `docs/SECURITY.md`
-(modèle de menace), `docs/API.md` (routes), `docs/ROADMAP.md` (pistes
+(modèle de menace ; la politique de divulgation est `SECURITY.md` à la
+racine), `docs/FORMATS.md` (les formats octet par octet), `docs/API.md` (routes), `docs/ROADMAP.md` (pistes
 d'amélioration, à cocher au fur et à mesure), `docs/ANDROID.md`
 (environnement Android du poste, plan de l'application et de la bulle).
 
@@ -22,7 +23,9 @@ il ne déchiffre rien : la user key reste sous la clé que seule la PRF donne).
 - `crates/guivault-crypto` — hiérarchie de clés et enveloppes. Consommé par
   Guiterm en dépendance git : **ne pas casser les formats binaires** (octet
   de version `0x01` en tête de chaque blob ; en ajouter un nouveau plutôt
-  que changer le sens de l'existant). Versions des crates crypto alignées
+  que changer le sens de l'existant). Tout format nouveau ou changé (blob,
+  `coffre.json`, sauvegarde, export) se décrit dans `docs/FORMATS.md` et se
+  relit par `gv recover` (`guivault-cli/src/recover.rs`). Versions des crates crypto alignées
   sur celles de Guiterm (`argon2 0.5`, `chacha20poly1305 0.10`, …) pour
   qu'elles s'unifient dans son binaire.
 - `crates/guivault-protocol` — types JSON. Même contrainte de compatibilité.
@@ -40,7 +43,9 @@ il ne déchiffre rien : la user key reste sous la clé que seule la PRF donne).
   run` : changer un type ici, c'est le changer là-bas, et régénérer.
 - `crates/guivault-cli` — `gv`, le coffre en ligne de commande
   (`docs/CLI.md`) : une bibliothèque (`login`, `unlock`, `sync`, `resolve`,
-  `aws_credential_process`, `git_credential`, `download_attachment` ; `store.rs` ce qui est gardé
+  `aws_credential_process`, `git_credential`, `download_attachment` ;
+  `recover.rs` = `gv recover`, lit coffre local, sauvegarde du serveur et
+  export **sans serveur**, d'après `docs/FORMATS.md` ; `store.rs` ce qui est gardé
   sur le disque, `vault.rs` les champs lus génériquement dans le JSON des
   items) et `main.rs` (arguments à la main, invites sur le terminal). Son
   test `tests/cli.rs` lance un vrai serveur, comme `tests/api.rs`.
