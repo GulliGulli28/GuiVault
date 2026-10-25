@@ -13,5 +13,8 @@ pub async fn health(State(state): State<AppState>) -> Json<HealthResponse> {
         max_attachment_bytes: state.config.max_attachment_bytes,
         passkeys: state.config.passkeys.is_some(),
         health_lookups: state.config.health_lookups,
+        build_commit: option_env!("GUIVAULT_BUILD_COMMIT")
+            .filter(|c| !c.is_empty())
+            .map(Into::into),
     })
 }

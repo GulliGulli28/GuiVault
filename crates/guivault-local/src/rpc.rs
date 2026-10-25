@@ -94,6 +94,7 @@ pub fn call(vault: &LocalVault, op: &str, args: &Value) -> Result<Value> {
             health_lookups: false,
             max_attachment_bytes: vault.options().max_attachment_bytes,
             passkeys: false,
+            build_commit: None,
         }),
         "account" => json(vault.account()?),
         "changePassword" => {

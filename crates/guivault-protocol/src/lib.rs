@@ -82,6 +82,12 @@ pub struct HealthResponse {
     /// La connexion par passkey est proposée (`GUIVAULT_PUBLIC_URL` réglé).
     #[serde(default)]
     pub passkeys: bool,
+    /// Le commit dont ce binaire — et l'interface web qu'il embarque — a été
+    /// construit, quand le build l'a fourni (l'image publiée le fait) : de
+    /// quoi vérifier que la page servie est celle du code publié
+    /// (`scripts/verify-web.sh`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub build_commit: Option<String>,
 }
 
 /// Un site qui accepte un code TOTP (liste publique 2fa.directory, relayée

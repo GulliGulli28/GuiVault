@@ -275,6 +275,7 @@ cd app-tauri && cargo clippy --all-targets && cargo fmt --check   # l'app, works
 cd app-tauri && cargo build && cd ../web && npm run test:app   # E2E de l'app : vrai binaire, WebDriver (Windows : docs/APP.md)
 cd web && npm run test:ext                            # corpus de remplissage (Playwright, Chromium)
 docker build -f docker/Dockerfile -t guivault:dev .
+scripts/verify-web.sh <url> [commit]  # la page servie = le build reproductible de ce commit
 ```
 
 `npm run build` produit `web/dist`, que `cargo build` embarque ensuite ;

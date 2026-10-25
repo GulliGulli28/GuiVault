@@ -417,9 +417,14 @@ Le README le dit en tête ; chaque case cochée y retire une ligne.
   (`EXTENSION.md`).
 - [ ] **Signature de code Windows** (§6) et Android essayé sur de vrais
   téléphones (§6).
-- [ ] **Builds reproductibles** du web embarqué : pouvoir vérifier que
-  `web/dist` d'une image correspond au commit — c'est la réponse à la
-  limite « l'interface web est livrée par le serveur ».
+- [x] **Builds reproductibles** du web embarqué : le build est
+  reproductible tel quel (vérifié entre un poste en Node 20 et l'image en
+  Node 22), `/health` annonce `build_commit` (argument de build de l'image),
+  `scripts/verify-web.sh <url> [commit]` reconstruit et compare chaque
+  fichier servi ; job `verify` de `server-image.yml` sur chaque image.
+  Reste : le faire depuis l'application ou l'extension (vérifier la page
+  avant d'y taper le mot de passe), ce qui demanderait la liste des
+  empreintes signée hors du serveur.
 - [ ] **Interface en anglais** (i18n), puis le README et `SECURITY.md`.
 - [x] **Politique de sécurité** : [`SECURITY.md`](../SECURITY.md) à la
   racine (canal, délais visés, versions maintenues, périmètre, bonne foi) ;

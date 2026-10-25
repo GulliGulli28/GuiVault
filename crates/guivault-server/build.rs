@@ -9,4 +9,7 @@ fn main() {
     // ceci, un `npm run build` suivi d'un `cargo build` ne re-embarquerait
     // pas la nouvelle version.
     println!("cargo:rerun-if-changed={}", dist.display());
+    // Le commit annoncé par `/health` (`option_env!` dans `routes/health.rs`),
+    // fourni par le build de l'image.
+    println!("cargo:rerun-if-env-changed=GUIVAULT_BUILD_COMMIT");
 }

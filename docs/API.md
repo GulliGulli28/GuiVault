@@ -40,7 +40,7 @@ Partout : `403 ip_not_allowed` si l'adresse du client n'est pas dans
 
 | | |
 |---|---|
-| `GET /health` | `{ status, protocol_version, server_version, registration, send_max_days, health_lookups, max_attachment_bytes, passkeys }` — `send_max_days` : durée de vie maximale d'un lien de partage, `0` (ou absent, serveur plus ancien) si les liens sont désactivés ; `health_lookups` : le serveur relaie les recherches du rapport de santé |
+| `GET /health` | `{ status, protocol_version, server_version, registration, send_max_days, health_lookups, max_attachment_bytes, passkeys, build_commit? }` — `send_max_days` : durée de vie maximale d'un lien de partage, `0` (ou absent, serveur plus ancien) si les liens sont désactivés ; `health_lookups` : le serveur relaie les recherches du rapport de santé ; `build_commit` (absent si inconnu) : le commit dont le binaire et son interface ont été construits (`scripts/verify-web.sh`) |
 
 ## Authentification (rate-limitées par IP)
 

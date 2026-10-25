@@ -19,6 +19,8 @@ export interface HealthResponse {
   health_lookups?: boolean;
   /** Taille maximale d'une pièce jointe, chiffrée ; 0 ou absent : désactivées. */
   max_attachment_bytes?: number;
+  /** Le commit dont le serveur (et cette page) a été construit, s'il le sait. */
+  build_commit?: string;
   /** Connexion par passkey proposée (`GUIVAULT_PUBLIC_URL` réglé). */
   passkeys?: boolean;
 }

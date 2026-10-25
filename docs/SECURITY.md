@@ -140,6 +140,15 @@ est installé une fois et vérifiable.
   web (même limite que Bitwarden ou Proton) : l'interface web ne protège
   pas contre un opérateur malveillant, seulement contre un opérateur honnête
   dont la base fuit. Qui veut cette garantie-là utilise Guiterm.
+- **Vérifiable** : le build de l'interface est reproductible (mêmes
+  sources, même `package-lock.json`, mêmes octets), et le serveur annonce
+  le commit dont il est construit (`build_commit` de `/api/v1/health`).
+  `scripts/verify-web.sh https://vault.example.com` reconstruit l'interface
+  de ce commit et compare chaque fichier servi ; le CI le fait pour chaque
+  image publiée (`server-image.yml`, job `verify`). Cela prouve ce qui a été
+  servi *à ce poste, à ce moment* — pas à tout le monde : un serveur
+  malveillant peut servir une autre page à une victime choisie. Contre ça,
+  seul un client installé (l'application, Guiterm) protège.
 - Pour que *rien d'autre* que le binaire ne puisse injecter du code, la page
   est servie avec une CSP stricte (`script-src 'self'`, pas d'inline, pas
   de domaine tiers, `frame-ancestors 'none'`), sans referrer, et le binaire

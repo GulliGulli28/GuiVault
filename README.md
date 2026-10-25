@@ -183,7 +183,9 @@ de clés en détail dans [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
   serveur compromis pourrait servir une page qui vole le mot de passe
   maître. C'est la limite de tout coffre web (Bitwarden et Proton
   compris) ; l'application et Guiterm, installés une fois, n'y sont pas
-  exposés.
+  exposés. Le build est reproductible : `scripts/verify-web.sh` vérifie
+  que la page que vous sert un serveur est celle du code publié — pour
+  vous, à ce moment-là.
 - **Pas de « Secret Key » à la 1Password** : qui vole la base peut attaquer
   hors ligne un mot de passe maître faible. Argon2id le rend coûteux, pas
   impossible — choisissez une phrase de passe longue.

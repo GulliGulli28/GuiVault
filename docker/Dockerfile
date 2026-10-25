@@ -26,7 +26,9 @@ RUN cargo chef cook --release --recipe-path recipe.json -p guivault-server
 COPY . .
 # `include_dir!` lit `web/dist` à la compilation : il doit être là avant.
 COPY --from=web /web/dist ./web/dist
-RUN cargo build --release --locked -p guivault-server
+# Le commit annoncé par `/api/v1/health` (fourni par le CI ; vide sinon).
+ARG GUIVAULT_BUILD_COMMIT=
+RUN GUIVAULT_BUILD_COMMIT="${GUIVAULT_BUILD_COMMIT}" cargo build --release --locked -p guivault-server
 
 FROM debian:bookworm-slim
 RUN apt-get update \
