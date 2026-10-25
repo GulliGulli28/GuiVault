@@ -3,6 +3,7 @@
  * codes 2FA, santé), les compteurs de la barre latérale. Relus quand la
  * révision d'un vault change ; en mémoire seulement, effacés avec la session
  * (`clearAllItems`). */
+import { issueKey, loadIgnored } from "./healthIgnore";
 import { useEffect, useMemo, useState } from "react";
 import { errorMessage } from "./api";
 import { allSecrets, findReused, findWeak, type HealthEntry } from "./health";
@@ -114,11 +115,15 @@ export function healthSummary(items: VaultItem[]): { total: number; weak: number
   const reused = reusedGroups.flat();
   const bad = new Set([...weak, ...reused]);
   const total = secrets.length;
+  // Le badge « à traiter » ne compte pas ce que la santé a ignoré.
+  const ignored = loadIgnored();
+  const reusedSet = new Set(reused);
+  const open = [...bad].filter((s) => !ignored.has(issueKey(s.entry.vault.id, s.entry.item.id, reusedSet.has(s) ? "reused" : "weak")));
   return {
     total,
     weak: weak.length,
     reused: reused.length,
-    issues: new Set([...bad].map((s) => s.entry.item.id)).size,
+    issues: new Set(open.map((s) => s.entry.item.id)).size,
     score: total === 0 ? 100 : Math.round((100 * (total - bad.size)) / total),
   };
 }

@@ -3,6 +3,7 @@ import type { PageContext } from "../App";
 import { api, errorMessage } from "../lib/api";
 import { allSecrets, checkPwned, directRange, findExpiring, findMissingTotp, findOld, findReused, findWeak, type HealthEntry } from "../lib/health";
 import { findDuplicates } from "../lib/duplicates";
+import { issueKey, useIgnored } from "../lib/healthIgnore";
 import { canMerge, MergeDuplicates } from "./MergeDuplicates";
 import { navigate } from "../lib/route";
 import { loadItems, payloadName } from "../lib/session";
@@ -29,6 +30,7 @@ export function HealthPage({ ctx }: { ctx: PageContext }) {
   const [tab, setTab] = useState<Tab>("all");
   const [info, setInfo] = useState(false);
   const [merging, setMerging] = useState<HealthEntry[] | null>(null);
+  const [ignored, setIgnored] = useIgnored();
   const slow = useDelayed(entries === null);
   const vaultsKey = session.vaults.map((v) => `${v.id}:${v.revision}`).join(",");
   const offline = !!session.offline;
@@ -126,8 +128,11 @@ export function HealthPage({ ctx }: { ctx: PageContext }) {
     return { weak: weak.size + leakedSet.size, reused: reused.size, healthy, score: total === 0 ? 100 : Math.round((100 * healthy) / total) };
   }, [report, leaked]);
 
-  const counts = (k: IssueKind) => issues.filter((i) => i.kind === k).length;
-  const shown = tab === "all" ? issues.filter((i) => i.kind !== "old") : issues.filter((i) => i.kind === tab);
+  const keyOf = (i: Issue) => issueKey(i.entry.vault.id, i.entry.item.id, i.kind);
+  const open = issues.filter((i) => !ignored.has(keyOf(i)));
+  const hidden = issues.filter((i) => ignored.has(keyOf(i)));
+  const counts = (k: IssueKind) => open.filter((i) => i.kind === k).length;
+  const shown = tab === "ignored" ? hidden : tab === "all" ? open.filter((i) => i.kind !== "old") : open.filter((i) => i.kind === tab);
   const next = !report ? null
     : counts("leaked") > 0 ? `Changer ${counts("leaked")} mot${counts("leaked") > 1 ? "s" : ""} de passe fuité${counts("leaked") > 1 ? "s" : ""}`
     : counts("reused") > 0 ? `Changer ${counts("reused")} secrets réutilisés`
@@ -187,8 +192,8 @@ export function HealthPage({ ctx }: { ctx: PageContext }) {
 
           <section aria-label="À traiter" className="flex flex-col gap-3.5">
             <div className="tabs" role="tablist" aria-label="Filtrer">
-              {(["all", "leaked", "reused", "weak", "totp", "duplicate", "old", "expiring"] as Tab[]).map((t) => {
-                const n = t === "all" ? issues.filter((i) => i.kind !== "old").length : counts(t);
+              {(["all", "leaked", "reused", "weak", "totp", "duplicate", "old", "expiring", "ignored"] as Tab[]).map((t) => {
+                const n = t === "all" ? open.filter((i) => i.kind !== "old").length : t === "ignored" ? hidden.length : counts(t);
                 if (t !== "all" && n === 0) return null;
                 return <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className="tab">{TAB_LABELS[t]} <span className="text-[var(--c-text-muted)]">{n}</span></button>;
               })}
@@ -200,7 +205,7 @@ export function HealthPage({ ctx }: { ctx: PageContext }) {
               </div>
             ) : (
               <div className="card divide-y divide-[var(--c-border)] overflow-hidden">
-                {shown.map((i, n) => <IssueRow key={n} issue={i} onMerge={setMerging} />)}
+                {shown.map((i, n) => <IssueRow key={n} issue={i} onMerge={setMerging} ignored={tab === "ignored"} onIgnore={(on) => setIgnored(keyOf(i), on)} />)}
               </div>
             )}
             <div className="flex flex-wrap gap-2.5">
@@ -225,7 +230,7 @@ export function HealthPage({ ctx }: { ctx: PageContext }) {
 }
 
 type IssueKind = "leaked" | "reused" | "weak" | "totp" | "duplicate" | "old" | "expiring";
-type Tab = "all" | IssueKind;
+type Tab = "all" | IssueKind | "ignored";
 interface Issue {
   kind: IssueKind;
   entry: HealthEntry;
@@ -235,7 +240,7 @@ interface Issue {
   group?: HealthEntry[];
 }
 
-const TAB_LABELS: Record<Tab, string> = { all: "À traiter", leaked: "Fuités", reused: "Réutilisés", weak: "Faibles", totp: "2FA possible", duplicate: "Doublons", old: "Plus d'un an", expiring: "Expirations" };
+const TAB_LABELS: Record<Tab, string> = { all: "À traiter", leaked: "Fuités", reused: "Réutilisés", weak: "Faibles", totp: "2FA possible", duplicate: "Doublons", old: "Plus d'un an", expiring: "Expirations", ignored: "Ignorés" };
 const CHIPS: Record<IssueKind, { label: string; tone: string; action: string }> = {
   leaked: { label: "Fuité", tone: "tag-danger", action: "Changer" },
   reused: { label: "Réutilisé", tone: "tag-danger", action: "Changer" },
@@ -255,7 +260,7 @@ function Legend({ color, children }: { color: string; children: ReactNode }) {
 }
 
 /** Une ligne de la file : l'élément, ce qui ne va pas, et y aller. */
-function IssueRow({ issue, onMerge }: { issue: Issue; onMerge: (group: HealthEntry[]) => void }) {
+function IssueRow({ issue, onMerge, ignored, onIgnore }: { issue: Issue; onMerge: (group: HealthEntry[]) => void; ignored: boolean; onIgnore: (ignore: boolean) => void }) {
   const p = issue.entry.item.payload;
   const name = payloadName(p) || KIND_LABELS[p.kind];
   const chip = CHIPS[issue.kind];
@@ -288,7 +293,8 @@ function IssueRow({ issue, onMerge }: { issue: Issue; onMerge: (group: HealthEnt
       </span>
       <span className={`tag ${chip.tone}`}>{chip.label}</span>
       <span className="w-[130px] truncate text-[12.5px] text-[var(--c-text-muted)] max-lg:hidden">{issue.entry.vault.name}{issue.entry.vault.role === "reader" ? " · lecture" : ""}</span>
-      <button onClick={open} className="btn btn-secondary ml-auto">{mergeable ? "Fusionner…" : chip.action}</button>
+      <button onClick={() => onIgnore(!ignored)} className="btn btn-ghost ml-auto" title={ignored ? "Le signaler de nouveau" : "Ne plus signaler ce problème pour cet élément"}>{ignored ? "Reprendre" : "Ignorer"}</button>
+      {!ignored && <button onClick={open} className="btn btn-secondary">{mergeable ? "Fusionner…" : chip.action}</button>}
     </div>
   );
 }

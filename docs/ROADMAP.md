@@ -167,7 +167,10 @@ paramètres ou formats anciens.
   clés d'API et cartes qui expirent dans le mois. Calcul :
   `web/src/lib/health.ts` ; relais : `routes/lookups.rs`
   (`GUIVAULT_HEALTH_LOOKUPS`, désactivable). Reste : dans l'extension et
-  Guiterm ; « ignorer » un élément signalé.
+  Guiterm. **Ignorer** un problème signalé pour un élément (onglet
+  « Ignorés », « Reprendre ») : retenu par compte dans les réglages
+  synchronisés, chiffrés (`lib/healthIgnore.ts`) ; le score ne change pas,
+  il dit l'état réel du coffre.
 - [x] **Connexion par passkey** ([`PASSKEYS.md`](PASSKEYS.md)) : sans mot de
   passe maître ni code TOTP, dans l'interface web. La PRF de WebAuthn tire
   une clé qui enveloppe la user key ; le serveur garde l'enveloppe sans

@@ -386,6 +386,13 @@ scenario("fuites : un coffre local interroge Have I Been Pwned lui-même", async
     if (/Have I Been Pwned répond|Failed to fetch|NetworkError|Load failed/i.test(t)) return "réseau";
     return false;
   }, { timeout: 60_000, timeoutMsg: "la recherche de fuites n'a pas abouti" });
+  if (outcome === "fuite") {
+    // L'ignorer : il quitte « À traiter », et se retrouve sous « Ignorés ».
+    await (await b.$("//div[contains(@class,'card')]//div[.//span[normalize-space()='Vieux compte']]//button[normalize-space()='Ignorer']")).click();
+    await (await b.$("//button[@role='tab'][starts-with(normalize-space(), 'Ignorés')]")).click();
+    await waitText(b, "Reprendre");
+    assert((await bodyText(b)).includes("Vieux compte"), "l'élément ignoré n'est pas sous « Ignorés »");
+  }
   await (await b.$("//a[.//span[normalize-space()='Personnel']]")).click();
   if (outcome === "réseau") return "ignoré : Have I Been Pwned injoignable depuis ce poste";
 });
