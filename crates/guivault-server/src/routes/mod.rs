@@ -31,6 +31,7 @@ pub mod sync;
 pub mod totp;
 pub mod users;
 pub mod vaults;
+pub mod well_known;
 
 pub fn router(state: AppState) -> Router {
     let cfg = &state.config;
@@ -215,6 +216,7 @@ pub fn router(state: AppState) -> Router {
             HeaderValue::from_static("nosniff"),
         ))
         .layer(TraceLayer::new_for_http())
+        .route("/.well-known/security.txt", get(well_known::security_txt))
         .merge(crate::web::router())
         .layer(axum::middleware::from_fn_with_state(state.clone(), restrict_ips))
         .with_state(state)

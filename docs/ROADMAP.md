@@ -417,9 +417,12 @@ Le README le dit en tête ; chaque case cochée y retire une ligne.
   `web/dist` d'une image correspond au commit — c'est la réponse à la
   limite « l'interface web est livrée par le serveur ».
 - [ ] **Interface en anglais** (i18n), puis le README et `SECURITY.md`.
-- [ ] **Politique de sécurité** : `SECURITY.md` à la racine (délais de
-  réponse, versions maintenues), `/.well-known/security.txt` servi par le
-  serveur, puis une prime aux bogues une fois l'audit passé.
+- [x] **Politique de sécurité** : [`SECURITY.md`](../SECURITY.md) à la
+  racine (canal, délais visés, versions maintenues, périmètre, bonne foi) ;
+  `/.well-known/security.txt` (RFC 9116) servi par chaque serveur, contact
+  de l'opérateur (`GUIVAULT_SECURITY_CONTACT`) puis du projet
+  (`routes/well_known.rs`, test `security_txt_names_the_operator_then_the_project`).
+- [ ] Une **prime aux bogues**, une fois l'audit passé.
 - [ ] **Livre blanc** : la conception cryptographique en un document
   autonome (hiérarchie, formats, ce que chaque attaque d'ETH Zurich
   devient ici), pour les relecteurs.

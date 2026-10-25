@@ -30,6 +30,12 @@ Erreurs : `{ "code": "…", "message": "…" }` (+ champs selon le code, ex.
 Partout : `403 ip_not_allowed` si l'adresse du client n'est pas dans
 `GUIVAULT_ALLOWED_IPS` (sauf `GET /health`).
 
+## Hors de l'API
+
+| | |
+|---|---|
+| `GET /.well-known/security.txt` | RFC 9116, texte : `Contact:` de l'opérateur (`GUIVAULT_SECURITY_CONTACT`) s'il en a déclaré un, puis celui du projet ; `Expires` à 180 jours, recalculé à chaque requête ; `Canonical` avec `GUIVAULT_PUBLIC_URL` |
+
 ## Santé
 
 | | |

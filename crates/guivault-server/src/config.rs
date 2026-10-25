@@ -223,6 +223,11 @@ pub struct Config {
     pub backup: Option<BackupConfig>,
     /// E-mails ; `None` : aucun, et rien n'en dépend.
     pub mail: Option<MailConfig>,
+    /// L'adresse publique du serveur (`GUIVAULT_PUBLIC_URL`), sans `/` final.
+    pub public_url: Option<String>,
+    /// À qui l'opérateur veut qu'on signale une faille de *ce* serveur
+    /// (`/.well-known/security.txt`) ; le projet y est toujours cité ensuite.
+    pub security_contact: Option<String>,
     /// Rafales autorisées sur les routes d'authentification, par IP.
     pub auth_rate_burst: u32,
     pub auth_rate_per_second: u64,
@@ -328,6 +333,10 @@ impl Config {
                 from: env("GUIVAULT_SMTP_FROM").unwrap_or_default(),
                 public_url: env("GUIVAULT_PUBLIC_URL").map(|u| u.trim_end_matches('/').to_string()),
             }),
+            public_url: env("GUIVAULT_PUBLIC_URL").map(|u| u.trim_end_matches('/').to_string()),
+            security_contact: env("GUIVAULT_SECURITY_CONTACT")
+                .map(|c| crate::routes::well_known::parse_contact(&c))
+                .transpose()?,
             auth_rate_burst: env_parse("GUIVAULT_AUTH_RATE_BURST", 10)?,
             auth_rate_per_second: env_parse("GUIVAULT_AUTH_RATE_PER_SECOND", 2)?,
             log_json: env_parse("GUIVAULT_LOG_JSON", false)?,
@@ -391,6 +400,8 @@ mod tests {
             quota_bytes: 0,
             backup: None,
             mail: None,
+            public_url: None,
+            security_contact: None,
             auth_rate_burst: 0,
             auth_rate_per_second: 0,
             log_json: false,

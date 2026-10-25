@@ -74,6 +74,8 @@ impl TestServer {
             quota_bytes: 0,
             backup: None,
             mail: None,
+            public_url: None,
+            security_contact: None,
             auth_rate_burst: 1000,
             auth_rate_per_second: 1000,
             log_json: false,
@@ -425,6 +427,51 @@ async fn web_ui_is_served_at_root_and_api_404_stays_json() {
         assert_eq!(res.status(), StatusCode::NOT_FOUND);
         assert!(ct.starts_with("text/plain"), "{ct}");
     }
+    server.stop().await;
+}
+
+#[tokio::test]
+async fn security_txt_names_the_operator_then_the_project() {
+    let Some(server) = TestServer::start_with(RegistrationMode::Open, |c| {
+        c.public_url = Some("https://vault.exemple.fr".into());
+        c.security_contact = Some("mailto:secu@exemple.fr".into());
+    })
+    .await
+    else {
+        return;
+    };
+    let origin = server.base.trim_end_matches("/api/v1").to_string();
+    let res = Client::new()
+        .get(format!("{origin}/.well-known/security.txt"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    assert!(
+        res.headers()[reqwest::header::CONTENT_TYPE]
+            .to_str()
+            .unwrap()
+            .starts_with("text/plain")
+    );
+    let body = res.text().await.unwrap();
+    let contacts: Vec<&str> = body.lines().filter_map(|l| l.strip_prefix("Contact: ")).collect();
+    assert_eq!(
+        contacts,
+        [
+            "mailto:secu@exemple.fr",
+            guivault_server::routes::well_known::PROJECT_CONTACT
+        ]
+    );
+    // RFC 9116 : `Expires` obligatoire, dans le futur, à moins d'un an.
+    let expires = body.lines().find_map(|l| l.strip_prefix("Expires: ")).unwrap();
+    let expires = chrono::DateTime::parse_from_rfc3339(expires).unwrap();
+    let left = expires.signed_duration_since(chrono::Utc::now());
+    assert!(
+        left > chrono::Duration::days(30) && left < chrono::Duration::days(365),
+        "{left}"
+    );
+    assert!(body.contains("Canonical: https://vault.exemple.fr/.well-known/security.txt\n"));
+    assert!(body.contains("Policy: https://"));
     server.stop().await;
 }
 

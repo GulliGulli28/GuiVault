@@ -290,5 +290,7 @@ par défaut.
 
 ## Signaler une vulnérabilité
 
-Ouvrir une *security advisory* privée sur GitHub plutôt qu'une issue
-publique.
+Voir la [politique de sécurité](../SECURITY.md) : *security advisory*
+privée sur GitHub, délais, périmètre. Chaque serveur sert aussi
+`/.well-known/security.txt` (RFC 9116) : le contact de son opérateur
+(`GUIVAULT_SECURITY_CONTACT`) puis celui du projet.

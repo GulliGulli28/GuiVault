@@ -65,6 +65,8 @@ impl Server {
             quota_bytes: 0,
             backup: None,
             mail: None,
+            public_url: None,
+            security_contact: None,
             auth_rate_burst: 1000,
             auth_rate_per_second: 1000,
             log_json: false,
