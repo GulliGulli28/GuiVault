@@ -19,6 +19,7 @@ import { BubbleButton } from "./BubbleButton";
 import { NARROW, useMediaQuery } from "../hooks/useMediaQuery";
 import { copyText, Dropdown, formatAgo } from "./ui";
 import { Guarded, useReprompt } from "./Reprompt";
+import { GettingStarted } from "./GettingStarted";
 
 /** Un élément tel que l'accueil le montre : son entité (nom, ligne
  * secondaire, épinglé) et de quoi l'ouvrir. */
@@ -88,6 +89,7 @@ export function HomePage({ ctx }: { ctx: PageContext }) {
             <IconSearch size={18} />
             <span className="min-w-0 flex-1 truncate">Rechercher dans {session.vaults.length > 1 ? `${session.vaults.length} coffres` : "le coffre"}</span>
           </button>
+          <GettingStarted session={session} secrets={loading ? null : entries.length} mobile />
           {supports("myInvitations") && session.invitations.map((inv) => (
             <div key={inv.id} className="m-card flex min-w-0 items-center gap-3 px-3.5 py-3">
               <span className="tile shrink-0 rounded-full" style={{ "--tile-size": "36px", "--tile-h": 25 } as React.CSSProperties}>{personInitials(inv.inviter_email)}</span>
@@ -165,6 +167,8 @@ export function HomePage({ ctx }: { ctx: PageContext }) {
             <a href={routeHash({ page: "invitations" })} className="btn btn-secondary">Voir l'invitation</a>
           </div>
         ))}
+
+        <GettingStarted session={session} secrets={loading ? null : entries.length} />
 
         <div className="flex flex-wrap items-start gap-6">
           <div className="flex min-w-0 flex-[999_1_520px] flex-col gap-6">

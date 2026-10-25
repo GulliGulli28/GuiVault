@@ -40,7 +40,7 @@ c'est ce qui sépare un projet solide d'un outil qu'on recommande.
 3. **Windows** (§6) : signature de code (SmartScreen), Windows Hello,
    agent SSH.
 4. **Le reste des cases vides**, au choix : 2FA WebAuthn et passkey dans
-   l'extension (§2), premier lancement guidé (§1),
+   l'extension (§2),
    petites écritures qui rechargent sur un conflit (§4), écrans propres à
    l'application qui n'ont eu que des textes raccourcis dans la refonte
    (`DESIGN.md`, « État »), `gv` et Guiterm sur un coffre local
@@ -120,7 +120,7 @@ paramètres ou formats anciens.
 | Tri, doublons, duplication | **Fait** : tri (nom en dossiers, modifiés / créés récemment à plat, retenu par appareil) ; **doublons** dans la santé (même site et même utilisateur, même numéro de carte, vault par vault) et **fusion** sans perte (`lib/duplicates.ts`, `MergeDuplicates` : mots de passe écartés dans l'historique, adresses, champs, notes, passkeys et pièces jointes réunis, les autres à la corbeille) ; **« Dupliquer »** une fiche (sans pièces jointes, passkeys ni historique) | Tri par dernier usage (à tracer côté client) |
 | ~~Re-demande du mot de passe maître pour un élément~~ **fait** | `SecretBase.reprompt` (« Redemander le mot de passe maître ») : afficher, copier, remplir, modifier, partager, taper ; vérifié sans le serveur, cinq minutes de grâce par élément (`lib/reprompt.ts`, `Reprompt.tsx`) ; le menu de l'extension et le remplissage d'Android n'en reçoivent rien ; importé et exporté avec Bitwarden | — |
 | Fonctions « premium » payantes (accès d'urgence, pièces jointes, Send, TOTP) ; +100 % sur Premium en janvier 2026 | **Accès d'urgence, Send, TOTP et pièces jointes faits**, gratuits parce qu'auto-hébergés | — |
-| Interface « datée », pas d'accompagnement | Pas de premier lancement guidé | Assistant d'import à la première connexion, puis une liste « activer la 2FA, installer l'extension, vérifier une empreinte » |
+| ~~Interface « datée », pas d'accompagnement~~ **fait** | Interface refaite (`DESIGN.md`) ; **« Bien démarrer »** en tête de l'accueil (`GettingStarted.tsx`) : importer, double authentification, biométrie, exporter le coffre (Android), installer l'extension, vérifier les empreintes — cochées d'elles-mêmes quand l'interface les voit faites, à la main sinon, masquables | Un vrai assistant pas à pas à la toute première connexion |
 
 ## 2. Fonctions nouvelles (zero-knowledge)
 

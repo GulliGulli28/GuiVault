@@ -267,6 +267,11 @@ scenario("créer un coffre local : un dossier sur le disque, rien en clair", asy
   const { raw, json } = coffreOnDisk(coffre);
   assert(json.format === 1 && json.vaults.length === 1 && json.vaults[0].kind === "personal", "coffre.json ne décrit pas un coffre neuf avec son vault personnel");
   assert(!raw.includes("Personnel"), "le nom du vault est en clair dans coffre.json");
+  // L'accueil d'un coffre neuf : « Bien démarrer », l'import en premier.
+  await waitText(b, "Bien démarrer");
+  await waitText(b, "Importer vos mots de passe");
+  await b.pause(1000);
+  await shot(b, "2a-bien-demarrer");
 });
 
 scenario("en local, ce qui demande un serveur n'apparaît pas", async (b) => {
