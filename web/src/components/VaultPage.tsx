@@ -14,7 +14,7 @@ import { setVaultColor, useVaultColors, VAULT_COLORS, vaultColor, vaultColorName
 import { pinnedEmailFor } from "../lib/pins";
 import { navigate } from "../lib/route";
 import { problemItem, problemText, type ManifestProblem } from "../lib/manifest";
-import { acceptIntegrity, deleteItem, findVault, loadItems, moveItem, payloadEntity, payloadName, putPayload, RevisionConflict, type DecodedItem, type VaultView } from "../lib/session";
+import { acceptIntegrity, changeItem, deleteItem, findVault, loadItems, moveItem, payloadEntity, payloadName, putPayload, RevisionConflict, type DecodedItem, type VaultView } from "../lib/session";
 import { canWrite, KIND_LABELS, KIND_LABELS_PLURAL, ROLE_HINTS, ROLE_LABELS, type CustomIcon, type GuiVaultEntity, type ItemKind, type Payload } from "../lib/types";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { useReprompt } from "./Reprompt";
@@ -296,25 +296,28 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
 
   const toggleFavorite = async () => {
     if (!current?.ok) return;
-    const p = current.payload;
-    const flip = <T extends { favorite?: boolean }>(e: T): T => ({ ...e, favorite: e.favorite ? undefined : true });
-    let next: Payload;
-    switch (p.kind) {
-      case "login": next = { ...p, login: flip(p.login) }; break;
-      case "note": next = { ...p, note: flip(p.note) }; break;
-      case "card": next = { ...p, card: flip(p.card) }; break;
-      case "identity": next = { ...p, identity: flip(p.identity) }; break;
-      case "aws": next = { ...p, aws: flip(p.aws) }; break;
-      case "api-key": next = { ...p, apiKey: flip(p.apiKey) }; break;
-      default: return;
-    }
+    // La valeur voulue, d'après ce qu'on voyait : rejouée telle quelle si
+    // l'élément a changé entre-temps (`changeItem`), jamais un « inverser »
+    // qui déferait une épingle posée ailleurs.
+    const favorite = payloadEntity(current.payload).favorite ? undefined : true;
+    const set = <T extends { favorite?: boolean }>(e: T): T => ({ ...e, favorite });
+    const edit = (p: Payload): Payload | null => {
+      switch (p.kind) {
+        case "login": return { ...p, login: set(p.login) };
+        case "note": return { ...p, note: set(p.note) };
+        case "card": return { ...p, card: set(p.card) };
+        case "identity": return { ...p, identity: set(p.identity) };
+        case "aws": return { ...p, aws: set(p.aws) };
+        case "api-key": return { ...p, apiKey: set(p.apiKey) };
+        default: return null;
+      }
+    };
     try {
-      await putPayload(vault, next, current.revision);
-      await load();
+      await changeItem(vault, current, edit);
     } catch (e) {
       ctx.error(errorMessage(e));
-      if (e instanceof RevisionConflict) await load();
     }
+    await load();
   };
 
   /** Copier l'utilisateur ou le mot de passe depuis la liste, sans ouvrir. */
@@ -372,7 +375,7 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
     if (!next) return;
     if (next.kind === "group" && nameTaken(next.group.name, folderId, id)) return ctx.error(`Un dossier « ${next.group.name} » existe déjà à cet endroit.`);
     try {
-      await putPayload(vault, next, it.revision);
+      await changeItem(vault, it, (p) => withParent(p, folderId));
       const dest = folderId ? index.groups.find((g) => g.id === folderId)?.name : null;
       ctx.notify(`« ${payloadName(next)} » rangé ${dest ? `dans « ${dest} »` : "à la racine"}.`);
     } catch (e) {

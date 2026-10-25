@@ -259,7 +259,8 @@ il ne déchiffre rien : la user key reste sous la clé que seule la PRF donne).
     élément), `MergeDialog` (+ `useMerge`, logique dans `lib/merge.ts` : un
     enregistrement refusé pour modification concurrente se fusionne champ
     par champ — page du vault et popup ; une nouvelle écriture depuis un
-    formulaire de modification passe par lui), `ShortcutsHelp` (« ? ») — les raccourcis à une touche passent
+    formulaire de modification passe par lui ; une *petite* écriture — un champ, hors formulaire — passe par
+    `session.changeItem`, rejouée sur la version du serveur), `ShortcutsHelp` (« ? ») — les raccourcis à une touche passent
     par `lib/keyboard.ts` (`plainShortcut` : ni en saisie, ni sous une
     fenêtre). Un `onClose` passé à une fenêtre (`useModalSurface`) doit être
     stable (`useCallback`) : le hook rend le focus à l'ouvreur quand il

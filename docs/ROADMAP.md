@@ -40,8 +40,7 @@ c'est ce qui sépare un projet solide d'un outil qu'on recommande.
 3. **Windows** (§6) : signature de code (SmartScreen), Windows Hello,
    agent SSH.
 4. **Le reste des cases vides**, au choix : 2FA WebAuthn et passkey dans
-   l'extension (§2),
-   petites écritures qui rechargent sur un conflit (§4), écrans propres à
+   l'extension (§2), écrans propres à
    l'application qui n'ont eu que des textes raccourcis dans la refonte
    (`DESIGN.md`, « État »), `gv` et Guiterm sur un coffre local
    (`APP.md`).
@@ -238,9 +237,12 @@ paramètres ou formats anciens.
   secrets masqués) ; le résultat part de la version du serveur (champs
   inconnus gardés), l'historique des mots de passe s'unit et le mot de
   passe écarté y entre. Supprimé entre-temps : recréer avec sa version.
-  Page du vault et popup de l'extension (`useMerge`). Reste : les petites
-  écritures (favori, glisser vers un dossier, TOTP retiré) rechargent
-  encore sur un conflit.
+  Page du vault et popup de l'extension (`useMerge`). Les petites
+  écritures (épingler, glisser vers un dossier, retirer un code 2FA,
+  joindre ou retirer un fichier) se **rejouent** sur la version du serveur
+  au lieu de recharger (`session.changeItem` ; épingler pose la valeur vue,
+  jamais un « inverser » qui déferait une épingle posée ailleurs ; test dans
+  `localHost.test.ts`).
 
 ## 5. Exploitation (auto-hébergement)
 

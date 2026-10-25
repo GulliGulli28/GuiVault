@@ -7,7 +7,7 @@
 import { api, ApiError, baseUrl, isHttpTransport } from "./api";
 import { fromBase64, randomBytes, toBase64, uuid } from "./bytes";
 import * as c from "./crypto";
-import { decodeItem, payloadEntity, putPayload, RevisionConflict, type DecodedItem, type VaultView } from "./session";
+import { changeItem, payloadEntity, type DecodedItem, type VaultView } from "./session";
 import type { FileAttachment, Payload } from "./types";
 
 /** La taille maximale annoncée par le serveur — ou le coffre local —
@@ -80,30 +80,22 @@ export function saveBlob(blob: Blob, name: string) {
   setTimeout(() => URL.revokeObjectURL(url), 30_000);
 }
 
-/** Une petite modification de l'item (ajouter, retirer une pièce jointe) :
- * s'il a changé entre-temps, elle est rejouée sur la version du serveur —
- * elle ne touche qu'un champ, pas besoin de fusion. */
-async function changeItem(vault: VaultView, item: DecodedItem & { ok: true }, change: (p: Payload) => void): Promise<void> {
-  const edited = (p: Payload): Payload => {
+/** Une petite modification de l'item (ajouter, retirer une pièce jointe),
+ * rejouée sur la version du serveur s'il a changé entre-temps
+ * (`session.changeItem`). */
+async function changeAttachments(vault: VaultView, item: DecodedItem & { ok: true }, change: (p: Payload) => void): Promise<void> {
+  await changeItem(vault, item, (p) => {
     const copy = JSON.parse(JSON.stringify(p)) as Payload;
     change(copy);
     return copy;
-  };
-  try {
-    await putPayload(vault, edited(item.payload), item.revision);
-  } catch (e) {
-    const cur = e instanceof RevisionConflict ? e.current : null;
-    const theirs = cur && !cur.deleted ? decodeItem(vault, cur) : null;
-    if (!theirs?.ok) throw e;
-    await putPayload(vault, edited(theirs.payload), theirs.revision);
-  }
+  });
 }
 
 /** Envoie le fichier et le rattache à l'item. */
 export async function attachFile(vault: VaultView, item: DecodedItem & { ok: true }, file: File, onProgress?: (done: number, total: number) => void): Promise<FileAttachment> {
   const att = await uploadAttachment(vault, item.id, file, onProgress);
   try {
-    await changeItem(vault, item, (p) => {
+    await changeAttachments(vault, item, (p) => {
       const e = payloadEntity(p);
       e.attachments = [...((e.attachments as FileAttachment[] | undefined) ?? []), att];
     });
@@ -116,7 +108,7 @@ export async function attachFile(vault: VaultView, item: DecodedItem & { ok: tru
 
 /** Détache le fichier de l'item, puis l'efface du serveur. */
 export async function removeAttachment(vault: VaultView, item: DecodedItem & { ok: true }, attachmentId: string): Promise<void> {
-  await changeItem(vault, item, (p) => {
+  await changeAttachments(vault, item, (p) => {
     const e = payloadEntity(p);
     e.attachments = ((e.attachments as FileAttachment[] | undefined) ?? []).filter((a) => a.id !== attachmentId);
   });

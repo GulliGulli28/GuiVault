@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { PageContext } from "../App";
 import { errorMessage } from "../lib/api";
-import { loadItems, putPayload } from "../lib/session";
+import { changeItem, loadItems } from "../lib/session";
 import { Page } from "./Page";
 import { TotpList, type TotpEntry } from "./TotpList";
 import { Loading, useDelayed } from "./ui";
@@ -24,7 +24,7 @@ export function TotpPage({ ctx }: { ctx: PageContext }) {
     const vault = ctx.session.vaults.find((v) => v.id === e.vaultId);
     if (!vault) return;
     try {
-      await putPayload(vault, { kind: "login", login: { ...e.login, totp: null } }, e.revision);
+      await changeItem(vault, { revision: e.revision, payload: { kind: "login", login: e.login } }, (p) => (p.kind === "login" ? { ...p, login: { ...p.login, totp: null } } : null));
       setEntries((list) => (list ?? []).filter((x) => x.id !== e.id));
       ctx.notify(`Code de « ${e.login.name} » retiré.`);
     } catch (err) {

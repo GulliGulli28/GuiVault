@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, ApiError, isHttpTransport, setTransport, supports } from "./api";
 import { emptyPayload } from "./items";
 import { localAccount, localChangePassword, localTransport, type LocalHost, type LocalOp, type NewCoffre } from "./localHost";
-import { changePassword, closeLocal, createLocal, loadItems, openLocal, putPayload } from "./session";
+import { changeItem, changePassword, closeLocal, createLocal, loadItems, openLocal, payloadEntity, putPayload } from "./session";
 import type { Item, Vault } from "./types";
 
 beforeEach(() => {
@@ -143,7 +143,12 @@ function memoryHost() {
         case "manifest": return null;
         case "items": return { items: coffre.items, revision: coffre.revision };
         case "putItem": {
-          const req = args.req as { item_type: string; ciphertext: string };
+          const req = args.req as { item_type: string; ciphertext: string; base_revision?: number | null };
+          // Le verrou optimiste du serveur : refusé avec la version courante.
+          const existing = coffre.items.find((i) => i.id === args.id);
+          if (existing && req.base_revision != null && req.base_revision !== existing.revision) {
+            throw { status: 409, code: "revision_mismatch", message: "modifié entre-temps", current: existing };
+          }
           coffre.revision++;
           const item: Item = { id: args.id as string, vault_id: args.vault as string, item_type: req.item_type, revision: coffre.revision, ciphertext: req.ciphertext, deleted: false, created_at: "2026-10-20T00:00:00Z", updated_at: "2026-10-20T00:00:00Z" };
           coffre.items = [...coffre.items.filter((i) => i.id !== item.id), item];
@@ -181,6 +186,25 @@ describe("une session sur un coffre local", () => {
     const { items } = await loadItems(reopened.vaults[0]);
     expect(items).toHaveLength(1);
     expect(items[0].ok && items[0].payload.kind === "note" && items[0].payload.note.name).toBe("Code de la porte");
+  }, 60_000);
+
+  it("une petite écriture se rejoue sur la version d'un autre appareil", async () => {
+    const { host } = memoryHost();
+    const s = await createLocal(host, "/tmp/Conflit.guivault", "mot de passe maître");
+    const v = s.vaults[0];
+    const payload = emptyPayload("note");
+    if (payload.kind !== "note") throw new Error("note attendue");
+    payload.note.name = "Avant";
+    const first = await putPayload(v, payload);
+    // Un autre appareil la renomme pendant qu'on la regarde.
+    await putPayload(v, { kind: "note", note: { ...payload.note, name: "Renommée ailleurs" } }, first.revision);
+    // D'ici, on l'épingle d'après la version vue : rejoué, rien de perdu.
+    const pin = (p: typeof payload) => (p.kind === "note" ? { ...p, note: { ...p.note, favorite: true } } : null);
+    const written = await changeItem(v, { revision: first.revision, payload }, pin);
+    expect(written && payloadEntity(written).name).toBe("Renommée ailleurs");
+    const { items } = await loadItems(v);
+    const it0 = items[0];
+    expect(it0.ok && it0.payload.kind === "note" && [it0.payload.note.name, it0.payload.note.favorite]).toEqual(["Renommée ailleurs", true]);
   }, 60_000);
 
   it("rend lisibles les erreurs de l'hôte à la création et à l'ouverture", async () => {

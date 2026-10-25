@@ -840,6 +840,29 @@ export async function putPayload(vault: VaultView, payload: Payload, baseRevisio
   }
 }
 
+/** Une petite modification d'un item (épingler, ranger dans un dossier,
+ * retirer un code 2FA, joindre un fichier) : s'il a changé entre-temps, elle
+ * est rejouée sur la version du serveur — elle ne touche qu'un champ, pas
+ * besoin de fusion (`MergeDialog`, pour les formulaires). `edit` rend la
+ * version modifiée, ou `null` s'il n'y a rien à y faire. Rend ce qui a été
+ * écrit (`null` : rien). Supprimé entre-temps : l'erreur d'origine. */
+export async function changeItem(vault: VaultView, item: { revision: number; payload: Payload }, edit: (p: Payload) => Payload | null): Promise<Payload | null> {
+  const first = edit(item.payload);
+  if (!first) return null;
+  try {
+    await putPayload(vault, first, item.revision);
+    return first;
+  } catch (e) {
+    const cur = e instanceof RevisionConflict ? e.current : null;
+    const theirs = cur && !cur.deleted ? decodeItem(vault, cur) : null;
+    if (!theirs?.ok) throw e;
+    const again = edit(theirs.payload);
+    if (!again) return null;
+    await putPayload(vault, again, theirs.revision);
+    return again;
+  }
+}
+
 /** Copie une entité dans un autre vault : même id (une entité ne vit que
  * dans un vault, Guiterm supprime la copie en trop), re-chiffrée sous
  * l'autre clé. */
