@@ -218,6 +218,9 @@ il ne déchiffre rien : la user key reste sous la clé que seule la PRF donne).
     vaults dont on est membre, lecture seule ; `findVault` pour les deux),
     `components/EmergencySettings.tsx` (Paramètres › Accès d'urgence, et le
     bandeau du donneur).
+  - `lib/duplicates.ts` — les doublons (onglet « Doublons » de la santé,
+    fusion par `MergeDuplicates`) et « Dupliquer » (copie sans pièces
+    jointes ni passkeys).
   - `lib/health.ts` — le rapport de santé (`HealthPage`, « Santé du
     coffre ») : tout est calculé ici ; les fuites (k-anonymat) et la liste
     des sites à 2FA passent par les relais du serveur (`routes/lookups.rs`).

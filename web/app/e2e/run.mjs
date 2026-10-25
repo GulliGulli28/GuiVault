@@ -329,6 +329,41 @@ scenario("élément protégé : le mot de passe maître avant de le montrer", as
   await shot(b, "3b-protege");
 });
 
+scenario("doublons : dupliquer un identifiant, le voir dans la santé, fusionner", async (b) => {
+  await openNewMenu(b);
+  await (await b.$("//button[@role='menuitem'][normalize-space()='Identifiant']")).click();
+  await waitText(b, "Nouvel identifiant");
+  await fillField(b, "Nom", "Forum");
+  await fillField(b, "Utilisateur", "alice");
+  await fillField(b, "Mot de passe", "forum-pw-1");
+  await click(b, "Ajouter un site");
+  await (await b.$('input[aria-label="Site 1"]')).setValue("https://forum.example");
+  await click(b, "Enregistrer");
+  await waitText(b, "Copier le mot de passe");
+  const before = coffreOnDisk(coffre).json.vaults[0].items.filter((i) => !i.deleted_at).length;
+  // Dupliquer : le formulaire s'ouvre sur une copie, enregistrée à part.
+  await (await b.$('button[aria-label="Plus d\'actions"]')).click();
+  await (await b.$("//button[@role='menuitem'][normalize-space()='Dupliquer']")).click();
+  await waitText(b, "Nouvel identifiant");
+  const name = await b.$(`//label[span[normalize-space()='Nom']]//input`);
+  assert((await name.getValue()) === "Forum (copie)", `la copie s'appelle « ${await name.getValue()} »`);
+  await click(b, "Enregistrer");
+  await b.waitUntil(async () => coffreOnDisk(coffre).json.vaults[0].items.filter((i) => !i.deleted_at).length === before + 1, { timeout: 15_000, timeoutMsg: "la copie n'a pas été écrite" });
+  // La santé les voit ; fusionner n'en laisse qu'un.
+  await (await b.$("//aside//a[.//span[normalize-space()='Santé']]")).click();
+  await waitText(b, "Doublons");
+  await (await b.$("//button[@role='tab'][starts-with(normalize-space(), 'Doublons')]")).click();
+  await waitText(b, "Même compte deux fois");
+  await click(b, "Fusionner…");
+  await waitText(b, "Fusionner les doublons");
+  await click(b, "Fusionner 2 éléments");
+  await waitText(b, "Doublons fusionnés");
+  await b.waitUntil(async () => coffreOnDisk(coffre).json.vaults[0].items.filter((i) => !i.deleted_at).length === before, { timeout: 15_000, timeoutMsg: "la fusion n'a pas envoyé le doublon à la corbeille" });
+  await b.waitUntil(async () => !(await bodyText(b)).includes("Même compte deux fois"), { timeout: 15_000, timeoutMsg: "le doublon est resté dans la santé après la fusion" });
+  await shot(b, "3c-doublons");
+  await (await b.$("//a[.//span[normalize-space()='Personnel']]")).click();
+});
+
 /** Une commande de l'application, depuis la page (W3C : la promesse est
  * attendue). Rend `{ ok, value }` ou `{ ok: false, error }`. */
 async function invoke(b, cmd, args = {}) {

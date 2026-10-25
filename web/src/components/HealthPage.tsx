@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { PageContext } from "../App";
 import { api, errorMessage } from "../lib/api";
 import { allSecrets, checkPwned, findExpiring, findMissingTotp, findOld, findReused, findWeak, type HealthEntry } from "../lib/health";
+import { findDuplicates } from "../lib/duplicates";
+import { canMerge, MergeDuplicates } from "./MergeDuplicates";
 import { navigate } from "../lib/route";
 import { loadItems, payloadName } from "../lib/session";
 import { KIND_LABELS, type TwoFactorSite } from "../lib/types";
@@ -26,6 +28,7 @@ export function HealthPage({ ctx }: { ctx: PageContext }) {
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [tab, setTab] = useState<Tab>("all");
   const [info, setInfo] = useState(false);
+  const [merging, setMerging] = useState<HealthEntry[] | null>(null);
   const slow = useDelayed(entries === null);
   const vaultsKey = session.vaults.map((v) => `${v.id}:${v.revision}`).join(",");
   const offline = !!session.offline;
@@ -71,6 +74,7 @@ export function HealthPage({ ctx }: { ctx: PageContext }) {
       old: findOld(entries, now),
       expiring: findExpiring(entries, now),
       missingTotp: sites ? findMissingTotp(entries, sites) : null,
+      duplicates: findDuplicates(entries),
     };
   }, [entries, sites]);
 
@@ -101,6 +105,12 @@ export function HealthPage({ ctx }: { ctx: PageContext }) {
     for (const m of report.missingTotp ?? []) out.push({ kind: "totp", entry: m.entry, detail: `${m.site.name} accepte un code TOTP`, link: m.site.documentation ?? undefined });
     for (const o of report.old) out.push({ kind: "old", entry: o.entry, detail: `Mot de passe du ${o.since.toLocaleDateString("fr-FR")}` });
     for (const x of report.expiring) out.push({ kind: "expiring", entry: x.entry, detail: `${capitalize(x.what)} ${x.expired ? "expirée le" : "expire le"} ${x.date.toLocaleDateString("fr-FR", { timeZone: "UTC" })}` });
+    // Une ligne par groupe de doublons, pas par élément.
+    for (const g of report.duplicates) {
+      const names = g.map((e) => `« ${payloadName(e.item.payload) || "(sans nom)"} »`);
+      const what = g[0].item.payload.kind === "card" ? "même carte" : "même compte";
+      out.push({ kind: "duplicate", entry: g[0], group: g, detail: `${capitalize(what)} ${g.length > 2 ? `${g.length} fois` : "deux fois"} : ${names.join(", ")}` });
+    }
     return out;
   }, [report, leaked, pwned]);
 
@@ -173,7 +183,7 @@ export function HealthPage({ ctx }: { ctx: PageContext }) {
 
           <section aria-label="À traiter" className="flex flex-col gap-3.5">
             <div className="tabs" role="tablist" aria-label="Filtrer">
-              {(["all", "leaked", "reused", "weak", "totp", "old", "expiring"] as Tab[]).map((t) => {
+              {(["all", "leaked", "reused", "weak", "totp", "duplicate", "old", "expiring"] as Tab[]).map((t) => {
                 const n = t === "all" ? issues.filter((i) => i.kind !== "old").length : counts(t);
                 if (t !== "all" && n === 0) return null;
                 return <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className="tab">{TAB_LABELS[t]} <span className="text-[var(--c-text-muted)]">{n}</span></button>;
@@ -186,7 +196,7 @@ export function HealthPage({ ctx }: { ctx: PageContext }) {
               </div>
             ) : (
               <div className="card divide-y divide-[var(--c-border)] overflow-hidden">
-                {shown.map((i, n) => <IssueRow key={n} issue={i} />)}
+                {shown.map((i, n) => <IssueRow key={n} issue={i} onMerge={setMerging} />)}
               </div>
             )}
             <div className="flex flex-wrap gap-2.5">
@@ -197,25 +207,36 @@ export function HealthPage({ ctx }: { ctx: PageContext }) {
           </section>
         </>
       )}
+      {merging && (
+        <MergeDuplicates
+          session={session}
+          group={merging}
+          onClose={() => setMerging(null)}
+          onMerged={(name) => { setMerging(null); ctx.notify(`Doublons fusionnés dans « ${name} ».`); void ctx.reload(); }}
+        />
+      )}
     </Page>
   );
 }
 
-type IssueKind = "leaked" | "reused" | "weak" | "totp" | "old" | "expiring";
+type IssueKind = "leaked" | "reused" | "weak" | "totp" | "duplicate" | "old" | "expiring";
 type Tab = "all" | IssueKind;
 interface Issue {
   kind: IssueKind;
   entry: HealthEntry;
   detail: string;
   link?: string;
+  /** Les doublons : tout le groupe (`entry` en est le premier). */
+  group?: HealthEntry[];
 }
 
-const TAB_LABELS: Record<Tab, string> = { all: "À traiter", leaked: "Fuités", reused: "Réutilisés", weak: "Faibles", totp: "2FA possible", old: "Plus d'un an", expiring: "Expirations" };
+const TAB_LABELS: Record<Tab, string> = { all: "À traiter", leaked: "Fuités", reused: "Réutilisés", weak: "Faibles", totp: "2FA possible", duplicate: "Doublons", old: "Plus d'un an", expiring: "Expirations" };
 const CHIPS: Record<IssueKind, { label: string; tone: string; action: string }> = {
   leaked: { label: "Fuité", tone: "tag-danger", action: "Changer" },
   reused: { label: "Réutilisé", tone: "tag-danger", action: "Changer" },
   weak: { label: "Faible", tone: "tag-warn", action: "Changer" },
   totp: { label: "2FA possible", tone: "tag-accent", action: "Ajouter la 2FA" },
+  duplicate: { label: "Doublon", tone: "", action: "Ouvrir" },
   old: { label: "Ancien", tone: "", action: "Ouvrir" },
   expiring: { label: "Expire", tone: "tag-warn", action: "Ouvrir" },
 };
@@ -229,11 +250,12 @@ function Legend({ color, children }: { color: string; children: ReactNode }) {
 }
 
 /** Une ligne de la file : l'élément, ce qui ne va pas, et y aller. */
-function IssueRow({ issue }: { issue: Issue }) {
+function IssueRow({ issue, onMerge }: { issue: Issue; onMerge: (group: HealthEntry[]) => void }) {
   const p = issue.entry.item.payload;
   const name = payloadName(p) || KIND_LABELS[p.kind];
   const chip = CHIPS[issue.kind];
-  const open = () => navigate({ page: "vault", id: issue.entry.vault.id, item: issue.entry.item.id });
+  const mergeable = !!issue.group && canMerge(issue.group);
+  const open = () => (mergeable ? onMerge(issue.group!) : navigate({ page: "vault", id: issue.entry.vault.id, item: issue.entry.item.id }));
   const narrow = useMediaQuery(NARROW);
   if (narrow) {
     // Mobile (maquette `MSante`) : la ligne entière ouvre l'élément.
@@ -261,7 +283,7 @@ function IssueRow({ issue }: { issue: Issue }) {
       </span>
       <span className={`tag ${chip.tone}`}>{chip.label}</span>
       <span className="w-[130px] truncate text-[12.5px] text-[var(--c-text-muted)] max-lg:hidden">{issue.entry.vault.name}{issue.entry.vault.role === "reader" ? " · lecture" : ""}</span>
-      <button onClick={open} className="btn btn-secondary ml-auto">{chip.action}</button>
+      <button onClick={open} className="btn btn-secondary ml-auto">{mergeable ? "Fusionner…" : chip.action}</button>
     </div>
   );
 }

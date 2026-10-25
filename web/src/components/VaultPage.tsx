@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { duplicateOf } from "../lib/duplicates";
 import type { PageContext } from "../App";
 import { errorMessage, supports } from "../lib/api";
 import { autoTypeBridge } from "../lib/platform";
@@ -39,7 +40,7 @@ import { NARROW, TOUCH, useMediaQuery } from "../hooks/useMediaQuery";
 
 /** `groupId` : le dossier où créer (bouton « + » d'un dossier) ; absent, le
  * dossier de l'élément sélectionné. */
-type Mode = { kind: "view" } | { kind: "edit" } | { kind: "new"; itemKind: ItemKind; groupId?: string | null };
+type Mode = { kind: "view" } | { kind: "edit" } | { kind: "new"; itemKind: ItemKind; groupId?: string | null; draft?: Payload };
 
 /** Les entrées du menu « Nouveau » : les secrets d'abord, puis les entités
  * Guiterm, un trait entre les deux. */
@@ -661,7 +662,7 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
             <p className="callout callout-warn m-4 mb-0">Ce vault a changé entre-temps : l'enregistrement proposera de fusionner.</p>
           )}
           {mode.kind === "new" && (
-            <ItemForm key={`${mode.itemKind}-${mode.groupId ?? ""}`} kind={mode.itemKind} index={index} defaultGroupId={mode.groupId !== undefined ? mode.groupId : selectedGroupId} onSave={(p) => save(p)} onCancel={() => setMode({ kind: "view" })} onAddIcon={addIcon} />
+            <ItemForm key={`${mode.itemKind}-${mode.groupId ?? ""}-${mode.draft ? payloadEntity(mode.draft).id : ""}`} kind={mode.itemKind} draft={mode.draft} index={index} defaultGroupId={mode.groupId !== undefined ? mode.groupId : selectedGroupId} onSave={(p) => save(p)} onCancel={() => setMode({ kind: "view" })} onAddIcon={addIcon} />
           )}
           {mode.kind === "edit" && current?.ok && (
             <ItemForm kind={current.payload.kind} initial={current.payload} index={index} onSave={(p) => save(p, current.revision)} onCancel={() => setMode({ kind: "view" })} onAddIcon={addIcon} />
@@ -703,6 +704,9 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
                   {(close) => (
                     <>
                       {!emergency && <button role="menuitem" className="menu-item" onClick={() => { close(); guard(() => setHistory(true)); }}><IconHistory size={14} /> Historique<span className="flex-1" />{!touch && <span className="kbd">H</span>}</button>}
+                      {writable && current.ok && current.payload.kind !== "group" && (
+                        <button role="menuitem" className="menu-item" onClick={() => { close(); const p = current.payload; guard(() => setMode({ kind: "new", itemKind: p.kind, draft: duplicateOf(p) })); }}><IconCopy size={14} /> Dupliquer</button>
+                      )}
                       {writable && current.ok && otherWritable.map((v) => (
                         <button key={v.id} role="menuitem" className="menu-item" onClick={() => { close(); setMoveTo(v); }}>
                           <span className="vdot" style={{ background: vaultColor(v.id, v.kind === "personal", colors) }} />

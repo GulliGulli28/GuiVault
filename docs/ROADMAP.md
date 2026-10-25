@@ -40,7 +40,7 @@ c'est ce qui sépare un projet solide d'un outil qu'on recommande.
 3. **Windows** (§6) : signature de code (SmartScreen), Windows Hello,
    agent SSH.
 4. **Le reste des cases vides**, au choix : 2FA WebAuthn et passkey dans
-   l'extension (§2), doublons, premier lancement guidé (§1),
+   l'extension (§2), premier lancement guidé (§1),
    petites écritures qui rechargent sur un conflit (§4), écrans propres à
    l'application qui n'ont eu que des textes raccourcis dans la refonte
    (`DESIGN.md`, « État »), `gv` et Guiterm sur un coffre local
@@ -117,7 +117,7 @@ paramètres ou formats anciens.
 | ~~Coffre auto-hébergé injoignable = plus rien (« bloqué à l'aéroport »)~~ **fait** | `lib/offline.ts` : copie chiffrée en IndexedDB (par appareil, désactivée par défaut), ouverte avec le mot de passe maître en lecture seule — web (interface gardée par `public/sw.js`) et extension (le remplissage marche) | Écrire hors ligne et resynchroniser ; manifeste PWA installable ; Guiterm |
 | ~~Pas d'historique des modifications~~ **fait** | Table `item_versions` (versions chiffrées, `GUIVAULT_ITEM_HISTORY`), corbeille `GUIVAULT_TRASH_DAYS` jours, restauration par renvoi tel quel ; web : « Historique » d'un élément et page Corbeille ; les rotations (web, Guiterm) re-chiffrent l'historique | Guiterm : pas encore d'écran corbeille/historique (le web s'en charge) |
 | ~~Presse-papier jamais effacé (très demandé)~~ **fait** | `lib/clipboard.ts` : effacé au bout du délai (30 s par défaut, section synchronisée `clipboard`) s'il contient encore ce qui a été copié ; extension : service worker + document hors écran ; web : à l'échéance si la page peut vérifier, sinon au clic suivant | — |
-| Tri, doublons, duplication | **Tri fait** (nom en dossiers, modifiés / créés récemment à plat, retenu par appareil) | Rapport de doublons avec fusion ; « Dupliquer » via `useSeed` ; tri par dernier usage (à tracer côté client) |
+| Tri, doublons, duplication | **Fait** : tri (nom en dossiers, modifiés / créés récemment à plat, retenu par appareil) ; **doublons** dans la santé (même site et même utilisateur, même numéro de carte, vault par vault) et **fusion** sans perte (`lib/duplicates.ts`, `MergeDuplicates` : mots de passe écartés dans l'historique, adresses, champs, notes, passkeys et pièces jointes réunis, les autres à la corbeille) ; **« Dupliquer »** une fiche (sans pièces jointes, passkeys ni historique) | Tri par dernier usage (à tracer côté client) |
 | ~~Re-demande du mot de passe maître pour un élément~~ **fait** | `SecretBase.reprompt` (« Redemander le mot de passe maître ») : afficher, copier, remplir, modifier, partager, taper ; vérifié sans le serveur, cinq minutes de grâce par élément (`lib/reprompt.ts`, `Reprompt.tsx`) ; le menu de l'extension et le remplissage d'Android n'en reçoivent rien ; importé et exporté avec Bitwarden | — |
 | Fonctions « premium » payantes (accès d'urgence, pièces jointes, Send, TOTP) ; +100 % sur Premium en janvier 2026 | **Accès d'urgence, Send, TOTP et pièces jointes faits**, gratuits parce qu'auto-hébergés | — |
 | Interface « datée », pas d'accompagnement | Pas de premier lancement guidé | Assistant d'import à la première connexion, puis une liste « activer la 2FA, installer l'extension, vérifier une empreinte » |
@@ -168,7 +168,7 @@ paramètres ou formats anciens.
   clés d'API et cartes qui expirent dans le mois. Calcul :
   `web/src/lib/health.ts` ; relais : `routes/lookups.rs`
   (`GUIVAULT_HEALTH_LOOKUPS`, désactivable). Reste : dans l'extension et
-  Guiterm ; « ignorer » un élément signalé ; doublons avec fusion (§1).
+  Guiterm ; « ignorer » un élément signalé.
 - [x] **Connexion par passkey** ([`PASSKEYS.md`](PASSKEYS.md)) : sans mot de
   passe maître ni code TOTP, dans l'interface web. La PRF de WebAuthn tire
   une clé qui enveloppe la user key ; le serveur garde l'enveloppe sans
