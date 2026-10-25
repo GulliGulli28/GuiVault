@@ -406,8 +406,12 @@ Le README le dit en tête ; chaque case cochée y retire une ligne.
   publié tel quel avec les corrections.
 - [ ] **Activer le manifeste** (§0) : la dernière limite structurelle face à
   un serveur malveillant.
-- [ ] **Image Docker publiée** sur ghcr.io, multi-architecture, signée
-  (cosign) avec attestation de provenance, comme l'APK.
+- [x] **Image Docker publiée** sur ghcr.io : amd64 et arm64 (runners
+  natifs, fusion par empreinte), signée par cosign sans clé, attestation de
+  provenance — `.github/workflows/server-image.yml`, après chaque CI vert
+  sur `main` et sur un tag `server-v*` ; vérification dans le README.
+  Reste : épingler les images de base par empreinte (`docker/Dockerfile`
+  suit `node:22-alpine` et `cargo-chef:latest-rust-1`), publier un SBOM.
 - [ ] **Extension dans les stores** (Chrome Web Store, Firefox Add-ons,
   Edge) — l'identifiant change : l'ajouter aux origines de l'hôte natif
   (`EXTENSION.md`).

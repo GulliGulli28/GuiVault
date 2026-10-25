@@ -30,9 +30,9 @@ même auteur.
 >   indépendant. Gardez une autre copie de ce que vous ne pouvez pas vous
 >   permettre de perdre.
 > - **Interface en français uniquement.**
-> - **Distribution encore artisanale** : image Docker à construire
->   soi-même, extension à charger « non empaquetée » (pas encore dans les
->   stores), installeurs Windows sans signature Authenticode (SmartScreen
+> - **Distribution encore artisanale** : l'image Docker est publiée et
+>   signée, mais l'extension est à charger « non empaquetée » (pas encore
+>   dans les stores), installeurs Windows sans signature Authenticode (SmartScreen
 >   avertit), APK Android à installer à la main et vérifié seulement sur
 >   émulateur. Ni iOS, ni macOS, ni application Linux.
 
@@ -260,8 +260,21 @@ git clone https://github.com/GulliGulli28/GuiVault.git && cd GuiVault
 cp .env.example .env
 # Renseigner POSTGRES_PASSWORD, GUIVAULT_SECRET (openssl rand -base64 48)
 # et GUIVAULT_ALLOWED_EMAILS (votre adresse : c'est le premier compte).
-docker compose up -d --build   # `--build` tant que l'image n'est pas publiée sur ghcr.io
+docker compose pull && docker compose up -d   # ou `up -d --build` pour construire l'image soi-même
 curl http://127.0.0.1:8080/api/v1/health
+```
+
+L'image `ghcr.io/gulligulli28/guivault` (amd64 et arm64) est publiée par le
+CI après chaque commit vert sur `main` (`:latest`, `:sha-<commit>`) et
+pour chaque tag `server-v<version>`. Elle est **signée** (cosign, sans clé :
+l'identité est le workflow) et accompagnée d'une **attestation de
+provenance** (quel dépôt, quel commit, quel workflow) :
+
+```bash
+cosign verify ghcr.io/gulligulli28/guivault:latest \
+  --certificate-identity-regexp '^https://github.com/GulliGulli28/GuiVault/.github/workflows/server-image.yml@' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+gh attestation verify oci://ghcr.io/gulligulli28/guivault:latest -R GulliGulli28/GuiVault
 ```
 
 Le serveur parle HTTP sur `127.0.0.1:8080`. **Mettez-le derrière un reverse
