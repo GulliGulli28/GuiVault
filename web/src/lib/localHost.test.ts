@@ -8,7 +8,7 @@ import { api, ApiError, isHttpTransport, setTransport, supports } from "./api";
 import { emptyPayload } from "./items";
 import { localAccount, localChangePassword, localTransport, type LocalHost, type LocalOp, type NewCoffre } from "./localHost";
 import { changeItem, changePassword, closeLocal, createLocal, loadItems, openLocal, payloadEntity, putPayload } from "./session";
-import type { Item, Vault } from "./types";
+import type { Item, Payload, Vault } from "./types";
 
 beforeEach(() => {
   const store = new Map<string, string>();
@@ -199,7 +199,7 @@ describe("une session sur un coffre local", () => {
     // Un autre appareil la renomme pendant qu'on la regarde.
     await putPayload(v, { kind: "note", note: { ...payload.note, name: "Renommée ailleurs" } }, first.revision);
     // D'ici, on l'épingle d'après la version vue : rejoué, rien de perdu.
-    const pin = (p: typeof payload) => (p.kind === "note" ? { ...p, note: { ...p.note, favorite: true } } : null);
+    const pin = (p: Payload): Payload | null => (p.kind === "note" ? { ...p, note: { ...p.note, favorite: true } } : null);
     const written = await changeItem(v, { revision: first.revision, payload }, pin);
     expect(written && payloadEntity(written).name).toBe("Renommée ailleurs");
     const { items } = await loadItems(v);
