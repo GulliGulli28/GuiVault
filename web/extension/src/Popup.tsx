@@ -27,6 +27,8 @@ import { IntegrityBanner } from "../../src/components/IntegrityBanner";
 import { RollbackBanner } from "../../src/components/RollbackBanner";
 import { useMerge } from "../../src/components/MergeDialog";
 import { AttachmentsPanel } from "../../src/components/AttachmentsPanel";
+import { RepromptContext, useReprompt, useRepromptHost } from "../../src/components/Reprompt";
+import { needsReprompt } from "../../src/lib/reprompt";
 import { OfflineSetting } from "../../src/components/OfflineSetting";
 import { loadOfflineCopy, refreshOfflineCopy, type OfflineCopy } from "../../src/lib/offline";
 import { copyText, formatAgo, InfoTip, PasswordInput, SettingRow } from "../../src/components/ui";
@@ -309,11 +311,15 @@ export function Popup() {
   /** Le seul formulaire est dans un cadre servi par un autre site que
    * l'identifiant : on demande avant d'y mettre un mot de passe. */
   const [frameConfirm, setFrameConfirm] = useState<{ entry: LoginEntry; what: "credentials" | "totp"; frameId: number; host: string } | null>(null);
+  // Un identifiant protégé (`reprompt`) : le mot de passe maître avant de le
+  // remplir ou de le montrer — le menu de la page, lui, n'en reçoit rien.
+  const [ask, repromptDialog] = useRepromptHost(screen.kind === "vault" ? screen.state : null);
 
   /** Le service worker choisit le cadre où remplir (jamais tous : un cadre
    * tiers n'a pas à recevoir le mot de passe du site). */
   const fill = async (e: LoginEntry, what: "credentials" | "totp", frameId?: number) => {
     if (tabId == null) return;
+    if (!(await ask({ kind: "login", login: e.login }))) return;
     try {
       const r = await chrome.runtime.sendMessage<PopupToBackground, FillTabReply>({ type: "guivault-fill-tab", tabId, loginId: e.login.id, what, frameId });
       if (!r) return say("Pas de réponse de la page.");
@@ -391,6 +397,7 @@ export function Popup() {
   const indexFor = (vaultId: string) => indexItems(cache[vaultId]?.items ?? []);
 
   return (
+    <RepromptContext.Provider value={ask}>
     <div className="relative flex h-[600px] flex-col bg-[var(--c-bg2)] text-[var(--c-text)]">
       <header className="flex min-h-[52px] shrink-0 items-center gap-2 border-b border-[var(--c-border)] pl-3.5 pr-2">
         {/* Le logo grise quand le coffre est verrouillé — comme l'icône de
@@ -659,7 +666,9 @@ export function Popup() {
         </div>
       )}
       {merging.dialog}
+      {repromptDialog}
     </div>
+    </RepromptContext.Provider>
   );
 }
 
@@ -680,7 +689,11 @@ function Section({ id, title, dot, count, collapsed, onToggle, children }: { id:
 
 /** Un identifiant du site ouvert : « Remplir » d'abord, copier à côté. */
 function SiteRow({ entry, onFill, onOpen, say }: { entry: LoginEntry; onFill: (e: LoginEntry, what: "credentials" | "totp") => Promise<void>; onOpen: () => void; say: (m: string) => void }) {
-  const copy = () => copyText(entry.login.password).then((ok) => say(ok ? "Mot de passe copié." : "Copie refusée par le navigateur."));
+  const ask = useReprompt();
+  const copy = async () => {
+    if (!(await ask(entry.payload))) return;
+    say((await copyText(entry.login.password)) ? "Mot de passe copié." : "Copie refusée par le navigateur.");
+  };
   return (
     <div className="flex min-w-0 items-center gap-2.5 py-2.5 pl-3 pr-2.5">
       <ItemTile entity={entry.entity} customIcons={entry.customIcons} size={32} />
@@ -697,11 +710,15 @@ function SiteRow({ entry, onFill, onOpen, say }: { entry: LoginEntry; onFill: (e
 /** Remplir, copier l'utilisateur, copier le mot de passe — sur une ligne
  * d'identifiant, où qu'elle soit. */
 function LoginActions({ entry, canFill, onFill, say }: { entry: LoginEntry; canFill: boolean; onFill: (e: LoginEntry, what: "credentials" | "totp") => Promise<void>; say: (m: string) => void }) {
-  const copy = (label: string, v: string) => () => copyText(v).then((ok) => say(ok ? `${label} copié.` : "Copie refusée par le navigateur."));
+  const ask = useReprompt();
+  const copy = (label: string, v: string, guarded = false) => async () => {
+    if (guarded && !(await ask(entry.payload))) return;
+    say((await copyText(v)) ? `${label} copié.` : "Copie refusée par le navigateur.");
+  };
   return (
     <>
       {entry.login.username && <button onClick={copy("Utilisateur", entry.login.username)} className="btn btn-ghost btn-sm btn-icon" title="Copier l'utilisateur" aria-label="Copier l'utilisateur"><IconIdentity size={13} /></button>}
-      {entry.login.password && <button onClick={copy("Mot de passe", entry.login.password)} className="btn btn-ghost btn-sm btn-icon" title="Copier le mot de passe" aria-label="Copier le mot de passe"><IconCopy size={13} /></button>}
+      {entry.login.password && <button onClick={copy("Mot de passe", entry.login.password, true)} className="btn btn-ghost btn-sm btn-icon" title="Copier le mot de passe" aria-label="Copier le mot de passe"><IconCopy size={13} /></button>}
       {canFill && <button onClick={() => void onFill(entry, "credentials")} className="btn btn-secondary btn-sm" title="Remplir la page">Remplir</button>}
     </>
   );
@@ -711,14 +728,20 @@ function Detail({ entry, vault, offline, index, canFill, writable, onBack, onFil
   const [confirm, setConfirm] = useState(false);
   const login = isLoginEntry(entry) ? entry : null;
   const site = login?.login.uris[0]?.uri;
-  const copy = (label: string, v: string) => () => copyText(v).then((ok) => say(ok ? `${label} copié.` : "Copie refusée par le navigateur."));
+  const ask = useReprompt();
+  const [, setUnlocks] = useState(0);
+  const locked = needsReprompt(entry.payload);
+  const copy = (label: string, v: string) => async () => {
+    if (!(await ask(entry.payload))) return;
+    say((await copyText(v)) ? `${label} copié.` : "Copie refusée par le navigateur.");
+  };
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex min-h-[48px] shrink-0 items-center gap-1 border-b border-[var(--c-border)] px-1.5">
         <button onClick={onBack} className="btn btn-ghost btn-icon" title="Retour" aria-label="Retour"><IconChevronRight size={15} className="rotate-180" /></button>
         <span className="min-w-0 flex-1 truncate text-[12.5px] text-[var(--c-text-muted)]">{entry.vaultName}{entry.entity.path ? ` · ${entry.entity.path}` : ""}</span>
         {/* Un vault en lecture (ou la copie hors ligne) ne se modifie pas d'ici. */}
-        {writable && <button onClick={onEdit} className="btn btn-ghost btn-icon" title="Modifier" aria-label="Modifier"><IconEdit size={15} /></button>}
+        {writable && <button onClick={() => void ask(entry.payload).then((ok) => { if (ok) onEdit(); })} className="btn btn-ghost btn-icon" title="Modifier" aria-label="Modifier"><IconEdit size={15} /></button>}
         {writable && <button onClick={() => setConfirm(true)} className="btn btn-ghost btn-icon hover:text-[var(--c-danger)]" title="Supprimer" aria-label="Supprimer"><IconTrash size={15} /></button>}
       </div>
       <div className="sidebar-scroll min-h-0 flex-1 overflow-y-auto px-3.5 pb-5 pt-4">
@@ -741,11 +764,21 @@ function Detail({ entry, vault, offline, index, canFill, writable, onBack, onFil
               {canFill && login.login.totp && <button onClick={() => void onFill(login, "totp")} className="btn btn-secondary w-full">Remplir le code 2FA</button>}
             </div>
           )}
-          <ItemView payload={entry.payload} index={index} />
-          {/* Les pièces jointes : lecture et téléchargement (joindre se fait
-              dans l'interface web — le sélecteur de fichier fermerait le popup). */}
-          {vault && isSecret(entry.payload) && (
-            <AttachmentsPanel vault={vault} item={entry.item} writable={false} offline={offline} onChanged={() => {}} notify={say} error={say} />
+          {locked ? (
+            <div className="card flex items-center gap-3 px-3.5 py-3">
+              <IconLock size={16} className="shrink-0 text-[var(--c-text-muted)]" />
+              <span className="min-w-0 flex-1 text-[13px]">Protégé par le mot de passe maître</span>
+              <button onClick={() => void ask(entry.payload).then((ok) => { if (ok) setUnlocks((n) => n + 1); })} className="btn btn-primary">Afficher</button>
+            </div>
+          ) : (
+            <>
+              <ItemView payload={entry.payload} index={index} />
+              {/* Les pièces jointes : lecture et téléchargement (joindre se fait
+                  dans l'interface web — le sélecteur de fichier fermerait le popup). */}
+              {vault && isSecret(entry.payload) && (
+                <AttachmentsPanel vault={vault} item={entry.item} writable={false} offline={offline} onChanged={() => {}} notify={say} error={say} />
+              )}
+            </>
           )}
         </div>
       </div>

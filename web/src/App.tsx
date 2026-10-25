@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType } from "react";
+import { RepromptProvider } from "./components/Reprompt";
 import { currentTokens, setSessionLostHandler, setTokens, setTokensChangedHandler, subscribeEvents } from "./lib/api";
 import { pullSettings, startSettingsSync, stopSettingsSync } from "./lib/syncedSettings";
 import "./lib/settingsSections";
@@ -348,6 +349,7 @@ export default function App({ Welcome = LoginScreen }: { Welcome?: ComponentType
   };
 
   return (
+    <RepromptProvider session={ctx.session}>
     <div className={`app-root flex h-full w-full overflow-hidden bg-[var(--c-bg)] text-[var(--c-text)] ${narrow ? "flex-col" : ""}`}>
       {!narrow && <Sidebar ctx={ctx} route={effective} onLogout={onLogout} onLock={lockByHand} onSearch={openSearch} width={sidebar.value} />}
       {!narrow && <PaneHandle onMouseDown={sidebar.onMouseDown} />}
@@ -379,5 +381,6 @@ export default function App({ Welcome = LoginScreen }: { Welcome?: ComponentType
       {autofillBridge() && <AutofillFeeder ctx={ctx} />}
       <Toasts toasts={toasts} onDismiss={dismiss} />
     </div>
+    </RepromptProvider>
   );
 }

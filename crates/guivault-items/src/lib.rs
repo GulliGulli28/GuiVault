@@ -144,6 +144,10 @@ pub struct SecretBase {
     pub tags: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub favorite: Option<bool>,
+    /// Redemander le mot de passe maître avant d'afficher, copier, remplir
+    /// ou modifier ce secret. Un garde de l'interface, pas du chiffrement.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reprompt: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub notes: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

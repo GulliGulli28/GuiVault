@@ -6,6 +6,7 @@
  * Les vaults sont relus à chaque ouverture ; ce qu'on en a déjà déchiffré
  * s'affiche tout de suite, en mémoire seulement, effacé avec la session
  * (`clearSearchCache`). */
+import { useReprompt } from "./Reprompt";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { PageContext } from "../App";
 import { errorMessage, supports } from "../lib/api";
@@ -60,6 +61,7 @@ function pages(vaults: VaultView[]): Entry[] {
 
 export function SearchPalette({ ctx, onClose }: { ctx: PageContext; onClose: () => void }) {
   const { ref, dialogProps } = useModalSurface({ onClose, label: "Recherche globale" });
+  const ask = useReprompt();
   const vaults = ctx.session.vaults;
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
@@ -138,10 +140,10 @@ export function SearchPalette({ ctx, onClose }: { ctx: PageContext; onClose: () 
       ctx.error(`Rien à copier (${which === "secret" ? "secret" : "utilisateur"}) pour « ${e.entity.name} ».`);
       return;
     }
-    void copyText(what.value).then((ok) => {
-      if (ok) ctx.notify(`${what.label} de « ${e.entity.name} » copié.`);
-    });
     onClose();
+    void (which === "secret" ? ask(e.payload) : Promise.resolve(true)).then(async (go) => {
+      if (go && (await copyText(what.value))) ctx.notify(`${what.label} de « ${e.entity.name} » copié.`);
+    });
   };
 
   const current = results[active];

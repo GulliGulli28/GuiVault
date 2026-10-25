@@ -130,10 +130,11 @@ describe("import", () => {
     expect(lastpass.items[0].folderPath).toEqual(["Perso", "Web"]);
     expect(lastpass.items[0].payload.kind === "login" && lastpass.items[0].payload.login.favorite).toBe(true);
 
-    const bw = await importFile("folder,favorite,type,name,notes,fields,reprompt,login_uri,login_username,login_password,login_totp\nA,0,note,N,contenu,,0,,,,\n,1,login,L,,\"k: v\",0,https://l.io,u,p,SECRET\n");
+    const bw = await importFile("folder,favorite,type,name,notes,fields,reprompt,login_uri,login_username,login_password,login_totp\nA,0,note,N,contenu,,0,,,,\n,1,login,L,,\"k: v\",1,https://l.io,u,p,SECRET\n");
     expect(bw.format).toBe("Bitwarden (CSV)");
     expect(bw.items[0].payload).toMatchObject({ kind: "note", note: { name: "N", content: "contenu" } });
-    expect(bw.items[1].payload).toMatchObject({ kind: "login", login: { totp: "SECRET", fields: [{ name: "k", value: "v" }] } });
+    expect(bw.items[1].payload).toMatchObject({ kind: "login", login: { totp: "SECRET", reprompt: true, fields: [{ name: "k", value: "v" }] } });
+    expect(bw.items[0].payload.kind === "note" && bw.items[0].payload.note.reprompt).toBeUndefined();
 
     await expect(importFile("foo,bar\n1,2\n")).rejects.toThrow(/Colonnes non reconnues/);
   });
@@ -167,7 +168,7 @@ describe("import", () => {
 });
 
 function samples(): Payload[] {
-  const login = { ...emptyLogin(), id: "11111111-1111-4111-8111-111111111111", name: "GitHub", username: "alice", password: "pw", uris: [{ uri: "https://github.com", match: null }], totp: "JBSWY3DPEHPK3PXP", favorite: true, notes: "n", fields: [{ name: "PIN", value: "1", type: "hidden" as const }, { name: "ok", value: "true", type: "boolean" as const }],
+  const login = { ...emptyLogin(), id: "11111111-1111-4111-8111-111111111111", name: "GitHub", username: "alice", password: "pw", uris: [{ uri: "https://github.com", match: null }], totp: "JBSWY3DPEHPK3PXP", favorite: true, reprompt: true, notes: "n", fields: [{ name: "PIN", value: "1", type: "hidden" as const }, { name: "ok", value: "true", type: "boolean" as const }],
     passkeys: [{ credentialId: "c", keyType: "public-key", keyAlgorithm: "ECDSA", keyCurve: "P-256", keyValue: "k", rpId: "github.com", rpName: "GitHub", userHandle: "u", userName: "alice", userDisplayName: null, counter: 1, discoverable: true, createdAt: "2026-01-01T00:00:00Z" }],
     passwordHistory: [{ password: "old", changedAt: "2025-01-01T00:00:00Z" }],
     autoType: { sequence: "{USERNAME}{TAB}{PASSWORD}{TAB}{TOTP}{ENTER}", windows: [{ title: "*GitHub*Firefox", sequence: "{PASSWORD}{ENTER}" }] } };
@@ -206,7 +207,7 @@ describe("export", () => {
     expect(skipped).toBe(4);
     const r = await importFile(csv);
     expect(r.format).toBe("Bitwarden (CSV)");
-    expect(r.items[0].payload).toMatchObject({ kind: "login", login: { name: "GitHub", username: "alice", totp: "JBSWY3DPEHPK3PXP" } });
+    expect(r.items[0].payload).toMatchObject({ kind: "login", login: { name: "GitHub", username: "alice", totp: "JBSWY3DPEHPK3PXP", reprompt: true } });
     expect(r.items[1]).toMatchObject({ folderPath: ["Dossier"], payload: { kind: "note", note: { content: "a\nb" } } });
   });
 

@@ -128,6 +128,7 @@ const COLUMNS: Record<string, string[]> = {
   totp: ["totp", "login_totp", "otp", "otpauth"],
   folder: ["folder", "grouping", "group", "dossier", "category", "path"],
   favorite: ["favorite", "fav", "favori"],
+  reprompt: ["reprompt"],
   type: ["type"],
   fields: ["fields"],
 };
@@ -174,14 +175,15 @@ export function importCsv(text: string): ImportResult {
     const type = get(row, "type").toLowerCase();
     const folderPath = folderPathOf(get(row, "folder"));
     const favorite = ["1", "true", "yes", "oui"].includes(get(row, "favorite").toLowerCase()) || undefined;
+    const reprompt = get(row, "reprompt") === "1" || undefined;
     const notes = get(row, "notes");
     const name = get(row, "name") || (url ? hostOf(url) : "") || "(sans nom)";
     if (type === "note" || (format === "Bitwarden (CSV)" && type !== "login")) {
-      const note = { ...emptyNote(), id: uuid(), name, favorite, content: notes };
+      const note = { ...emptyNote(), id: uuid(), name, favorite, reprompt, content: notes };
       items.push({ payload: { kind: "note", note }, folderPath });
       continue;
     }
-    const login = { ...emptyLogin(), id: uuid(), name, favorite, notes: notes || undefined, username: get(row, "username"), password: get(row, "password"), totp: get(row, "totp") || null };
+    const login = { ...emptyLogin(), id: uuid(), name, favorite, reprompt, notes: notes || undefined, username: get(row, "username"), password: get(row, "password"), totp: get(row, "totp") || null };
     if (url) login.uris = url.split(/[,\n]/).map((u) => u.trim()).filter(Boolean).map((uri) => ({ uri, match: null }));
     const fields = get(row, "fields");
     if (fields) login.fields = fields.split("\n").map((line) => { const [n, ...v] = line.split(": "); return { name: n, value: v.join(": "), type: "text" as const }; });

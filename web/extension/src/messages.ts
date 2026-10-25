@@ -8,6 +8,9 @@ export interface MatchSummary {
   username: string;
   hasTotp: boolean;
   favorite: boolean;
+  /** Protégé par le mot de passe maître (`SecretBase.reprompt`) : rien n'est
+   * remis à la page ; on le remplit depuis le popup, qui le demande. */
+  protected?: boolean;
 }
 
 export type ToBackground =
@@ -73,8 +76,8 @@ export type MatchesReply =
        * regex, insensibles à la casse). */
       otpPatterns: string[];
     };
-export type TotpReply = { code: string } | null;
-export type CredentialsReply = { username: string; password: string; totp: string | null } | null;
+export type TotpReply = { code: string } | { protected: true } | null;
+export type CredentialsReply = { username: string; password: string; totp: string | null } | { protected: true } | null;
 
 /** Vers le script de page. */
 export type ToContent =

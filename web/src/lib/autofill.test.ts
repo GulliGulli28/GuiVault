@@ -30,6 +30,11 @@ describe("buildAutofillIndex", () => {
     expect(index.entries).toEqual([]);
   });
 
+  it("ne confie rien d'un identifiant protégé (reprompt)", () => {
+    const index = buildAutofillIndex(session, [login("banque", { username: "moi", password: "p", reprompt: true }), login("forum", { username: "moi", password: "p" })]);
+    expect(index.entries.map((e) => e.id)).toEqual(["forum"]);
+  });
+
   it("nomme un coffre local par son dossier", () => {
     const local = { user: { email: "local" }, local: { path: "/data/coffres/Mon coffre.guivault" } } as unknown as SessionState;
     expect(buildAutofillIndex(local, []).label).toBe("Mon coffre");

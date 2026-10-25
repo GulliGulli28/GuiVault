@@ -44,7 +44,9 @@ web et relues par le crate : les deux définitions ne peuvent pas diverger
 sans qu'un test le dise.
 
 Champs communs (`SecretBase`) : `id`, `name`, `groupId`, `tags`,
-`favorite?`, `notes?`, `fields?` (champs libres `{ name, value, type:
+`favorite?`, `reprompt?` (redemander le mot de passe maître avant d'afficher,
+copier, remplir ou modifier — le `reprompt` de Bitwarden, importé et exporté
+avec lui), `notes?`, `fields?` (champs libres `{ name, value, type:
 text|hidden|boolean }`).
 
 | `kind` | Champs propres |

@@ -18,6 +18,9 @@ export function buildAutofillIndex(session: SessionState, items: VaultItem[]): A
     if (item.payload.kind !== "login") continue;
     const l = item.payload.login;
     if (!l.username && !l.password) continue;
+    // Protégé (`reprompt`) : le remplissage d'Android ne demande pas le mot
+    // de passe maître, il n'en reçoit donc rien.
+    if (l.reprompt) continue;
     entries.push({
       id: item.id,
       name: l.name || l.username || "Sans nom",

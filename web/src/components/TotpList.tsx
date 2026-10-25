@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { Login } from "../lib/types";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { TotpCode } from "./TotpCode";
+import { Guarded } from "./Reprompt";
 import { tileHue, tileInitial } from "../lib/tiles";
 import { GroupRow } from "./EntityRow";
 import { IconSearch, IconTrash, IconVault } from "./ui-icons";
@@ -54,7 +55,7 @@ export function TotpList({ entries, compact, onRemove, emptyMessage = "Aucun ide
         <span className="truncate font-medium text-[var(--c-text)]">{e.login.name}</span>
         <span className="truncate text-[12.5px] text-[var(--c-text-muted)]">{e.login.username || "—"}</span>
       </span>
-      <TotpCode secret={e.login.totp!} />
+      <Guarded payload={{ kind: "login", login: e.login }}><TotpCode secret={e.login.totp!} /></Guarded>
       {onRemove && <button onClick={() => setRemoving(e)} className="btn btn-ghost btn-icon hover:text-[var(--c-danger)]" title="Retirer ce code" aria-label={`Retirer le code de ${e.login.name}`}><IconTrash size={14} /></button>}
     </div>
   );

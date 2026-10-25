@@ -21,8 +21,11 @@ const EXTENSION = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..
 
 const BANK = { id: "l-bank", name: "Banque", username: "alice@banque", password: "mdp-banque-42", uris: [{ uri: "http://bank.test", match: null }], totp: "JBSWY3DPEHPK3PXP" };
 const PROVIDER = { id: "l-provider", name: "Fournisseur", username: "alice@fournisseur", password: "mdp-fournisseur", uris: [{ uri: "http://login.provider.test", match: null }], totp: null };
+/** Protégé par le mot de passe maître (`reprompt`) : jamais remis à la page. */
+const PROTECTED = { id: "l-coffre", name: "Coffre-fort", username: "alice@coffre", password: "mdp-protege", uris: [{ uri: "http://coffre.test", match: null }], totp: "JBSWY3DPEHPK3PXP", reprompt: true };
 
-const asItem = (l: typeof BANK | typeof PROVIDER) => ({
+type TestLogin = { id: string; name: string; username: string; password: string; uris: { uri: string; match: null }[]; totp: string | null; reprompt?: boolean };
+const asItem = (l: TestLogin) => ({
   id: l.id,
   revision: 1,
   updatedAt: "2026-01-01T00:00:00Z",
@@ -52,7 +55,7 @@ test.beforeAll(async () => {
   await worker.evaluate(async (items) => {
     await chrome.storage.local.set({ settings: { serverUrl: "http://guivault.test", email: "e2e@guivault.test", lockMinutes: 60, inlineAutofill: true, autoTotp: true, otpPatterns: "" } });
     await chrome.storage.session.set({ session: { e2e: true }, items: { "v-e2e": { revision: 1, items } } });
-  }, [asItem(BANK), asItem(PROVIDER)]);
+  }, [asItem(BANK), asItem(PROVIDER), asItem(PROTECTED)]);
 });
 
 test.afterAll(async () => {
@@ -276,6 +279,17 @@ test("popup : un formulaire seul dans un cadre d'un autre site demande confirmat
   const confirmed = await fillFromPopup(url("bank.test", "iframe-ad.html"), BANK.id, reply.frameId);
   expect(confirmed.ok).toBe(true);
   await expect.poll(() => fieldValue(ad, "password")).toBe(BANK.password);
+  await page.close();
+});
+
+test("identifiant protégé : le menu de la page ne le remplit pas", async () => {
+  const page = await open("plain.html", "coffre.test");
+  const f = page.mainFrame();
+  await fillFirst(page, f, "username");
+  // Le service worker refuse de remettre le mot de passe : rien ne bouge.
+  await page.waitForTimeout(800);
+  expect(await fieldValue(f, "username")).toBe("");
+  expect(await fieldValue(f, "password")).toBe("");
   await page.close();
 });
 

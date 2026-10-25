@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { CustomField, Group, SecretBase } from "../../lib/types";
 import { IconStar } from "../secret-icons";
 import { IconClose } from "../ui-icons";
-import { PasswordInput } from "../ui";
+import { InfoTip, PasswordInput } from "../ui";
 import { Field, GroupSelect, TagsInput } from "./common";
 
 /** Le tronc commun des formulaires de secrets : nom et favori en tête,
@@ -40,6 +40,17 @@ export function SecretFooter<T extends SecretBase>({ value, onChange, groups, wi
       <div className="grid grid-cols-2 gap-2">
         <Field label="Dossier"><GroupSelect groups={groups} value={value.groupId} onChange={(groupId) => onChange({ ...value, groupId })} /></Field>
         <Field label="Étiquettes"><TagsInput value={value.tags} onChange={(tags) => onChange({ ...value, tags })} /></Field>
+      </div>
+      <div className="flex items-center gap-3">
+        <span className="flex min-w-0 flex-1 items-center gap-1 text-[13px] text-[var(--c-text)]">
+          Redemander le mot de passe maître
+          <InfoTip label="Ce que fait cette protection" items={[
+            { text: "Avant d'afficher, copier, remplir ou modifier ses secrets." },
+            { text: "Une fois donné, il vaut cinq minutes pour cet élément.", tone: "ok" },
+            { text: "Contre un regard ou une session laissée ouverte : pas un chiffrement de plus.", tone: "warn" },
+          ]} />
+        </span>
+        <button type="button" role="switch" aria-checked={!!value.reprompt} aria-label="Redemander le mot de passe maître" onClick={() => onChange({ ...value, reprompt: value.reprompt ? undefined : true })} className="switch" />
       </div>
     </>
   );

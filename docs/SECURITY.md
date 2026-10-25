@@ -187,6 +187,20 @@ est installé une fois et vérifiable.
   pas secrets.
 - La dérivation Argon2id (64 MiB, 3 passes) tourne en JavaScript : une à
   deux secondes à la connexion, comme dans Guiterm.
+- **Éléments protégés** (`reprompt`, « Redemander le mot de passe maître »
+  dans le formulaire) : avant d'afficher, copier, remplir, modifier,
+  partager ou taper un tel élément, l'interface redemande le mot de passe
+  maître et le vérifie sans le serveur (Argon2id, puis la user key doit
+  s'ouvrir et être celle de la session) ; cinq minutes de grâce par élément,
+  tout oublié au verrouillage. C'est un **garde de l'interface**, pas un
+  chiffrement de plus : l'élément est déjà déchiffré en mémoire avec le
+  reste du coffre. Il protège d'un regard ou d'une session laissée ouverte,
+  pas d'un code qui tournerait dans la page. Le menu que l'extension pose
+  dans les pages n'en reçoit rien (le service worker refuse ; on le remplit
+  depuis le popup, qui demande), le remplissage d'Android non plus (il n'est
+  pas dans l'index confié au service). Une session ouverte par passkey ne
+  peut pas vérifier un mot de passe : elle demande de se reconnecter avec.
+  `gv` les lit comme les autres, comme la CLI de Bitwarden.
 - Les mêmes règles d'empreinte s'appliquent : inviter quelqu'un ou faire
   tourner une clé exige que son empreinte ait été vérifiée hors bande et
   épinglée dans *ce* navigateur.

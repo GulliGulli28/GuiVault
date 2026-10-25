@@ -6,6 +6,7 @@ import { Page } from "./Page";
 import { TotpList, type TotpEntry } from "./TotpList";
 import { Loading, useDelayed } from "./ui";
 import { TotpCode } from "./TotpCode";
+import { Guarded } from "./Reprompt";
 import { BubbleButton } from "./BubbleButton";
 import { IconSearch } from "./ui-icons";
 import { tileHue, tileInitial } from "../lib/tiles";
@@ -69,7 +70,7 @@ export function TotpPage({ ctx }: { ctx: PageContext }) {
               <span className="tile shrink-0" style={{ "--tile-size": "40px", "--tile-h": tileHue(e.login.name) } as React.CSSProperties}>{tileInitial(e.login.name)}</span>
               <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <span className="truncate font-medium">{e.login.name}</span>
-                <TotpCode secret={e.login.totp!} size="lg" />
+                <Guarded payload={{ kind: "login", login: e.login }}><TotpCode secret={e.login.totp!} size="lg" /></Guarded>
               </span>
             </div>
           ))}

@@ -299,6 +299,36 @@ scenario("créer une note : écrite chiffrée dans le coffre", async (b) => {
   await shot(b, "3-note");
 });
 
+scenario("élément protégé : le mot de passe maître avant de le montrer", async (b) => {
+  await openNewMenu(b);
+  await (await b.$("//button[@role='menuitem'][normalize-space()='Identifiant']")).click();
+  await waitText(b, "Nouvel identifiant");
+  await fillField(b, "Nom", "Coffre-fort");
+  await fillField(b, "Mot de passe", "mdp-tres-protege");
+  const toggle = await b.$('button[role="switch"][aria-label="Redemander le mot de passe maître"]');
+  await toggle.waitForExist({ timeout: 10_000, timeoutMsg: "réglage « Redemander le mot de passe maître » absent du formulaire" });
+  // Petit interrupteur au pied d'un formulaire qui défile : WebKitWebDriver
+  // ne le juge jamais « cliquable » ; le clic de la page fait la même chose.
+  await toggle.scrollIntoView({ block: "center" });
+  await b.execute((el) => el.click(), toggle);
+  assert((await toggle.getAttribute("aria-checked")) === "true", "le réglage « Redemander le mot de passe maître » ne s'est pas activé");
+  await click(b, "Enregistrer");
+  // La fiche ne montre rien : ni secret, ni bouton de copie.
+  await waitText(b, "Protégé par le mot de passe maître");
+  assert(!(await bodyText(b)).includes("Copier le mot de passe"), "la fiche d'un élément protégé propose de copier le mot de passe");
+  await click(b, "Afficher");
+  await waitText(b, "Élément protégé");
+  await fillPasswords(b, "pas le bon");
+  await click(b, "Déverrouiller");
+  await waitText(b, "Mot de passe maître incorrect.", 60_000);
+  await fillPasswords(b, PASSWORD);
+  await click(b, "Déverrouiller");
+  await b.waitUntil(async () => !(await bodyText(b)).includes("Protégé par le mot de passe maître"), { timeout: 60_000, timeoutMsg: "la fiche est restée masquée après le bon mot de passe" });
+  await waitText(b, "Copier le mot de passe");
+  assert(!coffreOnDisk(coffre).raw.includes("Coffre-fort"), "l'élément protégé est en clair dans coffre.json");
+  await shot(b, "3b-protege");
+});
+
 /** Une commande de l'application, depuis la page (W3C : la promesse est
  * attendue). Rend `{ ok, value }` ou `{ ok: false, error }`. */
 async function invoke(b, cmd, args = {}) {

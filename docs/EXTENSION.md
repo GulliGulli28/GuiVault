@@ -252,6 +252,14 @@ ce qu'il montre (`__guivaultFrameInfo`) avant de remplir depuis le popup.
 
 ## Modèle de menace
 
+**Élément protégé** (`reprompt`) : dans le menu de la page, il est marqué
+« protégé » et ne se remplit pas — le service worker refuse de remettre ses
+secrets (`guivault-credentials`, `guivault-totp` → `{ protected: true }`),
+ni le raccourci, ni le code 2FA automatique ne le prennent. Depuis le
+popup, remplir, copier, afficher ou modifier demandent le mot de passe
+maître (`useRepromptHost`, `src/components/Reprompt.tsx`). Corpus : « identifiant
+protégé : le menu de la page ne le remplit pas ».
+
 Comme l'interface web (`docs/SECURITY.md`) avec une différence en faveur
 de l'extension : son code est installé une fois, pas livré par le serveur à
 chaque chargement. Reste que le mot de passe maître est saisi dans le

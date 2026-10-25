@@ -7,6 +7,8 @@
  * - `performAutoType` : « Saisie automatique » sur une fiche.
  * - `AutoTypeFields` : la section du formulaire d'un identifiant.
  * - `AutoTypeSettings` : Paramètres › Saisie automatique. */
+import { useReprompt } from "./Reprompt";
+import { needsReprompt } from "../lib/reprompt";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PageContext } from "../App";
 import { errorMessage } from "../lib/api";
@@ -60,6 +62,11 @@ export function AutoTypeHost({ ctx }: { ctx: PageContext }) {
   const [picker, setPicker] = useState<{ request: AutoTypeRequest; matches: AutoTypeMatch<Candidate>[]; all: Candidate[] } | null>(null);
   const ctxRef = useRef(ctx);
   ctxRef.current = ctx;
+  // Un identifiant protégé (`reprompt`) : GuiVault revient au premier plan
+  // et demande le mot de passe maître avant de taper.
+  const ask = useReprompt();
+  const askRef = useRef(ask);
+  askRef.current = ask;
 
   useEffect(() => {
     const bridge = autoTypeBridge();
@@ -73,8 +80,13 @@ export function AutoTypeHost({ ctx }: { ctx: PageContext }) {
         const all = await allLogins(session.vaults, error);
         const matches = matchWindow(request.title, all, (c) => c.login, loadAutoTypeSettings().defaultSequence);
         if (matches.length === 1) {
+          const login = matches[0].item.login;
+          if (needsReprompt({ kind: "login", login })) {
+            await bridge.focusApp();
+            if (!(await askRef.current({ kind: "login", login }))) return;
+          }
           try {
-            await typeLogin(matches[0].item.login, matches[0].sequence, request.target);
+            await typeLogin(login, matches[0].sequence, request.target);
           } catch (e) {
             await bridge.focusApp();
             error(`Saisie automatique : ${errorMessage(e)}`);
@@ -97,7 +109,9 @@ export function AutoTypeHost({ ctx }: { ctx: PageContext }) {
       onClose={close}
       onPick={(c, sequence) => {
         setPicker(null);
-        typeLogin(c.login, sequence, picker.request.target).catch((e) => ctx.error(`Saisie automatique : ${errorMessage(e)}`));
+        void ask({ kind: "login", login: c.login }).then((go) => {
+          if (go) typeLogin(c.login, sequence, picker.request.target).catch((e) => ctx.error(`Saisie automatique : ${errorMessage(e)}`));
+        });
       }}
     />
   );

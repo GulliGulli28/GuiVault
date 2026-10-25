@@ -611,6 +611,10 @@ export interface SecretBase {
   groupId: string | null;
   tags: string[];
   favorite?: boolean;
+  /** Redemander le mot de passe maître avant d'afficher, copier, remplir ou
+   * modifier ce secret (`lib/reprompt.ts`). Un garde de l'interface, pas du
+   * chiffrement : le secret est déjà déchiffré en mémoire. */
+  reprompt?: boolean;
   notes?: string;
   fields?: CustomField[];
   /** Les pièces jointes (`lib/attachments.ts`, `docs/PIECES-JOINTES.md`). */

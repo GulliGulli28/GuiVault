@@ -18,6 +18,7 @@ import { Logo } from "./Logo";
 import { BubbleButton } from "./BubbleButton";
 import { NARROW, useMediaQuery } from "../hooks/useMediaQuery";
 import { copyText, Dropdown, formatAgo } from "./ui";
+import { Guarded, useReprompt } from "./Reprompt";
 
 /** Un élément tel que l'accueil le montre : son entité (nom, ligne
  * secondaire, épinglé) et de quoi l'ouvrir. */
@@ -38,6 +39,7 @@ function firstName(email: string): string {
  * récents), les codes 2FA, la santé, les coffres et les invitations en
  * attente. Tout est lu et calculé ici, comme le reste. */
 export function HomePage({ ctx }: { ctx: PageContext }) {
+  const ask = useReprompt();
   const { session } = ctx;
   const local = session.local;
   const colors = useVaultColors();
@@ -121,7 +123,7 @@ export function HomePage({ ctx }: { ctx: PageContext }) {
                 {codes.map((e) => (
                   <div key={`${e.vault.id}-${e.item.id}`} className="flex min-h-[56px] min-w-0 items-center gap-3">
                     <span className="min-w-0 flex-1 truncate font-medium">{e.entity.name}</span>
-                    {e.item.payload.kind === "login" && e.item.payload.login.totp && <TotpCode secret={e.item.payload.login.totp} size="lg" />}
+                    {e.item.payload.kind === "login" && e.item.payload.login.totp && <Guarded payload={e.item.payload}><TotpCode secret={e.item.payload.login.totp} size="lg" /></Guarded>}
                   </div>
                 ))}
               </div>
@@ -186,7 +188,12 @@ export function HomePage({ ctx }: { ctx: PageContext }) {
                         </a>
                         {secret && (
                           <button
-                            onClick={() => void copyText(secret.value).then((ok) => (ok ? ctx.notify(`${secret.label.charAt(0).toUpperCase()}${secret.label.slice(1)} copié.`) : ctx.error("Copie refusée par le navigateur.")))}
+                            onClick={() => void ask(e.item.payload).then(async (go) => {
+                              if (!go) return;
+                              const ok = await copyText(secret.value);
+                              if (ok) ctx.notify(`${secret.label.charAt(0).toUpperCase()}${secret.label.slice(1)} copié.`);
+                              else ctx.error("Copie refusée par le navigateur.");
+                            })}
                             className="btn btn-ghost btn-icon"
                             title={`Copier ${secret.label}`}
                             aria-label={`Copier ${secret.label} de ${e.entity.name}`}
@@ -232,7 +239,7 @@ export function HomePage({ ctx }: { ctx: PageContext }) {
                   {codes.map((e) => (
                     <div key={`${e.vault.id}-${e.item.id}`} className="flex min-w-0 items-center gap-3 py-2">
                       <span className="min-w-0 flex-1 truncate font-medium">{e.entity.name}</span>
-                      {e.item.payload.kind === "login" && e.item.payload.login.totp && <TotpCode secret={e.item.payload.login.totp} />}
+                      {e.item.payload.kind === "login" && e.item.payload.login.totp && <Guarded payload={e.item.payload}><TotpCode secret={e.item.payload.login.totp} /></Guarded>}
                     </div>
                   ))}
                 </div>

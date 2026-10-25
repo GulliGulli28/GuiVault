@@ -39,6 +39,8 @@ interface BwItem {
   name: string | null;
   notes?: string | null;
   favorite?: boolean;
+  /** 1 : redemander le mot de passe maître (`SecretBase.reprompt`). */
+  reprompt?: number | null;
   fields?: BwField[] | null;
   login?: { uris?: { uri: string | null; match?: number | null }[] | null; username?: string | null; password?: string | null; totp?: string | null; fido2Credentials?: BwFido2[] | null } | null;
   card?: Partial<Record<"cardholderName" | "brand" | "number" | "expMonth" | "expYear" | "code", string | null>> | null;
@@ -139,7 +141,7 @@ function convertPasskey(c: BwFido2): Passkey {
 
 function convertItem(it: BwItem, warnings: string[]): Payload | null {
   const name = s(it.name) || "(sans nom)";
-  const base = { id: uuid(), name, groupId: null, tags: [] as string[], favorite: it.favorite || undefined, notes: s(it.notes) || undefined, fields: convertFields(it.fields, warnings, name) };
+  const base = { id: uuid(), name, groupId: null, tags: [] as string[], favorite: it.favorite || undefined, reprompt: it.reprompt === 1 || undefined, notes: s(it.notes) || undefined, fields: convertFields(it.fields, warnings, name) };
   switch (it.type) {
     case 1: {
       const l = it.login ?? {};
@@ -257,10 +259,10 @@ export function toBitwardenCsvRows(items: { payload: Payload; folderPath: string
     const folder = folderPath.join("/");
     if (p.kind === "login") {
       const l = p.login;
-      rows.push([folder, l.favorite ? 1 : 0, "login", l.name, l.notes ?? "", fieldsToCsv(l.fields), 0, l.uris.map((u) => u.uri).join(","), l.username, l.password, l.totp ?? ""]);
+      rows.push([folder, l.favorite ? 1 : 0, "login", l.name, l.notes ?? "", fieldsToCsv(l.fields), l.reprompt ? 1 : 0, l.uris.map((u) => u.uri).join(","), l.username, l.password, l.totp ?? ""]);
     } else if (p.kind === "note") {
       const n = p.note;
-      rows.push([folder, n.favorite ? 1 : 0, "note", n.name, n.content, fieldsToCsv(n.fields), 0, "", "", "", ""]);
+      rows.push([folder, n.favorite ? 1 : 0, "note", n.name, n.content, fieldsToCsv(n.fields), n.reprompt ? 1 : 0, "", "", "", ""]);
     } else {
       skipped++;
     }

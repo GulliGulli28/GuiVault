@@ -72,6 +72,11 @@ font rien (le coffre s'écrit ailleurs).
 
 ## Sécurité
 
+Les éléments protégés par « Redemander le mot de passe maître »
+(`reprompt`) se lisent avec `gv` comme les autres : la session (`gv unlock`)
+a déjà demandé le mot de passe maître — c'est aussi le choix de la CLI de
+Bitwarden.
+
 Le modèle de la CLI de Bitwarden. Dans le dossier de `gv` (`GV_HOME`, sinon
 `~/.config/guivault-cli`, `%APPDATA%\guivault-cli`), `0700`/`0600` :
 

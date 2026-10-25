@@ -337,8 +337,13 @@ declare global {
     }
   };
 
+  /** Un identifiant protégé (`reprompt`) se remplit depuis le popup, qui
+   * demande le mot de passe maître : la page n'en reçoit rien d'ici. */
+  const PROTECTED = (m: MatchSummary) => `« ${m.name} » est protégé par le mot de passe maître : remplissez-le depuis l'icône GuiVault.`;
+
   const choose = async (m: MatchSummary, input: HTMLInputElement, crossFrame = false) => {
     closeMenu();
+    if (m.protected) return say(input, PROTECTED(m));
     if (crossFrame && parent) {
       const ok = await dialog(
         `Remplir dans ${parent.frameHost} ?`,
@@ -352,6 +357,7 @@ declare global {
     }
     const c = await send<CredentialsReply>({ type: "guivault-credentials", id: m.id, crossFrame });
     if (!c) return;
+    if ("protected" in c) return say(input, PROTECTED(m));
     fill({ username: c.username, password: c.password }, input);
   };
 
@@ -431,7 +437,7 @@ declare global {
   const openMenu = (input: HTMLInputElement, btn: HTMLElement) => {
     const site = location.hostname.replace(/^www\./, "");
     const { menu: m, list } = newMenu(btn, `GuiVault · ${site}`);
-    for (const l of matches) list.appendChild(menuItem(`${l.favorite ? "★ " : ""}${l.name}`, l.username || "—", () => void choose(l, input), "Remplir avec cet identifiant"));
+    for (const l of matches) list.appendChild(menuItem(`${l.favorite ? "★ " : ""}${l.name}`, l.protected ? `${l.username || "—"} · protégé` : l.username || "—", () => void choose(l, input), l.protected ? "Protégé par le mot de passe maître : à remplir depuis l'icône GuiVault" : "Remplir avec cet identifiant"));
     if (parent?.logins.length) {
       const h = document.createElement("div");
       h.className = "head";
@@ -491,8 +497,10 @@ declare global {
 
   const fillTotp = async (m: MatchSummary, field: HTMLInputElement, auto = false) => {
     closeMenu();
+    if (m.protected) return say(field, PROTECTED(m));
     const r = await send<TotpReply>({ type: "guivault-totp", id: m.id }).catch(() => null);
     if (!r) return;
+    if ("protected" in r) return say(field, PROTECTED(m));
     fillCode(field, r.code);
     say(field, auto ? `Code de « ${m.name} » rempli par GuiVault.` : `Code de « ${m.name} » rempli.`);
   };
@@ -612,7 +620,7 @@ declare global {
     // Un seul identifiant du site avec un TOTP, un champ de code vide : on
     // le remplit. Jamais pour « le dernier rempli » d'un autre site — là,
     // c'est à l'utilisateur de choisir, par le bouton.
-    const own = matches.filter((m) => m.hasTotp);
+    const own = matches.filter((m) => m.hasTotp && !m.protected);
     const target = withCodes[0];
     if (autoTotp && own.length === 1 && target && !target.value && !autoFilled.has(target)) {
       autoFilled.add(target);
@@ -1069,7 +1077,7 @@ declare global {
         }
         const input = Array.from(anchors.keys()).find((i) => !otpInputs.has(i));
         if (matches.length === 1 && input) void choose(matches[0], input);
-        else if (matches.length === 1) void send<CredentialsReply>({ type: "guivault-credentials", id: matches[0].id }).then((c) => c && fill({ username: c.username, password: c.password }));
+        else if (matches.length === 1 && !matches[0].protected) void send<CredentialsReply>({ type: "guivault-credentials", id: matches[0].id }).then((c) => c && "username" in c && fill({ username: c.username, password: c.password }));
         else if (input && matches.length > 1) openMenu(input, anchors.get(input)!);
         reply(none);
       });

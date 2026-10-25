@@ -38,7 +38,7 @@ async function logins(): Promise<Login[] | null> {
   return out;
 }
 
-const summary = (l: Login): MatchSummary => ({ id: l.id, name: l.name, username: l.username, hasTotp: !!l.totp, favorite: !!l.favorite });
+const summary = (l: Login): MatchSummary => ({ id: l.id, name: l.name, username: l.username, hasTotp: !!l.totp, favorite: !!l.favorite, protected: !!l.reprompt });
 
 async function matchesFor(url: string | undefined): Promise<Login[] | null> {
   if (!url || !/^https?:/.test(url)) return [];
@@ -325,6 +325,8 @@ chrome.runtime.onMessage.addListener((msg: ToBackground | PasskeyToBackground | 
       // Pas un identifiant du site : seulement le dernier rempli dans cet
       // onglet — la page de SSO qui suit, sur son propre domaine.
       if (!l && tabId != null && (await recentFill(tabId)) === msg.id) l = (await logins())?.find((x) => x.id === msg.id);
+      // Protégé : le mot de passe maître se demande dans le popup, pas ici.
+      if (l?.reprompt) return reply({ protected: true } satisfies TotpReply);
       const p = l?.totp ? parseTotp(l.totp) : null;
       return reply((p ? { code: await totpCode(p) } : null) satisfies TotpReply);
     }
@@ -415,6 +417,7 @@ chrome.runtime.onMessage.addListener((msg: ToBackground | PasskeyToBackground | 
       const top = parentUrl(sender);
       if (!l && msg.crossFrame && top) l = (await matchesFor(top))?.find((x) => x.id === msg.id);
       if (!l) return reply(null);
+      if (l.reprompt) return reply({ protected: true } satisfies CredentialsReply);
       if (sender.tab?.id != null) await noteRecentFill(sender.tab.id, l.id);
       const p = l.totp ? parseTotp(l.totp) : null;
       return reply({ username: l.username, password: l.password, totp: p ? await totpCode(p) : null } satisfies CredentialsReply);

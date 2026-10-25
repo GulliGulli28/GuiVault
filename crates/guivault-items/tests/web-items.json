@@ -39,6 +39,7 @@
         }
       ],
       "favorite": true,
+      "reprompt": true,
       "notes": "n",
       "fields": [
         {

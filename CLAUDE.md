@@ -173,6 +173,12 @@ il ne déchiffre rien : la user key reste sous la clé que seule la PRF donne).
     `lib/settingsSections.ts` (apparence, générateurs) ; le popup ajoute
     `extension`. Un nouveau réglage partagé = une section, et
     `settingsChanged(key)` là où il s'enregistre.
+  - `lib/reprompt.ts` + `components/Reprompt.tsx` — les éléments protégés
+    (`SecretBase.reprompt`) : **tout nouvel endroit qui affiche, copie,
+    remplit, tape ou modifie un secret passe par `useReprompt()`** (ou
+    `Guarded` pour un code 2FA) ; le popup héberge la question par
+    `useRepromptHost`, le service worker de l'extension refuse de remettre un
+    élément protégé à la page.
   - `lib/clipboard.ts` — tout ce que l'app copie passe par `copyText` et
     s'efface au bout du délai réglé (section synchronisée `clipboard`),
     seulement s'il est encore dans le presse-papiers ; le popup de

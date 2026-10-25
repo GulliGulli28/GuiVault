@@ -16,6 +16,8 @@ import { problemItem, problemText, type ManifestProblem } from "../lib/manifest"
 import { acceptIntegrity, deleteItem, findVault, loadItems, moveItem, payloadEntity, payloadName, putPayload, RevisionConflict, type DecodedItem, type VaultView } from "../lib/session";
 import { canWrite, KIND_LABELS, KIND_LABELS_PLURAL, ROLE_HINTS, ROLE_LABELS, type CustomIcon, type GuiVaultEntity, type ItemKind, type Payload } from "../lib/types";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { useReprompt } from "./Reprompt";
+import { needsReprompt } from "../lib/reprompt";
 import { ItemTile, ItemTree, KIND_ICONS, type FolderNaming } from "./ItemTree";
 import { ItemView } from "./ItemView";
 import { ItemForm } from "./forms/ItemForm";
@@ -30,7 +32,7 @@ import { ItemAside } from "./ItemAside";
 import { NewVaultDialog } from "./NewVault";
 import { BubbleButton } from "./BubbleButton";
 import { putVaultItems, useAllItems } from "../lib/allItems";
-import { IconCheck, IconChevronDown, IconChevronRight, IconCopy, IconEdit, IconExternal, IconFolder, IconKeyboard, IconPlus, IconRefresh, IconSearch, IconSettings, IconTrash, IconVault } from "./ui-icons";
+import { IconCheck, IconChevronDown, IconChevronRight, IconCopy, IconEdit, IconExternal, IconFolder, IconKeyboard, IconLock, IconPlus, IconRefresh, IconSearch, IconSettings, IconTrash, IconVault } from "./ui-icons";
 import { copyText, Dropdown, formatAgo, formatWhen, Loading, Modal, useDelayed } from "./ui";
 import { PaneHandle, usePersistedPane } from "../hooks/usePersistedPane";
 import { NARROW, TOUCH, useMediaQuery } from "../hooks/useMediaQuery";
@@ -127,6 +129,11 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
   const newButton = useRef<HTMLButtonElement>(null);
   const touch = useMediaQuery(TOUCH);
   const narrow = useMediaQuery(NARROW);
+  // Un élément protégé (`reprompt`) : le mot de passe maître avant d'en
+  // montrer, copier ou modifier les secrets ; `unlocks` fait redessiner une
+  // fois qu'il est donné.
+  const ask = useReprompt();
+  const [, setUnlocks] = useState(0);
   // Le menu « Nouveau » se referme à Échap, et rend le focus à son bouton.
   useEffect(() => {
     if (!newMenu) return;
@@ -314,11 +321,15 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
     const it = index.byId.get(entity.id);
     if (!it || it.payload.kind !== "login") return null;
     const l = it.payload.login;
-    const copy = (label: string, value: string) => () => copyText(value).then((ok) => ok && ctx.notify(`${label} copié.`));
+    const copy = (label: string, value: string, guarded = false) => async () => {
+      if (guarded && !(await ask(it.payload))) return;
+      const ok = await copyText(value);
+      if (ok) ctx.notify(`${label} copié.`);
+    };
     return (
       <>
         {l.username && <button onClick={copy("Utilisateur", l.username)} className="btn btn-ghost btn-sm" title="Copier l'utilisateur" aria-label="Copier l'utilisateur">U</button>}
-        {l.password && <button onClick={copy("Mot de passe", l.password)} className="btn btn-ghost btn-sm btn-icon" title="Copier le mot de passe" aria-label="Copier le mot de passe"><IconCopy size={11} /></button>}
+        {l.password && <button onClick={copy("Mot de passe", l.password, true)} className="btn btn-ghost btn-sm btn-icon" title="Copier le mot de passe" aria-label="Copier le mot de passe"><IconCopy size={11} /></button>}
       </>
     );
   };
@@ -396,16 +407,18 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
     if (e.key === "/") { e.preventDefault(); filterRef.current?.focus(); return; }
     if (e.key === "?") { e.preventDefault(); setHelp(true); return; }
     if (mode.kind !== "view" || !current?.ok) return;
-    const copy = (what: { label: string; value: string } | null) => {
+    const payload = current.payload;
+    const copy = (what: { label: string; value: string } | null, guarded = false) => {
       if (!what) return;
       e.preventDefault();
-      void copyText(what.value).then((ok) => ok && ctx.notify(`${what.label} copié.`));
+      void (guarded ? ask(payload) : Promise.resolve(true)).then((go) => go && copyText(what.value).then((ok) => ok && ctx.notify(`${what.label} copié.`)));
     };
+    const guarded = (fn: () => void) => { e.preventDefault(); void ask(payload).then((go) => go && fn()); };
     switch (e.key) {
-      case "c": copy(primarySecret(current.payload)); break;
-      case "u": copy(primaryUser(current.payload)); break;
-      case "h": if (!emergency) { e.preventDefault(); setHistory(true); } break;
-      case "e": if (writable) { e.preventDefault(); setMode({ kind: "edit" }); } break;
+      case "c": copy(primarySecret(payload), true); break;
+      case "u": copy(primaryUser(payload)); break;
+      case "h": if (!emergency) guarded(() => setHistory(true)); break;
+      case "e": if (writable) guarded(() => setMode({ kind: "edit" })); break;
       case "f": if (writable && isSecretItem) { e.preventDefault(); void toggleFavorite(); } break;
       case "Delete": if (writable) { e.preventDefault(); setConfirmDelete(true); } break;
     }
@@ -422,6 +435,9 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
     if (!what) return;
     void copyText(what.value).then((ok) => (ok ? ctx.notify(`${what.label} copié.`) : ctx.error("Copie refusée par le navigateur.")));
   };
+  /** `fn` après le mot de passe maître si l'élément ouvert est protégé. */
+  const guard = (fn: () => void) => void ask(current?.ok ? current.payload : null).then((go) => go && fn());
+  const locked = !!current?.ok && needsReprompt(current.payload);
   const copyTotp = (secret: string) => {
     const params = parseTotp(secret);
     if (!params) return ctx.error("Secret TOTP illisible.");
@@ -672,13 +688,13 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
                 {current.ok && current.payload.kind === "login" && autoTypeBridge() && (() => {
                   const login = current.payload.login;
                   return (
-                    <button onClick={() => performAutoType(login).catch((e) => ctx.error(`Saisie automatique : ${errorMessage(e)}`))} disabled={login.autoType?.enabled === false} className="btn btn-ghost btn-icon" title={login.autoType?.enabled === false ? "Saisie automatique désactivée pour cet identifiant" : "Saisie automatique : GuiVault se réduit et le tape dans la fenêtre d'avant"} aria-label="Saisie automatique"><IconKeyboard size={15} /></button>
+                    <button onClick={() => guard(() => void performAutoType(login).catch((e) => ctx.error(`Saisie automatique : ${errorMessage(e)}`)))} disabled={login.autoType?.enabled === false} className="btn btn-ghost btn-icon" title={login.autoType?.enabled === false ? "Saisie automatique désactivée pour cet identifiant" : "Saisie automatique : GuiVault se réduit et le tape dans la fenêtre d'avant"} aria-label="Saisie automatique"><IconKeyboard size={15} /></button>
                   );
                 })()}
                 {!emergency && isSecretItem && supports("createSend") && (
-                  <button onClick={() => setSharing(true)} className="btn btn-secondary" title="Partager par lien : une copie chiffrée, qui expire"><IconLink size={14} /> <span className="max-sm:hidden">Partager</span></button>
+                  <button onClick={() => guard(() => setSharing(true))} className="btn btn-secondary" title="Partager par lien : une copie chiffrée, qui expire"><IconLink size={14} /> <span className="max-sm:hidden">Partager</span></button>
                 )}
-                {writable && current.ok && <button onClick={() => setMode({ kind: "edit" })} className="btn btn-secondary"><IconEdit size={14} /> <span className="max-sm:hidden">Modifier</span></button>}
+                {writable && current.ok && <button onClick={() => guard(() => setMode({ kind: "edit" }))} className="btn btn-secondary"><IconEdit size={14} /> <span className="max-sm:hidden">Modifier</span></button>}
                 <Dropdown
                   label="Plus d'actions"
                   className="w-60"
@@ -686,7 +702,7 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
                 >
                   {(close) => (
                     <>
-                      {!emergency && <button role="menuitem" className="menu-item" onClick={() => { close(); setHistory(true); }}><IconHistory size={14} /> Historique<span className="flex-1" />{!touch && <span className="kbd">H</span>}</button>}
+                      {!emergency && <button role="menuitem" className="menu-item" onClick={() => { close(); guard(() => setHistory(true)); }}><IconHistory size={14} /> Historique<span className="flex-1" />{!touch && <span className="kbd">H</span>}</button>}
                       {writable && current.ok && otherWritable.map((v) => (
                         <button key={v.id} role="menuitem" className="menu-item" onClick={() => { close(); setMoveTo(v); }}>
                           <span className="vdot" style={{ background: vaultColor(v.id, v.kind === "personal", colors) }} />
@@ -722,6 +738,13 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
                           </p>
                         </div>
                       </div>
+                      {locked ? (
+                        <div className="card flex flex-wrap items-center gap-3 px-4 py-3.5">
+                          <IconLock size={18} className="shrink-0 text-[var(--c-text-muted)]" />
+                          <span className="min-w-0 flex-1 text-[13.5px]">Protégé par le mot de passe maître</span>
+                          <button onClick={() => void ask(current.payload).then((ok) => ok && setUnlocks((n) => n + 1))} className="btn btn-primary">Afficher</button>
+                        </div>
+                      ) : (<>
                       {(() => {
                         const p = current.payload;
                         const secret = primarySecret(p);
@@ -747,8 +770,9 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
                             <AttachmentsPanel key={current.id} vault={vault} item={current} writable={writable} offline={!!ctx.session.offline} session={ctx.session} onChanged={() => void load()} notify={ctx.notify} error={ctx.error} />
                           )}
                         </div>
-                        <ItemAside vault={vault} item={current} index={index} all={everything} onHistory={emergency ? undefined : () => setHistory(true)} />
+                        <ItemAside vault={vault} item={current} index={index} all={everything} onHistory={emergency ? undefined : () => guard(() => setHistory(true))} />
                       </div>
+                      </>)}
                     </>
                   ) : (
                     <p className="callout callout-danger">Impossible de déchiffrer cet élément : {current.error}. Il a peut-être été chiffré avec une clé de vault antérieure, ou altéré.</p>
