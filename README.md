@@ -40,7 +40,7 @@ même auteur.
 
 1. **Conçu contre un serveur malveillant, pas seulement contre une fuite.**
    En février 2026, ETH Zurich a publié
-   [27 attaques](https://eprint.iacr.org/2026/058) contre Bitwarden,
+   [31 attaques](https://eprint.iacr.org/2026/058) contre Bitwarden,
    LastPass, Dashlane et 1Password, toutes en supposant le serveur
    compromis. GuiVault répond à chacune des familles d'attaques décrites : plancher Argon2id et
    paramètres épinglés par appareil (le serveur ne peut pas imposer une

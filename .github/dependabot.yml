@@ -1,0 +1,21 @@
+# Les empreintes des images de base (docker/Dockerfile) et les versions des
+# actions des workflows : épinglées, donc à faire avancer — une pull request
+# par mois et par écosystème, que le CI vérifie comme le reste. Les
+# dépendances Rust et npm suivent `Cargo.lock` et `package-lock.json`, mises à
+# jour à la main (les crates crypto restent alignées sur Guiterm, CLAUDE.md).
+version: 2
+updates:
+  - package-ecosystem: docker
+    directory: /docker
+    schedule:
+      interval: monthly
+    groups:
+      images:
+        patterns: ["*"]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]

@@ -27,8 +27,11 @@ on:
     tags: ["server-v*"]
   workflow_dispatch:
 
+# Une publication à la fois par branche ou tag, dans l'ordre : une image plus
+# ancienne ne repose pas `:latest` après une plus récente (une seule reste en
+# attente, la dernière).
 concurrency:
-  group: server-image-${{ github.event.workflow_run.head_sha || github.ref }}
+  group: server-image-${{ github.ref }}
   cancel-in-progress: false
 
 env:

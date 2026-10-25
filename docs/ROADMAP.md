@@ -54,7 +54,8 @@ c'est ce qui sépare un projet solide d'un outil qu'on recommande.
 
 Référence : ETH Zurich, *Zero Knowledge (About) Encryption* (février 2026,
 [eprint 2026/058](https://eprint.iacr.org/2026/058)) — 12 attaques contre
-Bitwarden, 7 contre LastPass, 6 contre Dashlane, 2 contre 1Password, toutes
+Bitwarden, 7 contre LastPass, 6 contre Dashlane, 6 contre 1Password (version
+révisée du papier ; 2 dans la première), toutes
 en supposant le serveur compromis. Familles : récupération de compte qui
 rouvre une porte au serveur, métadonnées d'items non authentifiées,
 partage dont le serveur choisit les destinataires, rétrogradation vers des
@@ -410,8 +411,9 @@ Le README le dit en tête ; chaque case cochée y retire une ligne.
   natifs, fusion par empreinte), signée par cosign sans clé, attestation de
   provenance — `.github/workflows/server-image.yml`, après chaque CI vert
   sur `main` et sur un tag `server-v*` ; vérification dans le README.
-  Reste : épingler les images de base par empreinte (`docker/Dockerfile`
-  suit `node:22-alpine` et `cargo-chef:latest-rust-1`), publier un SBOM.
+  Images de base épinglées par empreinte, avancées par Dependabot
+  (`.github/dependabot.yml`, mensuel, avec les actions des workflows).
+  Reste : publier un SBOM.
 - [ ] **Extension dans les stores** (Chrome Web Store, Firefox Add-ons,
   Edge) — l'identifiant change : l'ajouter aux origines de l'hôte natif
   (`EXTENSION.md`).
@@ -433,8 +435,11 @@ Le README le dit en tête ; chaque case cochée y retire une ligne.
   (`routes/well_known.rs`, test `security_txt_names_the_operator_then_the_project`).
 - [ ] Une **prime aux bogues**, une fois l'audit passé.
 - [ ] **Livre blanc** : la conception cryptographique en un document
-  autonome (hiérarchie, formats, ce que chaque attaque d'ETH Zurich
-  devient ici), pour les relecteurs.
+  autonome, pour les relecteurs. Les formats y sont déjà
+  ([`FORMATS.md`](FORMATS.md)) et les menaces par famille
+  ([`SECURITY.md`](SECURITY.md)) ; manque ce que devient ici **chacune**
+  des 31 attaques d'ETH Zurich, à écrire papier complet en main (les
+  résumés publics ne donnent que les familles).
 - [ ] **Version 1.0 du serveur et des formats**, avec une promesse écrite de
   compatibilité et un journal des changements.
 - [ ] **Survivre au projet** — l'objection n°1 face à un seul développeur
