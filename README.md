@@ -1,82 +1,253 @@
 # GuiVault
 
-Serveur de coffre **zero-knowledge** pour [Guiterm](https://github.com/GulliGulli28/gui-termius) :
-synchronisation des hôtes, clés SSH, mots de passe et snippets entre
-appareils, et **vaults partagés** entre membres d'une équipe — sans que le
-serveur puisse jamais lire un secret.
+**Un coffre zero-knowledge pour les mots de passe *et* les secrets
+d'infrastructure — sur votre serveur, ou sans serveur du tout.**
 
-- **Zero-knowledge** : chiffrement côté client (XChaCha20-Poly1305, Argon2id,
-  X25519). Le serveur ne stocke que des blobs et ne possède aucune clé.
-- **Partage** : la clé d'un vault est enveloppée pour la clé publique de chaque
-  membre. Rôles `reader` / `writer` / `admin` / `owner`, invitations (y
-  compris vers quelqu'un qui n'a pas encore de compte), rotation de clé
-  après un départ.
-- **Synchronisation** : révisions monotones par vault, `?since=` pour ne
-  télécharger que ce qui a changé, verrou optimiste (409) sur les conflits,
-  pierres tombales pour les suppressions.
-- **Sessions** : jetons opaques hachés, rotation des jetons de
-  rafraîchissement avec détection de rejeu, révocation à distance, second
-  facteur TOTP optionnel avec codes de récupération, suppression du
-  compte (mot de passe et second facteur redemandés).
-- **Temps réel** : un flux SSE prévient les clients qu'un vault a changé.
-- **Audit** : journal en ajout seul par vault et par utilisateur.
-- **Interface web** servie par le serveur lui-même (`/`), avec le même
-  chiffrement dans le navigateur : consulter et modifier ses hôtes, clés,
-  snippets et connexions, gérer les vaults partagés, les membres, les
-  invitations, les sessions et le second facteur — depuis une machine sans
-  Guiterm. Même charte que Guiterm, mêmes réglages d'apparence (mode
-  sombre/clair/système, fond, couleur d'accent, police, tailles des
-  lignes), mêmes icônes d'hôtes et de dossiers.
-- **Gestionnaire de mots de passe** dans la même interface, à la manière de
-  Bitwarden : identifiants (avec sites, codes TOTP, passkeys, historique),
-  notes sécurisées, cartes, identités, favoris, champs personnalisés ;
-  générateur de mots de passe, de phrases de passe et de clés SSH
-  (Ed25519, RSA, ECDSA, format OpenSSH) ; import depuis
-  Bitwarden (JSON en clair ou protégé, CSV), Chrome, Firefox, LastPass,
-  KeePassXC ; export JSON (chiffré par mot de passe ou en clair) et CSV.
-  Recherche dans tous les vaults (**Ctrl+K**), raccourcis clavier (`?`),
-  tri par date, **historique** de chaque élément et **corbeille** (30 j),
-  presse-papiers effacé après copie, **copie hors ligne** chiffrée pour
-  lire son coffre (et remplir dans l'extension) quand le serveur ne répond
-  pas. Utilisable au téléphone, **installable** sur l'écran d'accueil
-  (PWA).
-  Formats décrits dans [`docs/ITEMS.md`](docs/ITEMS.md).
-- **Rapport de santé** : mots de passe faibles, réutilisés (identifiants,
-  hôtes, connexions, passphrases), inchangés depuis un an, **fuités** (Have
-  I Been Pwned par k-anonymat, sur demande), sites qui acceptent la 2FA sans
-  code enregistré, clés d'API et cartes qui expirent — calculé dans le
-  navigateur.
-- **Liens de partage** éphémères (« Send ») : un texte ou un élément transmis
-  à quelqu'un sans compte, chiffré dans le navigateur, la clé dans le lien
+GuiVault garde identifiants, codes 2FA, passkeys, notes, cartes et
+identités, mais aussi hôtes SSH, clés, accès AWS et clés d'API, et les
+partage entre les membres d'une équipe. Tout est chiffré sur l'appareil :
+le serveur, que vous hébergez, ne garde que des blobs qu'il ne sait pas
+lire et ne possède aucune clé. Le même coffre peut aussi vivre dans un
+simple dossier, sans serveur, à la manière de KeePass — et passer de l'un à
+l'autre quand le besoin change.
+
+Clients : interface web (servie par le serveur), extension de navigateur,
+application Windows, application Android, ligne de commande `gv`, et
+[Guiterm](https://github.com/GulliGulli28/gui-termius), le client SSH du
+même auteur.
+
+> **Où en est le projet — sans enjoliver** (octobre 2026)
+>
+> - **Projet jeune** : premier commit le 15 septembre 2026, un seul
+>   développeur. Environ 57 000 lignes de Rust, TypeScript et Kotlin, plus
+>   de 250 tests automatisés passés par le CI à chaque commit — unitaires,
+>   bout en bout contre un vrai serveur et une vraie base, extension dans un
+>   vrai Chromium, application dans sa vraie fenêtre (WebKitGTK et WebView2).
+> - **Aucun audit de sécurité externe à ce jour.** La conception est
+>   documentée et argumentée ([`docs/SECURITY.md`](docs/SECURITY.md)), la
+>   cryptographie repose sur des bibliothèques reconnues (RustCrypto,
+>   `@noble`) et non sur du fait maison — mais rien ne remplace un regard
+>   indépendant. Gardez une autre copie de ce que vous ne pouvez pas vous
+>   permettre de perdre.
+> - **Interface en français uniquement.**
+> - **Distribution encore artisanale** : image Docker à construire
+>   soi-même, extension à charger « non empaquetée » (pas encore dans les
+>   stores), installeurs Windows sans signature Authenticode (SmartScreen
+>   avertit), APK Android à installer à la main et vérifié seulement sur
+>   émulateur. Ni iOS, ni macOS, ni application Linux.
+
+## Pourquoi GuiVault
+
+1. **Conçu contre un serveur malveillant, pas seulement contre une fuite.**
+   En février 2026, ETH Zurich a publié
+   [27 attaques](https://eprint.iacr.org/2026/058) contre Bitwarden,
+   LastPass, Dashlane et 1Password, toutes en supposant le serveur
+   compromis. GuiVault répond à chacune des familles d'attaques décrites : plancher Argon2id et
+   paramètres épinglés par appareil (le serveur ne peut pas imposer une
+   dérivation au rabais), enveloppes de clés de vault **authentifiées** et
+   empreinte de l'inviteur vérifiée avant d'accepter, retour en arrière
+   détecté, accès d'urgence **sans** clé de récupération côté serveur, rôle
+   d'administrateur qui ne se donne que depuis le shell. Le manifeste qui
+   authentifie l'ensemble d'un vault est écrit, pas encore activé (voir
+   [Limites](#limites-connues)).
+2. **Local ou serveur, le même coffre.** Un coffre local n'est pas un autre
+   format : c'est exactement ce que garderait le serveur, dans un dossier.
+   On commence seul sans rien héberger, et on le copie vers un serveur le
+   jour où l'on veut partager — ou l'inverse —, historique, corbeille et
+   pièces jointes compris ([`docs/TRANSFERT.md`](docs/TRANSFERT.md)).
+   KeePass n'a pas de serveur ; Bitwarden, 1Password et Proton Pass n'ont
+   pas de mode sans serveur.
+3. **Les secrets d'infrastructure en première classe.** Hôtes, clés SSH
+   (générées au format OpenSSH), accès AWS, clés d'API qui expirent,
+   synchronisés avec Guiterm, dont l'agent SSH lit le coffre (confirmation
+   à chaque signature, signature des commits). `gv` lit un secret par
+   référence (`gv://vault/élément/champ`), lance une commande avec ses
+   secrets en variables (`gv run`), sert de `credential_process` AWS et de
+   credential helper Git. Ce que 1Password vend aux développeurs, en
+   logiciel libre et auto-hébergé.
+4. **Tout, sans palier payant.** Pièces jointes, accès d'urgence, liens de
+   partage (texte, élément ou fichier), TOTP, rapport de santé, passkeys :
+   ni licence, ni « premium ».
+5. **Un serveur qu'on exploite sereinement.** Une image Docker, un binaire
+   Rust, PostgreSQL. Des sauvegardes automatiques **restaurées dans une
+   base d'essai** à chaque fois, pour prouver qu'elles marchent ; une
+   administration qui ne voit jamais un contenu ; quotas, restriction par
+   adresse IP, journal d'audit en ajout seul, e-mails facultatifs dont rien
+   ne dépend.
+
+## Ce que ça fait
+
+### Les clients
+
+| Client | Ce qu'il fait | État |
+|---|---|---|
+| **Interface web** | Tout, depuis n'importe quel navigateur, avec la même cryptographie que les autres clients ; utilisable au téléphone, installable (PWA), copie hors ligne en lecture seule | Servie par le serveur à `/` |
+| **Extension** ([`EXTENSION.md`](docs/EXTENSION.md)) | Remplissage en un clic ou depuis le champ — composants web (shadow DOM) et cadres compris, sans jamais remettre le mot de passe d'un site à un cadre tiers —, codes TOTP, passkeys, générateur ; face à un serveur ou au coffre local de l'application | Chrome, Edge, Firefox ≥ 115 ; à charger non empaquetée |
+| **Application Windows** ([`APP.md`](docs/APP.md)) | Coffre local ou serveur ; saisie automatique à la KeePass, presse-papiers hors de l'historique Windows, verrouillage avec la session, zone de notification, sauvegardes du coffre local, import KeePass (KDBX), mises à jour signées | MSI et NSIS dans les [releases `app-v*`](https://github.com/GulliGulli28/GuiVault/releases) |
+| **Application Android** ([`ANDROID.md`](docs/ANDROID.md)) | Coffre local ou serveur ; déverrouillage biométrique, remplissage des autres applications et de Chrome ([`REMPLISSAGE.md`](docs/REMPLISSAGE.md)), bulle flottante | APK signé et attesté, joint aux mêmes releases ; vu sur émulateur seulement |
+| **`gv`** ([`CLI.md`](docs/CLI.md)) | Secrets par référence, `gv run`, AWS, Git, pièces jointes ; cache chiffré lisible sans le serveur | À compiler (`cargo build --release -p guivault-cli`) |
+| **Guiterm** | Client SSH : hôtes, clés, snippets et connexions synchronisés, agent SSH adossé au coffre | Dépôt à part |
+
+Tous lisent les mêmes blobs : des vecteurs générés par le Rust et relus par
+le TypeScript (et réciproquement) le vérifient à chaque build.
+
+### Le coffre
+
+- **Types d'éléments** : identifiants (plusieurs sites, TOTP, passkeys,
+  historique du mot de passe), notes sécurisées, cartes, identités, accès
+  AWS, clés d'API, hôtes, clés SSH, snippets ; champs personnalisés,
+  favoris, dossiers colorés, icônes. Formats dans
+  [`docs/ITEMS.md`](docs/ITEMS.md).
+- **Pièces jointes chiffrées**, une clé par fichier, morceaux liés à leur
+  place ([`docs/PIECES-JOINTES.md`](docs/PIECES-JOINTES.md)).
+- **Historique** de chaque élément et **corbeille** (30 jours par défaut).
+- **Conflits** : deux modifications concurrentes se fusionnent champ par
+  champ au lieu qu'une écrase l'autre.
+- **Recherche** dans tous les vaults (Ctrl+K), raccourcis clavier (`?`),
+  presse-papiers effacé après le délai réglé, verrouillage après
+  inactivité, réglages qui suivent le compte (chiffrés).
+- **Générateurs** : mots de passe, phrases de passe (liste EFF), clés SSH
+  Ed25519, RSA et ECDSA.
+- **Import** : Bitwarden (JSON en clair ou protégé, CSV), KeePass 2 et
+  KeePassXC (KDBX 3.1 et 4, fichier clé, pièces jointes et historique),
+  CSV de Chrome, Firefox, LastPass et KeePassXC. **Export** : JSON chiffré
+  par mot de passe ou en clair, CSV.
+
+### Le partage
+
+- **Vaults partagés** : la clé d'un vault est enveloppée pour la clé
+  publique de chaque membre ; rôles lecteur / éditeur / admin /
+  propriétaire ; invitations, y compris vers quelqu'un qui n'a pas encore
+  de compte ; **empreintes** à vérifier hors bande, épinglées, alerte si
+  elles changent ; rotation de clé après un départ.
+- **Liens de partage** (« Send ») : un texte, un élément ou un fichier
+  transmis à quelqu'un sans compte, la clé dans le fragment du lien
   (jamais vue par le serveur), avec expiration, nombre d'ouvertures et mot
   de passe facultatif.
-- **Accès d'urgence** : désigner un proche qui pourra lire certains de vos
-  vaults si vous ne refusez pas sa demande avant la fin d'un délai choisi —
-  les clés lui sont enveloppées côté client, le serveur ne sait que les
-  garder et les remettre.
-- **Extension de navigateur** (Chrome/Edge/Firefox) : les identifiants de
-  la page courante, remplissage en un clic ou depuis le champ — y compris
-  dans les composants web (shadow DOM) et les cadres de connexion, sans
-  jamais donner le mot de passe d'un site à un cadre tiers —, codes TOTP,
-  passkeys, authentificateur (codes TOTP), générateur —
-  [`docs/EXTENSION.md`](docs/EXTENSION.md).
-- **Application Windows** ([releases `app-v*`](https://github.com/GulliGulli28/GuiVault/releases)) :
-  se connecte à un serveur GuiVault **ou** garde un **coffre local** (un
-  dossier, chiffré comme sur le serveur, sans serveur du tout) ; saisie
-  automatique à la KeePass, presse-papiers hors de l'historique Windows,
-  verrouillage avec la session, sauvegardes, zone de notification, import
-  KeePass (KDBX), l'extension reliée au coffre local, mises à jour signées,
-  et la copie d'un coffre local vers un serveur (ou l'inverse) —
-  [`docs/APP.md`](docs/APP.md), [`docs/TRANSFERT.md`](docs/TRANSFERT.md).
-- **En ligne de commande** (`gv`) : lire un secret par référence
-  (`gv://vault/élément/champ`), lancer une commande avec ses secrets en
-  variables (`gv run`), `credential_process` AWS, credential helper Git —
-  [`docs/CLI.md`](docs/CLI.md).
-- **Une seule image Docker**, Rust/axum/PostgreSQL. Même stack que Guiterm.
+- **Accès d'urgence** : un proche pourra lire certains de vos vaults si
+  vous ne refusez pas sa demande avant la fin d'un délai choisi ; les clés
+  lui sont enveloppées côté client, le serveur ne sait que les garder.
 
-Voir [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) pour le fonctionnement,
-[`docs/SECURITY.md`](docs/SECURITY.md) pour le modèle de menace et
-[`docs/API.md`](docs/API.md) pour les routes.
+### Le compte et la sécurité
+
+- Connexion par **mot de passe maître** (Argon2id 64 Mio, 3 passes, côté
+  client) avec second facteur **TOTP** et codes de récupération, ou par
+  **passkey** (PRF de WebAuthn, [`docs/PASSKEYS.md`](docs/PASSKEYS.md)).
+- **Sessions** : jetons opaques hachés, rotation des jetons de
+  rafraîchissement avec détection de rejeu, révocation à distance, alerte
+  par e-mail à une connexion depuis une adresse jamais vue.
+- **Rapport de santé**, calculé dans le navigateur : mots de passe faibles,
+  réutilisés, anciens, **fuités** (Have I Been Pwned par k-anonymat, sur
+  demande), sites qui acceptent la 2FA sans code enregistré, clés et cartes
+  qui expirent.
+- **Synchronisation** : révisions monotones par vault, téléchargement des
+  seuls changements, verrou optimiste, flux temps réel (SSE).
+- **Suppression du compte** (mot de passe et second facteur redemandés).
+
+## La sécurité, en bref
+
+```
+mot de passe maître ─Argon2id─▶ master key ─┬─HKDF─▶ auth key ──▶ serveur (re-hachée Argon2id)
+                                            └─HKDF─▶ clé qui scelle la user key
+user key ─▶ clé privée X25519 ─▶ clés de vault (une enveloppe par membre) ─▶ items
+```
+
+- **Primitives** : XChaCha20-Poly1305, Argon2id, X25519, HKDF-SHA-256.
+  Chaque item est lié par l'AAD à son vault, son id et son type : déplacé,
+  renommé ou substitué, il ne s'ouvre plus.
+- **Le serveur voit** des adresses e-mail, qui est membre de quoi, le
+  nombre et le **type** des éléments, des tailles, des dates, les adresses
+  IP des sessions — jamais un nom, un site, un identifiant ou un secret.
+- **Changer de mot de passe** ne re-chiffre que la user key ; un mot de
+  passe maître perdu est **irrécupérable**, par construction.
+
+Le modèle de menace complet — ce qui est couvert, comment, et ce qui ne
+l'est pas — est dans [`docs/SECURITY.md`](docs/SECURITY.md) ; la hiérarchie
+de clés en détail dans [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+
+## Limites connues
+
+À lire avant d'adopter GuiVault ; chacune est détaillée dans
+[`docs/SECURITY.md`](docs/SECURITY.md) ou [`docs/ROADMAP.md`](docs/ROADMAP.md).
+
+- **Pas d'audit externe**, pas encore de programme de prime aux bogues.
+- **Retour en arrière d'un item** : un serveur malveillant peut resservir
+  l'ancienne version chiffrée d'un élément sous une révision qui monte. Le
+  manifeste de vault qui l'empêche est prêt dans tous les clients ; il sera
+  activé une fois la version de Guiterm qui l'entretient publiée.
+- **L'interface web est livrée par le serveur** à chaque chargement : un
+  serveur compromis pourrait servir une page qui vole le mot de passe
+  maître. C'est la limite de tout coffre web (Bitwarden et Proton
+  compris) ; l'application et Guiterm, installés une fois, n'y sont pas
+  exposés.
+- **Pas de « Secret Key » à la 1Password** : qui vole la base peut attaquer
+  hors ligne un mot de passe maître faible. Argon2id le rend coûteux, pas
+  impossible — choisissez une phrase de passe longue.
+- **Second facteur TOTP seulement** : pas encore de clé de sécurité en
+  second facteur ; la connexion par passkey existe dans l'interface web,
+  pas encore dans l'extension.
+- **Pas de fonctions d'entreprise** : ni SSO, ni SCIM, ni groupes, ni
+  politiques imposées aux membres.
+- **Pas d'import dédié** depuis 1Password ou Proton Pass, pas d'alias
+  d'e-mail.
+- **Android** : un coffre local vit dans le dossier privé de l'application,
+  que la désinstallation efface (pas encore d'export de fichier) — copiez-le
+  vers un serveur pour le mettre à l'abri.
+- **Métadonnées** : le serveur sait combien d'éléments de chaque type
+  vous avez, et avec qui vous partagez.
+
+## GuiVault face aux autres
+
+GuiVault ne remplace pas un gestionnaire éprouvé pour tout le monde. Voici
+où il se situe, honnêtement (état des concurrents à octobre 2026, à
+vérifier chez eux).
+
+| | GuiVault | Bitwarden / Vaultwarden | KeePassXC | 1Password | Proton Pass |
+|---|---|---|---|---|---|
+| Code source | Ouvert (MIT), serveur et clients | Ouvert (GPL/AGPL, certaines parties sous licence Bitwarden) ; Vaultwarden : serveur libre réécrit en Rust | Ouvert (GPL) | Propriétaire | Clients ouverts, serveur fermé |
+| Auto-hébergement | Oui (une image, PostgreSQL) | Oui (officiel ou Vaultwarden) | — (un fichier) | Non | Non |
+| Sans aucun serveur | Oui (coffre local, convertible en compte) | Non | Oui, c'est son modèle | Non | Non |
+| Partage avec rôles | Oui | Oui (organisations) | Non (un fichier partagé) | Oui | Oui |
+| Fonctions payantes | Aucune | Premium, Teams, Enterprise (Vaultwarden : tout inclus) | Aucune | Abonnement | Offres Plus et au-delà |
+| Audits externes | **Aucun** | Réguliers, publiés | Oui (2023) | Réguliers, SOC 2 | Oui |
+| Plateformes | Web, Chrome/Edge/Firefox, Windows, Android, CLI | Toutes, iOS et macOS compris | Windows, macOS, Linux ; mobiles par des applications tierces | Toutes | Toutes |
+| Secrets d'infrastructure | Hôtes et clés SSH, AWS, clés d'API ; agent SSH (Guiterm), CLI à références | Agent SSH, CLI, Secrets Manager (produit à part) | Agent SSH, CLI | Le plus complet : agent SSH, CLI à références, intégrations | CLI et agent SSH, récents |
+| Protection d'une base volée | Argon2id sur le mot de passe | Argon2id ou PBKDF2 sur le mot de passe | Argon2 sur le fichier | Mot de passe **+ Secret Key** de 128 bits | Mot de passe |
+| Langues | Français | Des dizaines | Des dizaines | Des dizaines | Des dizaines |
+| Ancienneté | Quelques semaines, un développeur | Depuis 2016, une entreprise | Depuis 2016, une communauté | Depuis 2006, une entreprise | Depuis 2023, Proton |
+
+**Choisissez plutôt…**
+
+- **Bitwarden, ou Vaultwarden avec les clients officiels**, si vous voulez
+  aujourd'hui un gestionnaire auto-hébergeable, audité, sur toutes les
+  plateformes, iPhone compris. Pour auto-héberger, c'est la référence
+  mûre.
+- **KeePassXC** si vous êtes seul, ne voulez rien héberger et vous
+  satisfaites d'un fichier synchronisé par vos soins.
+- **1Password** pour une famille ou une entreprise qui veut le plus
+  abouti, un support, la Secret Key et le mode voyage, et accepte le cloud
+  et le code fermé.
+- **Proton Pass** si vous vivez déjà dans l'écosystème Proton (Mail,
+  Drive, VPN), voulez des alias d'e-mail et ne voulez rien héberger.
+
+**Choisissez GuiVault** si vous hébergez vous-même, administrez des
+machines et voulez vos clés SSH et accès cloud au même endroit que vos mots
+de passe ; si vous voulez commencer sans serveur et pouvoir partager plus
+tard sans changer d'outil ; si le cas du serveur compromis compte pour
+vous — et si vous acceptez la jeunesse du projet.
+
+## Installer les clients
+
+- **Application Windows et Android** : la dernière
+  [release `app-v*`](https://github.com/GulliGulli28/GuiVault/releases)
+  (sommes SHA-256 jointes ; l'APK est attesté par le CI). L'application
+  Windows se met à jour d'elle-même ; sur Android, installer l'APK suivant
+  par-dessus.
+- **Extension** : `cd web && npm install && npm run build:ext`, puis
+  « Charger l'extension non empaquetée » sur `web/dist-extension`
+  ([`docs/EXTENSION.md`](docs/EXTENSION.md)).
+- **`gv`** : `cargo build --release -p guivault-cli` → `target/release/gv`.
+- **Interface web** : rien à installer, elle est servie par le serveur.
 
 ## Déploiement (Docker)
 
@@ -178,7 +349,7 @@ marchent et envoie un e-mail d'essai.
 
 ### Interface web
 
-Le binaire sert à `/` une application (React, même charte que Guiterm) qui
+Le binaire sert à `/` une application (React) qui
 fait exactement ce que fait Guiterm avec le serveur : dériver les clés du
 mot de passe maître dans le navigateur, déchiffrer les vaults, chiffrer ce
 qu'elle écrit. Le serveur ne voit pas plus de choses qu'avec Guiterm. Rien
@@ -257,11 +428,12 @@ chiffrés) : à protéger comme elle. `GUIVAULT_SECRET` n'y est pas : gardez-le
 
 ```bash
 scripts/test-db.sh        # Postgres jetable dans Docker (port 55432)
-cargo test                # unitaires + intégration bout en bout
-cargo clippy --all-targets
-cd web && npm install && npm test && npm run build   # interface web
-cd web && npm run build:ext                          # extension → web/dist-extension/
-cargo build --release -p guivault-cli                # gv → target/release/gv
+cargo test                # unitaires + intégration bout en bout (vrai serveur, vraie crypto)
+cargo clippy --all-targets && cargo fmt --all --check
+cd web && npm install && npm test && npm run lint && npm run build   # interface web
+cd web && npm run build:ext && npm run test:ext                      # extension et son corpus de remplissage
+cd web && npm run build:app                                          # interface de l'application
+cd app-tauri && cargo build && cd ../web && npm run test:app         # application, pilotée par WebDriver
 ```
 
 L'interface web est embarquée dans le binaire au moment de `cargo build`
@@ -276,29 +448,46 @@ Structure :
 - `crates/guivault-crypto` — primitives et hiérarchie de clés, partagées
   avec les clients. **Tout le chiffrement se passe ici, côté client.**
 - `crates/guivault-protocol` — types JSON de l'API.
+- `crates/guivault-items` — les formats en clair des secrets, pour qu'un
+  client Rust les lise sans les redéfinir. Testé contre ce que l'interface
+  web écrit.
 - `crates/guivault-server` — le serveur (axum + sqlx/PostgreSQL), qui sert
   aussi l'interface web.
-- `crates/guivault-items` — les formats en clair des secrets (identifiants,
-  notes, cartes, identités, accès AWS, clés d'API), pour qu'un client Rust
-  les lise sans les redéfinir. Testé contre ce que l'interface web écrit.
-- `crates/guivault-cli` — `gv`, le coffre en ligne de commande
-  ([`docs/CLI.md`](docs/CLI.md)).
+- `crates/guivault-local` — le coffre local : ce que garde le serveur, dans
+  un dossier, sans clé ni crypto.
+- `crates/guivault-cli` — `gv`.
 - `web/` — l'interface web (Vite + React + TypeScript). `src/lib/crypto.ts`
-  est le port de `guivault-crypto` ; des vecteurs générés par le crate
-  Rust (et réciproquement) garantissent que les deux lisent les mêmes
-  blobs. `web/extension/` : l'extension de navigateur, sur le même code ;
-  `web/app/` : l'interface de l'application.
-- `crates/guivault-local` — le coffre local de l'application : ce que
-  garde le serveur, dans un dossier, sans clé ni crypto.
-- `app-tauri/` — l'application Windows (Tauri 2, workspace Cargo à part) ;
-  publier une version : [`docs/APP.md`](docs/APP.md), « Mises à jour ».
+  est le port de `guivault-crypto` ; des vecteurs générés par le crate Rust
+  (et réciproquement) garantissent que les deux lisent les mêmes blobs.
+  `web/extension/` : l'extension, sur le même code ; `web/app/` : l'interface
+  de l'application.
+- `app-tauri/` — l'application Windows et Android (Tauri 2, workspace Cargo
+  à part ; le Kotlin d'Android dans `gen/android`).
 
 Guiterm consomme `guivault-crypto`, `guivault-protocol` et `guivault-items`
 en dépendances git, épinglées sur un commit : une réponse qui change casse
 la compilation des deux côtés au lieu de diverger.
 
-Les pistes d'amélioration, ce qui est fait et ce qui reste :
-[`docs/ROADMAP.md`](docs/ROADMAP.md).
+## Documentation
+
+| Document | Contenu |
+|---|---|
+| [`ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Fonctionnement, hiérarchie de clés, synchronisation |
+| [`SECURITY.md`](docs/SECURITY.md) | Modèle de menace : couvert, assumé, limites |
+| [`API.md`](docs/API.md) | Routes et codes d'erreur |
+| [`ITEMS.md`](docs/ITEMS.md) | Formats des éléments, import et export |
+| [`EXTENSION.md`](docs/EXTENSION.md) | Extension de navigateur |
+| [`APP.md`](docs/APP.md) | Application, coffre local, publication des versions |
+| [`ANDROID.md`](docs/ANDROID.md) · [`REMPLISSAGE.md`](docs/REMPLISSAGE.md) | Android, service de remplissage |
+| [`CLI.md`](docs/CLI.md) | `gv` |
+| [`PASSKEYS.md`](docs/PASSKEYS.md) · [`PIECES-JOINTES.md`](docs/PIECES-JOINTES.md) · [`TRANSFERT.md`](docs/TRANSFERT.md) · [`MANIFESTE.md`](docs/MANIFESTE.md) | Conceptions détaillées |
+| [`DESIGN.md`](docs/DESIGN.md) | Charte et règles de l'interface |
+| [`ROADMAP.md`](docs/ROADMAP.md) | Ce qui est fait, ce qui reste |
+
+## Signaler une vulnérabilité
+
+Par une [*security advisory* privée](https://github.com/GulliGulli28/GuiVault/security/advisories/new)
+sur GitHub, pas par une issue publique.
 
 ## Licence
 

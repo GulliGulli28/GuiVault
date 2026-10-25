@@ -391,6 +391,38 @@ L gros.
 - [ ] Panneau sur la bulle (recherche, codes 2FA) — à peser : il montrerait
   des secrets par-dessus une autre application.
 
+## 7. Confiance et distribution
+
+Ce qui sépare GuiVault d'un outil qu'on recommande à d'autres (octobre
+2026) : la conception est là, la preuve extérieure et la distribution non.
+Le README le dit en tête ; chaque case cochée y retire une ligne.
+
+- [ ] **Audit externe** de `guivault-crypto`, `crypto.ts` et des routes
+  d'authentification et de partage (Cure53, Trail of Bits, Radically Open
+  Security ; ou un financement OTF / NLnet pour un projet libre), rapport
+  publié tel quel avec les corrections.
+- [ ] **Activer le manifeste** (§0) : la dernière limite structurelle face à
+  un serveur malveillant.
+- [ ] **Image Docker publiée** sur ghcr.io, multi-architecture, signée
+  (cosign) avec attestation de provenance, comme l'APK.
+- [ ] **Extension dans les stores** (Chrome Web Store, Firefox Add-ons,
+  Edge) — l'identifiant change : l'ajouter aux origines de l'hôte natif
+  (`EXTENSION.md`).
+- [ ] **Signature de code Windows** (§6) et Android essayé sur de vrais
+  téléphones (§6).
+- [ ] **Builds reproductibles** du web embarqué : pouvoir vérifier que
+  `web/dist` d'une image correspond au commit — c'est la réponse à la
+  limite « l'interface web est livrée par le serveur ».
+- [ ] **Interface en anglais** (i18n), puis le README et `SECURITY.md`.
+- [ ] **Politique de sécurité** : `SECURITY.md` à la racine (délais de
+  réponse, versions maintenues), `/.well-known/security.txt` servi par le
+  serveur, puis une prime aux bogues une fois l'audit passé.
+- [ ] **Livre blanc** : la conception cryptographique en un document
+  autonome (hiérarchie, formats, ce que chaque attaque d'ETH Zurich
+  devient ici), pour les relecteurs.
+- [ ] **Version 1.0 du serveur et des formats**, avec une promesse écrite de
+  compatibilité et un journal des changements.
+
 ## Sources
 
 - ETH Zurich : [annonce](https://ethz.ch/en/news-and-events/eth-news/news/2026/02/password-managers-less-secure-than-promised.html),

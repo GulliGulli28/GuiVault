@@ -108,9 +108,9 @@ pour appliquer le délai.
 - **Le délai de l'accès d'urgence est appliqué par le serveur**, pas par la
   cryptographie : un serveur compromis peut remettre les enveloppes au
   contact sans attendre (le contact étant, par construction, quelqu'un à qui
-  le donneur a déjà confié ses clés). Sans alerte par e-mail (pas de SMTP
-  encore), le donneur découvre une demande à sa connexion suivante : le
-  délai doit en tenir compte. Ce que le contact a lu pendant un accès
+  le donneur a déjà confié ses clés). Le donneur est prévenu par e-mail
+  d'une demande si le serveur a un SMTP ; sinon, ou si l'e-mail se perd, il
+  la découvre à sa connexion suivante : le délai doit en tenir compte. Ce que le contact a lu pendant un accès
   accordé, il a pu le garder : reprendre la main n'efface pas sa mémoire,
   une rotation de clé si.
 - **Le client est dans la base de confiance.** Un Guiterm compromis a le
