@@ -96,13 +96,17 @@ il ne déchiffre rien : la user key reste sous la clé que seule la PRF donne).
   `mobile_entry_point`), ce qui n'existe qu'au bureau est sous
   `cfg(desktop)` ; `gen/android` est versionné (Kotlin de la bulle :
   `BubblePlugin.kt`, `BubbleService.kt`, de la biométrie :
-  `BiometricPlugin.kt`, du remplissage des autres applications :
+  `BiometricPlugin.kt`, des archives de coffre : `CoffreFilePlugin.kt`,
+  du remplissage des autres applications :
   `GuiVaultAutofillService.kt`, `AutofillIndex.kt`, `AutofillActivity.kt` —
   `docs/REMPLISSAGE.md`, marges : `MainActivity.kt`) ; on
   construit depuis une copie Windows (`scripts/android-sync.sh`,
   `scripts/android/*.ps1`). Côté interface : `web/app/src/mobile.ts`
   (`isMobile`, coffres de l'appareil, marges), `bubbleBridge.ts`,
   `biometricBridge.ts` (→ `src/lib/biometric.ts`, `BiometricSetting`),
+  `coffreFileBridge.ts` (exporter / importer un coffre en `.zip` :
+  `CoffreFilePlugin.kt`, `guivault_local::export_coffre`/`import_coffre`,
+  `CoffreExport`),
   `autofillBridge.ts` (→ `src/lib/autofill.ts`, `AutofillSetting` dont
   `AutofillFeeder`, qui confie l'index du coffre ouvert).
 - `web/` — l'interface web, Vite + React 19 + TypeScript + Tailwind 3.

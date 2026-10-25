@@ -32,7 +32,7 @@ const HELP: &str = "gv — le coffre GuiVault en ligne de commande
 
   gv recover <source> [--email E] [--out DOSSIER] [--password-stdin]
                                              tout ressortir en clair, sans serveur ni réseau : d'un
-                                             coffre local (son dossier), d'une sauvegarde du serveur
+                                             coffre local (dossier ou .zip), d'une sauvegarde du serveur
                                              (.jsonl.gz, avec --email) ou d'un export chiffré
 
 Références : gv://<vault>/<élément>[/<champ>] — noms ou ids, %20 pour une espace ;
@@ -396,6 +396,7 @@ fn run() -> Result<ExitCode> {
             let pw = password.as_deref().unwrap_or_default();
             let rec = match &source {
                 Source::Local(dir) => recover::from_local(dir, pw)?,
+                Source::Archive(file) => recover::from_archive(file, pw)?,
                 Source::Backup(file) => recover::from_backup(file, email.unwrap_or_default(), pw)?,
                 Source::Export(file) => recover::from_export(file, password.as_deref())?,
             };

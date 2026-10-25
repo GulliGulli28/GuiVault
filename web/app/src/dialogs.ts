@@ -23,7 +23,7 @@ function e2ePath(): string | null {
 
 /** Mobile : un nom libre dans le dossier des coffres de l'appareil
  * (« Mon coffre », « Mon coffre 2 »…). */
-async function freePath(base: string): Promise<string | null> {
+export async function freePath(base: string): Promise<string | null> {
   const dir = coffresDir();
   if (!dir) return null;
   const taken = new Set(await deviceCoffres());

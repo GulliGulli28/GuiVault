@@ -26,7 +26,7 @@ use uuid::Uuid;
 /// refusé (`local_format_unsupported`) plutôt que réécrit à moitié compris.
 pub const FORMAT: u32 = 1;
 pub const FILE_NAME: &str = "coffre.json";
-const LOCK_NAME: &str = ".lock";
+pub(crate) const LOCK_NAME: &str = ".lock";
 const ATTACHMENTS_DIR: &str = "attachments";
 
 /// Le compte du coffre, tel que le serveur le garderait — sans la clé

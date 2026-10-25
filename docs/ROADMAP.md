@@ -33,17 +33,13 @@ c'est ce qui sépare un projet solide d'un outil qu'on recommande.
    (alerte comprise), extension, vecteurs d'interop, `gv` et Guiterm ; reste
    l'**activation** (`AUTO_ENABLE_MANIFEST`), une fois ce Guiterm publié.
    La liste exacte : [`MANIFESTE.md`](MANIFESTE.md), « Ce qui reste, dans l'ordre ».
-2. **Android, ne pas perdre un coffre local** (§6) : il vit dans le dossier
-   privé de l'app, que la désinstallation efface ; ni export ni import de
-   fichier. Puis décider de la sauvegarde Google (`allowBackup`).
-   [`ANDROID.md`](ANDROID.md), « Ce qui reste ».
-3. **Android, l'essai sur un vrai téléphone** (biométrie et remplissage
+2. **Android, l'essai sur un vrai téléphone** (biométrie et remplissage
    compris), puis la suite du remplissage : enregistrer après une
    connexion, passkeys par le Credential Manager (§6,
    [`REMPLISSAGE.md`](REMPLISSAGE.md)).
-4. **Windows** (§6) : signature de code (SmartScreen), mises à jour pour
+3. **Windows** (§6) : signature de code (SmartScreen), mises à jour pour
    une installation MSI, Windows Hello, agent SSH.
-5. **Le reste des cases vides**, au choix : 2FA WebAuthn et passkey dans
+4. **Le reste des cases vides**, au choix : 2FA WebAuthn et passkey dans
    l'extension (§2), `reprompt`, doublons, premier lancement guidé (§1),
    petites écritures qui rechargent sur un conflit (§4), écrans propres à
    l'application qui n'ont eu que des textes raccourcis dans la refonte
@@ -376,9 +372,12 @@ L gros.
   automatique en quittant l'application (réglable), aucun secret affiché.
 - [ ] **Essai sur un vrai téléphone** (S) — tout n'a été vu que sur
   l'émulateur.
-- [ ] **Exporter / importer un coffre local** (M) : par le sélecteur de
-  documents d'Android ; aujourd'hui, désinstaller efface les coffres de
-  l'appareil. Et décider de la sauvegarde Google (`allowBackup`, S).
+- [x] **Exporter / importer un coffre local** : une archive `.zip` du
+  dossier du coffre par le sélecteur de documents d'Android (sans les
+  sauvegardes), importée sous un nom libre et un nouvel identifiant si
+  l'appareil a déjà ce coffre ; relue par `gv recover`. Sauvegarde Google :
+  pas de coffre dans le cloud, transfert vers un nouveau téléphone oui —
+  [`ANDROID.md`](ANDROID.md), « Exporter et importer un coffre ».
 - [x] **Déverrouillage biométrique** (M) : la user key sous une clé du
   Keystore, empreinte ou visage de classe 3 à chaque usage ; mot de passe
   après un redémarrage et tous les 14 jours — [`ANDROID.md`](ANDROID.md),

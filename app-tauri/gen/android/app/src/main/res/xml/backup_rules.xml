@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 11 et avant (une seule règle pour le cloud et le transfert) :
+     rien de ce que data_extraction_rules.xml exclut du cloud. -->
+<full-backup-content>
+    <exclude domain="root" path="coffres/" />
+    <exclude domain="sharedpref" path="guivault_biometric.xml" />
+    <exclude domain="sharedpref" path="guivault_autofill.xml" />
+    <exclude domain="file" path="autofill.bin" />
+</full-backup-content>

@@ -138,13 +138,14 @@ décrits dans [`FORMATS.md`](FORMATS.md) ; le code
 
 ```bash
 gv recover ~/GuiVault/Maison                                     # un coffre local (son dossier)
+gv recover "Maison.zip"                                          # un coffre exporté de l'application Android
 gv recover guivault-20261025-….jsonl.gz --email vous@example.com  # une sauvegarde du serveur
 gv recover export-chiffré.json --out ./récupéré                   # un export protégé par mot de passe
 ```
 
 | Source | Reconnue à | Mot de passe |
 |---|---|---|
-| Coffre local | un dossier avec `coffre.json` | le mot de passe maître du coffre |
+| Coffre local | un dossier avec `coffre.json`, ou l'archive `.zip` exportée par l'application Android | le mot de passe maître du coffre |
 | Sauvegarde du serveur (`guivault backup`) | le gzip | le mot de passe maître du compte `--email` ; seuls ses vaults sont relus |
 | Export JSON | `"format": "guivault-export-encrypted"` (ou `guivault-export`, en clair : sans mot de passe) | celui de l'export |
 

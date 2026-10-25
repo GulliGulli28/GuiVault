@@ -11,8 +11,9 @@
 //! `mobile_entry_point` sur mobile. Ce qui n'existe qu'au bureau (zone de
 //! notification, raccourci global, instance unique, démarrage automatique,
 //! mises à jour) est sous `cfg(desktop)` ; la bulle (`bubble.rs`), le
-//! déverrouillage biométrique (`biometric.rs`) et le remplissage
-//! automatique (`autofill.rs`) sous Android.
+//! déverrouillage biométrique (`biometric.rs`), le remplissage
+//! automatique (`autofill.rs`) et les archives de coffre (`coffre_file.rs`)
+//! sous Android.
 
 #[cfg(target_os = "android")]
 mod autofill;
@@ -23,6 +24,8 @@ mod browser;
 #[cfg(target_os = "android")]
 mod bubble;
 mod clipboard;
+#[cfg(target_os = "android")]
+mod coffre_file;
 mod native_host;
 mod system;
 mod tray;
@@ -151,6 +154,99 @@ async fn local_list(dir: String) -> Result<Vec<String>, Value> {
             .collect();
         out.sort();
         Ok(out)
+    })
+    .await
+}
+
+// ─── Archives de coffre (`src/coffre_file.rs`) ───────────────────────────────
+
+fn io_error(e: impl std::fmt::Display) -> Value {
+    error(guivault_local::Error::new(500, "local_io", e.to_string()))
+}
+
+/// Un dossier neuf dans le cache de l'app (`kind/<horodatage>`) : c'est là,
+/// et seulement là, que les archives se font et se défont.
+fn scratch(app: &AppHandle, kind: &str) -> Result<std::path::PathBuf, Value> {
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or_default();
+    let dir = app
+        .path()
+        .app_cache_dir()
+        .map_err(io_error)?
+        .join(kind)
+        .join(nanos.to_string());
+    std::fs::create_dir_all(&dir).map_err(io_error)?;
+    Ok(dir)
+}
+
+/// La copie du coffre `path` à archiver (`CoffreFilePlugin.save`, qui
+/// l'efface ensuite) : un dossier du même nom dans le cache, sans les
+/// sauvegardes (`guivault_local::export_coffre`).
+#[tauri::command]
+async fn local_export_snapshot(app: AppHandle, path: String) -> Result<String, Value> {
+    let src = std::path::PathBuf::from(&path);
+    let name = src
+        .file_name()
+        .map(|n| n.to_os_string())
+        .ok_or_else(|| io_error("chemin de coffre invalide"))?;
+    let dest = scratch(&app, "export")?.join(name);
+    let out = dest.to_string_lossy().into_owned();
+    blocking(move || guivault_local::export_coffre(&src, &dest).map_err(error)).await?;
+    Ok(out)
+}
+
+/// Le dossier vide où `CoffreFilePlugin.pick` décompresse une archive.
+#[tauri::command]
+fn local_staging(app: AppHandle) -> Result<String, Value> {
+    Ok(scratch(&app, "import")?.to_string_lossy().into_owned())
+}
+
+/// L'archive décompressée dans `staging` devient le coffre `dest` ; le
+/// dossier temporaire est effacé quoi qu'il arrive. Le coffre est à la racine
+/// de l'archive ou dans son seul dossier. Si l'appareil a déjà ce coffre (même
+/// identifiant), la copie en reçoit un autre.
+#[tauri::command]
+async fn local_import(app: AppHandle, staging: String, dest: String) -> Result<(), Value> {
+    let cache = app.path().app_cache_dir().map_err(io_error)?.join("import");
+    blocking(move || {
+        let staging = std::path::PathBuf::from(staging);
+        // Seulement ce que `local_staging` a donné : jamais effacer ailleurs.
+        if !staging.starts_with(&cache) {
+            return Err(io_error("dossier d'import inattendu"));
+        }
+        let result = (|| {
+            let root = if staging.join(guivault_local::FILE_NAME).is_file() {
+                staging.clone()
+            } else {
+                let dirs: Vec<_> = std::fs::read_dir(&staging)
+                    .map_err(io_error)?
+                    .filter_map(|e| e.ok())
+                    .map(|e| e.path())
+                    .filter(|p| p.join(guivault_local::FILE_NAME).is_file())
+                    .collect();
+                match dirs.as_slice() {
+                    [one] => one.clone(),
+                    _ => {
+                        return Err(error(guivault_local::Error::bad_request(
+                            "local_not_found",
+                            "cette archive ne contient pas un coffre (coffre.json)",
+                        )));
+                    }
+                }
+            };
+            let dest = std::path::PathBuf::from(&dest);
+            let id = guivault_local::coffre_id(&root).map_err(error)?;
+            let siblings = dest.parent().and_then(|d| std::fs::read_dir(d).ok());
+            let known = siblings.into_iter().flatten().filter_map(|e| e.ok()).any(|e| {
+                e.path().join(guivault_local::FILE_NAME).is_file()
+                    && guivault_local::coffre_id(&e.path()).ok() == Some(id)
+            });
+            guivault_local::import_coffre(&root, &dest, known).map_err(error)
+        })();
+        let _ = std::fs::remove_dir_all(&staging);
+        result
     })
     .await
 }
@@ -418,7 +514,8 @@ pub fn run() {
     let builder = builder
         .plugin(bubble::init())
         .plugin(biometric::init())
-        .plugin(autofill::init());
+        .plugin(autofill::init())
+        .plugin(coffre_file::init());
     let builder = builder
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
@@ -436,6 +533,9 @@ pub fn run() {
         local_call,
         local_backups,
         local_restore_backup,
+        local_export_snapshot,
+        local_staging,
+        local_import,
         autotype_available,
         autotype_set_hotkey,
         autotype_type,
@@ -462,6 +562,9 @@ pub fn run() {
         local_call,
         local_backups,
         local_restore_backup,
+        local_export_snapshot,
+        local_staging,
+        local_import,
         autotype_available,
         autotype_set_hotkey,
         clipboard_native,

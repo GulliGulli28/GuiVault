@@ -13,6 +13,7 @@ import { installSystem } from "./systemBridge";
 import { installBackups } from "./backupBridge";
 import { installUpdater } from "./updaterBridge";
 import { installCoffres } from "./coffreBridge";
+import { installCoffreFiles } from "./coffreFileBridge";
 import { installBubble } from "./bubbleBridge";
 import { installBiometric } from "./biometricBridge";
 import { installAutofill } from "./autofillBridge";
@@ -35,6 +36,7 @@ void detectMobile().then(() => {
   installBackups();
   if (!isMobile()) installUpdater();
   installCoffres();
+  installCoffreFiles();
   // Le pont système (verrou de session, zone de notification, démarrage,
   // extension) n'a pas de sens sur Android : pas de catégorie « Application ».
   return Promise.allSettled([installAutoType(), installClipboard(), isMobile() ? Promise.resolve() : installSystem(), installBubble(), installBiometric(), installAutofill()]);

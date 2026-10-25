@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/mobile-schema.json",
   "identifier": "mobile",
-  "description": "Android : choisir un fichier à importer, la bulle flottante (src/bubble.rs) et le déverrouillage biométrique (src/biometric.rs) et le remplissage automatique (src/autofill.rs).",
+  "description": "Android : choisir un fichier à importer, la bulle flottante (src/bubble.rs) et le déverrouillage biométrique (src/biometric.rs) le remplissage automatique (src/autofill.rs) et les archives de coffre (src/coffre_file.rs).",
   "platforms": [
     "android"
   ],
@@ -32,6 +32,8 @@
     "biometric:allow-unlock",
     "biometric:allow-touch",
     "biometric:allow-disable",
+    "coffrefile:allow-save",
+    "coffrefile:allow-pick",
     "opener:default"
   ]
 }

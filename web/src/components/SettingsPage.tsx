@@ -24,7 +24,8 @@ import { EmergencySettings } from "./EmergencySettings";
 import { AutoTypeSettings } from "./AutoType";
 import { AppSettings } from "./AppSettings";
 import { LocalBackups } from "./LocalBackups";
-import { autoTypeBridge, backupBridge, coffreBridge, systemBridge } from "../lib/platform";
+import { CoffreExport } from "./CoffreExport";
+import { autoTypeBridge, backupBridge, coffreBridge, coffreFileBridge, systemBridge } from "../lib/platform";
 import { TransferDialog } from "./TransferDialog";
 import { IconChevronRight, IconKeyboard, IconMonitor, IconPalette, IconSettings, IconShield } from "./ui-icons";
 import { CopyButton, Fingerprint, formatAgo, formatWhen, InfoTip, Modal, PasswordInput, SettingRow } from "./ui";
@@ -145,9 +146,10 @@ export function SettingsPage({ ctx, section }: { ctx: PageContext; section: Sett
                   )}
                 </div>
               </section>
-              {local && backupBridge() && (
+              {local && (backupBridge() || coffreFileBridge()) && (
                 <section className="flex flex-col gap-2.5">
                   <h2 className="eyebrow">Sauvegardes</h2>
+                  <CoffreExport path={local.path} onError={ctx.error} onDone={(name) => ctx.notify(`Coffre exporté : ${name}.`)} />
                   <LocalBackups path={local.path} onError={ctx.error} onRestored={(dest) => ctx.notify(`Copie créée : ${dest}. Elle est dans les coffres récents — fermez ce coffre pour l'ouvrir.`)} />
                 </section>
               )}

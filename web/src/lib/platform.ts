@@ -107,6 +107,29 @@ export function backupBridge(): BackupBridge | null {
   return backups;
 }
 
+/** Sortir un coffre de l'appareil, en faire entrer un (Android, où les
+ * coffres vivent dans le dossier privé de l'app que la désinstallation
+ * efface) : une archive `.zip` du dossier du coffre, rangée ou choisie par le
+ * sélecteur de documents du système (`docs/ANDROID.md`). */
+export interface CoffreFileBridge {
+  /** Écrit l'archive du coffre `path` là où l'utilisateur la range ; rend
+   * le nom du fichier, ou `null` s'il annule. */
+  exportArchive(path: string): Promise<string | null>;
+  /** Choisit une archive (ou un `coffre.json`) et en fait un coffre de
+   * l'appareil ; rend son chemin, ou `null` si on annule. */
+  importArchive(): Promise<string | null>;
+}
+
+let coffreFiles: CoffreFileBridge | null = null;
+
+export function setCoffreFileBridge(b: CoffreFileBridge | null) {
+  coffreFiles = b;
+}
+
+export function coffreFileBridge(): CoffreFileBridge | null {
+  return coffreFiles;
+}
+
 /** Les coffres locaux vus d'une autre session (`transfer.ts`) : copier un
  * compte dans un coffre, un coffre vers un serveur. */
 export interface CoffreBridge {

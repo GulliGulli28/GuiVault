@@ -29,6 +29,9 @@ use crate::vault;
 pub enum Source {
     /// Un dossier de coffre local (`coffre.json`).
     Local(PathBuf),
+    /// L'archive `.zip` d'un coffre local (« Exporter le coffre » de
+    /// l'application Android).
+    Archive(PathBuf),
     /// Une sauvegarde du serveur (`guivault-….jsonl.gz`) : il faut l'e-mail
     /// du compte.
     Backup(PathBuf),
@@ -54,11 +57,14 @@ impl Source {
         if n == 2 && head == [0x1f, 0x8b] {
             return Ok(Source::Backup(path.into()));
         }
+        if n == 2 && head == *b"PK" {
+            return Ok(Source::Archive(path.into()));
+        }
         if n >= 1 && head[0] == b'{' {
             return Ok(Source::Export(path.into()));
         }
         bail!(
-            "{} : ni un coffre local, ni une sauvegarde du serveur (.jsonl.gz), ni un export JSON",
+            "{} : ni un coffre local (dossier ou .zip), ni une sauvegarde du serveur (.jsonl.gz), ni un export JSON",
             path.display()
         )
     }
@@ -66,7 +72,7 @@ impl Source {
     /// Ce qu'il faut demander : le mot de passe de quoi.
     pub fn password_prompt(&self, email: Option<&str>) -> String {
         match self {
-            Source::Local(_) => "Mot de passe maître du coffre : ".into(),
+            Source::Local(_) | Source::Archive(_) => "Mot de passe maître du coffre : ".into(),
             Source::Backup(_) => format!("Mot de passe maître de {} : ", email.unwrap_or("ce compte")),
             Source::Export(_) => "Mot de passe de l'export : ".into(),
         }
@@ -321,6 +327,56 @@ pub fn from_local(dir: &Path, password: &str) -> Result<Recovered> {
         )
         .ok()
     }))
+}
+
+/// L'archive d'un coffre (`docs/FORMATS.md`, « Coffre local exporté ») :
+/// décompressée dans un dossier temporaire privé — des fichiers ordinaires
+/// seulement, aucun nom qui sorte du dossier —, lue comme un coffre local,
+/// puis effacée. Le coffre est à la racine de l'archive ou dans son seul
+/// dossier.
+pub fn from_archive(file: &Path, password: &str) -> Result<Recovered> {
+    let f = std::fs::File::open(file).with_context(|| format!("lecture de {}", file.display()))?;
+    let mut zip = zip::ZipArchive::new(f).with_context(|| format!("{} : archive illisible", file.display()))?;
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or_default();
+    let tmp = std::env::temp_dir().join(format!("gv-recover-{}-{nanos}", std::process::id()));
+    private_dir(&tmp)?;
+    let result = (|| {
+        for i in 0..zip.len() {
+            let mut entry = zip.by_index(i)?;
+            let Some(name) = entry.enclosed_name() else {
+                bail!("archive refusée : « {} » sort de son dossier", entry.name());
+            };
+            let target = tmp.join(name);
+            if entry.is_dir() {
+                private_dir(&target)?;
+            } else if entry.is_file() {
+                if let Some(parent) = target.parent() {
+                    private_dir(parent)?;
+                }
+                let mut out = std::fs::File::create(&target)?;
+                std::io::copy(&mut entry, &mut out)?;
+            }
+        }
+        let root = if tmp.join("coffre.json").is_file() {
+            tmp.clone()
+        } else {
+            let dirs: Vec<PathBuf> = std::fs::read_dir(&tmp)?
+                .filter_map(|e| e.ok())
+                .map(|e| e.path())
+                .filter(|p| p.join("coffre.json").is_file())
+                .collect();
+            match dirs.as_slice() {
+                [one] => one.clone(),
+                _ => bail!("{} : pas de coffre (coffre.json) dans cette archive", file.display()),
+            }
+        };
+        from_local(&root, password)
+    })();
+    let _ = std::fs::remove_dir_all(&tmp);
+    result
 }
 
 // ─── Sauvegarde du serveur ──────────────────────────────────────────────────

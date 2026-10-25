@@ -4,7 +4,7 @@ import { LocalBackups } from "../../src/components/LocalBackups";
 import { createLocal, lockedTarget, openLocal, type SessionState } from "../../src/lib/session";
 import { localBiometricId, serverBiometricId, touchBiometric, unlockLocalWithBiometric, unlockServerWithBiometric, useAutoPrompt, useBiometricState } from "../../src/lib/biometric";
 import { IconFingerprint } from "../../src/components/secret-icons";
-import { autofillBridge } from "../../src/lib/platform";
+import { autofillBridge, coffreFileBridge } from "../../src/lib/platform";
 import { AuthShell } from "../../src/components/AuthShell";
 import { LoginScreen } from "../../src/components/LoginScreen";
 import { InfoTip, PasswordInput } from "../../src/components/ui";
@@ -62,6 +62,23 @@ export function AppWelcome({ onSession: done }: { onSession: (s: SessionState) =
     const path = await pickNewCoffre();
     if (path) setStep({ kind: "create", path });
   };
+  // Android : une archive exportée d'un autre appareil (ou d'avant une
+  // réinstallation) devient un coffre de celui-ci.
+  const files = coffreFileBridge();
+  const [importing, setImporting] = useState(false);
+  const importArchive = async () => {
+    if (!files) return;
+    setError(null);
+    setImporting(true);
+    try {
+      const path = await files.importArchive();
+      if (path) setStep({ kind: "open", path });
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setImporting(false);
+    }
+  };
 
   if (step.kind === "login") {
     return <LoginScreen onSession={onSession} extra={<button onClick={home} className="font-medium text-[var(--c-accent-text)] hover:underline">Coffre local ou autre serveur</button>} />;
@@ -99,6 +116,7 @@ export function AppWelcome({ onSession: done }: { onSession: (s: SessionState) =
         <div className="flex flex-wrap gap-2.5">
           {!isMobile() && <button onClick={() => void pickExisting()} className="btn btn-secondary btn-lg min-w-[160px] flex-1">Ouvrir un coffre local</button>}
           <button onClick={() => void pickNew()} className="btn btn-secondary btn-lg min-w-[160px] flex-1">Créer un coffre local</button>
+          {files && <button onClick={() => void importArchive()} disabled={importing} className="btn btn-secondary btn-lg min-w-[160px] flex-1">{importing ? "Import…" : "Importer un coffre"}</button>}
         </div>
       </div>
       {error && <p className="callout callout-danger">{error}</p>}
@@ -337,7 +355,7 @@ function CreateForm({ path, onBack, onSession }: { path: string; onBack: () => v
           <span className="min-w-0 flex-1">Mot de passe perdu = coffre perdu.</span>
           <InfoTip label="Pourquoi" align="right" items={[
             { text: "Personne ne peut réinitialiser ce mot de passe.", tone: "warn" },
-            { text: "Sauvegardez aussi le dossier du coffre." },
+            { text: coffreFileBridge() ? "Exportez-le aussi de temps en temps : Paramètres › Compte." : "Sauvegardez aussi le dossier du coffre." },
           ]} />
         </div>
         {error && <p className="callout callout-danger">{error}</p>}

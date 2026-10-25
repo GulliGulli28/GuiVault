@@ -942,5 +942,44 @@ fn gv_recovers_without_a_server() {
     assert_eq!(rec.vaults[0].items[0]["login"]["password"], "wifi-pass");
     assert_eq!(rec.vaults[0].files[0].data, b"le fichier");
 
+    // Son archive, comme l'exporte l'application Android : le dossier du
+    // coffre dans un zip.
+    let zip_of = |path: &std::path::Path, extra: Option<&str>| {
+        use std::io::Write;
+        let mut zip = zip::ZipWriter::new(std::fs::File::create(path).unwrap());
+        let opts = zip::write::SimpleFileOptions::default();
+        let mut stack = vec![coffre.clone()];
+        while let Some(d) = stack.pop() {
+            for e in std::fs::read_dir(&d).unwrap() {
+                let p = e.unwrap().path();
+                if p.is_dir() {
+                    stack.push(p);
+                } else if !p.ends_with(".lock") {
+                    let rel = p.strip_prefix(coffre.parent().unwrap()).unwrap();
+                    zip.start_file(rel.to_string_lossy().replace('\\', "/"), opts).unwrap();
+                    zip.write_all(&std::fs::read(&p).unwrap()).unwrap();
+                }
+            }
+        }
+        if let Some(name) = extra {
+            zip.start_file(name, opts).unwrap();
+            zip.write_all(b"x").unwrap();
+        }
+        zip.finish().unwrap();
+    };
+    let archive = dir.join("Maison.zip");
+    zip_of(&archive, None);
+    assert_eq!(
+        recover::Source::detect(&archive).unwrap(),
+        recover::Source::Archive(archive.clone())
+    );
+    let rec = recover::from_archive(&archive, "coffre pw").unwrap();
+    assert_eq!(rec.vaults[0].items[0]["login"]["password"], "wifi-pass");
+    assert_eq!(rec.vaults[0].files[0].data, b"le fichier");
+    let trapped = dir.join("piege.zip");
+    zip_of(&trapped, Some("../../evil.txt"));
+    let err = recover::from_archive(&trapped, "coffre pw").err().unwrap().to_string();
+    assert!(err.contains("sort de son dossier"), "{err}");
+
     let _ = std::fs::remove_dir_all(&dir);
 }

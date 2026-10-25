@@ -25,12 +25,14 @@
 //! ```
 mod backup;
 mod error;
+mod export;
 mod format;
 pub mod rpc;
 mod validate;
 
 pub use backup::{BackupInfo, backups, restore_backup};
 pub use error::{Error, Result};
+pub use export::{coffre_id, export_coffre, import_coffre};
 pub use format::{FILE_NAME, FORMAT, LocalAccount};
 
 use chrono::{DateTime, Duration, Utc};

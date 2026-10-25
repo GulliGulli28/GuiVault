@@ -246,6 +246,16 @@ comme lui, et ouvrables avec le mot de passe maître **de leur date** —
 changer de mot de passe ne protège pas les sauvegardes d'avant d'un
 mot de passe déjà compromis ; les effacer (dossier `backups/`) le fait.
 
+**Archive d'un coffre** (Android, « Exporter le coffre ») : le dossier du
+coffre en zip, chiffré comme lui — qui la trouve peut attaquer le mot de
+passe maître hors ligne, comme avec le dossier. Les sauvegardes de
+l'appareil n'y sont pas (elles s'ouvrent avec d'anciens mots de passe).
+L'import refuse une archive dont un nom sort de son dossier, ne décompresse
+que dans le cache de l'application, et n'adopte qu'un `coffre.json` que
+cette version sait lire. La **sauvegarde Google** n'emporte pas les
+coffres ; le transfert direct vers un nouveau téléphone, si
+(`docs/ANDROID.md`).
+
 **Copier entre un coffre et un serveur** (`docs/TRANSFERT.md`) : tout passe
 chiffré, tel quel ; seules les clés de vault sont ré-enveloppées, dans
 l'interface, pour le compte d'arrivée. Un compte créé depuis un coffre en

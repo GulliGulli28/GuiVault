@@ -9,7 +9,8 @@ pages en mise en page mobile, onglets au doigt, bulle (réduire, déplacer,
 se ranger au bord, rouvrir d'un toucher, grise une fois verrouillé, fermer
 sur la croix ; automatique en quittant l'application, réglable),
 déverrouillage biométrique, remplissage des autres applications
-([`REMPLISSAGE.md`](REMPLISSAGE.md)). Les marges
+([`REMPLISSAGE.md`](REMPLISSAGE.md)), export et import d'un coffre
+(« Exporter et importer un coffre »). Les marges
 du système (barre d'état, barre de gestes, clavier) viennent de
 `MainActivity.kt` : l'app est « bord à bord » et `env(safe-area-inset-*)`
 vaut 0 dans la WebView ; la page les lit par `window.GuiVaultInsets`
@@ -139,18 +140,10 @@ ce qui manque, du plus pressant au plus confortable.
 
 **Les données du coffre local**
 
-- [ ] **Sortir un coffre de l'appareil, en faire entrer un** : les coffres
-  vivent dans le dossier privé de l'app (`local_dir`) ; pas de sélecteur
-  de documents (`pickCoffre` rend `null` sur mobile). Désinstaller
-  l'application les efface. Aujourd'hui, seule la copie vers un serveur
-  (`TRANSFERT.md`) les met à l'abri. Piste : exporter / importer
-  `coffre.json` (et ses pièces jointes) par le Storage Access Framework
-  (`ACTION_CREATE_DOCUMENT` / `ACTION_OPEN_DOCUMENT`), dans le plugin
-  Kotlin.
-- [ ] **Sauvegarde Android** (`android:allowBackup`, sauvegarde Google) :
-  décider. Le coffre n'y part que chiffré (la règle n°1 tient), mais une
-  copie dans le cloud de Google n'est pas ce qu'attend qui choisit un
-  coffre local. Soit l'exclure (`dataExtractionRules`), soit le dire.
+- [x] **Sortir un coffre de l'appareil, en faire entrer un** : voir
+  « Exporter et importer un coffre », plus bas.
+- [x] **Sauvegarde Android** : décidé — pas de coffre dans le cloud de
+  Google, transfert vers un nouveau téléphone oui (même section).
 - [ ] Les sauvegardes automatiques du coffre local (`LocalBackups`) : à
   vérifier sur Android (la restauration crée une copie dans le dossier de
   l'app, `pickRestoreDest`).
@@ -188,6 +181,49 @@ ce qui manque, du plus pressant au plus confortable.
   (`SYSTEM_ALERT_WINDOW` y est examinée de près).
 - [ ] Tablettes et paysage : l'interface passe au bureau au-delà de
   768 px ; jamais regardé sur une tablette.
+
+## Exporter et importer un coffre
+
+Les coffres vivent dans le dossier privé de l'application
+(`/data/user/0/dev.guivault.client/coffres`), que la désinstallation efface.
+
+- **Exporter** (Paramètres › Compte › Sauvegardes, « Exporter le coffre ») :
+  une archive `<nom>.zip` rangée où l'on veut par le sélecteur de documents
+  d'Android (Téléchargements, Drive, Nextcloud… — aucune permission de
+  stockage). Elle contient le dossier du coffre, `<nom>.guivault/coffre.json`
+  et `attachments/`, **sans les sauvegardes** (elles s'ouvrent avec le mot
+  de passe maître de leur date, peut-être un ancien) ni le verrou. Chiffrée
+  comme sur l'appareil : décompressée, elle s'ouvre telle quelle au bureau,
+  ou par `gv recover` (qui lit aussi le `.zip`).
+- **Importer** (accueil, « Importer un coffre ») : une archive de ce genre,
+  ou un `coffre.json` seul. Elle devient un coffre de l'appareil, sous un
+  nom libre (« Mon coffre 2 » si le nom est pris) ; si l'appareil a déjà ce
+  coffre (même identifiant), la copie en reçoit un autre, pour ne pas
+  hériter des révisions vues et manifestes de l'original.
+
+Code : `CoffreFilePlugin.kt` (sélecteur, zip, dézip — un nom qui sort du
+dossier, « zip slip », est refusé, comme une archive de plus de 4 Gio ou
+200 000 fichiers), `src/coffre_file.rs` et, dans `src/lib.rs`,
+`local_export_snapshot` (copie cohérente sous le verrou, dans le cache),
+`local_staging` et `local_import` (qui n'efface que dans le cache) ;
+`guivault_local::export_coffre` / `import_coffre` (`crates/guivault-local/src/export.rs`,
+testés) ; interface : `web/app/src/coffreFileBridge.ts`,
+`src/components/CoffreExport.tsx`, bouton de `AppWelcome`. Vérifié sur
+l'émulateur : export vers Téléchargements, archive relue par `gv recover`,
+import (nouvel identifiant à côté de l'original), archive piégée refusée
+sans rien écrire hors du dossier temporaire.
+
+**Sauvegarde Android** (`res/xml/data_extraction_rules.xml`, Android 12+ ;
+`backup_rules.xml` avant) : la sauvegarde Google (cloud) n'emporte **ni les
+coffres** — qui choisit un coffre local ne l'attend pas dans le cloud de
+Google, même chiffré — ni ce qui ne vaut qu'avec une clé du Keystore de ce
+téléphone (préférences de la biométrie, index du remplissage), qui ne se
+restaure pas. Le **transfert d'un téléphone à l'autre** (câble ou réseau
+local, à la mise en service du nouveau) emporte les coffres, chiffrés, pas
+le reste : sur le nouveau téléphone, biométrie et remplissage se
+réactivent. Avant Android 12, une seule règle pour les deux : les coffres
+n'y sont pas. Reste vrai : exporter est le seul moyen sûr de garder un
+coffre hors du téléphone.
 
 ## Déverrouillage biométrique
 

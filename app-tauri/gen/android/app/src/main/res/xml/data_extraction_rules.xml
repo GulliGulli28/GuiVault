@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12+ (docs/ANDROID.md, « Sauvegarde Android »).
+     Sauvegarde Google (cloud) : ni les coffres — qui choisit un coffre local
+     ne l'attend pas dans le cloud de Google, même chiffré —, ni ce qui ne vaut
+     qu'avec une clé du Keystore de ce téléphone (biométrie, index du
+     remplissage), qui ne se restaure pas.
+     Transfert d'un téléphone à l'autre (câble ou réseau local, à la mise en
+     service du nouveau) : les coffres suivent, chiffrés ; pas le reste. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" path="coffres/" />
+        <exclude domain="sharedpref" path="guivault_biometric.xml" />
+        <exclude domain="sharedpref" path="guivault_autofill.xml" />
+        <exclude domain="file" path="autofill.bin" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="sharedpref" path="guivault_biometric.xml" />
+        <exclude domain="sharedpref" path="guivault_autofill.xml" />
+        <exclude domain="file" path="autofill.bin" />
+    </device-transfer>
+</data-extraction-rules>

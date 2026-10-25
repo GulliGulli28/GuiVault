@@ -28,6 +28,8 @@ totp-rs = { version = "5", features = ["otpauth"] }
 rpassword = "7"
 # Les sauvegardes du serveur (`gv recover`) sont des .jsonl.gz.
 flate2 = "1"
+# Et l'archive d'un coffre exporté de l'application Android (.zip).
+zip = { version = "2", default-features = false, features = ["deflate"] }
 
 [dev-dependencies]
 guivault-server = { path = "../guivault-server" }

@@ -1047,3 +1047,92 @@ fn a_backup_becomes_a_new_coffre_even_when_the_original_is_corrupt() {
         "not_found"
     );
 }
+
+#[test]
+fn export_and_import_a_coffre() {
+    let tmp = TempDir::new();
+    let (store, client) = new_coffre(&tmp.coffre());
+    let v = client.personal;
+    let item = Uuid::new_v4();
+    client.put(&store, v, item, "à emporter", None).unwrap();
+    let file_key = SymmetricKey::random();
+    let att = Uuid::new_v4();
+    let chunks = seal_attachment(&file_key, &att.to_string(), b"le fichier").unwrap();
+    store
+        .create_attachment(
+            v,
+            CreateAttachmentRequest {
+                id: att,
+                item_id: item,
+                size: chunks.iter().map(Vec::len).sum::<usize>() as i64,
+                chunks: 1,
+            },
+        )
+        .unwrap();
+    store.put_chunk(v, att, 0, &chunks[0]).unwrap();
+    store.complete_attachment(v, att).unwrap();
+    // Ce qui ne doit pas partir : les sauvegardes, un fichier quelconque.
+    std::fs::create_dir_all(tmp.coffre().join("backups")).unwrap();
+    std::fs::write(tmp.coffre().join("backups/coffre-20260101-000000.json"), b"{}").unwrap();
+    std::fs::write(tmp.coffre().join("notes.txt"), b"x").unwrap();
+
+    let exported = tmp.0.join("export/Mon coffre.guivault");
+    guivault_local::export_coffre(&tmp.coffre(), &exported).unwrap();
+    assert!(exported.join("coffre.json").is_file());
+    assert!(
+        !exported.join("backups").exists(),
+        "les sauvegardes restent sur l'appareil"
+    );
+    assert!(!exported.join("notes.txt").exists());
+    assert!(!exported.join(".lock").exists(), "pas de verrou dans l'archive");
+    assert_eq!(
+        guivault_local::export_coffre(&tmp.coffre(), &exported)
+            .unwrap_err()
+            .code,
+        "local_exists"
+    );
+
+    // Un lien symbolique glissé dans l'archive n'est pas suivi.
+    #[cfg(unix)]
+    std::os::unix::fs::symlink("/etc/passwd", exported.join("attachments/piège")).unwrap();
+
+    // Sur un autre appareil : même coffre, même identifiant.
+    let other = tmp.0.join("autre/Mon coffre.guivault");
+    guivault_local::import_coffre(&exported, &other, false).unwrap();
+    assert!(!other.join("attachments/piège").exists());
+    let imported = LocalVault::open(&other).unwrap();
+    assert_eq!(imported.id().unwrap(), store.id().unwrap());
+    let it = imported.item(v, item).unwrap();
+    assert_eq!(client.open(v, item, "note", &it.ciphertext), "à emporter");
+    let read = vec![imported.chunk(v, att, 0).unwrap()];
+    assert_eq!(
+        open_attachment(&file_key, &att.to_string(), &read).unwrap(),
+        b"le fichier"
+    );
+    assert_eq!(
+        guivault_local::import_coffre(&exported, &other, false)
+            .unwrap_err()
+            .code,
+        "local_exists"
+    );
+
+    // Une seconde copie sur le même appareil : un autre identifiant.
+    let copy = tmp.0.join("autre/Copie.guivault");
+    guivault_local::import_coffre(&exported, &copy, true).unwrap();
+    assert_ne!(guivault_local::coffre_id(&copy).unwrap(), store.id().unwrap());
+
+    // Pas un coffre, ou un coffre abîmé : rien n'est créé.
+    let empty = tmp.0.join("vide");
+    std::fs::create_dir_all(&empty).unwrap();
+    let dest = tmp.0.join("autre/Rien.guivault");
+    assert_eq!(
+        guivault_local::import_coffre(&empty, &dest, false).unwrap_err().code,
+        "local_not_found"
+    );
+    std::fs::write(empty.join("coffre.json"), br#"{"format":1,"vaults":"non"}"#).unwrap();
+    assert_eq!(
+        guivault_local::import_coffre(&empty, &dest, false).unwrap_err().code,
+        "local_corrupt"
+    );
+    assert!(!dest.join("coffre.json").exists());
+}

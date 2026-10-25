@@ -175,6 +175,15 @@ la user key (tag AEAD). Un item avec `deleted_at` est une pierre tombale
 l'historique. Les champs inconnus sont à conserver. Un `format` plus grand
 que celui qu'on connaît est à refuser.
 
+### Coffre local exporté
+
+L'application Android exporte un coffre en **archive zip** de son dossier :
+`<nom>.guivault/coffre.json` et `<nom>.guivault/attachments/…`, rien d'autre
+(ni `backups/`, ni `.lock`). Décompressée, c'est un coffre local comme
+ci-dessus. Un lecteur doit refuser une entrée dont le nom sort du dossier
+(`../`, chemin absolu) et accepter le coffre à la racine de l'archive comme
+dans son seul dossier.
+
 ## Sauvegarde du serveur
 
 `guivault backup create` écrit `guivault-AAAAMMJJ-….jsonl.gz` : un gzip de

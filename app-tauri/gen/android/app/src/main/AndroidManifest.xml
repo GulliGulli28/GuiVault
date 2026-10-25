@@ -18,7 +18,12 @@
     <!-- AndroidTV support -->
     <uses-feature android:name="android.software.leanback" android:required="false" />
 
+    <!-- Sauvegarde Android : pas de coffre dans le cloud de Google, mais un
+         transfert vers un nouveau téléphone (res/xml/data_extraction_rules.xml). -->
     <application
+        android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:theme="@style/Theme.guivault_app"
