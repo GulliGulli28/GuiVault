@@ -87,8 +87,14 @@ C'est le rôle d'un client natif (Guiterm) ou d'une extension.
 
 Imports reconnus : les deux formats ci-dessus, Bitwarden JSON (en clair ou
 protégé par mot de passe — PBKDF2 ou Argon2id, `EncString` type 2) et CSV,
-et les CSV de Chrome, Firefox, LastPass, KeePassXC ou tout CSV dont les
-colonnes se reconnaissent (`web/src/lib/importers.ts`).
+les CSV de Chrome, Firefox, LastPass, KeePassXC, **1Password** (`Title, Url,
+Username, Password, OTPAuth, Favorite, Archived, Tags, Notes` : code TOTP,
+favori et étiquettes repris) et **Proton Pass** (`type, name, url, email,
+username, password, note, totp, …, vault` : l'utilisateur, sinon l'adresse ;
+le vault devient un dossier ; cartes, identités et alias, dont le CSV ne
+donne pas les champs, deviennent des notes, et on le dit), ou tout CSV dont
+les colonnes se reconnaissent (`web/src/lib/importers.ts`). Pas encore : le
+`.1pux` de 1Password et l'export JSON de Proton Pass, plus complets.
 
 **Bases KeePass** (`.kdbx`, KDBX 3.1 et 4 — KeePass 2, KeePassXC, KeeWeb ;
 `web/src/lib/kdbx.ts`) : déchiffrées ici avec le mot de passe maître et le

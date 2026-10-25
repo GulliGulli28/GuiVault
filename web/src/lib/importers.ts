@@ -122,11 +122,15 @@ function importGuiVault(doc: GuiVaultExport): ImportResult {
 const COLUMNS: Record<string, string[]> = {
   name: ["name", "title", "nom", "titre", "account"],
   url: ["url", "uri", "login_uri", "website", "web site", "site", "hostname"],
-  username: ["username", "user", "login_username", "login", "user name", "utilisateur", "email"],
+  username: ["username", "user", "login_username", "login", "user name", "utilisateur"],
+  // À part : Proton Pass a les deux colonnes, l'utilisateur d'abord, sinon
+  // l'adresse (et un CSV qui n'a que l'adresse s'en sert).
+  email: ["email", "e-mail", "courriel"],
   password: ["password", "login_password", "pass", "mot de passe", "mdp"],
   notes: ["notes", "note", "extra", "comment", "comments", "remarques"],
   totp: ["totp", "login_totp", "otp", "otpauth"],
-  folder: ["folder", "grouping", "group", "dossier", "category", "path"],
+  folder: ["folder", "grouping", "group", "dossier", "category", "path", "vault"],
+  tags: ["tags", "tag", "étiquettes", "labels"],
   favorite: ["favorite", "fav", "favori"],
   reprompt: ["reprompt"],
   type: ["type"],
@@ -153,6 +157,8 @@ function guessFormat(header: string[]): string {
   if (h.includes("grouping") && h.includes("extra")) return "LastPass (CSV)";
   if (h.includes("group") && h.includes("title") && h.includes("url")) return "KeePassXC (CSV)";
   if (h.includes("httprealm") || h.includes("formactionorigin")) return "Firefox (CSV)";
+  if (h.includes("otpauth") && h.includes("archived")) return "1Password (CSV)";
+  if (h.includes("createtime") && h.includes("vault")) return "Proton Pass (CSV)";
   if (h[0] === "name" && h.includes("url") && h.includes("username")) return "Chrome (CSV)";
   return "CSV";
 }
@@ -169,6 +175,7 @@ export function importCsv(text: string): ImportResult {
   const warnings: string[] = [];
   const items: ImportedItem[] = [];
   const get = (row: string[], key: string) => (col[key] === undefined ? "" : (row[col[key]] ?? "").trim());
+  let otherTypes = 0;
   for (const row of rows.slice(1)) {
     if (row.every((cell) => cell.trim() === "")) continue;
     const url = get(row, "url");
@@ -178,17 +185,23 @@ export function importCsv(text: string): ImportResult {
     const reprompt = get(row, "reprompt") === "1" || undefined;
     const notes = get(row, "notes");
     const name = get(row, "name") || (url ? hostOf(url) : "") || "(sans nom)";
-    if (type === "note" || (format === "Bitwarden (CSV)" && type !== "login")) {
-      const note = { ...emptyNote(), id: uuid(), name, favorite, reprompt, content: notes };
+    const tags = get(row, "tags").split(/[,;]/).map((t) => t.trim()).filter(Boolean);
+    // Proton Pass met aussi ses cartes, identités et alias dans le CSV, sans
+    // leurs champs : on en garde le nom et la note.
+    const other = format === "Proton Pass (CSV)" && type !== "" && type !== "login" && type !== "note";
+    if (other) otherTypes++;
+    if (type === "note" || type === "secure note" || other || (format === "Bitwarden (CSV)" && type !== "login")) {
+      const note = { ...emptyNote(), id: uuid(), name, favorite, reprompt, tags, content: notes };
       items.push({ payload: { kind: "note", note }, folderPath });
       continue;
     }
-    const login = { ...emptyLogin(), id: uuid(), name, favorite, reprompt, notes: notes || undefined, username: get(row, "username"), password: get(row, "password"), totp: get(row, "totp") || null };
+    const login = { ...emptyLogin(), id: uuid(), name, favorite, reprompt, tags, notes: notes || undefined, username: get(row, "username") || get(row, "email"), password: get(row, "password"), totp: get(row, "totp") || null };
     if (url) login.uris = url.split(/[,\n]/).map((u) => u.trim()).filter(Boolean).map((uri) => ({ uri, match: null }));
     const fields = get(row, "fields");
     if (fields) login.fields = fields.split("\n").map((line) => { const [n, ...v] = line.split(": "); return { name: n, value: v.join(": "), type: "text" as const }; });
     items.push({ payload: { kind: "login", login }, folderPath });
   }
+  if (otherTypes) warnings.push(`${otherTypes} carte(s), identité(s) ou alias importé(s) comme notes : le CSV de Proton Pass n'en donne pas les champs (son export JSON non chiffré, oui — pas encore lu ici).`);
   if (items.length === 0) warnings.push("Aucune ligne exploitable.");
   return { format, items, warnings };
 }

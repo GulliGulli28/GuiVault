@@ -112,7 +112,8 @@ le TypeScript (et réciproquement) le vérifient à chaque build.
   Ed25519, RSA et ECDSA.
 - **Import** : Bitwarden (JSON en clair ou protégé, CSV), KeePass 2 et
   KeePassXC (KDBX 3.1 et 4, fichier clé, pièces jointes et historique),
-  CSV de Chrome, Firefox, LastPass et KeePassXC. **Export** : JSON chiffré
+  CSV de 1Password, Proton Pass, Chrome, Firefox, LastPass et KeePassXC.
+  **Export** : JSON chiffré
   par mot de passe ou en clair, CSV.
 
 ### Le partage
@@ -196,8 +197,9 @@ de clés en détail dans [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
   pas encore dans l'extension.
 - **Pas de fonctions d'entreprise** : ni SSO, ni SCIM, ni groupes, ni
   politiques imposées aux membres.
-- **Pas d'import dédié** depuis 1Password ou Proton Pass, pas d'alias
-  d'e-mail.
+- **Import 1Password et Proton Pass par leur CSV seulement** (identifiants
+  et notes ; pas encore leurs exports complets `.1pux` et JSON), pas
+  d'alias d'e-mail.
 - **Android** : un coffre local vit dans le dossier privé de l'application,
   que la désinstallation efface (pas encore d'export de fichier) — copiez-le
   vers un serveur pour le mettre à l'abri.

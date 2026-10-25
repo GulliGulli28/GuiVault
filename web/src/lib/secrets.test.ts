@@ -136,6 +136,18 @@ describe("import", () => {
     expect(bw.items[1].payload).toMatchObject({ kind: "login", login: { totp: "SECRET", reprompt: true, fields: [{ name: "k", value: "v" }] } });
     expect(bw.items[0].payload.kind === "note" && bw.items[0].payload.note.reprompt).toBeUndefined();
 
+    const op = await importFile("Title,Url,Username,Password,OTPAuth,Favorite,Archived,Tags,Notes\nBanque,https://banque.fr,alice,pw1,otpauth://totp/B?secret=JBSWY3DPEHPK3PXP,true,false,\"perso,finances\",note\n");
+    expect(op.format).toBe("1Password (CSV)");
+    expect(op.items[0].payload).toMatchObject({ kind: "login", login: { name: "Banque", username: "alice", password: "pw1", totp: "otpauth://totp/B?secret=JBSWY3DPEHPK3PXP", favorite: true, tags: ["perso", "finances"], notes: "note", uris: [{ uri: "https://banque.fr" }] } });
+
+    const proton = await importFile("type,name,url,email,username,password,note,totp,createTime,modifyTime,vault\nlogin,Forum,https://forum.io,a@b.c,,pw2,,,1700000000,1700000000,Personal\nlogin,Git,https://git.io,a@b.c,alice,pw3,,JBSWY3DPEHPK3PXP,1700000000,1700000000,Personal\ncreditCard,Visa,,,,,ma carte,,1700000000,1700000000,Personal\n");
+    expect(proton.format).toBe("Proton Pass (CSV)");
+    expect(proton.items[0].payload).toMatchObject({ kind: "login", login: { name: "Forum", username: "a@b.c", password: "pw2" } });
+    expect(proton.items[1].payload).toMatchObject({ kind: "login", login: { username: "alice", totp: "JBSWY3DPEHPK3PXP" } });
+    expect(proton.items[1].folderPath).toEqual(["Personal"]);
+    expect(proton.items[2].payload).toMatchObject({ kind: "note", note: { name: "Visa", content: "ma carte" } });
+    expect(proton.warnings.join(" ")).toMatch(/1 carte/);
+
     await expect(importFile("foo,bar\n1,2\n")).rejects.toThrow(/Colonnes non reconnues/);
   });
 

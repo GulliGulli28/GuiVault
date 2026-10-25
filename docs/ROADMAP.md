@@ -392,9 +392,10 @@ L gros.
   (empreinte), associations liées au certificat de l'application —
   [`REMPLISSAGE.md`](REMPLISSAGE.md). Reste : enregistrer après une
   connexion, code 2FA, Credential Manager.
-- [ ] `FLAG_SECURE`, presse-papiers marqué sensible (S).
-- [ ] **Signaler une nouvelle version** (S) : pas d'updater sur Android ;
-  lire `latest.json` et ouvrir la release.
+- [x] `FLAG_SECURE` (réglable) et presse-papiers marqué sensible, effacé à
+  l'échéance — [`ANDROID.md`](ANDROID.md), « Ce qui reste ».
+- [x] **Signaler une nouvelle version** : les releases `app-v*` publiées,
+  lues sur l'API de GitHub ; « Télécharger » ouvre leur page.
 - [ ] Panneau sur la bulle (recherche, codes 2FA) — à peser : il montrerait
   des secrets par-dessus une autre application.
 
@@ -486,8 +487,11 @@ atouts, pas des manques. Rien ici ne retire une fonction au logiciel libre.
   reprise des coffres existants (Bitwarden, KeePass), formation.
 - [ ] **Contrat de maintenance** avec un délai d'engagement sur les failles
   (correctif publié, versions maintenues — la politique de sécurité du §7).
-- [ ] **Import 1Password et Proton Pass** dédiés (aujourd'hui un CSV
-  générique) : la migration est le premier geste d'un nouveau client.
+- [x] **Import 1Password et Proton Pass** par leur CSV : formats reconnus,
+  TOTP, favoris, étiquettes, vault Proton en dossier, adresse quand
+  l'utilisateur manque ([`ITEMS.md`](ITEMS.md)). Reste : le `.1pux` de
+  1Password et l'export JSON de Proton Pass (cartes, identités, champs
+  personnalisés), à écrire avec de vrais exports en main.
 
 ## Sources
 
