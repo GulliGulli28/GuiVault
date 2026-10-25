@@ -456,6 +456,20 @@ async fn app_update_advertised(app: AppHandle) -> Result<Option<String>, String>
     Ok(updater.check().await.map_err(|e| e.to_string())?.map(|u| u.version))
 }
 
+/// Comment l'application a été installée — le marqueur que le bundler de
+/// Tauri pose dans l'exécutable de chaque installeur. L'updater s'en sert
+/// pour choisir l'entrée `windows-x86_64-msi` ou `-nsis` de `latest.json`.
+#[cfg(desktop)]
+#[tauri::command]
+fn app_installer() -> Option<&'static str> {
+    use tauri::utils::{config::BundleType, platform::bundle_type};
+    match bundle_type()? {
+        BundleType::Msi => Some("msi"),
+        BundleType::Nsis => Some("nsis"),
+        _ => None,
+    }
+}
+
 /// Les arguments que wry passe d'office à WebView2 (et qu'en remplacer
 /// effacerait).
 #[cfg(windows)]
@@ -547,7 +561,8 @@ pub fn run() {
         app_set_close_to_tray,
         app_autostart,
         app_browser_integration,
-        app_update_advertised
+        app_update_advertised,
+        app_installer
     ]);
     // Mobile : le coffre local ; le reste répond « indisponible » (l'interface
     // ne le propose pas).

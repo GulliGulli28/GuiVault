@@ -16,6 +16,7 @@ export function installUpdater() {
   let pending: Update | null = null;
   setUpdaterBridge({
     version: () => getVersion(),
+    installer: () => invoke<"msi" | "nsis" | null>("app_installer").catch(() => null),
     async check() {
       await pending?.close().catch(() => {});
       pending = await check(noCache);

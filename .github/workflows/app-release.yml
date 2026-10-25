@@ -15,8 +15,10 @@ name: Application (release)
 # `windows` qui crée le brouillon.
 #
 # Mises à jour (`tauri-plugin-updater`) : avec le secret
-# `TAURI_SIGNING_PRIVATE_KEY`, l'installeur NSIS est signé (`.sig`) et un
-# `latest.json` joint à la release ; `app-updater.yml` le recopie dans la
+# `TAURI_SIGNING_PRIVATE_KEY`, les deux installeurs sont signés (`.sig`) et
+# un `latest.json` joint à la release — une entrée par installeur
+# (`windows-x86_64-msi`, `-nsis` : l'updater prend celle de l'installeur qui
+# a posé l'app), plus `windows-x86_64` (NSIS) pour les versions d'avant ; `app-updater.yml` le recopie dans la
 # release `app-updater` — celle que lit l'application — quand celle-ci est
 # **publiée**. Sans le secret : pas de mise à jour automatique, et on le dit.
 on:
@@ -77,33 +79,55 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
           if [ -n "$TAURI_SIGNING_PRIVATE_KEY" ]; then
-            ../web/node_modules/.bin/tauri build --config '{"bundle":{"createUpdaterArtifacts":true}}'
+            ../web/node_modules/.bin/tauri build --config '{"bundle":{"createUpdaterArtifacts":true}}' 2>&1 | tee build.log
           else
             echo "::warning title=Mises à jour désactivées::secret TAURI_SIGNING_PRIVATE_KEY absent — installeurs non signés pour l'updater, pas de latest.json (docs/APP.md, « Mises à jour »)."
-            ../web/node_modules/.bin/tauri build
+            ../web/node_modules/.bin/tauri build 2>&1 | tee build.log
+          fi
+          # Le bundler écrit dans l'exécutable de chaque installeur son type
+          # (MSI, NSIS), que l'updater lit pour choisir son entrée de
+          # latest.json. Un fichier tenu ouvert (antivirus) fait échouer ce
+          # patch avec un simple avertissement : l'app se mettrait alors à
+          # jour par le mauvais installeur.
+          if grep -q "Failed to add bundler type" build.log; then
+            echo "::error::le type d'installeur n'a pas pu être écrit dans l'exécutable (voir build.log)"
+            exit 1
           fi
 
-      # Ce que lit l'updater : la version, la signature de l'installeur NSIS
-      # et son adresse dans **cette** release.
+      # Ce que lit l'updater : la version, et pour chaque installeur sa
+      # signature et son adresse dans **cette** release. L'updater cherche
+      # `windows-x86_64-<installeur>` (marqueur posé par le bundler dans
+      # l'exécutable), puis `windows-x86_64` : celle-ci reste NSIS, pour les
+      # installations d'avant le marqueur.
       - name: latest.json
         shell: bash
-        working-directory: app-tauri/target/release/bundle/nsis
+        working-directory: app-tauri/target/release/bundle
         run: |
-          sig=$(ls *-setup.exe.sig 2>/dev/null | head -1)
-          [ -n "$sig" ] || { echo "pas de signature : pas de latest.json"; exit 0; }
-          exe="${sig%.sig}"
-          v=$(node -p "require('../../../../tauri.conf.json').version")
+          nsis=$(ls nsis/*-setup.exe.sig 2>/dev/null | head -1)
+          msi=$(ls msi/*.msi.sig 2>/dev/null | head -1)
+          [ -n "$nsis" ] || { echo "pas de signature : pas de latest.json"; exit 0; }
+          [ -n "$msi" ] || { echo "::error::l'installeur NSIS est signé, pas le MSI"; exit 1; }
+          v=$(node -p "require('../../../tauri.conf.json').version")
           tag="${GITHUB_REF_NAME:-app-v$v}"
           node -e '
             const fs = require("fs");
-            const [v, tag, exe, sig, repo] = process.argv.slice(1);
+            const path = require("path");
+            const [v, tag, nsis, msi, repo] = process.argv.slice(1);
+            const entry = (sig) => ({
+              signature: fs.readFileSync(sig, "utf8").trim(),
+              url: `https://github.com/${repo}/releases/download/${tag}/${encodeURIComponent(path.basename(sig, ".sig"))}`,
+            });
             fs.writeFileSync("latest.json", JSON.stringify({
               version: v,
               notes: `GuiVault ${v} — https://github.com/${repo}/releases/tag/${tag}`,
               pub_date: new Date().toISOString(),
-              platforms: { "windows-x86_64": { signature: fs.readFileSync(sig, "utf8").trim(), url: `https://github.com/${repo}/releases/download/${tag}/${encodeURIComponent(exe)}` } },
+              platforms: {
+                "windows-x86_64": entry(nsis),
+                "windows-x86_64-nsis": entry(nsis),
+                "windows-x86_64-msi": entry(msi),
+              },
             }, null, 2));
-          ' "$v" "$tag" "$exe" "$sig" "${{ github.repository }}"
+          ' "$v" "$tag" "$nsis" "$msi" "${{ github.repository }}"
           cat latest.json
 
       - name: Sommes SHA-256
@@ -124,7 +148,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           b=app-tauri/target/release/bundle
-          extra=$(ls $b/nsis/latest.json $b/nsis/*-setup.exe.sig 2>/dev/null || true)
+          extra=$(ls $b/latest.json $b/nsis/*-setup.exe.sig $b/msi/*.msi.sig 2>/dev/null || true)
           # `--latest=false` : « Latest » revient aux releases du serveur (GitHub la
           # donne quand même à une release app tant qu'elle est la seule).
           gh release create "$GITHUB_REF_NAME" --draft --latest=false \

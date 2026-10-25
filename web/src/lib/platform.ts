@@ -166,6 +166,10 @@ export interface AvailableUpdate {
 export interface UpdaterBridge {
   /** La version installée. */
   version(): Promise<string>;
+  /** Comment elle a été installée : `msi` (pour tous les utilisateurs),
+   * `nsis` (pour soi), `null` si on ne sait pas (lancée hors installeur).
+   * L'updater installe la mise à jour par le même installeur. */
+  installer(): Promise<"msi" | "nsis" | null>;
   /** Une version plus récente, ou `null` ; avec `null`, `advertised` dit
    * ce que la release annonce (égale à l'installée : à jour ; plus ancienne :
    * la dernière publication n'y est pas encore visible). */

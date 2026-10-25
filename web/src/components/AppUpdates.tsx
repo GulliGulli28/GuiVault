@@ -22,9 +22,11 @@ function megabytes(n: number): string {
 export function AppUpdates() {
   const bridge = updaterBridge();
   const [version, setVersion] = useState<string | null>(null);
+  const [installer, setInstaller] = useState<"msi" | "nsis" | null>(null);
   const [status, setStatus] = useState<Status>({ kind: "idle" });
   useEffect(() => {
     bridge?.version().then(setVersion).catch(() => setVersion(null));
+    bridge?.installer().then(setInstaller).catch(() => setInstaller(null));
   }, [bridge]);
   if (!bridge) return null;
 
@@ -51,7 +53,7 @@ export function AppUpdates() {
       <Eyebrow>Mise à jour</Eyebrow>
       <div className="card space-y-2 p-3">
         <div className="flex flex-wrap items-center gap-2">
-          <p className="min-w-0 flex-1 text-[12.5px] text-[var(--c-text)]">GuiVault {version ? <span className="font-mono">{version}</span> : "…"}</p>
+          <p className="min-w-0 flex-1 text-[12.5px] text-[var(--c-text)]">GuiVault {version ? <span className="font-mono">{version}</span> : "…"}{installer && <span className="text-[var(--c-text-muted)]"> · {installer === "msi" ? "installée pour tous (MSI)" : "installée pour vous (NSIS)"}</span>}</p>
           <button onClick={() => void check()} disabled={status.kind === "checking" || status.kind === "installing"} className="btn btn-secondary btn-sm">
             {status.kind === "checking" ? "Recherche…" : "Vérifier les mises à jour"}
           </button>

@@ -37,8 +37,8 @@ c'est ce qui sépare un projet solide d'un outil qu'on recommande.
    compris), puis la suite du remplissage : enregistrer après une
    connexion, passkeys par le Credential Manager (§6,
    [`REMPLISSAGE.md`](REMPLISSAGE.md)).
-3. **Windows** (§6) : signature de code (SmartScreen), mises à jour pour
-   une installation MSI, Windows Hello, agent SSH.
+3. **Windows** (§6) : signature de code (SmartScreen), Windows Hello,
+   agent SSH.
 4. **Le reste des cases vides**, au choix : 2FA WebAuthn et passkey dans
    l'extension (§2), `reprompt`, doublons, premier lancement guidé (§1),
    petites écritures qui rechargent sur un conflit (§4), écrans propres à
@@ -347,10 +347,12 @@ L gros.
   Paramètres › Application › Mise à jour, release `app-updater`
   ([`APP.md`](APP.md), « Mises à jour ») ; éprouvées sur un vrai poste
   (0.1.0 → 0.1.1, 21 octobre 2026).
-- [ ] **Mises à jour pour une installation MSI** (S) : aujourd'hui
-  `latest.json` ne sert que l'installeur NSIS ; signer aussi le MSI et
-  publier les entrées `windows-x86_64-msi` / `windows-x86_64-nsis`
-  ([`APP.md`](APP.md), « Limite connue »).
+- [x] **Mises à jour pour une installation MSI** : les deux installeurs
+  signés, `latest.json` avec `windows-x86_64-msi` / `-nsis` (et
+  `windows-x86_64` = NSIS pour les versions d'avant), l'updater prend celle
+  de son installeur ; vérifiées par `verify-app-release.mjs` ; le type
+  d'installation affiché dans Paramètres › Application ([`APP.md`](APP.md),
+  « MSI et NSIS »).
 - [ ] **Signature de code Windows** — SmartScreen avertit tant que les
   installeurs ne sont pas signés (options dans le `RELEASING.md` de Guiterm).
 - [ ] **Plusieurs coffres ouverts à la fois** (L) : local et compte côte à

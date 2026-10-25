@@ -334,8 +334,8 @@ Les tags `v*` sont ceux du serveur, d'où le préfixe `app-`.
    `git push origin app-v<version>` ; suivre « Application (release) »
    (`gh run watch`).
 3. **Vérifier avant de publier** : `node scripts/verify-app-release.mjs
-   app-v<version>` télécharge `latest.json` et l'installeur NSIS du
-   brouillon, et contrôle la signature contre la clé publique embarquée —
+   app-v<version>` télécharge `latest.json` et les deux installeurs du
+   brouillon, et contrôle chaque entrée contre la clé publique embarquée —
    exactement ce que fera l'updater (version, URL, identifiant de clé,
    commentaire de confiance).
 4. Ajouter les nouveautés en tête des notes, puis publier :
@@ -353,14 +353,22 @@ Les tags `v*` sont ceux du serveur, d'où le préfixe `app-`.
    question (`installMode: passive`) et relance. Circuit éprouvé de bout en
    bout avec 0.1.0 → 0.1.1.
 
-**Limite connue** : `latest.json` n'a qu'une entrée, `windows-x86_64`, qui
-pointe vers l'installeur **NSIS** (par utilisateur, `%LOCALAPPDATA%`). Une
-application installée par le **MSI** (par machine) recevrait donc
-l'installeur NSIS — vraisemblablement une seconde installation à côté. À
-faire (`ROADMAP.md`, §6) : publier aussi la signature du MSI et écrire les
-entrées `windows-x86_64-msi` / `windows-x86_64-nsis`, que l'updater choisit
-selon la façon dont l'app a été installée. D'ici là, recommander l'installeur
-NSIS (`*-setup.exe`) : c'est lui que l'updater sait remplacer.
+**MSI et NSIS** : chaque installeur a son entrée dans `latest.json`,
+`windows-x86_64-msi` et `windows-x86_64-nsis`, signée. L'updater lit dans
+son propre exécutable le marqueur que le bundler de Tauri y a posé
+(`bundle_type`) et prend l'entrée de son installeur : une installation par
+le MSI (pour tous les utilisateurs, `Program Files`, demande
+l'administrateur) se met à jour par le MSI, une installation NSIS (pour
+soi, `%LOCALAPPDATA%`) par le NSIS. L'entrée `windows-x86_64` reste le NSIS,
+pour les versions qui ne lisaient pas encore le marqueur (jusqu'à 0.4.0).
+Paramètres › Application › Mise à jour dit par quel installeur l'app a été
+posée (`app_installer`). Le bundler écrit ce marqueur en patchant
+l'exécutable ; si un autre processus le tient ouvert à ce moment
+(l'antivirus, vu sur le poste : erreur 1224), il ne fait qu'avertir et le
+MSI garde un marqueur inconnu — le workflow échoue alors plutôt que de
+publier. Vérifié localement : MSI extrait par `msiexec /a`, exécutable
+marqué `MSI` ; `verify-app-release.mjs --dir` sur les installeurs signés
+du poste, MSI altéré refusé.
 
 ### Versions publiées
 
