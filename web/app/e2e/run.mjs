@@ -369,6 +369,40 @@ scenario("doublons : dupliquer un identifiant, le voir dans la santé, fusionner
   await (await b.$("//a[.//span[normalize-space()='Personnel']]")).click();
 });
 
+scenario("fuites : un coffre local interroge Have I Been Pwned lui-même", async (b) => {
+  await openNewMenu(b);
+  await (await b.$("//button[@role='menuitem'][normalize-space()='Identifiant']")).click();
+  await waitText(b, "Nouvel identifiant");
+  await fillField(b, "Nom", "Vieux compte");
+  await fillField(b, "Mot de passe", "password123");
+  await click(b, "Enregistrer");
+  await waitText(b, "Copier le mot de passe");
+  await (await b.$("//aside//a[.//span[normalize-space()='Santé']]")).click();
+  await click(b, "Vérifier les fuites");
+  // Le réseau du poste décide : une réponse de HIBP, ou une erreur dite.
+  const outcome = await b.waitUntil(async () => {
+    const t = await bodyText(b);
+    if (/fuité/.test(t) && t.includes("Vieux compte")) return "fuite";
+    if (/Have I Been Pwned répond|Failed to fetch|NetworkError|Load failed/i.test(t)) return "réseau";
+    return false;
+  }, { timeout: 60_000, timeoutMsg: "la recherche de fuites n'a pas abouti" });
+  await (await b.$("//a[.//span[normalize-space()='Personnel']]")).click();
+  if (outcome === "réseau") return "ignoré : Have I Been Pwned injoignable depuis ce poste";
+});
+
+scenario("feuille de secours : le coffre, son empreinte, une case pour le mot de passe", async (b) => {
+  await openSettings(b);
+  await click(b, "Préparer…");
+  await waitText(b, "GuiVault — feuille de secours");
+  const text = await bodyText(b);
+  assert(text.includes("Mon coffre") && text.includes(coffre), "la feuille ne dit pas quel coffre ni où");
+  assert(text.includes("Mot de passe maître (à écrire à la main)"), "la feuille n'a pas de case pour le mot de passe");
+  assert(!text.includes(PASSWORD), "la feuille contient le mot de passe maître");
+  await shot(b, "3d-feuille");
+  await click(b, "Fermer");
+  await (await b.$("//a[.//span[normalize-space()='Personnel']]")).click();
+});
+
 /** Une commande de l'application, depuis la page (W3C : la promesse est
  * attendue). Rend `{ ok, value }` ou `{ ok: false, error }`. */
 async function invoke(b, cmd, args = {}) {

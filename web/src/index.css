@@ -829,3 +829,20 @@ canvas:focus-visible {
     animation: none;
   }
 }
+
+/* La feuille de secours (`RecoveryKit.tsx`) : seule à l'impression. */
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+  .print-sheet,
+  .print-sheet * {
+    visibility: visible !important;
+  }
+  .print-sheet {
+    position: fixed;
+    inset: 0;
+    border: none !important;
+    box-shadow: none !important;
+  }
+}

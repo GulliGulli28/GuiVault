@@ -178,6 +178,16 @@ export function countInRange(body: string, suffix: string): number {
   return 0;
 }
 
+/** Un coffre local n'a pas de serveur pour relayer : l'application
+ * interroge Have I Been Pwned elle-même, toujours par k-anonymat et avec
+ * remplissage (`Add-Padding`) — seule différence avec le relais, HIBP voit
+ * l'adresse IP de l'appareil. Sur demande seulement. */
+export async function directRange(prefix: string): Promise<string> {
+  const res = await fetch(`https://api.pwnedpasswords.com/range/${encodeURIComponent(prefix)}`, { headers: { "Add-Padding": "true" }, cache: "no-store" });
+  if (!res.ok) throw new Error(`Have I Been Pwned répond ${res.status}`);
+  return res.text();
+}
+
 /** Pour chaque secret distinct, combien de fois il apparaît dans les fuites
  * connues. `fetchRange(prefix)` rend la réponse « range » d'un préfixe de
  * 5 caractères (le relais du serveur) ; un même préfixe n'est demandé

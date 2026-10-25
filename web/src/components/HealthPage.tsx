@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { PageContext } from "../App";
 import { api, errorMessage } from "../lib/api";
-import { allSecrets, checkPwned, findExpiring, findMissingTotp, findOld, findReused, findWeak, type HealthEntry } from "../lib/health";
+import { allSecrets, checkPwned, directRange, findExpiring, findMissingTotp, findOld, findReused, findWeak, type HealthEntry } from "../lib/health";
 import { findDuplicates } from "../lib/duplicates";
 import { canMerge, MergeDuplicates } from "./MergeDuplicates";
 import { navigate } from "../lib/route";
@@ -33,6 +33,8 @@ export function HealthPage({ ctx }: { ctx: PageContext }) {
   const vaultsKey = session.vaults.map((v) => `${v.id}:${v.revision}`).join(",");
   const offline = !!session.offline;
   const local = !!session.local;
+  // Coffre local (l'application) : les fuites s'interrogent directement.
+  const direct = local && !offline;
 
   useEffect(() => {
     let cancelled = false;
@@ -82,7 +84,7 @@ export function HealthPage({ ctx }: { ctx: PageContext }) {
     if (!report) return;
     setProgress({ done: 0, total: 0 });
     try {
-      setPwned(await checkPwned(report.secrets.map((s) => s.value), (p) => api.pwnedRange(p), (done, total) => setProgress({ done, total })));
+      setPwned(await checkPwned(report.secrets.map((s) => s.value), direct ? directRange : (p) => api.pwnedRange(p), (done, total) => setProgress({ done, total })));
     } catch (e) {
       ctx.error(errorMessage(e));
     } finally {
@@ -132,7 +134,7 @@ export function HealthPage({ ctx }: { ctx: PageContext }) {
     : counts("weak") > 0 ? `Renforcer ${counts("weak")} secret${counts("weak") > 1 ? "s" : ""} faible${counts("weak") > 1 ? "s" : ""}`
     : counts("totp") > 0 ? `Ajouter la 2FA sur ${counts("totp")} site${counts("totp") > 1 ? "s" : ""}`
     : null;
-  const lookupsOff = lookups === false ? (local ? "Coffre local : sans serveur pour relayer" : offline ? "Hors ligne" : "Désactivé sur ce serveur") : null;
+  const lookupsOff = direct ? null : lookups === false ? (offline ? "Hors ligne" : "Désactivé sur ce serveur") : null;
 
   return (
     <Page
@@ -148,14 +150,16 @@ export function HealthPage({ ctx }: { ctx: PageContext }) {
               <span role="tooltip" className="popover absolute left-0 top-8 z-20 flex w-[320px] max-w-[calc(100vw-2rem)] flex-col gap-2 p-3.5 text-[13px] text-[var(--c-text-secondary)]">
                 <span className="flex gap-2"><IconCheck size={15} className="mt-0.5 shrink-0 text-[var(--c-ok)]" />Calculée ici, le serveur ne voit pas ce rapport</span>
                 <span className="flex gap-2"><IconCheck size={15} className="mt-0.5 shrink-0 text-[var(--c-ok)]" />Fuites : seuls 5 caractères de l'empreinte partent, à la demande</span>
-                <span className="flex gap-2"><IconCheck size={15} className="mt-0.5 shrink-0 text-[var(--c-ok)]" />Sites 2FA : liste publique relayée par le serveur</span>
+                {direct
+                  ? <span className="flex gap-2"><IconInfo size={15} className="mt-0.5 shrink-0 text-[var(--c-text-muted)]" />Coffre local : Have I Been Pwned est interrogé directement et voit l'adresse IP de cet appareil</span>
+                  : <span className="flex gap-2"><IconCheck size={15} className="mt-0.5 shrink-0 text-[var(--c-ok)]" />Sites 2FA : liste publique relayée par le serveur</span>}
               </span>
             </>
           )}
         </span>
       }
-      actions={lookups !== false && report && leaked === null ? (
-        <button onClick={() => void runPwned()} disabled={progress !== null || lookups === null || report.secrets.length === 0} className="btn btn-secondary btn-lg">
+      actions={(direct || lookups !== false) && report && leaked === null ? (
+        <button onClick={() => void runPwned()} disabled={progress !== null || (!direct && lookups === null) || report.secrets.length === 0} className="btn btn-secondary btn-lg">
           <IconSearch size={15} /> {progress ? `Recherche… ${progress.done}/${progress.total || "?"}` : "Vérifier les fuites"}
         </button>
       ) : undefined}
@@ -203,6 +207,7 @@ export function HealthPage({ ctx }: { ctx: PageContext }) {
               {report.old.length === 0 && <span className="pill max-w-full whitespace-normal"><IconCheck size={15} /> Aucun mot de passe de plus d'un an</span>}
               {report.expiring.length === 0 && <span className="pill max-w-full whitespace-normal"><IconCheck size={15} /> Rien n'expire ce mois</span>}
               {lookupsOff && <span className="pill max-w-full whitespace-normal">{lookupsOff} : fuites et sites 2FA indisponibles</span>}
+              {direct && <span className="pill max-w-full whitespace-normal">Coffre local : liste des sites 2FA indisponible sans serveur</span>}
             </div>
           </section>
         </>

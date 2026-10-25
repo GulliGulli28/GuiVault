@@ -27,6 +27,7 @@ import { LocalBackups } from "./LocalBackups";
 import { CoffreExport } from "./CoffreExport";
 import { autoTypeBridge, backupBridge, coffreBridge, coffreFileBridge, systemBridge } from "../lib/platform";
 import { TransferDialog } from "./TransferDialog";
+import { RecoveryKit } from "./RecoveryKit";
 import { IconChevronRight, IconKeyboard, IconMonitor, IconPalette, IconSettings, IconShield } from "./ui-icons";
 import { CopyButton, Fingerprint, formatAgo, formatWhen, InfoTip, Modal, PasswordInput, SettingRow } from "./ui";
 
@@ -66,7 +67,7 @@ export function SettingsPage({ ctx, section }: { ctx: PageContext; section: Sett
   const [sessions, setSessions] = useState<Session[]>([]);
   const [totp, setTotp] = useState<boolean | null>(null);
   const [audit, setAudit] = useState<AuditEntry[] | null>(null);
-  const [dialog, setDialog] = useState<null | "password" | "totp-setup" | "totp-disable" | "delete-account" | "transfer">(null);
+  const [dialog, setDialog] = useState<null | "password" | "totp-setup" | "totp-disable" | "delete-account" | "transfer" | "kit">(null);
   const [revoke, setRevoke] = useState<Session | null>(null);
   const closeDialog = useCallback(() => setDialog(null), []);
   const [lockMinutes, setLockMinutes] = useState(loadLockMinutes);
@@ -135,6 +136,13 @@ export function SettingsPage({ ctx, section }: { ctx: PageContext; section: Sett
                 <div className="card">
                   <SettingRow title={<span className="truncate">{local ? `Coffre local « ${who} »` : who}</span>} desc={`${local ? "Créé" : "Compte créé"} le ${formatWhen(session.user.created_at)}`} />
                   {local && <SettingRow title="Dossier" desc={<span className="break-all font-mono text-[12.5px]">{local.path}</span>} />}
+                  <SettingRow title={<>Feuille de secours <InfoTip label="À quoi sert la feuille de secours" items={[
+                    { text: "Où est le coffre, avec quel compte, son empreinte." },
+                    { text: "Une case pour le mot de passe maître, à écrire à la main.", tone: "ok" },
+                    { text: "Rangée hors de l'ordinateur, elle sauve un jour de panne." },
+                  ]} /></>} desc="À imprimer et ranger en lieu sûr.">
+                    <button onClick={() => setDialog("kit")} className="btn btn-secondary">Préparer…</button>
+                  </SettingRow>
                   {supports("members") && (
                     <SettingRow
                       title={<>Votre empreinte <InfoTip label="À quoi sert l'empreinte" items={[
@@ -263,6 +271,7 @@ export function SettingsPage({ ctx, section }: { ctx: PageContext; section: Sett
 
       {dialog === "password" && <PasswordDialog ctx={ctx} onClose={() => setDialog(null)} />}
       {dialog === "transfer" && <TransferDialog ctx={ctx} onClose={closeDialog} />}
+      {dialog === "kit" && <RecoveryKit session={session} onClose={closeDialog} />}
       {dialog === "delete-account" && <DeleteAccountDialog ctx={ctx} totp={totp === true} onClose={() => setDialog(null)} />}
       {dialog === "totp-setup" && <TotpSetupDialog ctx={ctx} onClose={() => { setDialog(null); reload(); }} />}
       {dialog === "totp-disable" && <TotpDisableDialog ctx={ctx} onClose={() => { setDialog(null); reload(); }} />}

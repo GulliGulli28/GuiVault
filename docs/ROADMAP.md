@@ -360,12 +360,17 @@ L gros.
 - [ ] **Plusieurs coffres ouverts à la fois** (L) : local et compte côte à
   côte, transfert entre eux (les « emplacements » de Guiterm).
 - [ ] **Références entre champs** `{REF:…}` (M, KeePass).
-- [ ] **Feuille de secours imprimable** (S, Emergency Kit de 1Password) :
-  emplacement du coffre, serveur, empreinte, une case pour le mot de passe.
+- [x] **Feuille de secours imprimable** (Emergency Kit de 1Password) :
+  Paramètres › Compte › « Feuille de secours » — coffre ou serveur et
+  compte, empreinte, date, une case pour le mot de passe maître **à écrire
+  à la main** (jamais imprimé), et le rappel de `gv recover`
+  (`RecoveryKit.tsx`, styles d'impression dans `index.css`).
 - [ ] **Modèles d'éléments**, types personnalisés (M).
 - [ ] **Mode portable** (S–M, KeePass) : sur une clé USB.
-- [ ] **Fuites sans serveur** (S) : depuis l'app, k-anonymat direct, en
-  option, pour un coffre local.
+- [x] **Fuites sans serveur** : un coffre local interroge Have I Been Pwned
+  lui-même, sur demande, par k-anonymat avec remplissage ; HIBP voit alors
+  l'adresse IP de l'appareil, et la page le dit (`health.directRange`). La
+  liste des sites 2FA reste indisponible sans serveur.
 
 **Android** ([`ANDROID.md`](ANDROID.md))
 
