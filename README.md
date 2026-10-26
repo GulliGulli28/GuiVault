@@ -47,9 +47,8 @@ même auteur.
    dérivation au rabais), enveloppes de clés de vault **authentifiées** et
    empreinte de l'inviteur vérifiée avant d'accepter, retour en arrière
    détecté, accès d'urgence **sans** clé de récupération côté serveur, rôle
-   d'administrateur qui ne se donne que depuis le shell. Le manifeste qui
-   authentifie l'ensemble d'un vault est écrit, pas encore activé (voir
-   [Limites](#limites-connues)).
+   d'administrateur qui ne se donne que depuis le shell, et un **manifeste
+   de vault** scellé qui trahit un élément rejoué, retenu ou ressuscité.
 2. **Local ou serveur, le même coffre.** Un coffre local n'est pas un autre
    format : c'est exactement ce que garderait le serveur, dans un dossier.
    On commence seul sans rien héberger, et on le copie vers un serveur le
@@ -181,10 +180,10 @@ de clés en détail dans [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 [`docs/SECURITY.md`](docs/SECURITY.md) ou [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 - **Pas d'audit externe**, pas encore de programme de prime aux bogues.
-- **Retour en arrière d'un item** : un serveur malveillant peut resservir
-  l'ancienne version chiffrée d'un élément sous une révision qui monte. Le
-  manifeste de vault qui l'empêche est prêt dans tous les clients ; il sera
-  activé une fois la version de Guiterm qui l'entretient publiée.
+- **Manifeste de vault** : tout membre, lecteur compris, peut en écrire un
+  valide (pas de signature par compte), et un appareil qui découvre un vault
+  n'a pas d'état antérieur à comparer. Il faut Guiterm 4.2.0 ou plus pour
+  écrire dans un vault qui en a un.
 - **L'interface web est livrée par le serveur** à chaque chargement : un
   serveur compromis pourrait servir une page qui vole le mot de passe
   maître. C'est la limite de tout coffre web (Bitwarden et Proton

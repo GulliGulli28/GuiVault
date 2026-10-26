@@ -30,11 +30,12 @@ il ne déchiffre rien : la user key reste sous la clé que seule la PRF donne).
   qu'elles s'unifient dans son binaire.
 - `crates/guivault-protocol` — types JSON. Même contrainte de compatibilité.
 - **Manifeste de vault** (`guivault-crypto/src/manifest.rs`, web
-  `lib/manifest.ts` + `session.ts`, alerte `components/IntegrityBanner.tsx`) : **en cours**, état et reste à faire
-  dans `docs/MANIFESTE.md`. Toute nouvelle route qui écrit ou supprime un
-  item doit porter le manifeste (`db::next_manifest` / `store_manifest`
-  côté serveur, `withManifest` côté web). Ne pas passer
-  `AUTO_ENABLE_MANIFEST` à vrai avant que Guiterm sache l'entretenir.
+  `lib/manifest.ts` + `session.ts`, alerte `components/IntegrityBanner.tsx`) : **actif**
+  depuis le 2026-10-26 (`AUTO_ENABLE_MANIFEST`, Guiterm ≥ 4.2.0 pour écrire
+  dans un vault qui en a un), détail dans `docs/MANIFESTE.md`. Toute nouvelle
+  route qui écrit ou supprime un item doit porter le manifeste
+  (`db::next_manifest` / `store_manifest` côté serveur, `withManifest` côté
+  web), sinon elle casse sur tout vault existant.
 - `crates/guivault-items` — formats en clair des secrets (`login`, `note`,
   `card`, `identity`, `aws`, `api-key`), miroir Rust de `web/src/lib/types.ts`, à consommer
   par Guiterm le jour de l'intégration (plan dans `docs/ITEMS.md`). Champs

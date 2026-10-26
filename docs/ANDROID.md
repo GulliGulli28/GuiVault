@@ -130,9 +130,9 @@ ce qui manque, du plus pressant au plus confortable.
 
 **À vérifier**
 
-- [ ] **Sur un vrai téléphone** : clavier et feuilles (`--inset-ime`), bulle
-  automatique en quittant, liens vers le navigateur, gestes entre onglets,
-  Argon2id (≈ 15 s sur l'émulateur : à mesurer sur un milieu de gamme).
+- [x] **Sur un vrai téléphone** : essayé par l'auteur sur le sien le
+  26 octobre 2026, sans remarque. Reste à mesurer Argon2id sur un
+  milieu de gamme (≈ 15 s sur l'émulateur).
 - [ ] **Bulle en ouvrant un lien** : « Visiter le site » quitte l'app vers le
   navigateur, et la bulle apparaît (`onUserLeaveHint`). Cohérent avec « en
   quittant l'application » ; à garder ou à écarter pour ce cas (retenir un

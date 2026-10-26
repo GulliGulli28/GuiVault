@@ -9,11 +9,11 @@ l'auto-hébergement sans fonctions « premium »).
 Chaque piste respecte la règle n°1 (`CLAUDE.md`) : le serveur ne garde que
 des blobs qu'il ne sait pas lire. Cocher au fur et à mesure.
 
-## État (23 octobre 2026)
+## État (26 octobre 2026)
 
-**Fait** : tout le §0 sauf le manifeste authentifié (plancher et
-paramètres Argon2id épinglés, retour en arrière détecté, enveloppes
-authentifiées, empreinte de l'inviteur) ; dans les §1, §3 et §4 : presse-papiers
+**Fait** : tout le §0 (plancher et paramètres Argon2id épinglés, retour en
+arrière détecté, enveloppes authentifiées, empreinte de l'inviteur,
+**manifeste de vault**, actif depuis le 26 octobre) ; dans les §1, §3 et §4 : presse-papiers
 effacé, historique et corbeille, copie hors ligne, recherche globale
 (Ctrl+K), raccourcis, tri, **fusion des conflits**, CLI `gv`, **remplissage fiable** de l'extension
 (shadow DOM, cadres, corpus rejoué en CI), **agent SSH dans Guiterm** ; dans le §2 : **accès d'urgence**,
@@ -29,17 +29,12 @@ En parallèle, la **confiance et la distribution** (§7 : audit, image signée,
 stores, politique de sécurité, survivre au projet) puis l'**offre** (§8) :
 c'est ce qui sépare un projet solide d'un outil qu'on recommande.
 
-1. **Manifeste de vault authentifié** (§0) : tout est écrit — serveur, web
-   (alerte comprise), extension, vecteurs d'interop, `gv` et Guiterm ; reste
-   l'**activation** (`AUTO_ENABLE_MANIFEST`), une fois ce Guiterm publié.
-   La liste exacte : [`MANIFESTE.md`](MANIFESTE.md), « Ce qui reste, dans l'ordre ».
-2. **Android, l'essai sur un vrai téléphone** (biométrie et remplissage
-   compris), puis la suite du remplissage : enregistrer après une
-   connexion, passkeys par le Credential Manager (§6,
-   [`REMPLISSAGE.md`](REMPLISSAGE.md)).
-3. **Windows** (§6) : signature de code (SmartScreen), Windows Hello,
+1. **Android, la suite du remplissage** (essayé sur un vrai téléphone le
+   26 octobre) : enregistrer après une connexion, passkeys par le
+   Credential Manager (§6, [`REMPLISSAGE.md`](REMPLISSAGE.md)).
+2. **Windows** (§6) : signature de code (SmartScreen), Windows Hello,
    agent SSH.
-4. **Le reste des cases vides**, au choix : passkey dans l'extension (§2), écrans propres à
+3. **Le reste des cases vides**, au choix : passkey dans l'extension (§2), écrans propres à
    l'application qui n'ont eu que des textes raccourcis dans la refonte
    (`DESIGN.md`, « État »), `gv` et Guiterm sur un coffre local
    (`APP.md`).
@@ -83,16 +78,17 @@ paramètres ou formats anciens.
   ce qui s'écrivait ensuite sous des révisions déjà « vues » — jusqu'à
   « Reprendre la synchronisation » (panneau GuiVault), où ce poste fait foi :
   versions renvoyées, items perdus recréés, suppressions rejouées.
-- [ ] **Manifeste de vault authentifié** — **en cours**, décisions prises,
-  détail et reste à faire dans [`MANIFESTE.md`](MANIFESTE.md). Fait :
+- [x] **Manifeste de vault authentifié** — **actif** depuis le 26 octobre
+  2026 (Guiterm 4.2.0 ou plus pour écrire dans un vault qui en a un),
+  détail dans [`MANIFESTE.md`](MANIFESTE.md) :
   format et vérification (`guivault-crypto/src/manifest.rs`), serveur
   (migration `0010`, écritures refusées sans manifeste, verrou optimiste,
   lecture cohérente, rotation), client web et extension (vérification,
   entretien à chaque écriture, bandeau d'alerte et prise d'acte,
   `IntegrityBanner.tsx`), vecteurs d'interop, `gv` (avertit sans bloquer,
   `gv sync --accept`), Guiterm (vérifie au pull, suspend le vault en écart,
-  entretient à chaque écriture). Reste : activation (`AUTO_ENABLE_MANIFEST`, coupé
-  d'ici là : aucun vault n'en reçoit).
+  entretient à chaque écriture) ; puis l'activation (`AUTO_ENABLE_MANIFEST`) :
+  le web en donne un à chaque vault où il peut écrire.
 - [x] **Enveloppes authentifiées.** Les enveloppes de clés de vault étaient
   des boîtes scellées anonymes : le serveur pouvait en fabriquer une pour un
   vault de son choix. Format 2 (`wrap_vault_key`) : X25519 statique entre
@@ -389,8 +385,9 @@ L gros.
   joint à chaque release par le CI (depuis la 0.2.1).
 - [x] **Bulle flottante** à la Messenger : réduire, déplacer, rouvrir ;
   automatique en quittant l'application (réglable), aucun secret affiché.
-- [ ] **Essai sur un vrai téléphone** (S) — tout n'a été vu que sur
-  l'émulateur.
+- [x] **Essai sur un vrai téléphone** (S) : l'application essayée par
+  l'auteur sur son téléphone le 26 octobre 2026 — à élargir à d'autres
+  modèles.
 - [x] **Exporter / importer un coffre local** : une archive `.zip` du
   dossier du coffre par le sélecteur de documents d'Android (sans les
   sauvegardes), importée sous un nom libre et un nouvel identifiant si
@@ -424,8 +421,8 @@ Le README le dit en tête ; chaque case cochée y retire une ligne.
   d'authentification et de partage (Cure53, Trail of Bits, Radically Open
   Security ; ou un financement OTF / NLnet pour un projet libre), rapport
   publié tel quel avec les corrections.
-- [ ] **Activer le manifeste** (§0) : la dernière limite structurelle face à
-  un serveur malveillant.
+- [x] **Activer le manifeste** (§0) : la dernière limite structurelle face à
+  un serveur malveillant — le 26 octobre 2026.
 - [x] **Image Docker publiée** sur ghcr.io : amd64 et arm64 (runners
   natifs, fusion par empreinte), signée par cosign sans clé, attestation de
   provenance — `.github/workflows/server-image.yml`, après chaque CI vert
@@ -442,8 +439,8 @@ Le README le dit en tête ; chaque case cochée y retire une ligne.
 - [ ] **Extension dans les stores** (Chrome Web Store, Firefox Add-ons,
   Edge) — l'identifiant change : l'ajouter aux origines de l'hôte natif
   (`EXTENSION.md`).
-- [ ] **Signature de code Windows** (§6) et Android essayé sur de vrais
-  téléphones (§6).
+- [ ] **Signature de code Windows** (§6) ; Android essayé sur un premier
+  vrai téléphone, à élargir (§6).
 - [x] **Builds reproductibles** du web embarqué : le build est
   reproductible tel quel (vérifié entre un poste en Node 20 et l'image en
   Node 22), `/health` annonce `build_commit` (argument de build de l'image),

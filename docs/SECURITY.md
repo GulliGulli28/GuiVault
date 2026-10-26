@@ -13,7 +13,7 @@ chiffrées.
 |---|---|
 | Fuite de la base (dump, sauvegarde, disque) | Aucune clé côté serveur. Les blobs sont XChaCha20-Poly1305 sous des clés dérivées d'un mot de passe maître via Argon2id (64 MiB, 3 passes). La clé d'authentification est re-hachée (Argon2id) : le dump ne permet pas non plus de se connecter. Les jetons sont stockés hachés (SHA-256). |
 | Serveur malveillant qui **modifie** des données | Chaque blob est AEAD. L'AAD lie un item à son vault, son id et son type : un item déplacé, renommé ou substitué ne s'ouvre plus. Un morceau de pièce jointe est lié à sa pièce jointe, à sa place et au fait d'être le dernier : ni réordonné, ni tronqué, ni emprunté à un autre fichier. |
-| Serveur malveillant qui **rejoue** une ancienne version d'un vault (ou base restaurée depuis une sauvegarde) | Les clients retiennent la dernière révision vue de chaque vault (web et extension : `web/src/lib/vaultRevisions.ts`, `localStorage` ; Guiterm : `SyncState::vault_revisions`) et, si le serveur en annonce une plus basse, le disent en rouge jusqu'à ce que l'utilisateur en prenne acte. Guiterm **suspend** en plus la synchronisation de ce vault (ni pull, ni push, ni suppression) jusqu'à reprise explicite, où sa version fait foi. Non couvert cryptographiquement : voir « Limites ». |
+| Serveur malveillant qui **rejoue** une ancienne version d'un vault (ou base restaurée depuis une sauvegarde) | Les clients retiennent la dernière révision vue de chaque vault (web et extension : `web/src/lib/vaultRevisions.ts`, `localStorage` ; Guiterm : `SyncState::vault_revisions`) et, si le serveur en annonce une plus basse, le disent en rouge jusqu'à ce que l'utilisateur en prenne acte. Guiterm **suspend** en plus la synchronisation de ce vault (ni pull, ni push, ni suppression) jusqu'à reprise explicite, où sa version fait foi. Au-delà de la révision, le **manifeste de vault** (`MANIFESTE.md`, scellé sous la clé du vault : compteur et empreinte de chaque item vivant) rend détectable un item rejoué, retenu ou ressuscité, et un manifeste qui recule : le web, l'extension et Guiterm cessent d'écrire dans le vault et le disent jusqu'à prise d'acte ; `gv` avertit. Reste ouvert : voir « Limites ». |
 | Serveur malveillant qui **substitue une clé publique** pour lire un vault partagé | C'est l'attaque principale contre tout système de partage E2E. Défense : l'**empreinte** de la clé publique (`fingerprint`) est renvoyée partout où une clé publique apparaît ; le client DOIT l'afficher et demander une vérification hors bande (voix, messagerie interne) avant le premier partage vers une personne, puis épingler la clé (TOFU) et alerter si elle change. Dans l'autre sens, l'enveloppe de la clé de vault est authentifiée (format 2) : le destinataire voit l'empreinte de qui la lui a remise et la vérifie de même. |
 | Vol du mot de passe maître seul (hameçonnage, épaule) | Second facteur TOTP optionnel : sans le code, pas de session. Une **clé de sécurité** (WebAuthn) peut le remplacer à la connexion — signature liée à l'origine du serveur, qu'un site d'hameçonnage ne peut pas relayer ; le code reste accepté (recours), donc l'hameçonnage du code reste possible tant qu'on ne l'impose pas. Ne protège pas contre un vol de mot de passe **plus** un dump de base. |
 | Vol d'un jeton d'accès | Durée 15 min. Révocable (sessions). |
@@ -85,11 +85,12 @@ pour appliquer le délai.
   détectent une **révision de vault qui recule** — ce que produit une base
   restaurée, ou un serveur qui rejoue sans maquiller — mais la révision
   n'est pas authentifiée : un serveur qui sert d'anciens chiffrés sous des
-  révisions qui montent passe. Le **manifeste de vault** qui le couvre est
-  en cours (`MANIFESTE.md`) : serveur, web, extension, `gv` et Guiterm
-  prêts, pas encore activé tant que ce Guiterm n'est pas publié. Une fois actif, il restera cette
-  limite assumée : n'importe quel membre (lecteur compris) peut écrire un
-  manifeste valide.
+  révisions qui montent passait. Le **manifeste de vault** (`MANIFESTE.md`,
+  actif depuis le 26 octobre 2026) le couvre pour tout vault qui en a un.
+  Restent deux limites assumées : n'importe quel membre (lecteur compris)
+  peut écrire un manifeste valide, et un serveur peut servir à un appareil
+  qui n'a jamais rien vu de ce vault un état ancien mais cohérent (le
+  compteur n'est retenu que par appareil).
 - **Vault fabriqué par le serveur.** Un serveur malveillant peut créer un
   vault avec une clé à lui et y inscrire un utilisateur, pour qu'il y range
   des secrets. Les enveloppes de format 2 sont authentifiées : il ne peut

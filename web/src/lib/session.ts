@@ -686,12 +686,11 @@ export async function loadItems(vault: VaultView): Promise<{ items: DecodedItem[
 // ─── Manifeste ──────────────────────────────────────────────────────────────
 
 /** Donner un manifeste aux vaults qui n'en ont pas (à la lecture, à la
- * rotation de clé). **Coupé** tant que Guiterm et `gv` ne savent pas
- * l'entretenir : le serveur refuse ensuite toute écriture sans manifeste sur
- * ce vault (`409 manifest_required`), le Guiterm d'aujourd'hui n'y écrirait
- * plus. Ordre de déploiement : `docs/MANIFESTE.md`. La vérification et
- * l'entretien, eux, sont actifs pour tout vault qui en a déjà un. */
-const AUTO_ENABLE_MANIFEST = false;
+ * rotation de clé). Ouvert depuis Guiterm 4.2.0, qui l'entretient : le
+ * serveur refuse ensuite toute écriture sans manifeste sur ce vault
+ * (`409 manifest_required`), un Guiterm plus ancien n'y écrit plus (il le
+ * lit toujours). Historique du déploiement : `docs/MANIFESTE.md`. */
+const AUTO_ENABLE_MANIFEST = true;
 
 /** Par vault : le dernier manifeste lu ou écrit d'ici, et sa révision — la
  * base de la prochaine écriture. */
@@ -979,8 +978,7 @@ export async function rotateVaultKey(state: SessionState, vault: VaultView, memb
   });
   const items = sealed.map((it) => ({ id: it.id, ciphertext: b64(it.ciphertext) }));
   // Le manifeste suit la clé : les empreintes des items re-chiffrés, sous la
-  // nouvelle clé (et il naît ici s'il n'y en avait pas, une fois
-  // `AUTO_ENABLE_MANIFEST` ouvert).
+  // nouvelle clé (et il naît ici s'il n'y en avait pas).
   if (integrity.get(vault.id)?.length) throw new IntegrityError(vault.name);
   const manifest = page.manifest || AUTO_ENABLE_MANIFEST ? manifestOf((page.manifest?.revision ?? 0) + 1, sealed) : null;
   // L'historique et la corbeille suivent la clé. Une version qui ne s'ouvre

@@ -1,10 +1,10 @@
 # Manifeste de vault authentifié
 
-Statut : **adopté, en cours d'implémentation** (29 septembre 2026). Serveur,
-format, client web, extension, `gv` et Guiterm faits et testés, vecteurs
-d'interopérabilité compris. **L'activation est coupée** (voir « Déploiement ») :
-aucun vault ne reçoit de manifeste tant que le Guiterm qui l'entretient
-n'est pas publié.
+Statut : **actif** depuis le 26 octobre 2026 (adopté le 29 septembre).
+Serveur, format, client web, extension, `gv` et Guiterm faits et testés,
+vecteurs d'interopérabilité compris. Le web donne un manifeste à chaque
+vault où il peut écrire ; il faut **Guiterm 4.2.0** ou plus pour écrire
+dans ces vaults (voir « Déploiement »).
 
 ## Le problème
 
@@ -139,19 +139,18 @@ rotation ; écritures refusées sans manifeste ou sur une base dépassée.
    déplacement, accès AWS) porte le manifeste et reprend sur
    `manifest_conflict` / `manifest_required` ; la rotation le re-scelle.
    Test `vault_manifest_is_maintained_and_checked` (`guivault_integration`).
-5. **Activer** : `AUTO_ENABLE_MANIFEST = true` dans `session.ts` (le web
-   donne alors un manifeste à chaque vault où il peut écrire, à la lecture
-   et à la rotation) — **seulement une fois 3 et 4 publiés** : une version
-   de Guiterm qui les contient installée par ceux qui partagent des vaults.
-6. Docs : `SECURITY.md` (ligne « rejoue » et « Limites connues »),
-   `ROADMAP.md` §0 à cocher.
+5. ~~**Activer**~~ — fait le 26 octobre 2026 : `AUTO_ENABLE_MANIFEST = true`
+   dans `session.ts` (le web donne un manifeste à chaque vault où il peut
+   écrire, à la lecture et à la rotation), après Guiterm 4.2.0 publié et
+   `guivault_integration` vert contre ce serveur.
+6. ~~Docs~~ — fait.
 
 ## Déploiement
 
-Tant que `AUTO_ENABLE_MANIFEST` est faux, ce serveur se déploie sans
-risque : aucun vault n'a de manifeste, tout se comporte comme avant, et les
-anciens clients ignorent le champ `manifest` des réponses. **Ne pas
-l'activer**, ni créer de manifeste à la main, avant que la version de
-Guiterm qui l'entretient soit publiée et installée : dès qu'un vault en a
-un, le serveur refuse les écritures d'un Guiterm plus ancien sur ce vault
-(il continue à le lire). `gv` ne fait que lire.
+Le serveur ne crée jamais de manifeste : c'est le client web (et
+l'extension, l'application) qui en donne un au premier vault qu'il lit et où
+il peut écrire. Dès qu'un vault en a un, le serveur refuse les écritures qui
+ne le portent pas (`409 manifest_required`) : **un Guiterm antérieur à 4.2.0
+lit toujours ce vault mais n'y écrit plus** — le mettre à jour. `gv` ne fait
+que lire. Un coffre local de l'application en reçoit un de la même façon
+(`guivault-local` applique les mêmes règles).
