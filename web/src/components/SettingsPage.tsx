@@ -207,7 +207,7 @@ export function SettingsPage({ ctx, section }: { ctx: PageContext; section: Sett
                   )}
                 </div>
               </section>
-              {supports("passkeys") && <PasskeySettings ctx={ctx} />}
+              {supports("passkeys") && <PasskeySettings ctx={ctx} totp={totp === true} />}
               <section className="flex flex-col gap-2.5">
                 <h2 className="eyebrow">Verrouillage</h2>
                 <div className="card">

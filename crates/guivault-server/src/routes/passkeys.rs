@@ -10,6 +10,7 @@
 //! (identifiant WebAuthn) et l'origine acceptée.
 use crate::audit::Audit;
 use crate::auth::{AuthUser, ClientIp};
+use crate::db;
 use crate::error::{ApiResult, AppError};
 use crate::sessions::{self, NewSession};
 use crate::state::AppState;
@@ -22,7 +23,8 @@ use base64::Engine;
 use chrono::{DateTime, Utc};
 use guivault_protocol::{
     LoginResponse, PasskeyInfo, PasskeyLoginOptions, PasskeyLoginRequest, PasskeyLoginResponse,
-    PasskeyRegistrationOptions, PasskeyRegistrationRequest, UserProfile,
+    PasskeyRegistrationOptions, PasskeyRegistrationRequest, SecondFactorOptions, SecondFactorStartRequest,
+    SecondFactorWebauthnRequest, UserProfile,
 };
 use uuid::Uuid;
 
@@ -118,7 +120,18 @@ pub async fn register(
 ) -> ApiResult<(StatusCode, Json<PasskeyInfo>)> {
     let rp = relying_party(&state)?.clone();
     validate::auth_key(&req.auth_key)?;
-    validate::key_blob("protected_user_key", &req.protected_user_key)?;
+    match &req.protected_user_key {
+        Some(blob) => validate::key_blob("protected_user_key", blob)?,
+        // Une clé de sécurité : elle s'ajoute au TOTP, son recours (codes de
+        // récupération compris) — jamais seule, perdue elle bloquerait le compte.
+        None if !super::totp::is_enabled(&state.db, user.id).await? => {
+            return Err(AppError::conflict(
+                "totp_required",
+                "activez d'abord la double authentification par code : elle reste le recours si la clé se perd",
+            ));
+        }
+        None => {}
+    }
     let name = req.name.trim();
     if name.is_empty() || name.chars().count() > 100 {
         return Err(AppError::bad_request("invalid_name", "un nom de 1 à 100 caractères"));
@@ -197,6 +210,7 @@ pub async fn register(
             name: name.to_string(),
             created_at,
             last_used_at: None,
+            login: req.protected_user_key.is_some(),
         }),
     ))
 }
@@ -207,11 +221,13 @@ struct PasskeyRow {
     name: String,
     created_at: DateTime<Utc>,
     last_used_at: Option<DateTime<Utc>>,
+    login: bool,
 }
 
 pub async fn list(State(state): State<AppState>, user: AuthUser) -> ApiResult<Json<Vec<PasskeyInfo>>> {
     let rows = sqlx::query_as::<_, PasskeyRow>(
-        "SELECT id, name, created_at, last_used_at FROM passkeys WHERE user_id = $1 ORDER BY created_at",
+        "SELECT id, name, created_at, last_used_at, protected_user_key IS NOT NULL AS login
+         FROM passkeys WHERE user_id = $1 ORDER BY created_at",
     )
     .bind(user.id)
     .fetch_all(&state.db)
@@ -223,6 +239,7 @@ pub async fn list(State(state): State<AppState>, user: AuthUser) -> ApiResult<Js
                 name: r.name,
                 created_at: r.created_at,
                 last_used_at: r.last_used_at,
+                login: r.login,
             })
             .collect(),
     ))
@@ -270,7 +287,7 @@ struct PasskeyUserRow {
     passkey_id: Uuid,
     public_key: Vec<u8>,
     sign_count: i64,
-    passkey_user_key: Vec<u8>,
+    passkey_user_key: Option<Vec<u8>>,
     id: Uuid,
     email: String,
     public_key_user: Vec<u8>,
@@ -313,6 +330,15 @@ pub async fn login(
             .write(&state.db)
             .await?;
         return Err(refused());
+    };
+    // Une clé de sécurité ne connecte pas seule : elle n'a pas d'enveloppe
+    // de la user key, et ne vaut qu'après le mot de passe maître.
+    let Some(passkey_user_key) = row.passkey_user_key.clone() else {
+        return Err(AppError::new(
+            StatusCode::UNAUTHORIZED,
+            "security_key_only",
+            "cette clé de sécurité sert de second facteur, après le mot de passe maître",
+        ));
     };
     let count = match webauthn::verify_assertion(
         &rp,
@@ -395,6 +421,106 @@ pub async fn login(
             protected_user_key: row.protected_user_key,
             protected_private_key: row.protected_private_key,
         },
-        passkey_user_key: row.passkey_user_key,
+        passkey_user_key,
     }))
+}
+
+// ─── Second facteur ─────────────────────────────────────────────────────────
+//
+// Après un mot de passe valide (`/auth/login` → 202 et son jeton), la
+// signature d'une clé de sécurité ou d'une passkey du compte remplace le
+// code TOTP. Mêmes règles que lui : le jeton vit cinq minutes, ses essais se
+// comptent ensemble (`totp::pending`), la session s'ouvre pareil
+// (`totp::complete_login`).
+
+/// Le compte a-t-il de quoi signer un second facteur ?
+pub async fn any_for_user<'e>(db: impl sqlx::PgExecutor<'e>, user_id: Uuid) -> sqlx::Result<bool> {
+    let (n,): (i64,) = sqlx::query_as("SELECT count(*) FROM passkeys WHERE user_id = $1")
+        .bind(user_id)
+        .fetch_one(db)
+        .await?;
+    Ok(n > 0)
+}
+
+/// Public (freiné par IP) : le défi, et les clés du compte à proposer.
+pub async fn second_factor_start(
+    State(state): State<AppState>,
+    Json(req): Json<SecondFactorStartRequest>,
+) -> ApiResult<Json<SecondFactorOptions>> {
+    let rp = relying_party(&state)?.clone();
+    let (_, user_id, _) = super::totp::pending(&state, &req.totp_token).await?;
+    let keys: Vec<(Vec<u8>,)> = sqlx::query_as("SELECT credential_id FROM passkeys WHERE user_id = $1")
+        .bind(user_id)
+        .fetch_all(&state.db)
+        .await?;
+    if keys.is_empty() {
+        return Err(AppError::conflict(
+            "no_security_key",
+            "ce compte n'a pas de clé de sécurité",
+        ));
+    }
+    let (challenge_id, challenge) = new_challenge(&state, Some(user_id), "second_factor").await?;
+    Ok(Json(SecondFactorOptions {
+        challenge_id,
+        challenge,
+        rp_id: rp.id,
+        allow: keys
+            .into_iter()
+            .map(|(id,)| base64::engine::general_purpose::STANDARD.encode(id))
+            .collect(),
+    }))
+}
+
+/// Public (freiné par IP) : la signature contre une session.
+pub async fn second_factor(
+    State(state): State<AppState>,
+    ClientIp(ip): ClientIp,
+    headers: HeaderMap,
+    Json(req): Json<SecondFactorWebauthnRequest>,
+) -> ApiResult<Json<LoginResponse>> {
+    let rp = relying_party(&state)?.clone();
+    let (token_hash, user_id, device_name) = super::totp::pending(&state, &req.totp_token).await?;
+    let challenge = take_challenge(&state, req.challenge_id, Some(user_id), "second_factor").await?;
+    let key: Option<(Uuid, Vec<u8>, i64)> =
+        sqlx::query_as("SELECT id, public_key, sign_count FROM passkeys WHERE credential_id = $1 AND user_id = $2")
+            .bind(&req.credential_id)
+            .bind(user_id)
+            .fetch_optional(&state.db)
+            .await?;
+    let verified = key.as_ref().map(|(_, public_key, sign_count)| {
+        webauthn::verify_assertion(
+            &rp,
+            &challenge,
+            public_key,
+            (*sign_count).clamp(0, u32::MAX as i64) as u32,
+            &req.client_data_json,
+            &req.authenticator_data,
+            &req.signature,
+        )
+    });
+    let (Some((key_id, _, _)), Some(Ok(count))) = (key, verified) else {
+        super::totp::failed_attempt(&state, &token_hash).await?;
+        Audit::new("user.totp_failed")
+            .actor(user_id)
+            .ip(ip)
+            .meta(serde_json::json!({ "second_factor": "webauthn" }))
+            .write(&state.db)
+            .await?;
+        return Err(AppError::new(
+            StatusCode::UNAUTHORIZED,
+            "invalid_code",
+            "clé de sécurité refusée",
+        ));
+    };
+    sqlx::query("UPDATE passkeys SET sign_count = $2, last_used_at = now() WHERE id = $1")
+        .bind(key_id)
+        .bind(i64::from(count))
+        .execute(&state.db)
+        .await?;
+    let user = db::user_by_id(&state.db, user_id)
+        .await?
+        .ok_or_else(AppError::unauthorized)?;
+    Ok(Json(
+        super::totp::complete_login(&state, &token_hash, user, device_name, ip, &headers, "webauthn").await?,
+    ))
 }

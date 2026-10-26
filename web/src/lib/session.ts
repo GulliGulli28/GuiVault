@@ -2,6 +2,7 @@
  * et les opérations qui combinent l'API et la cryptographie (l'équivalent de
  * `account.rs` + `sharing.rs` + la partie chiffrement de `sync.rs` dans
  * Guiterm). Tout vit en mémoire : recharger la page, c'est se reconnecter. */
+import { signSecondFactor } from "./securityKey";
 import { api, ApiError, currentTokens, setTokens, setTransport, supports } from "./api";
 import { fromBase64, toBase64, utf8, uuid, randomBytes } from "./bytes";
 import * as c from "./crypto";
@@ -113,7 +114,13 @@ export async function openSession(user: UserProfile, account: UnlockedAccount, b
 
 export type LoginOutcome =
   | { kind: "ok"; session: SessionState }
-  | { kind: "totp"; verify: (code: string) => Promise<SessionState> };
+  | {
+      kind: "totp";
+      verify: (code: string) => Promise<SessionState>;
+      /** Le compte a une clé de sécurité : la signer remplace le code. */
+      webauthn: boolean;
+      withKey: () => Promise<SessionState>;
+    };
 
 export async function login(email: string, password: string): Promise<LoginOutcome> {
   const normalized = email.trim().toLowerCase();
@@ -131,7 +138,12 @@ export async function login(email: string, password: string): Promise<LoginOutco
   };
   if (res.kind === "ok") return { kind: "ok", session: await finish(res.login) };
   const token = res.challenge.totp_token;
-  return { kind: "totp", verify: async (code) => finish(await api.totpVerify(token, code.replace(/\s+/g, ""))) };
+  return {
+    kind: "totp",
+    verify: async (code) => finish(await api.totpVerify(token, code.replace(/\s+/g, ""))),
+    webauthn: !!res.challenge.webauthn,
+    withKey: async () => finish(await signSecondFactor(token)),
+  };
 }
 
 export async function register(email: string, password: string): Promise<SessionState> {

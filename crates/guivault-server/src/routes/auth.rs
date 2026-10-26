@@ -293,8 +293,10 @@ pub async fn login(
     }
 
     if super::totp::is_enabled(&state.db, row.id).await? {
-        let challenge =
+        let mut challenge =
             super::totp::issue_challenge(&state.db, row.id, validate::device_name(req.device_name), ip).await?;
+        challenge.webauthn =
+            state.config.passkeys.is_some() && super::passkeys::any_for_user(&state.db, row.id).await?;
         return Ok((StatusCode::ACCEPTED, Json(challenge)).into_response());
     }
 

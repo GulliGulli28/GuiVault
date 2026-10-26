@@ -58,6 +58,8 @@ pub fn router(state: AppState) -> Router {
         .route("/auth/totp/verify", post(totp::verify))
         .route("/auth/passkeys/login/start", post(passkeys::login_start))
         .route("/auth/passkeys/login", post(passkeys::login))
+        .route("/auth/2fa/webauthn/start", post(passkeys::second_factor_start))
+        .route("/auth/2fa/webauthn", post(passkeys::second_factor))
         .route("/sends/{id}/access", get(sends::info).post(sends::access))
         .layer(GovernorLayer::new(Arc::new(governor)));
 

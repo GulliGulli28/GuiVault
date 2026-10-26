@@ -5108,7 +5108,7 @@ async fn passkeys_log_in_without_the_master_password() {
                 credential_id: key.credential_id.clone(),
                 client_data_json,
                 attestation_object,
-                protected_user_key: wrapped.clone(),
+                protected_user_key: Some(wrapped.clone()),
             })
             .send()
     };
@@ -5261,4 +5261,230 @@ async fn passkeys_log_in_without_the_master_password() {
         StatusCode::FORBIDDEN
     );
     plain.stop().await;
+}
+
+#[tokio::test]
+async fn security_keys_as_second_factor() {
+    use base64::Engine;
+    use guivault_server::webauthn::{RelyingParty, testing::SoftAuthenticator};
+    let rp = RelyingParty::from_public_url("https://vault.test").unwrap();
+    let rp2 = rp.clone();
+    let Some(server) = TestServer::start_with(RegistrationMode::Open, move |c| c.passkeys = Some(rp2)).await else {
+        return;
+    };
+    let alice = User::register(&server, "alice-sk@t.io", "pw-alice").await;
+    let key = SoftAuthenticator::new(21);
+    let good = auth_key_of(&alice, "pw-alice").await;
+    let add_key = || async {
+        let opts: PasskeyRegistrationOptions = serde_json::from_str(&status!(
+            alice
+                .req(reqwest::Method::POST, "/auth/passkeys/register/start")
+                .send()
+                .await
+                .unwrap(),
+            StatusCode::OK
+        ))
+        .unwrap();
+        let (client_data_json, attestation_object) = key.register(&rp.id, &rp.origin, &opts.challenge);
+        alice
+            .req(reqwest::Method::POST, "/auth/passkeys")
+            .json(&PasskeyRegistrationRequest {
+                challenge_id: opts.challenge_id,
+                auth_key: good.clone(),
+                name: "YubiKey".into(),
+                credential_id: key.credential_id.clone(),
+                client_data_json,
+                attestation_object,
+                // Pas d'enveloppe : second facteur seulement.
+                protected_user_key: None,
+            })
+            .send()
+            .await
+            .unwrap()
+    };
+    // Sans TOTP (son recours), pas de clé de sécurité.
+    let body = status!(add_key().await, StatusCode::CONFLICT);
+    assert!(body.contains("totp_required"), "{body}");
+
+    // Le TOTP d'abord.
+    let setup: TotpSetupResponse = serde_json::from_str(&status!(
+        alice
+            .req(reqwest::Method::POST, "/auth/totp/setup")
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::OK
+    ))
+    .unwrap();
+    let totp = totp_rs::TOTP::new(
+        totp_rs::Algorithm::SHA1,
+        6,
+        1,
+        30,
+        totp_rs::Secret::Encoded(setup.secret.clone()).to_bytes().unwrap(),
+        Some("GuiVault".into()),
+        "alice-sk@t.io".into(),
+    )
+    .unwrap();
+    status!(
+        alice
+            .req(reqwest::Method::POST, "/auth/totp/enable")
+            .json(&TotpCodeRequest {
+                code: totp.generate_current().unwrap()
+            })
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::OK
+    );
+    let info: PasskeyInfo = serde_json::from_str(&status!(add_key().await, StatusCode::CREATED)).unwrap();
+    assert!(!info.login, "une clé de sécurité n'est pas une passkey de connexion");
+    let listed: Vec<PasskeyInfo> = alice.get("/auth/passkeys").await;
+    assert_eq!(listed.iter().map(|p| p.login).collect::<Vec<_>>(), [false]);
+
+    // Le mot de passe, puis la clé à la place du code.
+    let http = Client::new();
+    let pre: PreloginResponse = http
+        .post(format!("{}/auth/prelogin", server.base))
+        .json(&PreloginRequest {
+            email: "alice-sk@t.io".into(),
+        })
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    let lm = gc::prepare_login("pw-alice", &pre.kdf_salt, pre.kdf).unwrap();
+    let password_step = || async {
+        let body = status!(
+            http.post(format!("{}/auth/login", server.base))
+                .json(&LoginRequest {
+                    email: "alice-sk@t.io".into(),
+                    auth_key: lm.auth_key.as_bytes().to_vec(),
+                    device_name: Some("portable".into()),
+                })
+                .send()
+                .await
+                .unwrap(),
+            StatusCode::ACCEPTED
+        );
+        serde_json::from_str::<TotpChallenge>(&body).unwrap()
+    };
+    let start = |token: String| async {
+        serde_json::from_str::<SecondFactorOptions>(&status!(
+            http.post(format!("{}/auth/2fa/webauthn/start", server.base))
+                .json(&SecondFactorStartRequest { totp_token: token })
+                .send()
+                .await
+                .unwrap(),
+            StatusCode::OK
+        ))
+        .unwrap()
+    };
+    let finish = |token: String, opts: &SecondFactorOptions, signer: &mut SoftAuthenticator, site: &str| {
+        let (client_data_json, authenticator_data, signature) = signer.assert(site, &rp.origin, &opts.challenge);
+        http.post(format!("{}/auth/2fa/webauthn", server.base))
+            .json(&SecondFactorWebauthnRequest {
+                totp_token: token,
+                challenge_id: opts.challenge_id,
+                credential_id: signer.credential_id.clone(),
+                client_data_json,
+                authenticator_data,
+                signature,
+            })
+            .send()
+    };
+    let ch = password_step().await;
+    assert!(ch.webauthn, "le défi annonce la clé de sécurité");
+    let opts = start(ch.totp_token.clone()).await;
+    assert_eq!(
+        opts.allow,
+        [base64::engine::general_purpose::STANDARD.encode(&key.credential_id)]
+    );
+    // Une clé inconnue du compte, ou signée pour un autre site : refusées.
+    let mut stranger = SoftAuthenticator::new(22);
+    status!(
+        finish(ch.totp_token.clone(), &opts, &mut stranger, &rp.id)
+            .await
+            .unwrap(),
+        StatusCode::UNAUTHORIZED
+    );
+    let opts = start(ch.totp_token.clone()).await;
+    let mut signer = SoftAuthenticator::new(21);
+    status!(
+        finish(ch.totp_token.clone(), &opts, &mut signer, "evil.test")
+            .await
+            .unwrap(),
+        StatusCode::UNAUTHORIZED
+    );
+    let opts = start(ch.totp_token.clone()).await;
+    let res: LoginResponse = serde_json::from_str(&status!(
+        finish(ch.totp_token.clone(), &opts, &mut signer, &rp.id).await.unwrap(),
+        StatusCode::OK
+    ))
+    .unwrap();
+    assert_eq!(res.user.id, alice.profile.id);
+    status!(
+        http.get(format!("{}/sync", server.base))
+            .bearer_auth(&res.tokens.access_token)
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::OK
+    );
+    // Le jeton est consommé avec la session.
+    status!(
+        http.post(format!("{}/auth/2fa/webauthn/start", server.base))
+            .json(&SecondFactorStartRequest {
+                totp_token: ch.totp_token.clone()
+            })
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::UNAUTHORIZED
+    );
+
+    // Seule, elle ne connecte pas : pas d'enveloppe de la user key.
+    let opts: PasskeyLoginOptions = serde_json::from_str(&status!(
+        http.post(format!("{}/auth/passkeys/login/start", server.base))
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::OK
+    ))
+    .unwrap();
+    let (client_data_json, authenticator_data, signature) = signer.assert(&rp.id, &rp.origin, &opts.challenge);
+    let body = status!(
+        http.post(format!("{}/auth/passkeys/login", server.base))
+            .json(&PasskeyLoginRequest {
+                challenge_id: opts.challenge_id,
+                credential_id: signer.credential_id.clone(),
+                client_data_json,
+                authenticator_data,
+                signature,
+                device_name: None,
+            })
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::UNAUTHORIZED
+    );
+    assert!(body.contains("security_key_only"), "{body}");
+
+    // Le code TOTP marche toujours ; le désactiver retire la clé.
+    status!(
+        alice
+            .req(reqwest::Method::POST, "/auth/totp/disable")
+            .json(&TotpCodeRequest {
+                code: totp.generate_current().unwrap()
+            })
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::NO_CONTENT
+    );
+    let listed: Vec<PasskeyInfo> = alice.get("/auth/passkeys").await;
+    assert!(listed.is_empty(), "la clé de sécurité part avec le TOTP");
+    server.stop().await;
 }

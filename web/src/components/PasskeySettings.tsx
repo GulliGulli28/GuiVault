@@ -4,24 +4,32 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import type { PageContext } from "../App";
 import { api, errorMessage } from "../lib/api";
-import { passkeysSupported, registerPasskey } from "../lib/accountPasskeys";
+import { passkeysSupported, registerPasskey, registerSecurityKey } from "../lib/accountPasskeys";
 import type { AccountPasskey } from "../lib/types";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { IconPasskey } from "./secret-icons";
 import { formatAgo, formatWhen, InfoTip, Modal, PasswordInput, SettingRow } from "./ui";
 import { IconPlus } from "./ui-icons";
 
-export function PasskeySettings({ ctx }: { ctx: PageContext }) {
+/** `totp` : la double authentification par code est active (tenu par
+ * `SettingsPage`, qui le relit quand on l'active ou la désactive) — une clé
+ * de sécurité ne s'ajoute qu'à côté d'elle. */
+export function PasskeySettings({ ctx, totp }: { ctx: PageContext; totp: boolean }) {
   const [enabled, setEnabled] = useState<boolean | null>(null);
   const [list, setList] = useState<AccountPasskey[] | null>(null);
-  const [adding, setAdding] = useState(false);
+  const [adding, setAdding] = useState<null | "passkey" | "key">(null);
   const [removing, setRemoving] = useState<AccountPasskey | null>(null);
-  const closeAdd = useCallback(() => setAdding(false), []);
+  const closeAdd = useCallback(() => setAdding(null), []);
   const cancelRemove = useCallback(() => setRemoving(null), []);
   const { error } = ctx;
   const load = useCallback(() => {
     api.passkeys().then(setList).catch((e) => error(errorMessage(e)));
   }, [error]);
+  // Désactiver le TOTP retire les clés de sécurité (côté serveur) : la liste
+  // se relit.
+  useEffect(() => {
+    if (enabled) load();
+  }, [totp, enabled, load]);
   useEffect(() => {
     api.health().then((h) => {
       setEnabled(!!h.passkeys);
@@ -42,22 +50,34 @@ export function PasskeySettings({ ctx }: { ctx: PageContext }) {
           ]} /></>}
           desc={!enabled ? "Non configurée sur ce serveur (GUIVAULT_PUBLIC_URL)." : !supported ? "Ce navigateur ne gère pas les passkeys." : "Sans taper le mot de passe maître."}
         >
-          {enabled && supported && <button onClick={() => setAdding(true)} className="btn btn-secondary"><IconPlus size={14} /> Ajouter</button>}
+          {enabled && supported && <button onClick={() => setAdding("passkey")} className="btn btn-secondary"><IconPlus size={14} /> Ajouter</button>}
         </SettingRow>
+        {enabled && supported && (
+          <SettingRow
+            title={<>Clé de sécurité en second facteur <InfoTip label="Ce que fait une clé de sécurité" items={[
+              { text: "Après le mot de passe maître, elle remplace le code TOTP." },
+              { text: "Le code reste le recours si la clé se perd : il doit être actif.", tone: "ok" },
+              { text: "Elle n'ouvre pas le coffre seule.", tone: "ok" },
+            ]} /></>}
+            desc={totp ? "YubiKey, Titan, ou celle de votre système." : "Activez d'abord la double authentification par code."}
+          >
+            <button onClick={() => setAdding("key")} disabled={!totp} className="btn btn-secondary"><IconPlus size={14} /> Ajouter</button>
+          </SettingRow>
+        )}
         {list?.map((p) => (
           <div key={p.id} className="setting-row">
             <span className="tile tile-neutral" style={{ "--tile-size": "34px" } as React.CSSProperties}><IconPasskey size={16} /></span>
             <div className="min-w-0 flex-1">
               <p className="truncate font-medium">{p.name}</p>
               <p className="truncate text-[12.5px] text-[var(--c-text-muted)]">
-                Ajoutée le {formatWhen(p.created_at)}{p.last_used_at ? ` · utilisée ${formatAgo(p.last_used_at)}` : " · jamais utilisée"}
+                {p.login === false ? "Second facteur · " : ""}Ajoutée le {formatWhen(p.created_at)}{p.last_used_at ? ` · utilisée ${formatAgo(p.last_used_at)}` : " · jamais utilisée"}
               </p>
             </div>
             <button onClick={() => setRemoving(p)} className="btn btn-ghost" aria-label={`Retirer ${p.name}`}>Retirer</button>
           </div>
         ))}
       </div>
-      {adding && <AddPasskeyDialog ctx={ctx} onClose={closeAdd} onAdded={load} />}
+      {adding && <AddPasskeyDialog ctx={ctx} securityKey={adding === "key"} onClose={closeAdd} onAdded={load} />}
       {removing && (
         <ConfirmDialog
           title={`Retirer « ${removing.name} » ?`}
@@ -82,8 +102,8 @@ export function PasskeySettings({ ctx }: { ctx: PageContext }) {
   );
 }
 
-function AddPasskeyDialog({ ctx, onClose, onAdded }: { ctx: PageContext; onClose: () => void; onAdded: () => void }) {
-  const [name, setName] = useState(defaultName());
+function AddPasskeyDialog({ ctx, securityKey, onClose, onAdded }: { ctx: PageContext; securityKey: boolean; onClose: () => void; onAdded: () => void }) {
+  const [name, setName] = useState(securityKey ? "Clé de sécurité" : defaultName());
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -92,8 +112,8 @@ function AddPasskeyDialog({ ctx, onClose, onAdded }: { ctx: PageContext; onClose
     setBusy(true);
     setError(null);
     try {
-      const p = await registerPasskey(ctx.session, name, password);
-      ctx.notify(`« ${p.name} » ajoutée : elle ouvre maintenant ce compte.`);
+      const p = securityKey ? await registerSecurityKey(ctx.session, name, password) : await registerPasskey(ctx.session, name, password);
+      ctx.notify(securityKey ? `« ${p.name} » ajoutée : elle remplace le code au second facteur.` : `« ${p.name} » ajoutée : elle ouvre maintenant ce compte.`);
       onAdded();
       onClose();
     } catch (err) {
@@ -103,7 +123,7 @@ function AddPasskeyDialog({ ctx, onClose, onAdded }: { ctx: PageContext; onClose
     }
   };
   return (
-    <Modal title="Ajouter une passkey" onClose={onClose}>
+    <Modal title={securityKey ? "Ajouter une clé de sécurité" : "Ajouter une passkey"} onClose={onClose}>
       <form onSubmit={submit} className="space-y-3">
         <label className="block"><span className="field-label">Nom</span><input value={name} onChange={(e) => setName(e.target.value)} maxLength={100} className="input" /></label>
         <div>
@@ -114,7 +134,7 @@ function AddPasskeyDialog({ ctx, onClose, onAdded }: { ctx: PageContext; onClose
         {error && <p className="callout callout-danger">{error}</p>}
         <div className="flex justify-end gap-2">
           <button type="button" onClick={onClose} className="btn btn-ghost">Annuler</button>
-          <button type="submit" disabled={busy || !password || !name.trim()} className="btn btn-primary">{busy ? "Passkey…" : "Continuer"}</button>
+          <button type="submit" disabled={busy || !password || !name.trim()} className="btn btn-primary">{busy ? (securityKey ? "Clé…" : "Passkey…") : "Continuer"}</button>
         </div>
       </form>
     </Modal>

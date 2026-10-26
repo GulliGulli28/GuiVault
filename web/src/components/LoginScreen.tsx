@@ -20,7 +20,7 @@ export function LoginScreen({ onSession, extra }: { onSession: (s: SessionState)
   const [confirm, setConfirm] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [totp, setTotp] = useState<{ verify: (code: string) => Promise<SessionState> } | null>(null);
+  const [totp, setTotp] = useState<{ verify: (code: string) => Promise<SessionState>; webauthn: boolean; withKey: () => Promise<SessionState> } | null>(null);
   const [code, setCode] = useState("");
   /** Le serveur ne répond pas (page ouverte depuis le cache, erreur réseau,
    * proxy en 5xx) : la copie hors ligne de ce compte, s'il y en a une. */
@@ -67,7 +67,7 @@ export function LoginScreen({ onSession, extra }: { onSession: (s: SessionState)
       } else {
         const out = await login(email, password);
         if (out.kind === "ok") onSession(out.session);
-        else setTotp({ verify: out.verify });
+        else setTotp({ verify: out.verify, webauthn: out.webauthn, withKey: out.withKey });
       }
     } catch (err) {
       const down = !(err instanceof ApiError) || err.status >= 500;
@@ -105,8 +105,24 @@ export function LoginScreen({ onSession, extra }: { onSession: (s: SessionState)
     }
   };
 
+  // La clé de sécurité, seulement servie par le serveur lui-même : WebAuthn
+  // la lie à son origine (l'application et l'extension ont la leur).
+  const keyUsable = !!totp?.webauthn && passkeysSupported() && !("__TAURI_INTERNALS__" in window);
+  const signWithKey = async () => {
+    if (!totp) return;
+    setError(null);
+    setBusy("Clé de sécurité…");
+    try {
+      onSession(await totp.withKey());
+    } catch (err) {
+      setError(err instanceof DOMException && err.name === "NotAllowedError" ? "Clé de sécurité : annulé, ou refusé par le navigateur." : errorMessage(err));
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const title = totp ? "Second facteur" : mode === "register" ? "Créer un compte" : "Déverrouiller";
-  const sub = totp ? "Le code de votre application d'authentification." : mode === "register" ? "Vos secrets seront chiffrés sur cet appareil." : "Vos secrets se déchiffrent ici, sur cet appareil.";
+  const sub = totp ? (keyUsable ? "Le code de votre application, ou votre clé de sécurité." : "Le code de votre application d'authentification.") : mode === "register" ? "Vos secrets seront chiffrés sur cet appareil." : "Vos secrets se déchiffrent ici, sur cet appareil.";
 
   return (
     <AuthShell
@@ -139,6 +155,9 @@ export function LoginScreen({ onSession, extra }: { onSession: (s: SessionState)
           </label>
           {error && <p className="callout callout-danger">{error}</p>}
           <button type="submit" disabled={!code.trim() || busy !== null} className="btn btn-primary btn-lg w-full">{busy ?? "Valider"}</button>
+          {keyUsable && (
+            <button type="button" onClick={() => void signWithKey()} disabled={busy !== null} className="btn btn-secondary btn-lg w-full gap-2"><IconPasskey size={16} /> Utiliser une clé de sécurité</button>
+          )}
           <button type="button" onClick={() => { setTotp(null); setCode(""); setError(null); }} className="btn btn-ghost w-full">Revenir</button>
         </form>
       ) : (

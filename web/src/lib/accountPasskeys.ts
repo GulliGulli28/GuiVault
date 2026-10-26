@@ -100,6 +100,50 @@ export async function registerPasskey(state: SessionState, name: string, passwor
   }
 }
 
+/** Ajoute une **clé de sécurité** : second facteur seulement, à la place du
+ * code TOTP (qui reste le recours, et doit être actif). Pas de PRF, pas
+ * d'enveloppe : elle ne peut pas ouvrir le coffre, seulement prouver qu'on
+ * la tient. Mot de passe maître redemandé, comme pour une passkey. */
+export async function registerSecurityKey(state: SessionState, name: string, password: string): Promise<AccountPasskey> {
+  const pre = await api.prelogin(state.user.email);
+  requireKdfNotDowngraded(state.user.email, pre.kdf);
+  const master = await c.deriveMasterKey(password, fromBase64(pre.kdf_salt), pre.kdf);
+  master.stretchedKey.fill(0);
+  try {
+    const opts = await api.passkeyRegisterStart();
+    const created = (await navigator.credentials.create({
+      publicKey: {
+        challenge: buf(opts.challenge),
+        rp: { id: opts.rp_id, name: opts.rp_name },
+        user: { id: buf(opts.user_handle), name: opts.user_name, displayName: opts.user_name },
+        pubKeyCredParams: [
+          { type: "public-key", alg: -7 },
+          { type: "public-key", alg: -8 },
+          { type: "public-key", alg: -257 },
+        ],
+        // Une clé qui n'a pas besoin d'être découvrable : le serveur dit
+        // laquelle signer (`allowCredentials`).
+        authenticatorSelection: { residentKey: "discouraged", userVerification: "required" },
+        excludeCredentials: opts.exclude.map((id) => ({ type: "public-key" as const, id: buf(id) })),
+        attestation: "none",
+        timeout: 120_000,
+      },
+    })) as PublicKeyCredential | null;
+    if (!created) throw new Error("Enregistrement de la clé annulé.");
+    const response = created.response as AuthenticatorAttestationResponse;
+    return await api.registerPasskey({
+      challenge_id: opts.challenge_id,
+      auth_key: toBase64(master.authKey),
+      name: name.trim(),
+      credential_id: toBase64(bytes(created.rawId)),
+      client_data_json: toBase64(bytes(response.clientDataJSON)),
+      attestation_object: toBase64(bytes(response.attestationObject)),
+    });
+  } finally {
+    master.authKey.fill(0);
+  }
+}
+
 /** Se connecter sans mot de passe maître : la passkey signe le défi du
  * serveur (utilisateur vérifié), et sa PRF rouvre la user key. */
 export async function loginWithPasskey(): Promise<SessionState> {

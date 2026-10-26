@@ -32,6 +32,8 @@ export interface AccountPasskey {
   name: string;
   created_at: string;
   last_used_at: string | null;
+  /** Faux : une clé de sécurité, qui ne sert qu'au second facteur. */
+  login?: boolean;
 }
 
 export interface PasskeyRegistrationOptions {
@@ -182,6 +184,16 @@ export interface LoginResponse extends TokenPair {
 
 export interface TotpChallenge {
   totp_token: string;
+  /** Le compte a une clé de sécurité ou une passkey : elle peut remplacer le code. */
+  webauthn?: boolean;
+}
+
+/** `POST /auth/2fa/webauthn/start`. */
+export interface SecondFactorOptions {
+  challenge_id: string;
+  challenge: string;
+  rp_id: string;
+  allow: string[];
 }
 
 export interface Session {

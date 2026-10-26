@@ -217,8 +217,11 @@ pub struct PasskeyRegistrationRequest {
     pub client_data_json: Vec<u8>,
     #[serde(with = "b64")]
     pub attestation_object: Vec<u8>,
-    #[serde(with = "b64")]
-    pub protected_user_key: Vec<u8>,
+    /// La user key sous la clé de la PRF : une passkey de connexion.
+    /// Absente : une **clé de sécurité**, second facteur seulement (il faut
+    /// alors le TOTP activé, qui reste le recours).
+    #[serde(default, with = "b64::option", skip_serializing_if = "Option::is_none")]
+    pub protected_user_key: Option<Vec<u8>>,
 }
 
 /// Une passkey du compte (`GET /auth/passkeys`).
@@ -228,6 +231,13 @@ pub struct PasskeyInfo {
     pub name: String,
     pub created_at: DateTime<Utc>,
     pub last_used_at: Option<DateTime<Utc>>,
+    /// Faux : une clé de sécurité, qui ne sert qu'au second facteur.
+    #[serde(default = "yes")]
+    pub login: bool,
+}
+
+fn yes() -> bool {
+    true
 }
 
 /// `POST /auth/passkeys/login/start` : un défi, sans dire à quel compte
@@ -274,6 +284,43 @@ pub struct PasskeyLoginResponse {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TotpChallenge {
     pub totp_token: String,
+    /// Le compte a des clés de sécurité ou des passkeys : le second facteur
+    /// peut aussi être leur signature (`/auth/2fa/webauthn`).
+    #[serde(default)]
+    pub webauthn: bool,
+}
+
+/// `POST /auth/2fa/webauthn/start` : le défi de second facteur, après un
+/// mot de passe valide (le jeton du défi TOTP).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SecondFactorStartRequest {
+    pub totp_token: String,
+}
+
+/// Le défi, et les clés du compte que l'authentificateur peut utiliser.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SecondFactorOptions {
+    pub challenge_id: Uuid,
+    #[serde(with = "b64")]
+    pub challenge: Vec<u8>,
+    pub rp_id: String,
+    /// Identifiants des clés (base64).
+    pub allow: Vec<String>,
+}
+
+/// `POST /auth/2fa/webauthn` : la signature contre une session.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SecondFactorWebauthnRequest {
+    pub totp_token: String,
+    pub challenge_id: Uuid,
+    #[serde(with = "b64")]
+    pub credential_id: Vec<u8>,
+    #[serde(with = "b64")]
+    pub client_data_json: Vec<u8>,
+    #[serde(with = "b64")]
+    pub authenticator_data: Vec<u8>,
+    #[serde(with = "b64")]
+    pub signature: Vec<u8>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

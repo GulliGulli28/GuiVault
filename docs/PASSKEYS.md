@@ -71,16 +71,48 @@ créées (le domaine, identifiant WebAuthn) et l'origine acceptée.
   `GUIVAULT_PUBLIC_URL`), et un aller-retour dans Chromium avec un
   authentificateur virtuel (PRF, vérification de l'utilisateur).
 
+## Clé de sécurité (second facteur)
+
+Une passkey **sans enveloppe** de la user key : elle ne peut pas ouvrir le
+coffre, seulement prouver, après le mot de passe maître, qu'on la tient — à
+la place du code TOTP. YubiKey, Titan, ou celle du système.
+
+- **À côté du TOTP, jamais seule** : elle ne s'ajoute que s'il est actif
+  (`409 totp_required`), et part avec lui quand on le désactive. Le code et
+  ses codes de récupération restent le recours : perdre la clé ne bloque
+  jamais le compte. Rien ne change pour qui n'en ajoute pas.
+- **Au second facteur**, le défi TOTP (`202` de `/auth/login`) annonce
+  `webauthn: true` si le compte a une clé ou une passkey ; le navigateur
+  signe alors un défi (`/auth/2fa/webauthn/start`, `allowCredentials` = les
+  clés du compte) et le serveur ouvre la session (`/auth/2fa/webauthn`).
+  N'importe quelle clé ou passkey du compte convient ; mêmes cinq essais et
+  cinq minutes que le code.
+- **Seule, elle ne connecte pas** (`401 security_key_only` sur
+  `/auth/passkeys/login`).
+- Interface web seulement (comme la connexion par passkey) : l'application
+  et l'extension ont leur propre origine et gardent le code.
+
+Code : migration `0014` (`protected_user_key` facultative, défi
+`second_factor`), `routes/passkeys.rs` (`second_factor_start`,
+`second_factor`), `routes/totp.rs` (`pending`, `complete_login` partagés
+avec le code) ; web : `lib/securityKey.ts`, `registerSecurityKey`
+(`lib/accountPasskeys.ts`), Paramètres › Sécurité, bouton du second facteur
+de `LoginScreen`. Tests : `security_keys_as_second_factor` (`tests/api.rs` :
+TOTP exigé, clé de sécurité ajoutée, connexion mot de passe + clé, clé
+inconnue ou autre site refusés, jeton consommé, connexion seule refusée,
+retirée avec le TOTP) ; aller-retour dans Chromium avec un authentificateur
+virtuel (compte, TOTP, clé, reconnexion par la clé).
+
 ## Reste
 
 - **Extension** : ses pages ont leur propre origine (`chrome-extension://…`),
   qui ne peut pas utiliser les passkeys du domaine du serveur. Piste :
   ouvrir la connexion dans un onglet de l'interface web et reprendre la
   session.
-- **Code PIN dans l'extension** (déverrouillage rapide local) et **2FA
-  WebAuthn** (une clé de sécurité en second facteur du mot de passe) : la
-  vérification WebAuthn côté serveur est là, il reste les routes et
-  l'interface.
+- **Code PIN dans l'extension** (déverrouillage rapide local).
+- Une clé de sécurité **imposée** (refuser le code TOTP une fois une clé
+  ajoutée, contre l'hameçonnage) : à proposer en option, avec ses codes de
+  récupération comme seul recours.
 - La **copie hors ligne** ne se rafraîchit pas après une connexion par
   passkey (ses paramètres Argon2id viennent d'une connexion par mot de
   passe) : elle attend la suivante.

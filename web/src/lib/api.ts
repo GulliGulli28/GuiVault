@@ -2,7 +2,7 @@
  * `core/src/guivault/client.rs` dans Guiterm. Une méthode par route ; les
  * blobs restent en base64, c'est `session.ts` qui chiffre et déchiffre. */
 import type { TwoFactorSite } from "./types";
-import type { AccountPasskey, AdminOverview, AdminUserInfo, AuditEntry, BackupsStatus, EmergencyGrant, EmergencyOverview, EmergencyVault, HealthResponse, ImportItemsRequest, Invitation, Item, ItemVersion, ItemsPage, KdfParams, ManifestWrite, LoginResponse, PasskeyLoginOptions, PasskeyRegistrationOptions, PreloginResponse, Role, SendContent, SendInfo, SendPassword, SendSummary, RegistrationInvite, ServerAttachment, ServerEvent, Session, SyncResponse, TokenPair, TotpChallenge, TrashedItem, UserLookupResponse, UserProfile, UserSettings, Vault, VaultManifest, VaultMember } from "./types";
+import type { AccountPasskey, AdminOverview, AdminUserInfo, AuditEntry, BackupsStatus, EmergencyGrant, EmergencyOverview, EmergencyVault, HealthResponse, ImportItemsRequest, Invitation, Item, ItemVersion, ItemsPage, KdfParams, ManifestWrite, LoginResponse, PasskeyLoginOptions, PasskeyRegistrationOptions, PreloginResponse, SecondFactorOptions, Role, SendContent, SendInfo, SendPassword, SendSummary, RegistrationInvite, ServerAttachment, ServerEvent, Session, SyncResponse, TokenPair, TotpChallenge, TrashedItem, UserLookupResponse, UserProfile, UserSettings, Vault, VaultManifest, VaultMember } from "./types";
 
 /** Une enveloppe de clé de vault pour un contact d'urgence. */
 export interface EmergencyVaultKey {
@@ -209,7 +209,7 @@ function httpTransport(conn: Connection) {
     // ── Passkeys du compte (`lib/accountPasskeys.ts`) ──
     passkeys: () => authed<AccountPasskey[]>("GET", "/auth/passkeys"),
     passkeyRegisterStart: () => authed<PasskeyRegistrationOptions>("POST", "/auth/passkeys/register/start"),
-    registerPasskey: (req: { challenge_id: string; auth_key: string; name: string; credential_id: string; client_data_json: string; attestation_object: string; protected_user_key: string }) =>
+    registerPasskey: (req: { challenge_id: string; auth_key: string; name: string; credential_id: string; client_data_json: string; attestation_object: string; protected_user_key?: string }) =>
       authed<AccountPasskey>("POST", "/auth/passkeys", req),
     deletePasskey: (id: string) => authed<void>("DELETE", `/auth/passkeys/${id}`),
     passkeyLoginStart: () => raw<PasskeyLoginOptions>("POST", "/auth/passkeys/login/start", undefined, false),
@@ -225,6 +225,9 @@ function httpTransport(conn: Connection) {
       return { kind: "ok", login: await parse<LoginResponse>(res) };
     },
     totpVerify: (totp_token: string, code: string) => raw<LoginResponse>("POST", "/auth/totp/verify", { totp_token, code }, false),
+    secondFactorStart: (totp_token: string) => raw<SecondFactorOptions>("POST", "/auth/2fa/webauthn/start", { totp_token }, false),
+    secondFactorWebauthn: (req: { totp_token: string; challenge_id: string; credential_id: string; client_data_json: string; authenticator_data: string; signature: string }) =>
+      raw<LoginResponse>("POST", "/auth/2fa/webauthn", req, false),
     logout: () => authed<void>("POST", "/auth/logout"),
     changePassword: (req: { current_auth_key: string; kdf: KdfParams; kdf_salt: string; auth_key: string; protected_user_key: string }) =>
       authed<void>("POST", "/auth/password", req),

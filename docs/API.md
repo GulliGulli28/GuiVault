@@ -25,7 +25,7 @@ Erreurs : `{ "code": "…", "message": "…" }` (+ champs selon le code, ex.
 `manifest_conflict`, `manifest_too_large`, `attachments_disabled`, `attachment_too_large`,
 `attachment_exists`, `attachment_complete`, `attachment_incomplete`, `send_complete`,
 `send_incomplete`, `passkeys_disabled`, `invalid_challenge`, `invalid_passkey`,
-`passkey_exists`, `too_many_passkeys`, `item_exists`, `import_closed`, `import_too_large`, `invalid_*`, `internal`.
+`passkey_exists`, `too_many_passkeys`, `security_key_only`, `no_security_key`, `item_exists`, `import_closed`, `import_too_large`, `invalid_*`, `internal`.
 
 Partout : `403 ip_not_allowed` si l'adresse du client n'est pas dans
 `GUIVAULT_ALLOWED_IPS` (sauf `GET /health`).
@@ -50,9 +50,11 @@ Partout : `403 ip_not_allowed` si l'adresse du client n'est pas dans
 | `POST /auth/register` | matériel de compte + `personal_vault` → `201` `LoginResponse`. Hors `open` : adresse de `GUIVAULT_ALLOWED_EMAILS`, inscription ouverte par un administrateur (consommée), ou — en `invite_only` — invitation de vault en attente ; sinon `403 invitation_required` (ou `forbidden` en `closed`) |
 | `POST /auth/login` | `{ email, auth_key, device_name? }` → `200` `LoginResponse` (`access_token`, `refresh_token`, `user`, `protected_user_key`, `protected_private_key`) — ou `202` `TotpChallenge { totp_token }` si le compte a un second facteur ; `403 account_disabled` si un administrateur l'a désactivé (dit seulement avec le bon mot de passe) |
 | `POST /auth/totp/verify` | `{ totp_token, code }` → `LoginResponse` (code à 6 chiffres ou code de récupération ; 5 essais, 5 min) |
+| `POST /auth/2fa/webauthn/start` | `{ totp_token }` → `SecondFactorOptions { challenge_id, challenge, rp_id, allow }` : le défi d'une **clé de sécurité** à la place du code (après le `202` de `/auth/login`, dont le `TotpChallenge` porte `webauthn: true` si le compte a des clés ou passkeys) ; `allow` : leurs identifiants. `401 challenge_expired`, `409 no_security_key`, `403 passkeys_disabled` |
+| `POST /auth/2fa/webauthn` | `{ totp_token, challenge_id, credential_id, client_data_json, authenticator_data, signature }` → `LoginResponse`. Une clé de sécurité ou une passkey **du compte**, signature vérifiée (site, origine, défi à usage unique, utilisateur vérifié, compteur) ; ses essais se comptent avec ceux du code (5). `401 invalid_code`, `400 invalid_challenge` |
 | `POST /auth/refresh` | `{ refresh_token }` → `TokenPair` (rotation) |
 | `POST /auth/passkeys/login/start` | → `{ challenge_id, challenge, rp_id, prf_salt }` : un défi de connexion par passkey (cinq minutes, usage unique) ; `403 passkeys_disabled` sans `GUIVAULT_PUBLIC_URL`. Voir `docs/PASSKEYS.md` |
-| `POST /auth/passkeys/login` | `{ challenge_id, credential_id, client_data_json, authenticator_data, signature, device_name? }` → `PasskeyLoginResponse` : un `LoginResponse` et `passkey_user_key` (la user key sous la clé tirée de la PRF de la passkey). Signature WebAuthn vérifiée, utilisateur vérifié exigé ; pas de second facteur en plus. `400 invalid_challenge`, `401 invalid_credentials` (passkey inconnue ou refusée), `403 account_disabled` |
+| `POST /auth/passkeys/login` | `{ challenge_id, credential_id, client_data_json, authenticator_data, signature, device_name? }` → `PasskeyLoginResponse` : un `LoginResponse` et `passkey_user_key` (la user key sous la clé tirée de la PRF de la passkey). Signature WebAuthn vérifiée, utilisateur vérifié exigé ; pas de second facteur en plus. `400 invalid_challenge`, `401 invalid_credentials` (passkey inconnue ou refusée), `401 security_key_only` (une clé de sécurité, qui ne connecte pas seule), `403 account_disabled` |
 | `GET /sends/{id}/access` | sans compte : `SendInfo { password?: { kdf, salt }, expires_at, views_left }`, ou `404 send_unavailable` (inconnu, expiré, épuisé, supprimé — ou liens désactivés). Ne consomme rien |
 | `POST /sends/{id}/access` | sans compte : `{ access_key }` → `SendContent { ciphertext, expires_at, views_left }` et une vue consommée (la dernière efface le chiffré), ou `403 invalid_send_key` (lien incomplet, mauvais mot de passe) |
 
@@ -82,9 +84,9 @@ Partout : `403 ip_not_allowed` si l'adresse du client n'est pas dans
 
 | | |
 |---|---|
-| `GET /auth/passkeys` | `[PasskeyInfo { id, name, created_at, last_used_at }]` |
+| `GET /auth/passkeys` | `[PasskeyInfo { id, name, created_at, last_used_at, login }]` — `login: false` : une clé de sécurité (second facteur seulement) |
 | `POST /auth/passkeys/register/start` | → `PasskeyRegistrationOptions { challenge_id, challenge, rp_id, rp_name, user_handle, user_name, exclude, prf_salt }` |
-| `POST /auth/passkeys` | `{ challenge_id, auth_key, name, credential_id, client_data_json, attestation_object, protected_user_key }` → `201 PasskeyInfo`. Le mot de passe maître (clé d'auth) est vérifié (`401 invalid_credentials`) ; la création WebAuthn aussi (`400 invalid_passkey` : défi, origine, site, utilisateur non vérifié, type de clé) ; `409 passkey_exists`, `409 too_many_passkeys` (20) |
+| `POST /auth/passkeys` | `{ challenge_id, auth_key, name, credential_id, client_data_json, attestation_object, protected_user_key? }` → `201 PasskeyInfo`. Sans `protected_user_key` : une **clé de sécurité** (second facteur seulement), refusée tant que le TOTP n'est pas actif (`409 totp_required`) — elle part avec lui quand on le désactive. Le mot de passe maître (clé d'auth) est vérifié (`401 invalid_credentials`) ; la création WebAuthn aussi (`400 invalid_passkey` : défi, origine, site, utilisateur non vérifié, type de clé) ; `409 passkey_exists`, `409 too_many_passkeys` (20) |
 | `DELETE /auth/passkeys/{id}` | la retire (`404` si ce n'est pas la mienne) |
 
 ## Vaults

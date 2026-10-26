@@ -249,6 +249,12 @@ pub async fn disable(
         .bind(user.id)
         .execute(&mut *tx)
         .await?;
+    // Les clés de sécurité ne valent qu'à côté du TOTP (leur recours) : elles
+    // partent avec lui. Les passkeys de connexion restent.
+    sqlx::query("DELETE FROM passkeys WHERE user_id = $1 AND protected_user_key IS NULL")
+        .bind(user.id)
+        .execute(&mut *tx)
+        .await?;
     Audit::new("user.totp_disable")
         .actor(user.id)
         .ip(ip)
@@ -286,7 +292,15 @@ pub async fn issue_challenge<'e>(
     .bind(CHALLENGE_TTL_SECS as f64)
     .execute(db)
     .await?;
-    Ok(TotpChallenge { totp_token: token })
+    Ok(TotpChallenge {
+        totp_token: token,
+        webauthn: false,
+    })
+}
+
+struct PendingCh {
+    user_id: Uuid,
+    device_name: Option<String>,
 }
 
 #[derive(sqlx::FromRow)]
@@ -296,13 +310,11 @@ struct ChallengeRow {
     attempts: i32,
 }
 
-pub async fn verify(
-    State(state): State<AppState>,
-    ClientIp(ip): ClientIp,
-    headers: HeaderMap,
-    Json(req): Json<TotpVerifyRequest>,
-) -> ApiResult<Json<LoginResponse>> {
-    let token_hash = hash_token(&req.totp_token);
+/// Le défi en cours d'un jeton de connexion en deux temps : encore valable,
+/// pas épuisé. Partagé par le code TOTP et la clé de sécurité
+/// (`passkeys::second_factor`), qui comptent leurs essais ensemble.
+pub(crate) async fn pending(state: &AppState, token: &str) -> ApiResult<(Vec<u8>, Uuid, Option<String>)> {
+    let token_hash = hash_token(token);
     let Some(ch) = sqlx::query_as::<_, ChallengeRow>(
         "SELECT user_id, device_name, attempts FROM totp_challenges WHERE token_hash = $1 AND expires_at > now()",
     )
@@ -327,14 +339,31 @@ pub async fn verify(
             "trop d'essais, recommencer la connexion",
         ));
     }
+    Ok((token_hash.to_vec(), ch.user_id, ch.device_name))
+}
+
+/// Un second facteur refusé : un essai de moins.
+pub(crate) async fn failed_attempt(state: &AppState, token_hash: &[u8]) -> ApiResult<()> {
+    sqlx::query("UPDATE totp_challenges SET attempts = attempts + 1 WHERE token_hash = $1")
+        .bind(token_hash)
+        .execute(&state.db)
+        .await?;
+    Ok(())
+}
+
+pub async fn verify(
+    State(state): State<AppState>,
+    ClientIp(ip): ClientIp,
+    headers: HeaderMap,
+    Json(req): Json<TotpVerifyRequest>,
+) -> ApiResult<Json<LoginResponse>> {
+    let (token_hash, user_id, device_name) = pending(&state, &req.totp_token).await?;
+    let ch = PendingCh { user_id, device_name };
     let user = db::user_by_id(&state.db, ch.user_id)
         .await?
         .ok_or_else(AppError::unauthorized)?;
     if !check_code(&state, user.id, &user.email, &req.code).await? {
-        sqlx::query("UPDATE totp_challenges SET attempts = attempts + 1 WHERE token_hash = $1")
-            .bind(&token_hash)
-            .execute(&state.db)
-            .await?;
+        failed_attempt(&state, &token_hash).await?;
         Audit::new("user.totp_failed")
             .actor(user.id)
             .ip(ip)
@@ -347,6 +376,23 @@ pub async fn verify(
         ));
     }
 
+    Ok(Json(
+        complete_login(&state, &token_hash, user, ch.device_name, ip, &headers, "totp").await?,
+    ))
+}
+
+/// La fin d'une connexion en deux temps, quel que soit le second facteur
+/// (code TOTP, clé de sécurité) : le défi consommé, une session, l'audit et
+/// l'alerte de connexion.
+pub(crate) async fn complete_login(
+    state: &AppState,
+    token_hash: &[u8],
+    user: db::UserRow,
+    device_name: Option<String>,
+    ip: Option<IpAddr>,
+    headers: &HeaderMap,
+    factor: &str,
+) -> ApiResult<LoginResponse> {
     #[derive(sqlx::FromRow)]
     struct Blobs {
         protected_user_key: Vec<u8>,
@@ -359,10 +405,10 @@ pub async fn verify(
 
     let mut tx = state.db.begin().await?;
     sqlx::query("DELETE FROM totp_challenges WHERE token_hash = $1 OR expires_at < now()")
-        .bind(&token_hash)
+        .bind(token_hash)
         .execute(&mut *tx)
         .await?;
-    let device = validate::device_name(ch.device_name);
+    let device = validate::device_name(device_name);
     let agent = headers.get(header::USER_AGENT).and_then(|v| v.to_str().ok());
     let (_, tokens) = sessions::create(
         &mut *tx,
@@ -378,16 +424,16 @@ pub async fn verify(
     Audit::new("user.login")
         .actor(user.id)
         .ip(ip)
-        .meta(serde_json::json!({ "totp": true }))
+        .meta(serde_json::json!({ "second_factor": factor }))
         .write(&mut *tx)
         .await?;
     tx.commit().await?;
-    crate::mail::login_alert(&state, user.id, &user.email, ip, device.as_deref(), agent).await;
+    crate::mail::login_alert(state, user.id, &user.email, ip, device.as_deref(), agent).await;
 
-    Ok(Json(LoginResponse {
+    Ok(LoginResponse {
         tokens,
         user: UserProfile::from(user),
         protected_user_key: blobs.protected_user_key,
         protected_private_key: blobs.protected_private_key,
-    }))
+    })
 }

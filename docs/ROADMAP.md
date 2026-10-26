@@ -39,8 +39,7 @@ c'est ce qui sépare un projet solide d'un outil qu'on recommande.
    [`REMPLISSAGE.md`](REMPLISSAGE.md)).
 3. **Windows** (§6) : signature de code (SmartScreen), Windows Hello,
    agent SSH.
-4. **Le reste des cases vides**, au choix : 2FA WebAuthn et passkey dans
-   l'extension (§2), écrans propres à
+4. **Le reste des cases vides**, au choix : passkey dans l'extension (§2), écrans propres à
    l'application qui n'ont eu que des textes raccourcis dans la refonte
    (`DESIGN.md`, « État »), `gv` et Guiterm sur un coffre local
    (`APP.md`).
@@ -177,9 +176,12 @@ paramètres ou formats anciens.
   pouvoir l'ouvrir et vérifie les signatures (`src/webauthn.rs`, Rust pur,
   utilisateur vérifié exigé, compteur contre les clones). Ajouter redemande
   le mot de passe maître. Activée par `GUIVAULT_PUBLIC_URL`.
+- [x] **2FA WebAuthn** : une clé de sécurité à la place du code TOTP, après
+  le mot de passe ; à côté du TOTP (son recours), jamais seule
+  ([`PASSKEYS.md`](PASSKEYS.md), « Clé de sécurité »). Reste : l'imposer en
+  option (refuser le code).
 - [ ] Passkey et **code PIN dans l'extension** (ses pages ont leur propre
-  origine) ; **2FA WebAuthn** (une clé en second facteur du mot de passe :
-  la vérification est là, restent les routes et l'interface).
+  origine).
 - [ ] Alias d'e-mail dans le générateur (SimpleLogin / addy.io), comme
   Proton Pass — moins prioritaire.
 
