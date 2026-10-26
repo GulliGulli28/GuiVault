@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 /** Empreintes épinglées : la seule défense contre un serveur qui glisserait
  * sa propre clé publique à la place de celle d'un membre. Par navigateur
  * (`localStorage`), comme Guiterm les garde par machine. */
@@ -32,12 +33,12 @@ export function pinFingerprint(email: string, fingerprint: string) {
 }
 
 export function requirePinned(email: string, fingerprint: string) {
-  const t = fingerprintTrust(email, fingerprint);
-  if (t.kind !== "pinned") {
+  const trust = fingerprintTrust(email, fingerprint);
+  if (trust.kind !== "pinned") {
     throw new Error(
-      t.kind === "changed"
-        ? `L'empreinte de ${email} a changé depuis sa vérification (${t.previous}) : vérifiez-la à nouveau avant de partager.`
-        : `L'empreinte de ${email} n'a pas été vérifiée : comparez-la hors bande et épinglez-la avant de partager.`,
+      trust.kind === "changed"
+        ? t("L'empreinte de {0} a changé depuis sa vérification ({1}) : vérifiez-la à nouveau avant de partager.", email, trust.previous)
+        : t("L'empreinte de {0} n'a pas été vérifiée : comparez-la hors bande et épinglez-la avant de partager.", email),
     );
   }
 }

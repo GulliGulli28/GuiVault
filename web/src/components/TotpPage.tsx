@@ -11,6 +11,7 @@ import { BubbleButton } from "./BubbleButton";
 import { IconSearch } from "./ui-icons";
 import { tileHue, tileInitial } from "../lib/tiles";
 import { NARROW, useMediaQuery } from "../hooks/useMediaQuery";
+import { t } from "../lib/i18n";
 
 /** L'authentificateur : les codes TOTP de tous les vaults au même endroit. */
 export function TotpPage({ ctx }: { ctx: PageContext }) {
@@ -26,7 +27,7 @@ export function TotpPage({ ctx }: { ctx: PageContext }) {
     try {
       await changeItem(vault, { revision: e.revision, payload: { kind: "login", login: e.login } }, (p) => (p.kind === "login" ? { ...p, login: { ...p.login, totp: null } } : null));
       setEntries((list) => (list ?? []).filter((x) => x.id !== e.id));
-      ctx.notify(`Code de « ${e.login.name} » retiré.`);
+      ctx.notify(t("Code de « {0} » retiré.", e.login.name));
     } catch (err) {
       ctx.error(errorMessage(err));
     }
@@ -58,13 +59,13 @@ export function TotpPage({ ctx }: { ctx: PageContext }) {
       .sort((a, b) => a.login.name.localeCompare(b.login.name));
     return (
       <div className="m-page">
-        <header className="m-head"><h1 className="m-title min-w-0 flex-1 truncate">Codes 2FA</h1><BubbleButton ctx={ctx} /></header>
+        <header className="m-head"><h1 className="m-title min-w-0 flex-1 truncate">{t("Codes 2FA")}</h1><BubbleButton ctx={ctx} /></header>
         <div className="shrink-0 px-4 pb-2.5">
-          <label className="m-search"><IconSearch size={18} /><input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Rechercher un code" aria-label="Rechercher un code" /></label>
+          <label className="m-search"><IconSearch size={18} /><input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("Rechercher un code")} aria-label={t("Rechercher un code")} /></label>
         </div>
         <div className="m-body gap-2.5">
           {entries === null && slow && <Loading />}
-          {entries !== null && shown.length === 0 && <p className="py-10 text-center text-[14px] text-[var(--c-text-muted)]">{entries.some((e) => e.login.totp) ? "Rien ne correspond." : "Aucun identifiant n'a de code 2FA."}</p>}
+          {entries !== null && shown.length === 0 && <p className="py-10 text-center text-[14px] text-[var(--c-text-muted)]">{entries.some((e) => e.login.totp) ? t("Rien ne correspond.") : t("Aucun identifiant n'a de code 2FA.")}</p>}
           {shown.map((e) => (
             <div key={e.id} className="m-card flex min-w-0 items-center gap-3.5 px-4 py-3.5">
               <span className="tile shrink-0" style={{ "--tile-size": "40px", "--tile-h": tileHue(e.login.name) } as React.CSSProperties}>{tileInitial(e.login.name)}</span>
@@ -80,7 +81,7 @@ export function TotpPage({ ctx }: { ctx: PageContext }) {
   }
 
   return (
-    <Page title="Codes 2FA" sub={entries ? `${entries.filter((e) => e.login.totp).length} codes · cliquez pour copier` : undefined} width="max-w-[760px]" align="left" mobileBack={null}>
+    <Page title={t("Codes 2FA")} sub={entries ? t("{0} codes · cliquez pour copier", entries.filter((e) => e.login.totp).length) : undefined} width="max-w-[760px]" align="left" mobileBack={null}>
       {entries === null ? (slow ? <Loading /> : null) : <TotpList entries={entries} onRemove={ctx.session.vaults.some((v) => v.role !== "reader") ? remove : undefined} />}
     </Page>
   );

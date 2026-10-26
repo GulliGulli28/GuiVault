@@ -4,6 +4,7 @@
  * message, … }`) — `localHost.ts` en refait une `ApiError`. */
 import { invoke } from "@tauri-apps/api/core";
 import type { LocalHost } from "../../src/lib/localHost";
+import { t } from "../../src/lib/i18n";
 
 export const tauriHost: LocalHost = {
   create: (path, coffre) => invoke("local_create", { path, coffre }),
@@ -15,7 +16,7 @@ export const tauriHost: LocalHost = {
 /** Le pair : un second coffre ouvert à côté de la session, pour la
  * synchroniser avec sa copie (`coffreSync.ts`). On n'en crée pas. */
 export const tauriPeerHost: LocalHost = {
-  create: () => Promise.reject({ status: 400, code: "local_unsupported", message: "on ne crée pas de coffre ici" }),
+  create: () => Promise.reject({ status: 400, code: "local_unsupported", message: t("on ne crée pas de coffre ici") }),
   open: (path) => invoke("peer_open", { path }),
   close: () => invoke("peer_close"),
   call: (op, args) => invoke("peer_call", { op, args }),

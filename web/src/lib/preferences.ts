@@ -1,3 +1,4 @@
+import { translated } from "./i18n";
 /** Les préférences d'affichage. Parties du sous-ensemble « Apparence » de
  * Guiterm (mêmes accents nommés, que les dossiers gardent comme couleur),
  * elles ont leur défaut propre depuis la refonte (`docs/DESIGN.md`) : le fond
@@ -27,7 +28,7 @@ export interface AccentColorEntry {
   light?: { c600: string; c500: string };
 }
 
-export const ACCENT_COLORS: Record<UiAccent, AccentColorEntry> = {
+export const ACCENT_COLORS: Record<UiAccent, AccentColorEntry> = translated({
   pervenche: { label: "Pervenche", c600: "#8b8cff", c500: "#a0a1ff", c300: "#b9baff", dim: "rgba(139,140,255,0.16)", light: { c600: "#5755d9", c500: "#4846c8" } },
   indigo:  { label: "Indigo",   c600: "#4f46e5", c500: "#6366f1", c300: "#a5b4fc", dim: "rgba(79,70,229,0.18)"  },
   blue:    { label: "Bleu",     c600: "#2563eb", c500: "#3b82f6", c300: "#93c5fd", dim: "rgba(37,99,235,0.18)"  },
@@ -37,7 +38,7 @@ export const ACCENT_COLORS: Record<UiAccent, AccentColorEntry> = {
   teal:    { label: "Teal",     c600: "#0d9488", c500: "#14b8a6", c300: "#5eead4", dim: "rgba(13,148,136,0.18)" },
   amber:   { label: "Ambre",    c600: "#d97706", c500: "#f59e0b", c300: "#fcd34d", dim: "rgba(217,119,6,0.18)"  },
   cyan:    { label: "Cyan",     c600: "#0891b2", c500: "#06b6d4", c300: "#67e8f9", dim: "rgba(8,145,178,0.18)"  },
-};
+}, ["label"]);
 
 export type UiBg = "graphite" | "slate" | "gray" | "zinc" | "black" | "navy" | "aurora";
 export type ColorMode = "dark" | "light";
@@ -65,7 +66,7 @@ export interface BgThemeEntry {
  * couches empilées ; ici, c'est la bordure d'un pixel qui découpe. En clair,
  * `bg2` est blanc — le panneau — et `bg` un gris à peine teinté pour la zone
  * de travail. */
-export const BG_THEMES: Record<UiBg, BgThemeEntry> = {
+export const BG_THEMES: Record<UiBg, BgThemeEntry> = translated({
   graphite: {
     label: "Graphite",
     lightLabel: "Craie",
@@ -106,7 +107,7 @@ export const BG_THEMES: Record<UiBg, BgThemeEntry> = {
     dark:  { bg: "#0b0910", bg2: "#110e17", bg3: "#191420", border: "#26202f" },
     light: { bg: "#ede8f5", bg2: "#f9f7fc", bg3: "#e4dcef", border: "#cdc2df" },
   },
-};
+}, ["label", "lightLabel"]);
 
 /** Le nom d'un fond tel qu'il se présente dans le mode courant : les fonds
  * clairs ne sont pas les fonds sombres éclaircis, ils ont leur teinte propre
@@ -175,7 +176,7 @@ export function hostGroupMetrics(fontPx: number, iconPx: number): { font: string
 /** La police par défaut, embarquée (`src/fonts.ts`). */
 export const GEIST_STACK = "\"Geist Variable\", system-ui, -apple-system, \"Segoe UI\", sans-serif";
 
-export const UI_FONT_FAMILIES: { value: string; label: string }[] = [
+export const UI_FONT_FAMILIES: { value: string; label: string }[] = translated([
   { value: GEIST_STACK, label: "Geist" },
   { value: "system", label: "Système (Segoe UI sous Windows)" },
   { value: "\"Inter\", system-ui, sans-serif", label: "Inter" },
@@ -183,7 +184,7 @@ export const UI_FONT_FAMILIES: { value: string; label: string }[] = [
   { value: "\"Helvetica Neue\", Helvetica, Arial, sans-serif", label: "Helvetica / Arial" },
   { value: "Verdana, Geneva, sans-serif", label: "Verdana" },
   { value: "\"JetBrains Mono\", ui-monospace, monospace", label: "JetBrains Mono (tout en mono)" },
-];
+], ["label"]);
 
 /** La pile de polices réellement appliquée pour une valeur de `uiFontFamily`.
  * `"system"` est la valeur par défaut, laissée au navigateur. */

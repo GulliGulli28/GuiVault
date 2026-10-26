@@ -14,6 +14,7 @@ import { pickCoffre, pickNewCoffre } from "./dialogs";
 import { tauriHost } from "./tauriHost";
 import { deviceCoffres, isMobile } from "./mobile";
 import { coffreName, forgetCoffre, lastServer, recentCoffres, rememberCoffre, rememberServer } from "./recents";
+import { t } from "../../src/lib/i18n";
 
 type Step =
   | { kind: "home" }
@@ -81,7 +82,7 @@ export function AppWelcome({ onSession: done }: { onSession: (s: SessionState) =
   };
 
   if (step.kind === "login") {
-    return <LoginScreen onSession={onSession} extra={<button onClick={home} className="font-medium text-[var(--c-accent-text)] hover:underline">Coffre local ou autre serveur</button>} />;
+    return <LoginScreen onSession={onSession} extra={<button onClick={home} className="font-medium text-[var(--c-accent-text)] hover:underline">{t("Coffre local ou autre serveur")}</button>} />;
   }
   if (step.kind === "server") return <ServerForm onBack={home} onReady={() => setStep({ kind: "login" })} />;
   if (step.kind === "open") return <UnlockForm key={step.path} path={step.path} onBack={home} onSession={onSession} onBiometric={done} onOpenCopy={(dest) => setStep({ kind: "open", path: dest })} />;
@@ -89,10 +90,10 @@ export function AppWelcome({ onSession: done }: { onSession: (s: SessionState) =
   if (step.kind === "create") return <CreateForm path={step.path} onBack={home} onSession={onSession} />;
 
   return (
-    <AuthShell title="Bienvenue" sub="Un serveur pour tous vos appareils, ou un coffre sur celui-ci." store={listed.length ? "local" : "server"} footer={<span>Chiffré sur cet appareil, avec ou sans serveur</span>}>
+    <AuthShell title={t("Bienvenue")} sub={t("Un serveur pour tous vos appareils, ou un coffre sur celui-ci.")} store={listed.length ? "local" : "server"} footer={<span>{t("Chiffré sur cet appareil, avec ou sans serveur")}</span>}>
       {listed.length > 0 && (
         <div className="flex flex-col gap-1.5">
-          <p className="field-label">{isMobile() ? "Coffres de cet appareil" : "Coffres récents"}</p>
+          <p className="field-label">{isMobile() ? t("Coffres de cet appareil") : t("Coffres récents")}</p>
           <ul className="card divide-y divide-[var(--c-border)]">
             {listed.map((path) => (
               <li key={path} className="flex min-w-0 items-center gap-1 pr-1.5">
@@ -104,19 +105,19 @@ export function AppWelcome({ onSession: done }: { onSession: (s: SessionState) =
                   </span>
                   <IconChevronRight size={14} className="shrink-0 text-[var(--c-text-muted)]" />
                 </button>
-                {!isMobile() && <button onClick={() => { forgetCoffre(path); setRecents(recentCoffres()); }} className="btn btn-ghost btn-icon btn-sm shrink-0" title="Retirer de la liste" aria-label={`Retirer ${coffreName(path)} de la liste`}><IconClose size={13} /></button>}
+                {!isMobile() && <button onClick={() => { forgetCoffre(path); setRecents(recentCoffres()); }} className="btn btn-ghost btn-icon btn-sm shrink-0" title={t("Retirer de la liste")} aria-label={t("Retirer {0} de la liste", coffreName(path))}><IconClose size={13} /></button>}
               </li>
             ))}
           </ul>
         </div>
       )}
       <div className="flex flex-col gap-2.5">
-        <button onClick={() => setStep({ kind: "server" })} className={`btn btn-lg w-full ${listed.length ? "btn-secondary" : "btn-primary"}`}>Se connecter à un serveur</button>
-        <div className="flex items-center gap-3 text-[12.5px] text-[var(--c-text-muted)]"><span className="h-px flex-1 bg-[var(--c-border)]" />ou un coffre sur cet appareil<span className="h-px flex-1 bg-[var(--c-border)]" /></div>
+        <button onClick={() => setStep({ kind: "server" })} className={`btn btn-lg w-full ${listed.length ? "btn-secondary" : "btn-primary"}`}>{t("Se connecter à un serveur")}</button>
+        <div className="flex items-center gap-3 text-[12.5px] text-[var(--c-text-muted)]"><span className="h-px flex-1 bg-[var(--c-border)]" />{t("ou un coffre sur cet appareil")}<span className="h-px flex-1 bg-[var(--c-border)]" /></div>
         <div className="flex flex-wrap gap-2.5">
-          {!isMobile() && <button onClick={() => void pickExisting()} className="btn btn-secondary btn-lg min-w-[160px] flex-1">Ouvrir un coffre local</button>}
-          <button onClick={() => void pickNew()} className="btn btn-secondary btn-lg min-w-[160px] flex-1">Créer un coffre local</button>
-          {files && <button onClick={() => void importArchive()} disabled={importing} className="btn btn-secondary btn-lg min-w-[160px] flex-1">{importing ? "Import…" : "Importer un coffre"}</button>}
+          {!isMobile() && <button onClick={() => void pickExisting()} className="btn btn-secondary btn-lg min-w-[160px] flex-1">{t("Ouvrir un coffre local")}</button>}
+          <button onClick={() => void pickNew()} className="btn btn-secondary btn-lg min-w-[160px] flex-1">{t("Créer un coffre local")}</button>
+          {files && <button onClick={() => void importArchive()} disabled={importing} className="btn btn-secondary btn-lg min-w-[160px] flex-1">{importing ? t("Import…") : t("Importer un coffre")}</button>}
         </div>
       </div>
       {error && <p className="callout callout-danger">{error}</p>}
@@ -133,7 +134,7 @@ function CoffreCard({ path, onChange }: { path: string; onChange: () => void }) 
         <span className="truncate text-[13.5px] font-medium">{coffreName(path)}</span>
         <span className="truncate font-mono text-[11.5px] text-[var(--c-text-muted)]">{path}</span>
       </span>
-      <button type="button" onClick={onChange} className="btn btn-ghost text-[var(--c-accent-text)]">Changer</button>
+      <button type="button" onClick={onChange} className="btn btn-ghost text-[var(--c-accent-text)]">{t("Changer")}</button>
     </div>
   );
 }
@@ -158,31 +159,31 @@ function ServerForm({ onBack, onReady }: { onBack: () => void; onReady: () => vo
       rememberServer(clean);
       onReady();
     } catch (err) {
-      setError(`Aucun serveur GuiVault ne répond à cette adresse (${errorMessage(err)}).`);
+      setError(t("Aucun serveur GuiVault ne répond à cette adresse ({0}).", errorMessage(err)));
     } finally {
       setBusy(false);
     }
   };
   const insecure = /^http:\/\//i.test(url.trim()) && !/^http:\/\/(localhost|127\.0\.0\.1)(:|\/|$)/i.test(url.trim());
   return (
-    <AuthShell title="Se connecter" sub="L'adresse de votre serveur GuiVault." footer={<span>Chiffré sur cet appareil, avant l'envoi</span>}>
+    <AuthShell title={t("Se connecter")} sub={t("L'adresse de votre serveur GuiVault.")} footer={<span>{t("Chiffré sur cet appareil, avant l'envoi")}</span>}>
       <form onSubmit={submit} className="flex flex-col gap-4">
         <label className="block">
-          <span className="field-label">Adresse du serveur</span>
+          <span className="field-label">{t("Adresse du serveur")}</span>
           <input value={url} onChange={(e) => setUrl(e.target.value)} autoFocus required placeholder="https://vault.exemple.fr" className="input input-mono h-[42px]" />
         </label>
         {insecure && (
           <div className="callout callout-warn flex items-center gap-2">
-            <span className="min-w-0 flex-1">Sans HTTPS : préférez une adresse en https://.</span>
-            <InfoTip label="Pourquoi" align="right" items={[
-              { text: "Qui est sur le réseau voit passer vos jetons de session.", tone: "warn" },
-              { text: "Vos secrets, eux, restent chiffrés.", tone: "ok" },
+            <span className="min-w-0 flex-1">{t("Sans HTTPS : préférez une adresse en https://.")}</span>
+            <InfoTip label={t("Pourquoi")} align="right" items={[
+              { text: t("Qui est sur le réseau voit passer vos jetons de session."), tone: "warn" },
+              { text: t("Vos secrets, eux, restent chiffrés."), tone: "ok" },
             ]} />
           </div>
         )}
         {error && <p className="callout callout-danger">{error}</p>}
-        <button type="submit" disabled={!url.trim() || busy} className="btn btn-primary btn-lg w-full">{busy ? "Connexion…" : "Continuer"}</button>
-        <button type="button" onClick={onBack} className="btn btn-ghost w-full">Retour</button>
+        <button type="submit" disabled={!url.trim() || busy} className="btn btn-primary btn-lg w-full">{busy ? t("Connexion…") : t("Continuer")}</button>
+        <button type="button" onClick={onBack} className="btn btn-ghost w-full">{t("Retour")}</button>
       </form>
     </AuthShell>
   );
@@ -193,13 +194,13 @@ function BiometricButton({ busy, onClick }: { busy: boolean; onClick: () => void
   return (
     <button type="button" onClick={onClick} disabled={busy} className="btn btn-primary btn-lg w-full gap-2">
       <IconFingerprint size={20} />
-      {busy ? "Déverrouillage…" : "Déverrouiller par biométrie"}
+      {busy ? t("Déverrouillage…") : t("Déverrouiller par biométrie")}
     </button>
   );
 }
 
 function Or() {
-  return <div className="flex items-center gap-3 text-[12.5px] text-[var(--c-text-muted)]"><span className="h-px flex-1 bg-[var(--c-border)]" />ou<span className="h-px flex-1 bg-[var(--c-border)]" /></div>;
+  return <div className="flex items-center gap-3 text-[12.5px] text-[var(--c-text-muted)]"><span className="h-px flex-1 bg-[var(--c-border)]" />{t("ou")}<span className="h-px flex-1 bg-[var(--c-border)]" /></div>;
 }
 
 function UnlockForm({ path, onBack, onSession, onBiometric, onOpenCopy }: { path: string; onBack: () => void; onSession: (s: SessionState) => void; onBiometric: (s: SessionState) => void; onOpenCopy: (dest: string) => void }) {
@@ -248,7 +249,7 @@ function UnlockForm({ path, onBack, onSession, onBiometric, onOpenCopy }: { path
   useAutoPrompt(bioReady, () => void biometric());
   const hint = bioOff ?? bio?.password;
   return (
-    <AuthShell title="Déverrouiller" sub="Le coffre se déchiffre ici, sur cet appareil." store="local" footer={<span className="truncate">Coffre local</span>}>
+    <AuthShell title={t("Déverrouiller")} sub={t("Le coffre se déchiffre ici, sur cet appareil.")} store="local" footer={<span className="truncate">{t("Coffre local")}</span>}>
       <form onSubmit={submit} className="flex flex-col gap-4">
         <CoffreCard path={path} onChange={onBack} />
         {bioReady && (
@@ -258,18 +259,18 @@ function UnlockForm({ path, onBack, onSession, onBiometric, onOpenCopy }: { path
           </>
         )}
         <label className="block">
-          <span className="field-label">Mot de passe maître</span>
+          <span className="field-label">{t("Mot de passe maître")}</span>
           <PasswordInput value={password} onChange={setPassword} autoComplete="current-password" autoFocus={bio === null || !bioReady} />
         </label>
         {hint && <p className="callout flex items-center gap-2 text-[13px]"><IconFingerprint size={16} className="shrink-0 text-[var(--c-text-muted)]" /><span className="min-w-0 flex-1">{hint}</span></p>}
         {error && <p className="callout callout-danger">{error}</p>}
         {corrupt && (
           <div className="flex flex-col gap-1.5">
-            <p className="text-[13px]">Ce coffre ne se lit plus. Ses sauvegardes :</p>
+            <p className="text-[13px]">{t("Ce coffre ne se lit plus. Ses sauvegardes :")}</p>
             <LocalBackups path={path} onError={setError} onRestored={onOpenCopy} />
           </div>
         )}
-        <button type="submit" disabled={!password || busy} className={`btn btn-lg w-full ${bioReady ? "btn-secondary" : "btn-primary"}`}>{busy && !bioReady ? "Déverrouillage…" : "Déverrouiller"}</button>
+        <button type="submit" disabled={!password || busy} className={`btn btn-lg w-full ${bioReady ? "btn-secondary" : "btn-primary"}`}>{busy && !bioReady ? t("Déverrouillage…") : t("Déverrouiller")}</button>
       </form>
     </AuthShell>
   );
@@ -299,7 +300,7 @@ function ServerLocked({ userId, email, onSession, onPassword }: { userId: string
   useAutoPrompt(!!bio?.ready, () => void biometric());
   if (!bio) return null;
   return (
-    <AuthShell title="Déverrouiller" sub="Vos secrets se déchiffrent ici, sur cet appareil." footer={<span className="truncate">{baseUrl() || "Serveur"}</span>}>
+    <AuthShell title={t("Déverrouiller")} sub={t("Vos secrets se déchiffrent ici, sur cet appareil.")} footer={<span className="truncate">{baseUrl() || t("Serveur")}</span>}>
       <div className="flex flex-col gap-4">
         <div className="card flex min-w-0 items-center gap-3 py-2.5 pl-3 pr-2">
           <span className="tile shrink-0 rounded-full" style={{ "--tile-size": "34px", "--tile-h": 238 } as React.CSSProperties}>{tileInitial(email)}</span>
@@ -310,7 +311,7 @@ function ServerLocked({ userId, email, onSession, onPassword }: { userId: string
         </div>
         {bio.ready && !error && <BiometricButton busy={busy} onClick={() => void biometric()} />}
         {(bio.password || error) && <p className="callout flex items-center gap-2 text-[13px]"><IconFingerprint size={16} className="shrink-0 text-[var(--c-text-muted)]" /><span className="min-w-0 flex-1">{error ?? bio.password}</span></p>}
-        <button type="button" onClick={onPassword} className={`btn btn-lg w-full ${bio.ready && !error ? "btn-secondary" : "btn-primary"}`}>Utiliser le mot de passe</button>
+        <button type="button" onClick={onPassword} className={`btn btn-lg w-full ${bio.ready && !error ? "btn-secondary" : "btn-primary"}`}>{t("Utiliser le mot de passe")}</button>
       </div>
     </AuthShell>
   );
@@ -338,28 +339,28 @@ function CreateForm({ path, onBack, onSession }: { path: string; onBack: () => v
     }
   };
   return (
-    <AuthShell title="Nouveau coffre" sub="Un dossier sur cet appareil, chiffré par votre mot de passe maître." store="local" footer={<span className="truncate">Coffre local</span>}>
+    <AuthShell title={t("Nouveau coffre")} sub={t("Un dossier sur cet appareil, chiffré par votre mot de passe maître.")} store="local" footer={<span className="truncate">{t("Coffre local")}</span>}>
       <form onSubmit={submit} className="flex flex-col gap-4">
         <CoffreCard path={path} onChange={onBack} />
         <label className="block">
-          <span className="field-label">Mot de passe maître</span>
+          <span className="field-label">{t("Mot de passe maître")}</span>
           <PasswordInput value={password} onChange={setPassword} autoComplete="new-password" autoFocus />
-          {tooShort && <span className="help-text mt-1.5 block text-[var(--c-warn-text)]">Au moins 12 caractères.</span>}
+          {tooShort && <span className="help-text mt-1.5 block text-[var(--c-warn-text)]">{t("Au moins 12 caractères.")}</span>}
         </label>
         <label className="block">
-          <span className="field-label">Confirmer</span>
+          <span className="field-label">{t("Confirmer")}</span>
           <PasswordInput value={confirm} onChange={setConfirm} autoComplete="new-password" />
-          {mismatch && <span className="help-text mt-1.5 block text-[var(--c-warn-text)]">Les deux saisies diffèrent.</span>}
+          {mismatch && <span className="help-text mt-1.5 block text-[var(--c-warn-text)]">{t("Les deux saisies diffèrent.")}</span>}
         </label>
         <div className="callout callout-warn flex items-center gap-2">
-          <span className="min-w-0 flex-1">Mot de passe perdu = coffre perdu.</span>
-          <InfoTip label="Pourquoi" align="right" items={[
-            { text: "Personne ne peut réinitialiser ce mot de passe.", tone: "warn" },
-            { text: coffreFileBridge() ? "Exportez-le aussi de temps en temps : Paramètres › Compte." : "Sauvegardez aussi le dossier du coffre." },
+          <span className="min-w-0 flex-1">{t("Mot de passe perdu = coffre perdu.")}</span>
+          <InfoTip label={t("Pourquoi")} align="right" items={[
+            { text: t("Personne ne peut réinitialiser ce mot de passe."), tone: "warn" },
+            { text: coffreFileBridge() ? t("Exportez-le aussi de temps en temps : Paramètres › Compte.") : t("Sauvegardez aussi le dossier du coffre.") },
           ]} />
         </div>
         {error && <p className="callout callout-danger">{error}</p>}
-        <button type="submit" disabled={!password || password !== confirm || busy} className="btn btn-primary btn-lg w-full">{busy ? "Création…" : "Créer le coffre"}</button>
+        <button type="submit" disabled={!password || password !== confirm || busy} className="btn btn-primary btn-lg w-full">{busy ? t("Création…") : t("Créer le coffre")}</button>
       </form>
     </AuthShell>
   );

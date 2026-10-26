@@ -6,7 +6,7 @@
 export function tileInitial(name: string): string {
   const s = name.trim().replace(/^www\./i, "");
   const m = /[\p{L}\p{N}]/u.exec(s);
-  return m ? m[0].toLocaleUpperCase("fr-FR") : "·";
+  return m ? m[0].toUpperCase() : "·";
 }
 
 /** Une teinte (0–359) stable pour un nom : un hachage FNV-1a, ramené sur

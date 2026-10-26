@@ -7,6 +7,7 @@ import { coffreName } from "./localHost";
 import type { VaultItem } from "./allItems";
 import { autofillBridge, type AutofillIndex } from "./platform";
 import type { SessionState } from "./session";
+import { t } from "./i18n";
 
 export { autofillBridge };
 
@@ -23,7 +24,7 @@ export function buildAutofillIndex(session: SessionState, items: VaultItem[]): A
     if (l.reprompt) continue;
     entries.push({
       id: item.id,
-      name: l.name || l.username || "Sans nom",
+      name: l.name || l.username || t("Sans nom"),
       vault: vault.name,
       username: l.username,
       password: l.password,

@@ -844,6 +844,19 @@ scenario("copier : le coffre vers un nouveau compte, puis le compte vers un nouv
   await unlockFromRecents(b);
 });
 
+scenario("langue : l'interface passe en anglais, puis revient en français", async (b) => {
+  await openSettings(b, "Apparence");
+  await (await b.$("//button[@role='radio'][normalize-space()='English']")).click();
+  await waitText(b, "Language, theme, accent color, font and density.");
+  const text = await bodyText(b);
+  assert(text.includes("Settings") && text.includes("Lock"), "l'interface n'est pas passée en anglais");
+  assert((await b.execute(() => document.documentElement.lang)) === "en", "<html lang> n'a pas suivi");
+  await shot(b, "langue-en");
+  await (await b.$("//button[@role='radio'][normalize-space()='Français']")).click();
+  await waitText(b, "Langue, thème, couleur d'accent, police et densité.");
+  await (await b.$("//a[.//span[normalize-space()='Personnel']]")).click();
+});
+
 scenario("fermer puis rouvrir : coffres récents, mauvais mot de passe refusé", async (b) => {
   await account(b, "Fermer le coffre");
   await button(b, "Créer un coffre local");
@@ -956,6 +969,16 @@ async function main() {
       connectionRetryCount: 3,
     });
     try {
+      // Les textes vérifiés sont ceux de l'interface en français, quelle que
+      // soit la langue du système (le runner Windows est en anglais) : le
+      // réglage « Langue », puis l'interface rechargée.
+      const lang = await browser.execute(() => {
+        const was = localStorage.getItem("guivault.language");
+        localStorage.setItem("guivault.language", "fr");
+        if (was !== "fr") location.reload();
+        return was;
+      });
+      if (lang !== "fr") await browser.pause(1500);
       // Les scénarios s'enchaînent : un échec arrête la suite (les suivants
       // partent de l'état que le précédent laisse).
       for (const { name, run } of scenarios) {

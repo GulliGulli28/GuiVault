@@ -5,6 +5,7 @@ import type { Identity, Payload } from "../../lib/types";
 import { PasswordInput } from "../ui";
 import { Field, FormShell, useSeed } from "./common";
 import { SecretFooter, SecretHeader } from "./SecretBits";
+import { t } from "../../lib/i18n";
 
 // Les champs texte de l'identité — énumérés parce que la signature d'index
 // `[extra: string]: unknown` rend `keyof Identity` inutilisable.
@@ -29,37 +30,37 @@ export function IdentityForm({ initial, index, defaultGroupId, onSave, onCancel 
     </Field>
   );
   return (
-    <FormShell title={initial ? `Modifier « ${initial.name} »` : "Nouvelle identité"} onSave={() => onSave({ kind: "identity", identity: { ...identity, name: identity.name.trim() } })} onCancel={onCancel} validate={() => (identity.name.trim() ? null : "Le nom est obligatoire.")}>
-      <SecretHeader value={identity} onChange={setIdentity} placeholder="Moi, société…" />
+    <FormShell title={initial ? t("Modifier « {0} »", initial.name) : t("Nouvelle identité")} onSave={() => onSave({ kind: "identity", identity: { ...identity, name: identity.name.trim() } })} onCancel={onCancel} validate={() => (identity.name.trim() ? null : t("Le nom est obligatoire."))}>
+      <SecretHeader value={identity} onChange={setIdentity} placeholder={t("Moi, société…")} />
       <div className="grid grid-cols-[6rem_1fr_1fr] gap-2">
-        {text("title", "Civilité")}
-        {text("firstName", "Prénom")}
-        {text("lastName", "Nom de famille")}
+        {text("title", t("Civilité"))}
+        {text("firstName", t("Prénom"))}
+        {text("lastName", t("Nom de famille"))}
       </div>
       <div className="grid grid-cols-2 gap-2">
-        {text("middleName", "Deuxième prénom")}
-        {text("company", "Société")}
+        {text("middleName", t("Deuxième prénom"))}
+        {text("company", t("Société"))}
       </div>
       <div className="grid grid-cols-2 gap-2">
-        {text("username", "Nom d'utilisateur", { mono: true })}
-        {text("email", "E-mail", { mono: true })}
+        {text("username", t("Nom d'utilisateur"), { mono: true })}
+        {text("email", t("E-mail"), { mono: true })}
       </div>
-      {text("phone", "Téléphone", { mono: true })}
-      {text("address1", "Adresse")}
-      {text("address2", "Complément d'adresse")}
-      {text("address3", "Complément (2)")}
+      {text("phone", t("Téléphone"), { mono: true })}
+      {text("address1", t("Adresse"))}
+      {text("address2", t("Complément d'adresse"))}
+      {text("address3", t("Complément (2)"))}
       <div className="grid grid-cols-[8rem_1fr] gap-2">
-        {text("postalCode", "Code postal", { mono: true })}
-        {text("city", "Ville")}
+        {text("postalCode", t("Code postal"), { mono: true })}
+        {text("city", t("Ville"))}
       </div>
       <div className="grid grid-cols-2 gap-2">
-        {text("state", "Région / État")}
-        {text("country", "Pays")}
+        {text("state", t("Région / État"))}
+        {text("country", t("Pays"))}
       </div>
       <div className="grid grid-cols-3 gap-2">
-        {secret("ssn", "N° de sécurité sociale")}
-        {secret("passportNumber", "N° de passeport")}
-        {secret("licenseNumber", "N° de permis")}
+        {secret("ssn", t("N° de sécurité sociale"))}
+        {secret("passportNumber", t("N° de passeport"))}
+        {secret("licenseNumber", t("N° de permis"))}
       </div>
       <SecretFooter value={identity} onChange={setIdentity} groups={index.groups} />
     </FormShell>

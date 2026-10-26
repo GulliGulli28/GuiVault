@@ -6,6 +6,7 @@ import { Guarded } from "./Reprompt";
 import { tileHue, tileInitial } from "../lib/tiles";
 import { GroupRow } from "./EntityRow";
 import { IconSearch, IconTrash, IconVault } from "./ui-icons";
+import { t } from "../lib/i18n";
 
 export interface TotpEntry {
   id: string;
@@ -18,7 +19,7 @@ export interface TotpEntry {
 /** L'authentificateur : tous les identifiants qui ont un secret TOTP, avec
  * leur code en direct — ce qu'on ouvre quand un autre site demande « le
  * code de votre application ». Partagé par l'interface web et l'extension. */
-export function TotpList({ entries, compact, onRemove, emptyMessage = "Aucun identifiant n'a de secret TOTP. Ajoutez-en un dans la fiche d'un identifiant (URI otpauth:// ou QR code)." }: {
+export function TotpList({ entries, compact, onRemove, emptyMessage = t("Aucun identifiant n'a de secret TOTP. Ajoutez-en un dans la fiche d'un identifiant (URI otpauth:// ou QR code).") }: {
   entries: TotpEntry[];
   compact?: boolean;
   /** Retirer le secret TOTP d'un identifiant (l'identifiant reste). */
@@ -56,16 +57,16 @@ export function TotpList({ entries, compact, onRemove, emptyMessage = "Aucun ide
         <span className="truncate text-[12.5px] text-[var(--c-text-muted)]">{e.login.username || "—"}</span>
       </span>
       <Guarded payload={{ kind: "login", login: e.login }}><TotpCode secret={e.login.totp!} /></Guarded>
-      {onRemove && <button onClick={() => setRemoving(e)} className="btn btn-ghost btn-icon hover:text-[var(--c-danger)]" title="Retirer ce code" aria-label={`Retirer le code de ${e.login.name}`}><IconTrash size={14} /></button>}
+      {onRemove && <button onClick={() => setRemoving(e)} className="btn btn-ghost btn-icon hover:text-[var(--c-danger)]" title={t("Retirer ce code")} aria-label={t("Retirer le code de {0}", e.login.name)}><IconTrash size={14} /></button>}
     </div>
   );
   return (
     <div className={compact ? "" : "flex flex-col gap-6"}>
       <label className={`flex h-9 min-w-0 items-center gap-2 rounded-[9px] border border-[var(--c-border)] bg-[var(--c-surface)] px-2.5 text-[var(--c-text-muted)] focus-within:border-[var(--c-accent)] ${compact ? "mb-2" : "max-w-md"}`}>
         <IconSearch size={14} />
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Rechercher un code" aria-label="Rechercher un code" className="min-w-0 flex-1 bg-transparent text-[13.5px] text-[var(--c-text)] outline-none placeholder:text-[var(--c-text-muted)] focus-visible:outline-none" />
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("Rechercher un code")} aria-label={t("Rechercher un code")} className="min-w-0 flex-1 bg-transparent text-[13.5px] text-[var(--c-text)] outline-none placeholder:text-[var(--c-text-muted)] focus-visible:outline-none" />
       </label>
-      {shown.length === 0 && <p className="px-2 py-6 text-center text-[13px] text-[var(--c-text-muted)]">{entries.some((e) => e.login.totp) ? "Rien ne correspond." : emptyMessage}</p>}
+      {shown.length === 0 && <p className="px-2 py-6 text-center text-[13px] text-[var(--c-text-muted)]">{entries.some((e) => e.login.totp) ? t("Rien ne correspond.") : emptyMessage}</p>}
       {vaults.map((v) => {
         const expanded = terms.length > 0 || !collapsed.has(v.id);
         if (!compact) {
@@ -87,9 +88,9 @@ export function TotpList({ entries, compact, onRemove, emptyMessage = "Aucun ide
       })}
       {removing && onRemove && (
         <ConfirmDialog
-          title={`Retirer le code de « ${removing.login.name} » ?`}
-          message="L'identifiant reste. Si le site exige encore ce code, désactivez d'abord la 2FA chez lui."
-          confirmLabel="Retirer le code"
+          title={t("Retirer le code de « {0} » ?", removing.login.name)}
+          message={t("L'identifiant reste. Si le site exige encore ce code, désactivez d'abord la 2FA chez lui.")}
+          confirmLabel={t("Retirer le code")}
           danger
           onConfirm={() => { const e = removing; setRemoving(null); void onRemove(e); }}
           onCancel={() => setRemoving(null)}

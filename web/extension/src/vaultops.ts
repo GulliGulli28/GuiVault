@@ -6,10 +6,11 @@ import { applyBackend } from "./backend";
 import { deleteItem as deleteVaultItem, IntegrityError, loadItems, payloadEntity, putPayload, RevisionConflict, type DecodedItem, type SessionState, type VaultView } from "../../src/lib/session";
 import type { Login, Payload } from "../../src/lib/types";
 import { loadItemsCache, loadSession, loadSettings, saveItemsCache } from "./store";
+import { t } from "../../src/lib/i18n";
 
 async function session(): Promise<SessionState> {
   const s = await loadSession();
-  if (!s) throw new Error("Coffre verrouillé.");
+  if (!s) throw new Error(t("Coffre verrouillé."));
   applyBackend(s.state, await loadSettings());
   return s.state;
 }
@@ -37,7 +38,7 @@ async function assertIntact(vault: VaultView) {
 export async function savePayload(vaultId: string, payload: Payload, revision?: number): Promise<DecodedItem> {
   const state = await session();
   const vault = state.vaults.find((v) => v.id === vaultId);
-  if (!vault) throw new Error("Vault inconnu.");
+  if (!vault) throw new Error(t("Vault inconnu."));
   const id = payloadEntity(payload).id;
   await assertIntact(vault);
   try {
@@ -62,7 +63,7 @@ export function saveLogin(vaultId: string, login: Login, revision?: number): Pro
 export async function deleteItem(vaultId: string, id: string): Promise<void> {
   const state = await session();
   const vault = state.vaults.find((v) => v.id === vaultId);
-  if (!vault) throw new Error("Vault inconnu.");
+  if (!vault) throw new Error(t("Vault inconnu."));
   await assertIntact(vault);
   await deleteVaultItem(vault, id);
   const cache = await loadItemsCache();

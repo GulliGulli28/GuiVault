@@ -18,6 +18,7 @@ import { errorMessage } from "../lib/api";
 import { sshAgentBridge, type SshAgentKeyStatus, type SshAgentRequest } from "../lib/platform";
 import { isProtected } from "../lib/reprompt";
 import { InfoTip, Modal, SettingRow } from "./ui";
+import { t } from "../lib/i18n";
 
 function useSettings(): [Settings, (s: Settings) => void] {
   const [settings, setSettings] = useState(loadSshAgent);
@@ -96,13 +97,13 @@ export function SshAgentFeeder({ ctx }: { ctx: Pick<PageContext, "session" | "er
 function describe(r: SshAgentRequest): string {
   switch (r.purpose.kind) {
     case "sshLogin":
-      return `Connexion SSH en tant que « ${r.purpose.user} »`;
+      return t("Connexion SSH en tant que « {0} »", r.purpose.user);
     case "gitSignature":
-      return "Signer un commit ou une étiquette Git";
+      return t("Signer un commit ou une étiquette Git");
     case "sshsig":
-      return `Signer des données (espace « ${r.purpose.namespace} »)`;
+      return t("Signer des données (espace « {0} »)", r.purpose.namespace);
     default:
-      return "Une signature d'un type inconnu";
+      return t("Une signature d'un type inconnu");
   }
 }
 
@@ -129,34 +130,34 @@ export function SshAgentPrompt() {
   }, [current, remember]);
   const refuse = useCallback(() => answer(false), [answer]);
   if (!current) return null;
-  const who = current.client.program ? `${current.client.program}${current.client.pid ? ` (pid ${current.client.pid})` : ""}` : "Un programme de ce poste";
+  const who = current.client.program ? `${current.client.program}${current.client.pid ? t(" (pid {0})", current.client.pid) : ""}` : t("Un programme de ce poste");
   return (
-    <Modal title="Agent SSH : autoriser ?" onClose={refuse}>
+    <Modal title={t("Agent SSH : autoriser ?")} onClose={refuse}>
       <div className="flex flex-col gap-4">
         <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-[13px]">
-          <dt className="text-[var(--c-text-muted)]">Demande</dt>
+          <dt className="text-[var(--c-text-muted)]">{t("Demande")}</dt>
           <dd className="min-w-0 truncate font-medium">{describe(current)}</dd>
           {current.purpose.kind === "sshLogin" && current.purpose.fingerprint && (
             <>
-              <dt className="text-[var(--c-text-muted)]">Serveur</dt>
+              <dt className="text-[var(--c-text-muted)]">{t("Serveur")}</dt>
               <dd className="min-w-0 truncate font-mono text-[12px]" title={current.purpose.fingerprint}>{current.purpose.fingerprint}</dd>
             </>
           )}
-          <dt className="text-[var(--c-text-muted)]">Clé</dt>
+          <dt className="text-[var(--c-text-muted)]">{t("Clé")}</dt>
           <dd className="min-w-0 truncate" title={current.keyFingerprint}>{current.keyName}</dd>
-          <dt className="text-[var(--c-text-muted)]">Programme</dt>
+          <dt className="text-[var(--c-text-muted)]">{t("Programme")}</dt>
           <dd className="min-w-0 truncate">{who}</dd>
         </dl>
-        {current.forwarded && <p className="callout callout-warn">Par un agent transféré sur un serveur distant : demandé à chaque fois.</p>}
+        {current.forwarded && <p className="callout callout-warn">{t("Par un agent transféré sur un serveur distant : demandé à chaque fois.")}</p>}
         {!current.forwarded && (
           <label className="flex items-center gap-2 text-[13px]">
             <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
-            Ne plus demander pour cette clé pendant 10 minutes
+            {t("Ne plus demander pour cette clé pendant 10 minutes")}
           </label>
         )}
         <div className="flex justify-end gap-2">
-          <button type="button" onClick={refuse} className="btn btn-ghost">Refuser</button>
-          <button type="button" onClick={() => answer(true)} className="btn btn-primary" autoFocus>Autoriser</button>
+          <button type="button" onClick={refuse} className="btn btn-ghost">{t("Refuser")}</button>
+          <button type="button" onClick={() => answer(true)} className="btn btn-primary" autoFocus>{t("Autoriser")}</button>
         </div>
       </div>
     </Modal>
@@ -178,38 +179,38 @@ export function SshAgentSettings({ ctx }: { ctx: Pick<PageContext, "session" | "
   return (
     <>
       <section className="flex flex-col gap-2.5">
-        <h2 className="eyebrow">Agent</h2>
+        <h2 className="eyebrow">{t("Agent")}</h2>
         <div className="card">
           <SettingRow
-            title={<>Agent SSH <InfoTip label="Ce que fait l'agent SSH" items={[
-              { text: "ssh, git et scp signent avec les clés cochées, sans fichier sur le disque.", tone: "ok" },
-              { text: "Chaque signature est confirmée ici, ou une fois pour 10 minutes par clé." },
-              { text: "Au verrouillage, l'agent oublie toutes les clés." },
-              { text: "Windows : le service « OpenSSH Authentication Agent » doit être arrêté." },
+            title={<>{t("Agent SSH")} <InfoTip label={t("Ce que fait l'agent SSH")} items={[
+              { text: t("ssh, git et scp signent avec les clés cochées, sans fichier sur le disque."), tone: "ok" },
+              { text: t("Chaque signature est confirmée ici, ou une fois pour 10 minutes par clé.") },
+              { text: t("Au verrouillage, l'agent oublie toutes les clés.") },
+              { text: t("Windows : le service « OpenSSH Authentication Agent » doit être arrêté.") },
             ]} /></>}
-            desc={error ?? (settings.enabled ? `Écoute sur ${endpoint ?? "…"}` : "Les clés du coffre pour ssh et git, sur ce poste")}
+            desc={error ?? (settings.enabled ? t("Écoute sur {0}", endpoint ?? "…") : t("Les clés du coffre pour ssh et git, sur ce poste"))}
           >
-            <button type="button" role="switch" aria-checked={settings.enabled} aria-label="Agent SSH" onClick={() => save({ ...settings, enabled: !settings.enabled })} className="switch" />
+            <button type="button" role="switch" aria-checked={settings.enabled} aria-label={t("Agent SSH")} onClick={() => save({ ...settings, enabled: !settings.enabled })} className="switch" />
           </SettingRow>
         </div>
       </section>
       <section className="flex flex-col gap-2.5">
-        <h2 className="eyebrow">Clés confiées</h2>
+        <h2 className="eyebrow">{t("Clés confiées")}</h2>
         <div className="card divide-y divide-[var(--c-border)]">
-          {!loading && keys.length === 0 && <p className="px-5 py-4 text-[13px] text-[var(--c-text-muted)]">Aucune clé SSH dans vos vaults.</p>}
+          {!loading && keys.length === 0 && <p className="px-5 py-4 text-[13px] text-[var(--c-text-muted)]">{t("Aucune clé SSH dans vos vaults.")}</p>}
           {keys.map((v) => {
             const p = v.item.payload as Extract<typeof v.item.payload, { kind: "key" }>;
             const can = offerable(v);
             const on = can && settings.keys.includes(v.item.id);
             const status = statuses.find((s) => s.id === v.item.id);
             const desc = !p.content?.trim()
-              ? "Pas de contenu dans le coffre (fichier sur un autre poste)"
+              ? t("Pas de contenu dans le coffre (fichier sur un autre poste)")
               : isProtected(p)
-                ? "Élément protégé : pas confié à l'agent"
+                ? t("Élément protégé : pas confié à l'agent")
                 : status?.error ?? (on && status?.fingerprint ? status.fingerprint : v.vault.name);
             return (
               <SettingRow key={v.item.id} title={p.key.name} desc={desc}>
-                <button type="button" role="switch" aria-checked={on} aria-label={`Confier « ${p.key.name} » à l'agent`} disabled={!can} onClick={() => toggleKey(v.item.id, !on)} className="switch" />
+                <button type="button" role="switch" aria-checked={on} aria-label={t("Confier « {0} » à l'agent", p.key.name)} disabled={!can} onClick={() => toggleKey(v.item.id, !on)} className="switch" />
               </SettingRow>
             );
           })}

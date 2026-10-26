@@ -9,6 +9,7 @@ import { coffreName } from "../lib/localHost";
 import { coffreBridge } from "../lib/platform";
 import { connectAccount, copyToCoffre, copyToNewCoffre, copyVaults, createAccountFrom, transferVaults, type AccountDestination, type TransferProgress, type VaultReport } from "../lib/transfer";
 import { Modal, PasswordInput } from "./ui";
+import { t, plural } from "../lib/i18n";
 
 type Phase = "form" | "totp" | "running" | "done";
 
@@ -72,7 +73,7 @@ export function TransferDialog({ ctx, onClose }: { ctx: PageContext; onClose: ()
     e.preventDefault();
     setError(null);
     if (toServer) {
-      if (!/^https?:\/\//i.test(url.trim())) { setError("L'adresse du serveur commence par https://"); return; }
+      if (!/^https?:\/\//i.test(url.trim())) { setError(t("L'adresse du serveur commence par https://")); return; }
       if (mode === "new") {
         await run(async () => {
           const dest = await createAccountFrom(session, api, url, email, password);
@@ -86,7 +87,7 @@ export function TransferDialog({ ctx, onClose }: { ctx: PageContext; onClose: ()
       }
       setPhase("running");
       try {
-        const out = await connectAccount(url, email, password, `Personnel (${coffreName(local.path)})`);
+        const out = await connectAccount(url, email, password, t("Personnel ({0})", coffreName(local.path)));
         if (out.kind === "totp") {
           setVerify(() => out.verify);
           setPhase("totp");
@@ -99,11 +100,11 @@ export function TransferDialog({ ctx, onClose }: { ctx: PageContext; onClose: ()
       }
       return;
     }
-    if (!path) { setError("Choisissez d'abord le dossier du coffre."); return; }
+    if (!path) { setError(t("Choisissez d'abord le dossier du coffre.")); return; }
     await run(async () => {
       const res = mode === "new"
         ? await copyToNewCoffre(session, api, bridge.host, path, password, chosen(), setProgress)
-        : await copyToCoffre(api, bridge.host, path, password, `Personnel (${session.user.email})`, chosen(), setProgress);
+        : await copyToCoffre(api, bridge.host, path, password, t("Personnel ({0})", session.user.email), chosen(), setProgress);
       bridge.remember(path);
       return res;
     });
@@ -126,7 +127,7 @@ export function TransferDialog({ ctx, onClose }: { ctx: PageContext; onClose: ()
     if (p) setPath(p);
   };
 
-  const title = toServer ? "Copier vers un serveur" : "Copier dans un coffre local";
+  const title = toServer ? t("Copier vers un serveur") : t("Copier dans un coffre local");
   if (phase === "done") {
     const failed = reports.some((r) => r.error);
     return (
@@ -135,20 +136,20 @@ export function TransferDialog({ ctx, onClose }: { ctx: PageContext; onClose: ()
           <ul className="space-y-1">
             {reports.map((r) => (
               <li key={r.id} className="card p-2.5 text-[12.5px] text-[var(--c-text)]">
-                <span className="font-medium">{r.name}</span>{r.resumed && <span className="tag ml-1.5">complété</span>}
+                <span className="font-medium">{r.name}</span>{r.resumed && <span className="tag ml-1.5">{t("complété")}</span>}
                 {r.error
                   ? <p className="text-[11.5px] text-[var(--c-danger)]">{r.error}</p>
                   : <p className="text-[11.5px] text-[var(--c-text-muted)]">{summary(r)}</p>}
               </li>
             ))}
           </ul>
-          {failed && <p className="callout callout-warn">Relancez la copie : ce qui est déjà arrivé ne repart pas.</p>}
+          {failed && <p className="callout callout-warn">{t("Relancez la copie : ce qui est déjà arrivé ne repart pas.")}</p>}
           <p className="help-text">
             {toServer
-              ? "La copie est faite ; ce coffre n'a pas changé. Pour ouvrir le compte, fermez le coffre et connectez-vous depuis l'accueil."
-              : `Le coffre « ${coffreName(path ?? "")} » est dans les coffres récents de l'accueil. Ce compte n'a pas changé.`}
+              ? t("La copie est faite ; ce coffre n'a pas changé. Pour ouvrir le compte, fermez le coffre et connectez-vous depuis l'accueil.")
+              : t("Le coffre « {0} » est dans les coffres récents de l'accueil. Ce compte n'a pas changé.", coffreName(path ?? ""))}
           </p>
-          <div className="flex justify-end"><button onClick={onClose} className="btn btn-primary">Fermer</button></div>
+          <div className="flex justify-end"><button onClick={onClose} className="btn btn-primary">{t("Fermer")}</button></div>
         </div>
       </Modal>
     );
@@ -158,11 +159,11 @@ export function TransferDialog({ ctx, onClose }: { ctx: PageContext; onClose: ()
     return (
       <Modal title={title} onClose={close}>
         <form onSubmit={submitTotp} className="space-y-3">
-          <label className="block"><span className="field-label">Code de second facteur</span><input value={code} onChange={(e) => setCode(e.target.value)} autoFocus inputMode="numeric" autoComplete="one-time-code" className="input" /></label>
+          <label className="block"><span className="field-label">{t("Code de second facteur")}</span><input value={code} onChange={(e) => setCode(e.target.value)} autoFocus inputMode="numeric" autoComplete="one-time-code" className="input" /></label>
           {error && <p className="callout callout-danger">{error}</p>}
           <div className="flex justify-end gap-2">
-            <button type="button" onClick={onClose} className="btn btn-ghost">Annuler</button>
-            <button type="submit" disabled={!code} className="btn btn-primary">Continuer</button>
+            <button type="button" onClick={onClose} className="btn btn-ghost">{t("Annuler")}</button>
+            <button type="submit" disabled={!code} className="btn btn-primary">{t("Continuer")}</button>
           </div>
         </form>
       </Modal>
@@ -172,50 +173,50 @@ export function TransferDialog({ ctx, onClose }: { ctx: PageContext; onClose: ()
   return (
     <Modal title={title} onClose={close} wide>
       <form onSubmit={submit} className="space-y-3">
-        <div role="radiogroup" aria-label="Destination" className="flex flex-wrap gap-x-4 gap-y-1">
+        <div role="radiogroup" aria-label={t("Destination")} className="flex flex-wrap gap-x-4 gap-y-1">
           {(["new", "existing"] as const).map((m) => (
             <label key={m} className="flex items-center gap-2 text-[12.5px] text-[var(--c-text)]">
               <input type="radio" name="transfer-mode" checked={mode === m} disabled={busy} onChange={() => { setMode(m); setPath(null); }} />
-              {toServer ? (m === "new" ? "Créer un compte" : "Compte existant") : (m === "new" ? "Nouveau coffre" : "Coffre existant")}
+              {toServer ? (m === "new" ? t("Créer un compte") : t("Compte existant")) : (m === "new" ? t("Nouveau coffre") : t("Coffre existant"))}
             </label>
           ))}
         </div>
 
         {toServer ? (
           <>
-            <label className="block"><span className="field-label">Serveur</span><input value={url} onChange={(e) => setUrl(e.target.value)} disabled={busy} placeholder="https://vault.example.org" className="input" /></label>
-            <label className="block"><span className="field-label">E-mail</span><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} disabled={busy} autoComplete="username" className="input" /></label>
+            <label className="block"><span className="field-label">{t("Serveur")}</span><input value={url} onChange={(e) => setUrl(e.target.value)} disabled={busy} placeholder="https://vault.example.org" className="input" /></label>
+            <label className="block"><span className="field-label">{t("E-mail")}</span><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} disabled={busy} autoComplete="username" className="input" /></label>
           </>
         ) : (
           <div className="flex items-center gap-2">
-            <button type="button" onClick={pick} disabled={busy} className="btn btn-secondary btn-sm">{mode === "new" ? "Créer le coffre…" : "Choisir le coffre…"}</button>
-            <span className="min-w-0 flex-1 break-all font-mono text-[11px] text-[var(--c-text-muted)]">{path ?? "aucun dossier choisi"}</span>
+            <button type="button" onClick={pick} disabled={busy} className="btn btn-secondary btn-sm">{mode === "new" ? t("Créer le coffre…") : t("Choisir le coffre…")}</button>
+            <span className="min-w-0 flex-1 break-all font-mono text-[11px] text-[var(--c-text-muted)]">{path ?? t("aucun dossier choisi")}</span>
           </div>
         )}
         <label className="block"><span className="field-label">{passwordLabel(toServer, mode)}</span><PasswordInput value={password} onChange={setPassword} autoComplete="current-password" /></label>
         <p className="help-text">{passwordHelp(toServer, mode)}</p>
 
         <fieldset className="space-y-1">
-          <legend className="field-label">Vaults à copier</legend>
+          <legend className="field-label">{t("Vaults à copier")}</legend>
           <div className="card divide-y divide-[var(--c-border)]">
             {session.vaults.map((v) => (
               <label key={v.id} className="flex items-start gap-2 p-2.5">
                 <input type="checkbox" checked={selected.has(v.id) || forced(v.id)} disabled={busy || forced(v.id)} onChange={() => toggle(v.id)} className="mt-0.5" />
                 <span className="min-w-0 flex-1 text-[12.5px] text-[var(--c-text)]">
                   {v.name}
-                  {v.role !== "owner" && <span className="block text-[11px] text-[var(--c-text-muted)]">Partagé avec vous : la copie sera à vous seul, sans les autres membres.</span>}
+                  {v.role !== "owner" && <span className="block text-[11px] text-[var(--c-text-muted)]">{t("Partagé avec vous : la copie sera à vous seul, sans les autres membres.")}</span>}
                 </span>
               </label>
             ))}
           </div>
         </fieldset>
-        <p className="help-text">Tout part chiffré, historique et pièces jointes compris. {toServer ? "Ce coffre" : "Ce compte"} ne change pas.</p>
+        <p className="help-text">{t("Tout part chiffré, historique et pièces jointes compris.")} {toServer ? t("Ce coffre") : t("Ce compte")} {t("ne change pas.")}</p>
 
-        {busy && <p className="callout" role="status">{progress ? progressText(progress) : toServer && mode === "new" ? "Création du compte…" : "Connexion…"}</p>}
+        {busy && <p className="callout" role="status">{progress ? progressText(progress) : toServer && mode === "new" ? t("Création du compte…") : t("Connexion…")}</p>}
         {error && <p className="callout callout-danger">{error}</p>}
         <div className="flex justify-end gap-2">
-          <button type="button" onClick={onClose} disabled={busy} className="btn btn-ghost">Annuler</button>
-          <button type="submit" disabled={busy || !password || (toServer ? !url || !email : !path)} className="btn btn-primary">{busy ? "Copie…" : "Copier"}</button>
+          <button type="button" onClick={onClose} disabled={busy} className="btn btn-ghost">{t("Annuler")}</button>
+          <button type="submit" disabled={busy || !password || (toServer ? !url || !email : !path)} className="btn btn-primary">{busy ? t("Copie…") : t("Copier")}</button>
         </div>
       </form>
     </Modal>
@@ -223,27 +224,27 @@ export function TransferDialog({ ctx, onClose }: { ctx: PageContext; onClose: ()
 }
 
 function passwordLabel(toServer: boolean, mode: "new" | "existing"): string {
-  if (toServer) return mode === "new" ? "Mot de passe maître de ce coffre" : "Mot de passe maître du compte";
-  return mode === "new" ? "Mot de passe maître de ce compte" : "Mot de passe maître du coffre";
+  if (toServer) return mode === "new" ? t("Mot de passe maître de ce coffre") : t("Mot de passe maître du compte");
+  return mode === "new" ? t("Mot de passe maître de ce compte") : t("Mot de passe maître du coffre");
 }
 
 function passwordHelp(toServer: boolean, mode: "new" | "existing"): string {
   if (toServer) return mode === "new"
-    ? "Le compte naît avec le compte de ce coffre : même mot de passe maître (à changer ensuite si vous voulez), mêmes clés — rien n'est re-chiffré."
-    : "Les clés des vaults sont enveloppées pour ce compte ; le vault personnel du coffre y devient un vault ordinaire.";
+    ? t("Le compte naît avec le compte de ce coffre : même mot de passe maître (à changer ensuite si vous voulez), mêmes clés — rien n'est re-chiffré.")
+    : t("Les clés des vaults sont enveloppées pour ce compte ; le vault personnel du coffre y devient un vault ordinaire.");
   return mode === "new"
-    ? "Le coffre naît avec le compte : même mot de passe maître, mêmes clés."
-    : "Les clés des vaults sont enveloppées pour le compte du coffre ; votre vault personnel y devient un vault ordinaire.";
+    ? t("Le coffre naît avec le compte : même mot de passe maître, mêmes clés.")
+    : t("Les clés des vaults sont enveloppées pour le compte du coffre ; votre vault personnel y devient un vault ordinaire.");
 }
 
 function progressText(p: TransferProgress): string {
-  return p.step === "items" ? `${p.vault} : éléments ${p.done}/${p.total}` : `${p.vault} : pièces jointes ${p.done}/${p.total}`;
+  return p.step === "items" ? t("{0} : éléments {1}/{2}", p.vault, p.done, p.total) : t("{0} : pièces jointes {1}/{2}", p.vault, p.done, p.total);
 }
 
 function summary(r: VaultReport): string {
-  const parts = [`${r.items} élément${r.items > 1 ? "s" : ""}${r.trashed ? ` (dont ${r.trashed} à la corbeille)` : ""}`, `${r.versions} version${r.versions > 1 ? "s" : ""} précédente${r.versions > 1 ? "s" : ""}`];
-  if (r.attachments) parts.push(`${r.attachments} pièce${r.attachments > 1 ? "s" : ""} jointe${r.attachments > 1 ? "s" : ""}`);
+  const parts = [t("{0} élément{1}{2}", r.items, r.items > 1 ? "s" : "", r.trashed ? t(" (dont {0} à la corbeille)", r.trashed) : ""), t("{0} version{1} précédente{2}", r.versions, r.versions > 1 ? "s" : "", r.versions > 1 ? "s" : "")];
+  if (r.attachments) parts.push(plural(r.attachments, "{0} pièce jointe", "{0} pièces jointes"));
   let s = parts.join(", ");
-  if (r.skippedAttachments) s += ` — ${r.skippedAttachments} pièce${r.skippedAttachments > 1 ? "s" : ""} jointe${r.skippedAttachments > 1 ? "s" : ""} d'éléments à la corbeille non copiée${r.skippedAttachments > 1 ? "s" : ""}`;
+  if (r.skippedAttachments) s += plural(r.skippedAttachments, " — {0} pièce jointe d'éléments à la corbeille non copiée", " — {0} pièces jointes d'éléments à la corbeille non copiées");
   return s;
 }

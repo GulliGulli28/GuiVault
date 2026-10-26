@@ -14,6 +14,7 @@ import { acceptRollback as acceptRollbackRevision, observeRevisions, type VaultR
 import { canWrite, type EmergencyGrant, type EmergencyOverview, type Invitation, type Item, type ItemsPage, type LoginResponse, type ManifestWrite, type Payload, type Role, type UserProfile, type Vault, type VaultManifest, type VaultMember } from "./types";
 import { itemDigest, manifestOf, nextManifest, openManifest, sealManifest, verifyManifest, type Manifest, type ManifestProblem } from "./manifest";
 import { acceptCounter, observeCounter, seenCounter } from "./manifestCounters";
+import { t } from "./i18n";
 
 /** Qui a remis la clé de ce vault à ce compte : soi-même (vault créé ou
  * clé renouvelée ici), la détentrice d'une clé publique (enveloppe de format
@@ -97,8 +98,8 @@ export function setDeviceLabel(label: string) {
 
 export function deviceName(): string {
   const ua = navigator.userAgent;
-  const browser = /Firefox\//.test(ua) ? "Firefox" : /Edg\//.test(ua) ? "Edge" : /Chrome\//.test(ua) ? "Chrome" : /Safari\//.test(ua) ? "Safari" : "navigateur";
-  const os = /Windows/.test(ua) ? "Windows" : /Mac OS/.test(ua) ? "macOS" : /Linux/.test(ua) ? "Linux" : /Android/.test(ua) ? "Android" : /iPhone|iPad/.test(ua) ? "iOS" : "";
+  const browser = /Firefox\//.test(ua) ? t("Firefox") : /Edg\//.test(ua) ? t("Edge") : /Chrome\//.test(ua) ? t("Chrome") : /Safari\//.test(ua) ? t("Safari") : "navigateur";
+  const os = /Windows/.test(ua) ? t("Windows") : /Mac OS/.test(ua) ? "macOS" : /Linux/.test(ua) ? t("Linux") : /Android/.test(ua) ? t("Android") : /iPhone|iPad/.test(ua) ? "iOS" : "";
   return `${deviceLabel} (${browser}${os ? `, ${os}` : ""})`;
 }
 
@@ -165,7 +166,7 @@ export async function register(email: string, password: string): Promise<Session
     protected_private_key: b64(material.protectedPrivateKey),
     personal_vault: {
       id: vaultId,
-      name_enc: b64(c.sealVaultName(vaultKey, vaultId, "Personnel")),
+      name_enc: b64(c.sealVaultName(vaultKey, vaultId, t("Personnel"))),
       wrapped_vault_key: b64(c.wrapVaultKey(account.keypair, material.publicKey, vaultId, vaultKey)),
     },
     device_name: deviceName(),
@@ -259,7 +260,7 @@ export async function createLocal(host: LocalHost, path: string, password: strin
     account: { ...blobs, public_key: b64(material.publicKey) },
     personal: {
       id: vaultId,
-      name_enc: b64(c.sealVaultName(vaultKey, vaultId, "Personnel")),
+      name_enc: b64(c.sealVaultName(vaultKey, vaultId, t("Personnel"))),
       wrapped_vault_key: b64(c.wrapVaultKey(account.keypair, material.publicKey, vaultId, vaultKey)),
     },
   });
@@ -280,7 +281,7 @@ export async function openLocal(host: LocalHost, path: string, password: string)
     try {
       account = c.unlockAccount(master.stretchedKey, unb64(a.protected_user_key), unb64(a.protected_private_key));
     } catch {
-      throw new Error("Mot de passe maître incorrect.");
+      throw new Error(t("Mot de passe maître incorrect."));
     } finally {
       master.stretchedKey.fill(0);
     }
@@ -303,7 +304,7 @@ export async function openLocalWithUserKey(host: LocalHost, path: string, userKe
     try {
       account = c.unlockAccountWithUserKey(userKey, unb64(a.protected_private_key));
     } catch {
-      throw new Error("Cette clé n'ouvre plus ce coffre : utilisez le mot de passe maître.");
+      throw new Error(t("Cette clé n'ouvre plus ce coffre : utilisez le mot de passe maître."));
     }
     const blobs: AccountBlobs = { kdf: a.kdf, kdf_salt: a.kdf_salt, protected_user_key: a.protected_user_key, protected_private_key: a.protected_private_key };
     return await startLocal(host, path, account, blobs);
@@ -317,13 +318,13 @@ export async function openLocalWithUserKey(host: LocalHost, path: string, userKe
  * sa user key (biométrie de l'app) : pas de nouvelle connexion, la session
  * du serveur continue. */
 export async function resumeWithUserKey(userKey: Uint8Array, blobs: AccountBlobs): Promise<SessionState> {
-  if (!currentTokens()) throw new Error("La session du serveur est fermée : utilisez le mot de passe maître.");
+  if (!currentTokens()) throw new Error(t("La session du serveur est fermée : utilisez le mot de passe maître."));
   const user = await api.me();
   let account: UnlockedAccount;
   try {
     account = c.unlockAccountWithUserKey(userKey, unb64(blobs.protected_private_key));
   } catch {
-    throw new Error("Cette clé n'ouvre plus ce compte : utilisez le mot de passe maître.");
+    throw new Error(t("Cette clé n'ouvre plus ce compte : utilisez le mot de passe maître."));
   }
   return openSession(user, account, blobs);
 }
@@ -372,7 +373,7 @@ async function changeLocalPassword(host: LocalHost, state: SessionState, current
   try {
     c.unlockAccount(old.stretchedKey, unb64(a.protected_user_key), unb64(a.protected_private_key));
   } catch {
-    throw new Error("Mot de passe actuel incorrect.");
+    throw new Error(t("Mot de passe actuel incorrect."));
   } finally {
     old.stretchedKey.fill(0);
   }
@@ -412,7 +413,7 @@ function decodeVault(state: SessionState, v: Vault): VaultView {
   try {
     name = c.openVaultName(key, v.id, unb64(v.name_enc));
   } catch {
-    name = v.kind === "personal" ? "Personnel" : "(nom illisible)";
+    name = v.kind === "personal" ? t("Personnel") : t("(nom illisible)");
   }
   return { id: v.id, kind: v.kind, role: v.role, name, key, keyFrom: keyFromSender(state, sender), revision: v.revision, updatedAt: v.updated_at, travelSafe: !!v.travel_safe };
 }
@@ -453,7 +454,7 @@ async function refreshEmergency(state: SessionState): Promise<string[]> {
     }
     // Un raté ici ne doit pas faire échouer toute la synchronisation : on
     // garde ce qu'on avait.
-    return [`Accès d'urgence : ${e instanceof Error ? e.message : e}`];
+    return [t("Accès d'urgence : {0}", e instanceof Error ? e.message : String(e))];
   }
   const warnings: string[] = [];
   const vaults: VaultView[] = [];
@@ -478,7 +479,7 @@ async function refreshEmergency(state: SessionState): Promise<string[]> {
         try {
           name = c.openVaultName(key, v.id, unb64(v.name_enc));
         } catch {
-          name = v.kind === "personal" ? "Personnel" : "(nom illisible)";
+          name = v.kind === "personal" ? t("Personnel") : t("(nom illisible)");
         }
         vaults.push({ id: v.id, kind: v.kind, role: "reader", name, key, keyFrom: { kind: "member", fingerprint: g.grantor.fingerprint }, revision: v.revision, updatedAt: v.updated_at, emergency: { grantId: g.id, grantor: g.grantor.email } });
       } catch (e) {
@@ -526,7 +527,7 @@ export function acceptRollback(state: SessionState, vaultId: string) {
 
 export function vaultOf(state: SessionState, id: string): VaultView {
   const v = state.vaults.find((v) => v.id === id);
-  if (!v) throw new Error("Vault inconnu");
+  if (!v) throw new Error(t("Vault inconnu"));
   return v;
 }
 
@@ -611,10 +612,10 @@ export function decodeItem(vault: VaultView, item: Item): DecodedItem {
     const plain = c.openItem(vault.key, vault.id, item.id, item.item_type, unb64(item.ciphertext));
     const payload = JSON.parse(utf8.decode(plain)) as Payload;
     if (typeof payload !== "object" || payload === null || payload.kind !== item.item_type) {
-      return { ...base, ok: false, itemType: item.item_type, error: "contenu incohérent avec son type" };
+      return { ...base, ok: false, itemType: item.item_type, error: t("contenu incohérent avec son type") };
     }
     if (payloadId(payload) !== item.id) {
-      return { ...base, ok: false, itemType: item.item_type, error: "contenu incohérent avec son identité" };
+      return { ...base, ok: false, itemType: item.item_type, error: t("contenu incohérent avec son identité") };
     }
     return { ...base, ok: true, payload };
   } catch (e) {
@@ -641,7 +642,7 @@ export async function openOffline(
   try {
     account = c.unlockAccount(master.stretchedKey, unb64(copy.blobs.protected_user_key), unb64(copy.blobs.protected_private_key));
   } catch {
-    throw new Error("Mot de passe maître incorrect.");
+    throw new Error(t("Mot de passe maître incorrect."));
   } finally {
     master.stretchedKey.fill(0);
   }
@@ -707,7 +708,7 @@ export function vaultIntegrity(vaultId: string): ManifestProblem[] {
 
 export class IntegrityError extends Error {
   constructor(name: string) {
-    super(`« ${name} » ne correspond pas à son manifeste : rien n'y est écrit d'ici tant que vous n'en avez pas pris acte (page du vault).`);
+    super(t("« {0} » ne correspond pas à son manifeste : rien n'y est écrit d'ici tant que vous n'en avez pas pris acte (page du vault).", name));
   }
 }
 
@@ -834,7 +835,7 @@ export async function acceptIntegrity(vault: VaultView): Promise<void> {
  * là avec `deleted`. De quoi proposer une fusion (`lib/merge.ts`). */
 export class RevisionConflict extends Error {
   constructor(public readonly current: Item | null) {
-    super("Cet élément a été modifié entre-temps par quelqu'un d'autre : rechargez-le avant de réessayer.");
+    super(t("Cet élément a été modifié entre-temps par quelqu'un d'autre : rechargez-le avant de réessayer."));
   }
 }
 
@@ -938,7 +939,7 @@ export async function restoreVersion(vault: VaultView, v: { item_id: string; ite
 function publicKeyOf(email: string, publicKeyB64: string, expectedFingerprint: string): Uint8Array {
   const pk = unb64(publicKeyB64);
   if (fingerprintOf(pk) !== expectedFingerprint) {
-    throw new Error(`la clé publique de ${email} ne correspond pas à l'empreinte vérifiée — partage refusé`);
+    throw new Error(t("la clé publique de {0} ne correspond pas à l'empreinte vérifiée — partage refusé", email));
   }
   return pk;
 }
@@ -958,7 +959,7 @@ export async function invite(state: SessionState, vault: VaultView, email: strin
 }
 
 export async function completeInvitation(state: SessionState, vault: VaultView, inv: Invitation): Promise<Invitation> {
-  if (!inv.invitee_public_key || !inv.invitee_fingerprint) throw new Error("L'invité n'a pas encore de clé publique.");
+  if (!inv.invitee_public_key || !inv.invitee_fingerprint) throw new Error(t("L'invité n'a pas encore de clé publique."));
   requirePinned(inv.invitee_email, inv.invitee_fingerprint);
   const pk = publicKeyOf(inv.invitee_email, inv.invitee_public_key, inv.invitee_fingerprint);
   return api.completeInvitation(inv.id, b64(c.wrapVaultKey(state.account.keypair, pk, vault.id, vault.key)));
@@ -1038,7 +1039,7 @@ export function emergencyEnvelopes(state: SessionState, grantee: { email: string
   const pk = publicKeyOf(grantee.email, grantee.public_key, grantee.fingerprint);
   return vaultIds.map((id) => {
     const v = vaultOf(state, id);
-    if (v.role !== "owner") throw new Error(`« ${v.name} » : seuls les vaults dont vous êtes propriétaire se confient.`);
+    if (v.role !== "owner") throw new Error(t("« {0} » : seuls les vaults dont vous êtes propriétaire se confient.", v.name));
     return { vault_id: id, wrapped_vault_key: b64(c.wrapEmergencyKey(state.account.keypair, pk, id, v.key)) };
   });
 }

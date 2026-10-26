@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { PageContext } from "../App";
 import { errorMessage } from "./api";
 import { bubbleBridge } from "./platform";
+import { t } from "./i18n";
 
 export { bubbleBridge };
 
@@ -11,9 +12,9 @@ export async function reduceToBubble(ctx: Pick<PageContext, "notify" | "error">)
   const b = bubbleBridge();
   if (!b) return;
   try {
-    if (!(await b.show())) ctx.notify("Autorisez « Afficher par-dessus d'autres applis », puis réessayez.");
+    if (!(await b.show())) ctx.notify(t("Autorisez « Afficher par-dessus d'autres applis », puis réessayez."));
   } catch (e) {
-    ctx.error(`Bulle : ${errorMessage(e)}`);
+    ctx.error(t("Bulle : {0}", errorMessage(e)));
   }
 }
 

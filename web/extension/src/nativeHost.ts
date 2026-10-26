@@ -9,11 +9,12 @@
  * arrive en parties (`{ id, part, of, data }`, le navigateur refuse plus de
  * 1 Mo par message), recollées ici. */
 import type { LocalHost, LocalOp } from "../../src/lib/localHost";
+import { t } from "../../src/lib/i18n";
 
 export const NATIVE_HOST = "dev.guivault.client";
 
 /** Ce que l'on montre quand l'hôte manque : c'est un réglage de l'app. */
-const NOT_LINKED = "L'application GuiVault n'est pas reliée à ce navigateur : dans l'app, Paramètres › Application › « Extension de navigateur ».";
+const notLinked = () => t("L'application GuiVault n'est pas reliée à ce navigateur : dans l'app, Paramètres › Application › « Extension de navigateur ».");
 
 interface Pending {
   parts: string[];
@@ -26,8 +27,8 @@ const pending = new Map<number, Pending>();
 let nextId = 1;
 
 function friendly(message: string | undefined): Error {
-  if (!message || /not found|forbidden|introuvable/i.test(message)) return new Error(NOT_LINKED);
-  if (/exited/i.test(message)) return new Error("L'hôte de l'application GuiVault s'est arrêté.");
+  if (!message || /not found|forbidden|introuvable/i.test(message)) return new Error(notLinked());
+  if (/exited/i.test(message)) return new Error(t("L'hôte de l'application GuiVault s'est arrêté."));
   return new Error(message);
 }
 
@@ -80,7 +81,7 @@ export async function knownCoffres(): Promise<string[]> {
 /** L'hôte du coffre `path`, pour `localTransport` et `session.openLocal`. */
 export function nativeCoffre(path: string): LocalHost {
   return {
-    create: () => Promise.reject(new Error("Créer un coffre se fait dans l'application GuiVault.")),
+    create: () => Promise.reject(new Error(t("Créer un coffre se fait dans l'application GuiVault."))),
     open: async () => {
       await send({ op: "open", path });
     },

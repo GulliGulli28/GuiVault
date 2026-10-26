@@ -8,6 +8,7 @@ import type { HealthEntry } from "../lib/health";
 import { deleteItem, findVault, payloadName, putPayload, type SessionState } from "../lib/session";
 import { formatAgo, Modal } from "./ui";
 import { useReprompt } from "./Reprompt";
+import { t } from "../lib/i18n";
 
 /** Une fusion n'a de sens qu'entre identifiants d'un vault où l'on écrit. */
 export function canMerge(group: HealthEntry[]): boolean {
@@ -46,7 +47,7 @@ export function MergeDuplicates({ session, group, onClose, onMerged }: { session
         }
         await deleteItem(vault, d.item.id);
       }
-      onMerged(payloadName(keep.item.payload) || "l'élément");
+      onMerged(payloadName(keep.item.payload) || t("l'élément"));
     } catch (e) {
       setError(errorMessage(e));
       setBusy(false);
@@ -54,10 +55,10 @@ export function MergeDuplicates({ session, group, onClose, onMerged }: { session
   };
 
   return (
-    <Modal title="Fusionner les doublons" onClose={close}>
+    <Modal title={t("Fusionner les doublons")} onClose={close}>
       <div className="flex flex-col gap-4">
-        <p className="text-[13px] text-[var(--c-text-secondary)]">Celui qui reste :</p>
-        <div className="card divide-y divide-[var(--c-border)]" role="radiogroup" aria-label="Celui qui reste">
+        <p className="text-[13px] text-[var(--c-text-secondary)]">{t("Celui qui reste :")}</p>
+        <div className="card divide-y divide-[var(--c-border)]" role="radiogroup" aria-label={t("Celui qui reste")}>
           {group.map((e) => {
             const p = e.item.payload;
             const user = p.kind === "login" ? p.login.username : "";
@@ -65,22 +66,22 @@ export function MergeDuplicates({ session, group, onClose, onMerged }: { session
               <label key={e.item.id} className="flex cursor-pointer items-center gap-3 px-3.5 py-2.5">
                 <input type="radio" name="keep" checked={keepId === e.item.id} onChange={() => setKeepId(e.item.id)} disabled={busy} />
                 <span className="flex min-w-0 flex-1 flex-col">
-                  <span className="truncate text-[13.5px] font-medium">{payloadName(p) || "(sans nom)"}</span>
-                  <span className="truncate text-[12px] text-[var(--c-text-muted)]">{user || "—"} · modifié {formatAgo(e.item.updatedAt)}</span>
+                  <span className="truncate text-[13.5px] font-medium">{payloadName(p) || t("(sans nom)")}</span>
+                  <span className="truncate text-[12px] text-[var(--c-text-muted)]">{user || "—"} {t("· modifié")} {formatAgo(e.item.updatedAt)}</span>
                 </span>
               </label>
             );
           })}
         </div>
         <ul className="flex flex-col gap-1 text-[12.5px] text-[var(--c-text-secondary)]">
-          <li>Son mot de passe reste ; les autres vont dans son historique.</li>
-          <li>Adresses, champs, notes, passkeys et pièces jointes s'ajoutent.</li>
-          <li>Les autres partent dans la corbeille du vault.</li>
+          <li>{t("Son mot de passe reste ; les autres vont dans son historique.")}</li>
+          <li>{t("Adresses, champs, notes, passkeys et pièces jointes s'ajoutent.")}</li>
+          <li>{t("Les autres partent dans la corbeille du vault.")}</li>
         </ul>
         {error && <p className="callout callout-danger">{error}</p>}
         <div className="flex justify-end gap-2">
-          <button onClick={close} disabled={busy} className="btn btn-ghost">Annuler</button>
-          <button onClick={() => void merge()} disabled={busy} className="btn btn-primary">{busy ? "Fusion…" : `Fusionner ${group.length} éléments`}</button>
+          <button onClick={close} disabled={busy} className="btn btn-ghost">{t("Annuler")}</button>
+          <button onClick={() => void merge()} disabled={busy} className="btn btn-primary">{busy ? t("Fusion…") : t("Fusionner {0} éléments", group.length)}</button>
         </div>
       </div>
     </Modal>

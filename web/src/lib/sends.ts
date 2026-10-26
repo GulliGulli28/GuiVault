@@ -11,6 +11,7 @@ import * as c from "./crypto";
 import { isSecret } from "./items";
 import type { SessionState } from "./session";
 import type { Payload, SecretKind, SendSummary } from "./types";
+import { t } from "./i18n";
 
 /** Ce que contient un lien, une fois ouvert. `v` : pour faire évoluer le
  * format sans casser les liens déjà donnés. */
@@ -75,7 +76,7 @@ export function shareablePayload<P extends Extract<Payload, { kind: SecretKind }
 export function sendName(content: SendPayload): string {
   if (content.kind === "text" || content.kind === "file") return content.name;
   const entity = Object.values(content.payload).find((v) => typeof v === "object" && v !== null && "name" in v) as { name?: string } | undefined;
-  return entity?.name || "Élément";
+  return entity?.name || t("Élément");
 }
 
 /** Crée un lien. Pour un fichier (`file`, avec un contenu `kind: "file"`),
@@ -173,7 +174,7 @@ export async function openSend(
 ): Promise<{ content: SendPayload; viewsLeft: number | null; expiresAt: string; file?: Blob }> {
   let passwordKey: Uint8Array | undefined;
   if (info.password) {
-    if (!password) throw new Error("Ce lien demande un mot de passe.");
+    if (!password) throw new Error(t("Ce lien demande un mot de passe."));
     passwordKey = await c.sendPasswordKey(password, fromBase64(info.password.salt), info.password.kdf);
   }
   const keys = c.sendKeys(secret, passwordKey);
@@ -184,16 +185,16 @@ export async function openSend(
     try {
       content = JSON.parse(utf8.decode(c.openSend(keys, id, fromBase64(res.ciphertext)))) as SendPayload;
     } catch {
-      throw new Error("Le contenu de ce lien ne s'ouvre pas : le lien est incomplet, ou le contenu a été altéré.");
+      throw new Error(t("Le contenu de ce lien ne s'ouvre pas : le lien est incomplet, ou le contenu a été altéré."));
     }
     if (content.v !== 1 || (content.kind !== "text" && content.kind !== "file" && !(content.kind === "item" && isSecret(content.payload)))) {
-      throw new Error("Ce lien contient un format inconnu de cette version de GuiVault.");
+      throw new Error(t("Ce lien contient un format inconnu de cette version de GuiVault."));
     }
     let file: Blob | undefined;
     if (content.kind === "file") {
       // La vue est consommée : on télécharge tout de suite, avec le jeton
       // qu'elle a donné (une heure).
-      if (!res.download) throw new Error("Le serveur n'a pas donné de quoi télécharger le fichier.");
+      if (!res.download) throw new Error(t("Le serveur n'a pas donné de quoi télécharger le fichier."));
       const parts: Uint8Array[] = [];
       const n = res.download.chunks;
       for (let i = 0; i < n; i++) {
@@ -201,12 +202,12 @@ export async function openSend(
         try {
           parts.push(c.openSendChunk(keys, id, i, i === n - 1, sealed));
         } catch {
-          throw new Error("Le fichier de ce lien ne s'ouvre pas : un morceau manque, est déplacé ou altéré.");
+          throw new Error(t("Le fichier de ce lien ne s'ouvre pas : un morceau manque, est déplacé ou altéré."));
         }
         onProgress?.(i + 1, n);
       }
       const size = parts.reduce((t, p) => t + p.length, 0);
-      if (size !== content.size) throw new Error(`Fichier incomplet : ${size} octets sur ${content.size}.`);
+      if (size !== content.size) throw new Error(t("Fichier incomplet : {0} octets sur {1}.", size, content.size));
       file = new Blob(parts as BlobPart[], { type: content.mime || "application/octet-stream" });
     }
     return { content, viewsLeft: res.views_left, expiresAt: res.expires_at, file };

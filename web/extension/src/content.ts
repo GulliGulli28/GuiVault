@@ -26,6 +26,7 @@ import { DEFAULT_GENERATOR, generate, type GeneratorOptions } from "../../src/li
 import { tileHue, tileInitial } from "../../src/lib/tiles";
 import { collect, deepActiveElement, eventElement, eventInput, hintOf, HOST_ID, isSignup, passwordsToFill, setValue, usable, usableInputs, visible } from "./dom";
 import type { CredentialsReply, FillReply, FrameInfo, MatchesReply, MatchSummary, PasskeyToBackground, Pending, ToBackground, ToContent, TotpReply, VaultsReply } from "./messages";
+import { t } from "./contentI18n";
 
 declare global {
   interface Window {
@@ -339,19 +340,19 @@ declare global {
 
   /** Un identifiant protégé (`reprompt`) se remplit depuis le popup, qui
    * demande le mot de passe maître : la page n'en reçoit rien d'ici. */
-  const PROTECTED = (m: MatchSummary) => `« ${m.name} » est protégé par le mot de passe maître : remplissez-le depuis l'icône GuiVault.`;
+  const PROTECTED = (m: MatchSummary) => t("« {0} » est protégé par le mot de passe maître : remplissez-le depuis l'icône GuiVault.", m.name);
 
   const choose = async (m: MatchSummary, input: HTMLInputElement, crossFrame = false) => {
     closeMenu();
     if (m.protected) return say(input, PROTECTED(m));
     if (crossFrame && parent) {
       const ok = await dialog(
-        `Remplir dans ${parent.frameHost} ?`,
-        `Ce formulaire est servi par ${parent.frameHost}, dans la page de ${parent.host}. « ${m.name} » est un identifiant de ${parent.host} : ne continuez que si ce cadre est bien la connexion de ce site, pas une publicité ou un widget.`,
+        t("Remplir dans {0} ?", parent.frameHost),
+        t("Ce formulaire est servi par {0}, dans la page de {1}. « {2} » est un identifiant de {3} : ne continuez que si ce cadre est bien la connexion de ce site, pas une publicité ou un widget.", parent.frameHost, parent.host, m.name, parent.host),
         null,
-        "Remplir quand même",
+        t("Remplir quand même"),
         false,
-        "Annuler",
+        t("Annuler"),
       );
       if (ok === null) return;
     }
@@ -436,27 +437,27 @@ declare global {
 
   const openMenu = (input: HTMLInputElement, btn: HTMLElement) => {
     const site = location.hostname.replace(/^www\./, "");
-    const { menu: m, list } = newMenu(btn, `GuiVault · ${site}`);
-    for (const l of matches) list.appendChild(menuItem(`${l.favorite ? "★ " : ""}${l.name}`, l.protected ? `${l.username || "—"} · protégé` : l.username || "—", () => void choose(l, input), l.protected ? "Protégé par le mot de passe maître : à remplir depuis l'icône GuiVault" : "Remplir avec cet identifiant"));
+    const { menu: m, list } = newMenu(btn, t("GuiVault · {0}", site));
+    for (const l of matches) list.appendChild(menuItem(`${l.favorite ? "★ " : ""}${l.name}`, l.protected ? t("{0} · protégé", l.username || "—") : l.username || "—", () => void choose(l, input), l.protected ? t("Protégé par le mot de passe maître : à remplir depuis l'icône GuiVault") : t("Remplir avec cet identifiant")));
     if (parent?.logins.length) {
       const h = document.createElement("div");
       h.className = "head";
-      h.textContent = `De ${parent.host}, dans un cadre de ${parent.frameHost}`;
+      h.textContent = t("De {0}, dans un cadre de {1}", parent.host, parent.frameHost);
       list.appendChild(h);
-      for (const l of parent.logins) list.appendChild(menuItem(`${l.favorite ? "★ " : ""}${l.name}`, `${l.username || "—"} · à confirmer`, () => void choose(l, input, true), `Identifiant de ${parent!.host}, dans un cadre de ${parent!.frameHost} : GuiVault demandera confirmation`));
+      for (const l of parent.logins) list.appendChild(menuItem(`${l.favorite ? "★ " : ""}${l.name}`, t("{0} · à confirmer", l.username || "—"), () => void choose(l, input, true), t("Identifiant de {0}, dans un cadre de {1} : GuiVault demandera confirmation", parent!.host, parent!.frameHost)));
     }
     const signup = signupFor(input);
     const sticky = document.createElement("div");
     if (matches.length || parent?.logins.length) sticky.className = "sticky";
     sticky.appendChild(menuItem(
-      signup ? "Générer un mot de passe" : "Nouvel identifiant pour ce site",
-      signup ? "Et l'enregistrer dans GuiVault" : matches.length ? "" : "Aucun identifiant GuiVault ici",
+      signup ? t("Générer un mot de passe") : t("Nouvel identifiant pour ce site"),
+      signup ? t("Et l'enregistrer dans GuiVault") : matches.length ? "" : t("Aucun identifiant GuiVault ici"),
       () => { closeMenu(); void newLoginDialog(input, signup); },
       undefined,
       "+",
     ));
     m.appendChild(sticky);
-    m.appendChild(menuFoot("Entrée remplit · Échap ferme", "Ctrl Maj L"));
+    m.appendChild(menuFoot(t("Entrée remplit · Échap ferme"), t("Ctrl Maj L")));
     placeMenu();
     (m.querySelector("button") as HTMLElement | null)?.focus();
   };
@@ -502,20 +503,20 @@ declare global {
     if (!r) return;
     if ("protected" in r) return say(field, PROTECTED(m));
     fillCode(field, r.code);
-    say(field, auto ? `Code de « ${m.name} » rempli par GuiVault.` : `Code de « ${m.name} » rempli.`);
+    say(field, auto ? t("Code de « {0} » rempli par GuiVault.", m.name) : t("Code de « {0} » rempli.", m.name));
   };
 
   const openTotpMenu = (field: HTMLInputElement, btn: HTMLElement) => {
     const list = totpCandidates();
-    const { menu: m, list: box } = newMenu(btn, "GuiVault · code à usage unique");
-    for (const c of list) box.appendChild(menuItem(`${c.favorite ? "★ " : ""}${c.name}`, c === recent ? `${c.username || "—"} · rempli juste avant` : c.username || "—", () => void fillTotp(c, field), "Remplir le code TOTP de cet identifiant"));
+    const { menu: m, list: box } = newMenu(btn, t("GuiVault · code à usage unique"));
+    for (const c of list) box.appendChild(menuItem(`${c.favorite ? "★ " : ""}${c.name}`, c === recent ? t("{0} · rempli juste avant", c.username || "—") : c.username || "—", () => void fillTotp(c, field), t("Remplir le code TOTP de cet identifiant")));
     if (list.length === 0) {
       const p = document.createElement("div");
       p.className = "note";
-      p.textContent = "Aucun identifiant de ce site n'a de code 2FA.";
+      p.textContent = t("Aucun identifiant de ce site n'a de code 2FA.");
       box.appendChild(p);
     }
-    m.appendChild(menuFoot("Le code change toutes les 30 s"));
+    m.appendChild(menuFoot(t("Le code change toutes les 30 s")));
     placeMenu();
     (m.querySelector("button") as HTMLElement | null)?.focus();
   };
@@ -525,12 +526,12 @@ declare global {
    * avant de le remplir. */
   const onButton = (input: HTMLInputElement, btn: HTMLElement) => {
     if (menu) return closeMenu();
-    if (locked) return void dialog("GuiVault est verrouillé", "Cliquez sur l'icône GuiVault dans la barre du navigateur pour vous reconnecter, puis revenez ici.", null, "OK", true);
+    if (locked) return void dialog(t("GuiVault est verrouillé"), t("Cliquez sur l'icône GuiVault dans la barre du navigateur pour vous reconnecter, puis revenez ici."), null, "OK", true);
     if (otpInputs.has(input)) return openTotpMenu(input, btn);
     openMenu(input, btn);
   };
 
-  const buttonTitle = (input: HTMLInputElement) => (otpInputs.has(input) ? "Code à usage unique (GuiVault)" : matches.length ? "Remplir avec GuiVault" : "Enregistrer dans GuiVault");
+  const buttonTitle = (input: HTMLInputElement) => (otpInputs.has(input) ? t("Code à usage unique (GuiVault)") : matches.length ? t("Remplir avec GuiVault") : t("Enregistrer dans GuiVault"));
 
   const attach = (input: HTMLInputElement) => {
     if (anchors.has(input)) return;
@@ -728,13 +729,13 @@ declare global {
     banner.setAttribute("aria-label", "Enregistrer dans GuiVault");
     const update = p.mode === "update";
     banner.innerHTML = `<div class="top"><span class="logo">${ICON}</span><span class="text"></span><button type="button" class="b b-ghost b-icon" data-act="close" aria-label="Fermer">✕</button></div><div class="card"><span class="tile"></span><span class="txt"><span class="name"></span><span class="user"></span></span></div>`;
-    (banner.querySelector(".text") as HTMLElement).textContent = update ? "Mettre à jour le mot de passe ?" : "Enregistrer cet identifiant ?";
+    (banner.querySelector(".text") as HTMLElement).textContent = update ? t("Mettre à jour le mot de passe ?") : t("Enregistrer cet identifiant ?");
     const label = (update ? p.loginName : p.host) ?? p.host ?? "";
     const tile = banner.querySelector(".tile") as HTMLElement;
     tile.textContent = tileInitial(label);
     tile.style.setProperty("--h", String(tileHue(label)));
     (banner.querySelector(".name") as HTMLElement).textContent = label;
-    (banner.querySelector(".user") as HTMLElement).textContent = p.username || (update ? "" : "sans utilisateur");
+    (banner.querySelector(".user") as HTMLElement).textContent = p.username || (update ? "" : t("sans utilisateur"));
     let select: HTMLSelectElement | null = null;
     if (p.mode === "new" && p.vaults.length > 1) {
       const where = document.createElement("div");
@@ -756,10 +757,10 @@ declare global {
     actions.className = "actions";
     const later = document.createElement("button");
     later.className = "b b-secondary";
-    later.textContent = "Plus tard";
+    later.textContent = t("Plus tard");
     const save = document.createElement("button");
     save.className = "b b-primary";
-    save.textContent = p.mode === "update" ? "Mettre à jour" : "Enregistrer";
+    save.textContent = p.mode === "update" ? t("Mettre à jour") : t("Enregistrer");
     actions.append(later, save);
     banner.appendChild(actions);
     const close = () => { banner?.remove(); banner = null; };
@@ -768,10 +769,10 @@ declare global {
     onTrustedClick(save, () => {
       save.disabled = true;
       void send<{ ok: true; name: string } | { ok: false; error: string }>({ type: "guivault-save-captured", vaultId: select?.value ?? p.defaultVaultId }).then((r) => {
-        (banner?.querySelector(".text") as HTMLElement | null)?.replaceChildren(document.createTextNode(r.ok ? `« ${r.name} » enregistré.` : `Échec : ${r.error}`));
+        (banner?.querySelector(".text") as HTMLElement | null)?.replaceChildren(document.createTextNode(r.ok ? t("« {0} » enregistré.", r.name) : t("Échec : {0}", r.error)));
         select?.closest(".where")?.remove();
         save.remove();
-        later.textContent = "Fermer";
+        later.textContent = t("Fermer");
         if (r.ok) setTimeout(close, 4000);
       });
     });
@@ -792,7 +793,7 @@ declare global {
   /** Une boîte de dialogue dans le shadow DOM : titre, texte, choix
    * (facultatif), Continuer / `secondary` (« Utiliser le navigateur » pour
    * les passkeys). */
-  const dialog = (title: string, text: string, choices: Choice[] | null, primary: string, okOnly = false, secondary = "Utiliser le navigateur"): Promise<string | null> =>
+  const dialog = (title: string, text: string, choices: Choice[] | null, primary: string, okOnly = false, secondary = t("Utiliser le navigateur")): Promise<string | null> =>
     new Promise((resolve) => {
       const root = ensureHost();
       const veil = document.createElement("div");
@@ -871,7 +872,7 @@ declare global {
    * formulaire — mot de passe et confirmation. */
   const newLoginDialog = async (input: HTMLInputElement, generated = false) => {
     const v = await send<VaultsReply>({ type: "guivault-vaults" }).catch(() => null);
-    if (!v || v.locked) return void dialog("GuiVault est verrouillé", "Cliquez sur l'icône GuiVault dans la barre du navigateur pour vous reconnecter.", null, "OK", true);
+    if (!v || v.locked) return void dialog(t("GuiVault est verrouillé"), t("Cliquez sur l'icône GuiVault dans la barre du navigateur pour vous reconnecter."), null, "OK", true);
     const all = inputs();
     const password = input.type === "password" ? input : sameForm(input, all).find((i) => i.type === "password") ?? all.find((i) => i.type === "password");
     const user = input.type === "password" ? usernameFor(input, all) : input;
@@ -988,7 +989,7 @@ declare global {
     }
     onTrustedClick(q("[data-act=save]"), () => {
       const body = { type: "guivault-create-login" as const, vaultId: select.value, name: q<HTMLInputElement>("[name=name]").value, username: q<HTMLInputElement>("[name=username]").value, password: q<HTMLInputElement>("[name=password]").value, uri: q<HTMLInputElement>("[name=uri]").value };
-      if (!body.password) { const err = q(".err"); err.textContent = "Il faut un mot de passe (tapez-le ou générez-le)."; err.hidden = false; return; }
+      if (!body.password) { const err = q(".err"); err.textContent = t("Il faut un mot de passe (tapez-le ou générez-le)."); err.hidden = false; return; }
       (q("[data-act=save]") as HTMLButtonElement).disabled = true;
       void send<{ ok: true; name: string } | { ok: false; error: string }>(body).then((r) => {
         if (!r.ok) { const err = q(".err"); err.textContent = r.error; err.hidden = false; (q("[data-act=save]") as HTMLButtonElement).disabled = false; return; }
@@ -1014,20 +1015,20 @@ declare global {
           const r = await send<{ candidates: { loginId: string; loginName: string; credentialId: string; userName: string }[] | null; error?: string }>({ type: "guivault-passkey-candidates", rpId: req.rpId, allow: req.allowCredentials });
           if (r.error || !r.candidates || r.candidates.length === 0) return replyShim(d.id, { fallback: true });
           const choices = r.candidates.map((c) => ({ value: c.credentialId, label: c.loginName, sub: c.userName }));
-          const picked = await dialog(`Se connecter à ${req.rpId}`, r.candidates.length === 1 ? `Avec la passkey de « ${choices[0].label} »${choices[0].sub ? ` (${choices[0].sub})` : ""} enregistrée dans GuiVault.` : "Plusieurs passkeys GuiVault correspondent à ce site.", r.candidates.length === 1 ? null : choices, "Continuer");
+          const picked = await dialog(t("Se connecter à {0}", req.rpId), r.candidates.length === 1 ? t("Avec la passkey de « {0} »{1} enregistrée dans GuiVault.", choices[0].label, choices[0].sub ? ` (${choices[0].sub})` : "") : t("Plusieurs passkeys GuiVault correspondent à ce site."), r.candidates.length === 1 ? null : choices, t("Continuer"));
           if (picked === null) return replyShim(d.id, { fallback: true });
           const a = await send<{ assertion: Record<string, string> | null; error?: string }>({ type: "guivault-passkey-assert", credentialId: picked || choices[0].value, rpId: req.rpId, challenge: req.challenge });
-          if (!a.assertion) return replyShim(d.id, { error: a.error ?? "passkey indisponible" });
+          if (!a.assertion) return replyShim(d.id, { error: a.error ?? t("passkey indisponible") });
           return replyShim(d.id, { result: a.assertion });
         }
         const req = d.request as { rpId: string; rpName: string; userHandle: string; userName: string; userDisplayName: string; challenge: string; excludeCredentials: string[]; discoverable: boolean };
         const l = await send<{ logins: { id: string; name: string; username: string }[] | null; error?: string }>({ type: "guivault-passkey-logins", rpId: req.rpId });
         if (l.error || !l.logins) return replyShim(d.id, { fallback: true });
-        const choices: Choice[] = [...l.logins.map((x) => ({ value: x.id, label: x.name, sub: x.username })), { value: "", label: `Nouvel identifiant « ${req.rpName || req.rpId} »`, sub: req.userName }];
-        const picked = await dialog(`Enregistrer une passkey pour ${req.rpName || req.rpId}`, `Pour ${req.userDisplayName || req.userName}. Elle sera chiffrée dans votre coffre et synchronisée.`, choices, "Enregistrer");
+        const choices: Choice[] = [...l.logins.map((x) => ({ value: x.id, label: x.name, sub: x.username })), { value: "", label: t("Nouvel identifiant « {0} »", req.rpName || req.rpId), sub: req.userName }];
+        const picked = await dialog(t("Enregistrer une passkey pour {0}", req.rpName || req.rpId), t("Pour {0}. Elle sera chiffrée dans votre coffre et synchronisée.", req.userDisplayName || req.userName), choices, t("Enregistrer"));
         if (picked === null) return replyShim(d.id, { fallback: true });
         const a = await send<{ attestation: Record<string, string> | { error: string }; error?: string }>({ type: "guivault-passkey-register", rpId: req.rpId, rpName: req.rpName, userHandle: req.userHandle, userName: req.userName, userDisplayName: req.userDisplayName, challenge: req.challenge, loginId: picked || null, discoverable: req.discoverable });
-        if (a.error || !a.attestation || "error" in a.attestation) return replyShim(d.id, { error: a.error ?? (a.attestation as { error: string })?.error ?? "enregistrement impossible" });
+        if (a.error || !a.attestation || "error" in a.attestation) return replyShim(d.id, { error: a.error ?? (a.attestation as { error: string })?.error ?? t("enregistrement impossible") });
         return replyShim(d.id, { result: a.attestation });
       } catch (err) {
         replyShim(d.id, { error: err instanceof Error ? err.message : String(err) });

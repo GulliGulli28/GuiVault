@@ -9,16 +9,17 @@ import { ConfirmDialog } from "./ConfirmDialog";
 import { IconTrash, IconVault } from "./ui-icons";
 import { IconCheck } from "./ui-icons";
 import { Eyebrow, Field, Fingerprint, formatWhen, InfoTip, TrustBadge } from "./ui";
+import { t, translated, plural } from "../lib/i18n";
 
 const WAIT_CHOICES = [1, 2, 3, 7, 14, 30, 60, 90];
-const days = (n: number) => `${n} jour${n > 1 ? "s" : ""}`;
+const days = (n: number) => plural(n, "{0} jour", "{0} jours");
 
-const STATUS_LABELS: Record<EmergencyStatus, string> = {
+const STATUS_LABELS: Record<EmergencyStatus, string> = translated({
   invited: "en attente d'acceptation",
   accepted: "accepté",
   requested: "accès demandé",
   granted: "accès ouvert",
-};
+});
 
 type Act = (label: string, f: () => Promise<unknown>, done?: string) => Promise<void>;
 
@@ -48,39 +49,39 @@ export function EmergencySettings({ ctx }: { ctx: PageContext }) {
   useEffect(() => {
     if (!session.emergency?.granted_by_me.some((g) => g.vaults.some((v) => !v.has_key))) return;
     repairEmergencyKeys(session)
-      .then((n) => { if (n > 0) { ctx.notify("Clés d'urgence renouvelées après une rotation."); void ctx.reload(); } })
+      .then((n) => { if (n > 0) { ctx.notify(t("Clés d'urgence renouvelées après une rotation.")); void ctx.reload(); } })
       .catch((e) => ctx.error(errorMessage(e)));
     // Au montage : `ctx` et `session` changent d'identité à chaque `/sync`.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  if (session.offline) return <p className="callout max-w-2xl">Hors ligne : l'accès d'urgence se règle avec le serveur.</p>;
+  if (session.offline) return <p className="callout max-w-2xl">{t("Hors ligne : l'accès d'urgence se règle avec le serveur.")}</p>;
   const overview = session.emergency;
-  if (!overview) return <p className="callout max-w-2xl">Ce serveur ne connaît pas encore l'accès d'urgence : il est d'une version plus ancienne que cette interface.</p>;
+  if (!overview) return <p className="callout max-w-2xl">{t("Ce serveur ne connaît pas encore l'accès d'urgence : il est d'une version plus ancienne que cette interface.")}</p>;
   const owned = session.vaults.filter((v) => v.role === "owner");
 
   return (
     <>
       <div className="flex flex-wrap items-center gap-2.5">
-        <span className="pill"><IconCheck size={15} /> Lecture seule</span>
-        <span className="pill"><IconCheck size={15} /> Vous pouvez refuser pendant le délai</span>
-        <span className="pill"><IconCheck size={15} /> Clés enveloppées ici, illisibles du serveur</span>
-        <InfoTip label="Quand une demande arrive" items={[
-          { text: "Le proche obtient l'accès à la fin du délai, si vous n'avez pas refusé." },
-          { text: "Sans alerte par e-mail sur ce serveur, une demande se voit à votre prochaine connexion : choisissez un délai en conséquence.", tone: "warn" },
+        <span className="pill"><IconCheck size={15} /> {t("Lecture seule")}</span>
+        <span className="pill"><IconCheck size={15} /> {t("Vous pouvez refuser pendant le délai")}</span>
+        <span className="pill"><IconCheck size={15} /> {t("Clés enveloppées ici, illisibles du serveur")}</span>
+        <InfoTip label={t("Quand une demande arrive")} items={[
+          { text: t("Le proche obtient l'accès à la fin du délai, si vous n'avez pas refusé.") },
+          { text: t("Sans alerte par e-mail sur ce serveur, une demande se voit à votre prochaine connexion : choisissez un délai en conséquence."), tone: "warn" },
         ]} />
       </div>
 
       <section className="flex flex-col gap-2.5">
-        <Eyebrow>Vos contacts d'urgence</Eyebrow>
-        {overview.granted_by_me.length === 0 && <p className="text-[13px] text-[var(--c-text-muted)]">Personne pour l'instant.</p>}
+        <Eyebrow>{t("Vos contacts d'urgence")}</Eyebrow>
+        {overview.granted_by_me.length === 0 && <p className="text-[13px] text-[var(--c-text-muted)]">{t("Personne pour l'instant.")}</p>}
         {overview.granted_by_me.map((g) => <GrantorCard key={g.id} g={g} owned={owned} act={act} busy={busy} onPinned={repaint} ctx={ctx} />)}
         <Designate ctx={ctx} owned={owned} act={act} busy={busy} onPinned={repaint} taken={overview.granted_by_me.map((g) => g.grantee.id)} />
       </section>
 
       <section className="flex flex-col gap-2.5">
-        <Eyebrow>Vous êtes le contact d'urgence de</Eyebrow>
-        {overview.granted_to_me.length === 0 && <p className="text-[13px] text-[var(--c-text-muted)]">Personne ne vous a désigné.</p>}
+        <Eyebrow>{t("Vous êtes le contact d'urgence de")}</Eyebrow>
+        {overview.granted_to_me.length === 0 && <p className="text-[13px] text-[var(--c-text-muted)]">{t("Personne ne vous a désigné.")}</p>}
         {overview.granted_to_me.map((g) => <GranteeCard key={g.id} g={g} vaults={session.emergencyVaults.filter((v) => v.emergency?.grantId === g.id)} act={act} busy={busy} onPinned={repaint} />)}
       </section>
     </>
@@ -102,7 +103,7 @@ function GrantorCard({ g, owned, act, busy, onPinned, ctx }: { g: EmergencyGrant
   const saveVaults = () => {
     if (!editing) return;
     const ids = [...editing];
-    void act("vaults", () => api.updateEmergency(g.id, { vaults: emergencyEnvelopes(ctx.session, g.grantee, ids) }), "Vaults confiés mis à jour.").then(() => setEditing(null));
+    void act("vaults", () => api.updateEmergency(g.id, { vaults: emergencyEnvelopes(ctx.session, g.grantee, ids) }), t("Vaults confiés mis à jour.")).then(() => setEditing(null));
   };
 
   return (
@@ -110,7 +111,7 @@ function GrantorCard({ g, owned, act, busy, onPinned, ctx }: { g: EmergencyGrant
       <div className="flex min-w-0 items-center gap-2">
         <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-[var(--c-text)]" title={g.grantee.email}>{g.grantee.email}</span>
         <StatusTag status={g.status} />
-        <button onClick={() => setConfirm("remove")} className="btn btn-ghost btn-sm btn-icon shrink-0 hover:text-[var(--c-danger)]" title="Retirer ce contact" aria-label="Retirer ce contact"><IconTrash size={11} /></button>
+        <button onClick={() => setConfirm("remove")} className="btn btn-ghost btn-sm btn-icon shrink-0 hover:text-[var(--c-danger)]" title={t("Retirer ce contact")} aria-label={t("Retirer ce contact")}><IconTrash size={11} /></button>
       </div>
       <div className="flex flex-wrap items-center gap-1.5">
         <Fingerprint value={g.grantee.fingerprint} />
@@ -119,67 +120,67 @@ function GrantorCard({ g, owned, act, busy, onPinned, ctx }: { g: EmergencyGrant
 
       {g.status === "requested" && (
         <div className="callout callout-warn space-y-2 text-[12.5px]">
-          <p>A demandé l'accès le {formatWhen(g.requested_at)} : il l'aura le <span className="font-medium">{formatWhen(g.access_at)}</span>, sauf refus de votre part.</p>
+          <p>{t("A demandé l'accès le")} {formatWhen(g.requested_at)} {t(": il l'aura le")} <span className="font-medium">{formatWhen(g.access_at)}</span>{t(", sauf refus de votre part.")}</p>
           <div className="flex flex-wrap gap-2">
-            <button disabled={busy !== null} onClick={() => void act("reject", () => api.emergencyAction(g.id, "reject"), "Demande refusée.")} className="btn btn-secondary btn-sm">Refuser</button>
-            <button disabled={busy !== null} onClick={() => setConfirm("approve")} className="btn btn-ghost btn-sm">Accorder maintenant</button>
+            <button disabled={busy !== null} onClick={() => void act("reject", () => api.emergencyAction(g.id, "reject"), t("Demande refusée."))} className="btn btn-secondary btn-sm">{t("Refuser")}</button>
+            <button disabled={busy !== null} onClick={() => setConfirm("approve")} className="btn btn-ghost btn-sm">{t("Accorder maintenant")}</button>
           </div>
         </div>
       )}
       {g.status === "granted" && (
         <div className="callout space-y-2 text-[12.5px]">
-          <p>Lit les vaults confiés depuis le {formatWhen(g.access_at)}. Reprendre la main coupe l'accès ; ce qu'il a déjà lu, il a pu le garder — renouvelez la clé des vaults concernés si besoin.</p>
-          <button disabled={busy !== null} onClick={() => void act("reject", () => api.emergencyAction(g.id, "reject"), "Accès repris.")} className="btn btn-secondary btn-sm">Reprendre la main</button>
+          <p>{t("Lit les vaults confiés depuis le")} {formatWhen(g.access_at)}{t(". Reprendre la main coupe l'accès ; ce qu'il a déjà lu, il a pu le garder — renouvelez la clé des vaults concernés si besoin.")}</p>
+          <button disabled={busy !== null} onClick={() => void act("reject", () => api.emergencyAction(g.id, "reject"), t("Accès repris."))} className="btn btn-secondary btn-sm">{t("Reprendre la main")}</button>
         </div>
       )}
-      {g.status === "invited" && <p className="help-text">Il doit accepter, depuis ses propres paramètres, après avoir vérifié votre empreinte.</p>}
+      {g.status === "invited" && <p className="help-text">{t("Il doit accepter, depuis ses propres paramètres, après avoir vérifié votre empreinte.")}</p>}
 
       <div className="flex flex-wrap items-center gap-2">
-        <label htmlFor={`wait-${g.id}`} className="text-[12px] text-[var(--c-text-secondary)]">Délai d'attente</label>
-        <select id={`wait-${g.id}`} value={g.wait_days} disabled={busy !== null} onChange={(e) => void act("wait", () => api.updateEmergency(g.id, { wait_days: Number(e.target.value) }), "Délai modifié.")} className="input w-auto">
+        <label htmlFor={`wait-${g.id}`} className="text-[12px] text-[var(--c-text-secondary)]">{t("Délai d'attente")}</label>
+        <select id={`wait-${g.id}`} value={g.wait_days} disabled={busy !== null} onChange={(e) => void act("wait", () => api.updateEmergency(g.id, { wait_days: Number(e.target.value) }), t("Délai modifié."))} className="input w-auto">
           {WAIT_CHOICES.map((n) => <option key={n} value={n}>{days(n)}</option>)}
         </select>
       </div>
 
       <div>
-        <p className="text-[12px] text-[var(--c-text-secondary)]">Vaults confiés</p>
+        <p className="text-[12px] text-[var(--c-text-secondary)]">{t("Vaults confiés")}</p>
         {editing ? (
           <div className="mt-1 space-y-1">
             <VaultChecklist vaults={owned} selected={editing} onChange={setEditing} />
-            {!pinned && <p className="help-text">Vérifiez son empreinte avant de lui envelopper des clés.</p>}
+            {!pinned && <p className="help-text">{t("Vérifiez son empreinte avant de lui envelopper des clés.")}</p>}
             <div className="flex gap-2">
-              <button disabled={!pinned || editing.size === 0 || busy !== null} onClick={saveVaults} className="btn btn-primary btn-sm">Enregistrer</button>
-              <button onClick={() => setEditing(null)} className="btn btn-ghost btn-sm">Annuler</button>
+              <button disabled={!pinned || editing.size === 0 || busy !== null} onClick={saveVaults} className="btn btn-primary btn-sm">{t("Enregistrer")}</button>
+              <button onClick={() => setEditing(null)} className="btn btn-ghost btn-sm">{t("Annuler")}</button>
             </div>
           </div>
         ) : (
           <div className="mt-1 flex flex-wrap items-center gap-1.5">
             {[...covered].map(([id, hasKey]) => (
-              <span key={id} className="tag" title={hasKey ? undefined : "La clé de ce vault a été renouvelée : son enveloppe est à refaire (depuis un appareil où l'empreinte du contact est vérifiée)."}>
-                {nameOf(id)}{hasKey ? "" : " · à renouveler"}
+              <span key={id} className="tag" title={hasKey ? undefined : t("La clé de ce vault a été renouvelée : son enveloppe est à refaire (depuis un appareil où l'empreinte du contact est vérifiée).")}>
+                {nameOf(id)}{hasKey ? "" : t(" · à renouveler")}
               </span>
             ))}
-            <button onClick={() => setEditing(new Set(g.vaults.map((v) => v.vault_id).filter((id) => owned.some((o) => o.id === id))))} className="btn btn-ghost btn-sm">Modifier</button>
+            <button onClick={() => setEditing(new Set(g.vaults.map((v) => v.vault_id).filter((id) => owned.some((o) => o.id === id))))} className="btn btn-ghost btn-sm">{t("Modifier")}</button>
           </div>
         )}
       </div>
 
       {confirm === "remove" && (
         <ConfirmDialog
-          title={`Retirer ${g.grantee.email} ?`}
-          message={`Les enveloppes qui lui étaient destinées sont effacées : il ne pourra plus demander l'accès.${g.status === "granted" ? " Ce qu'il a déjà lu, il a pu le garder : renouvelez la clé des vaults concernés." : ""}`}
-          confirmLabel="Retirer"
+          title={t("Retirer {0} ?", g.grantee.email)}
+          message={t("Les enveloppes qui lui étaient destinées sont effacées : il ne pourra plus demander l'accès.{0}", g.status === "granted" ? t(" Ce qu'il a déjà lu, il a pu le garder : renouvelez la clé des vaults concernés.") : "")}
+          confirmLabel={t("Retirer")}
           danger
-          onConfirm={() => { setConfirm(null); void act("remove", () => api.deleteEmergency(g.id), "Contact d'urgence retiré."); }}
+          onConfirm={() => { setConfirm(null); void act("remove", () => api.deleteEmergency(g.id), t("Contact d'urgence retiré.")); }}
           onCancel={() => setConfirm(null)}
         />
       )}
       {confirm === "approve" && (
         <ConfirmDialog
-          title={`Accorder l'accès à ${g.grantee.email} maintenant ?`}
-          message={`Il lira tout de suite ${g.vaults.length > 1 ? `les ${g.vaults.length} vaults confiés` : "le vault confié"}, sans attendre la fin du délai.`}
-          confirmLabel="Accorder"
-          onConfirm={() => { setConfirm(null); void act("approve", () => api.emergencyAction(g.id, "approve"), "Accès accordé."); }}
+          title={t("Accorder l'accès à {0} maintenant ?", g.grantee.email)}
+          message={t("Il lira tout de suite {0}, sans attendre la fin du délai.", g.vaults.length > 1 ? t("les {0} vaults confiés", g.vaults.length) : t("le vault confié"))}
+          confirmLabel={t("Accorder")}
+          onConfirm={() => { setConfirm(null); void act("approve", () => api.emergencyAction(g.id, "approve"), t("Accès accordé.")); }}
           onCancel={() => setConfirm(null)}
         />
       )}
@@ -188,7 +189,7 @@ function GrantorCard({ g, owned, act, busy, onPinned, ctx }: { g: EmergencyGrant
 }
 
 function VaultChecklist({ vaults, selected, onChange }: { vaults: VaultView[]; selected: Set<string>; onChange: (s: Set<string>) => void }) {
-  if (vaults.length === 0) return <p className="help-text">Vous n'êtes propriétaire d'aucun vault.</p>;
+  if (vaults.length === 0) return <p className="help-text">{t("Vous n'êtes propriétaire d'aucun vault.")}</p>;
   return (
     <div className="space-y-0.5">
       {vaults.map((v) => (
@@ -204,7 +205,7 @@ function VaultChecklist({ vaults, selected, onChange }: { vaults: VaultView[]; s
             }}
           />
           {v.name}
-          {v.kind === "personal" && <span className="text-[11px] text-[var(--c-text-faint)]">personnel</span>}
+          {v.kind === "personal" && <span className="text-[11px] text-[var(--c-text-faint)]">{t("personnel")}</span>}
         </label>
       ))}
     </div>
@@ -224,7 +225,7 @@ function Designate({ ctx, owned, act, busy, onPinned, taken }: { ctx: PageContex
     const normalized = email.trim().toLowerCase();
     if (!normalized) return;
     if (normalized === ctx.session.user.email) {
-      ctx.error("On ne se désigne pas soi-même.");
+      ctx.error(t("On ne se désigne pas soi-même."));
       return;
     }
     try {
@@ -240,12 +241,12 @@ function Designate({ ctx, owned, act, busy, onPinned, taken }: { ctx: PageContex
   return (
     <div className="card space-y-2 p-3">
       <form onSubmit={lookup} className="flex flex-wrap items-end gap-2">
-        <Field label="Désigner un contact" className="min-w-0 flex-1">
+        <Field label={t("Désigner un contact")} className="min-w-0 flex-1">
           <input value={email} onChange={(e) => { setEmail(e.target.value); setFound(null); }} type="email" placeholder="proche@exemple.fr" className="input" />
         </Field>
-        <button type="submit" disabled={!email.trim()} className="btn btn-secondary">Chercher</button>
+        <button type="submit" disabled={!email.trim()} className="btn btn-secondary">{t("Chercher")}</button>
       </form>
-      {found === "none" && <p className="help-text">Pas de compte à cette adresse sur ce serveur : votre proche doit d'abord s'en créer un.</p>}
+      {found === "none" && <p className="help-text">{t("Pas de compte à cette adresse sur ce serveur : votre proche doit d'abord s'en créer un.")}</p>}
       {found && found !== "none" && (
         <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-1.5">
@@ -254,29 +255,29 @@ function Designate({ ctx, owned, act, busy, onPinned, taken }: { ctx: PageContex
             <TrustBadge email={found.email} fingerprint={found.fingerprint} onPinned={onPinned} />
           </div>
           {already ? (
-            <p className="help-text">Déjà désigné : modifiez sa désignation ci-dessus.</p>
+            <p className="help-text">{t("Déjà désigné : modifiez sa désignation ci-dessus.")}</p>
           ) : (
             <>
               <div>
-                <p className="text-[12px] text-[var(--c-text-secondary)]">Vaults à lui confier</p>
+                <p className="text-[12px] text-[var(--c-text-secondary)]">{t("Vaults à lui confier")}</p>
                 <VaultChecklist vaults={owned} selected={selected} onChange={setSelected} />
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <label htmlFor="designate-wait" className="text-[12px] text-[var(--c-text-secondary)]">Délai d'attente</label>
+                <label htmlFor="designate-wait" className="text-[12px] text-[var(--c-text-secondary)]">{t("Délai d'attente")}</label>
                 <select id="designate-wait" value={wait} onChange={(e) => setWait(Number(e.target.value))} className="input w-auto">
                   {WAIT_CHOICES.map((n) => <option key={n} value={n}>{days(n)}</option>)}
                 </select>
               </div>
-              {!pinned && <p className="help-text">Vérifiez son empreinte d'abord : c'est à cette clé que les vôtres seront confiées.</p>}
+              {!pinned && <p className="help-text">{t("Vérifiez son empreinte d'abord : c'est à cette clé que les vôtres seront confiées.")}</p>}
               <button
                 disabled={!pinned || selected.size === 0 || busy !== null}
                 onClick={() => {
                   const target = found;
-                  void act("designate", () => api.createEmergency({ grantee_id: target.id, wait_days: wait, vaults: emergencyEnvelopes(ctx.session, target, [...selected]) }), `${target.email} est votre contact d'urgence (à lui d'accepter).`).then(() => { setEmail(""); setFound(null); });
+                  void act("designate", () => api.createEmergency({ grantee_id: target.id, wait_days: wait, vaults: emergencyEnvelopes(ctx.session, target, [...selected]) }), t("{0} est votre contact d'urgence (à lui d'accepter).", target.email)).then(() => { setEmail(""); setFound(null); });
                 }}
                 className="btn btn-primary btn-sm"
               >
-                Désigner
+                {t("Désigner")}
               </button>
             </>
           )}
@@ -296,27 +297,27 @@ function GranteeCard({ g, vaults, act, busy, onPinned }: { g: EmergencyGrant; va
       <div className="flex min-w-0 items-center gap-2">
         <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-[var(--c-text)]" title={g.grantor.email}>{g.grantor.email}</span>
         <StatusTag status={g.status} />
-        <button onClick={() => setConfirm("renounce")} className="btn btn-ghost btn-sm btn-icon shrink-0 hover:text-[var(--c-danger)]" title="Renoncer" aria-label="Renoncer"><IconTrash size={11} /></button>
+        <button onClick={() => setConfirm("renounce")} className="btn btn-ghost btn-sm btn-icon shrink-0 hover:text-[var(--c-danger)]" title={t("Renoncer")} aria-label={t("Renoncer")}><IconTrash size={11} /></button>
       </div>
       <div className="flex flex-wrap items-center gap-1.5">
         <Fingerprint value={g.grantor.fingerprint} />
         <TrustBadge email={g.grantor.email} fingerprint={g.grantor.fingerprint} onPinned={onPinned} />
       </div>
-      <p className="text-[12px] text-[var(--c-text-muted)]">{n} vault{n > 1 ? "s" : ""} confié{n > 1 ? "s" : ""} · délai de {days(g.wait_days)}</p>
+      <p className="text-[12px] text-[var(--c-text-muted)]">{plural(n, "{0} vault confié · délai de {1}", "{0} vaults confiés · délai de {1}", days(g.wait_days))}</p>
 
       {g.status === "invited" && (
         <div className="flex flex-wrap items-center gap-2">
-          <button disabled={!pinned || busy !== null} onClick={() => void act("accept", () => api.emergencyAction(g.id, "accept"), "Désignation acceptée.")} className="btn btn-primary btn-sm">Accepter</button>
-          {!pinned && <span className="help-text">Vérifiez d'abord son empreinte : c'est elle qui signera les clés qu'on vous remettra.</span>}
+          <button disabled={!pinned || busy !== null} onClick={() => void act("accept", () => api.emergencyAction(g.id, "accept"), t("Désignation acceptée."))} className="btn btn-primary btn-sm">{t("Accepter")}</button>
+          {!pinned && <span className="help-text">{t("Vérifiez d'abord son empreinte : c'est elle qui signera les clés qu'on vous remettra.")}</span>}
         </div>
       )}
       {g.status === "accepted" && (
-        <button disabled={busy !== null} onClick={() => setConfirm("request")} className="btn btn-secondary btn-sm">Demander l'accès…</button>
+        <button disabled={busy !== null} onClick={() => setConfirm("request")} className="btn btn-secondary btn-sm">{t("Demander l'accès…")}</button>
       )}
       {g.status === "requested" && (
         <div className="flex flex-wrap items-center gap-2 text-[12.5px] text-[var(--c-text)]">
-          <span>Accès le <span className="font-medium">{formatWhen(g.access_at)}</span>, sauf refus.</span>
-          <button disabled={busy !== null} onClick={() => void act("cancel", () => api.emergencyAction(g.id, "reject"), "Demande retirée.")} className="btn btn-ghost btn-sm">Retirer la demande</button>
+          <span>{t("Accès le")} <span className="font-medium">{formatWhen(g.access_at)}</span>{t(", sauf refus.")}</span>
+          <button disabled={busy !== null} onClick={() => void act("cancel", () => api.emergencyAction(g.id, "reject"), t("Demande retirée."))} className="btn btn-ghost btn-sm">{t("Retirer la demande")}</button>
         </div>
       )}
       {g.status === "granted" && (
@@ -325,29 +326,29 @@ function GranteeCard({ g, vaults, act, busy, onPinned }: { g: EmergencyGrant; va
             {vaults.map((v) => (
               <button key={v.id} onClick={() => navigate({ page: "vault", id: v.id })} className="btn btn-secondary btn-sm"><IconVault size={11} /> {v.name}</button>
             ))}
-            {vaults.length === 0 && <span className="help-text">Aucun vault lisible pour l'instant (clé en cours de renouvellement ?).</span>}
+            {vaults.length === 0 && <span className="help-text">{t("Aucun vault lisible pour l'instant (clé en cours de renouvellement ?).")}</span>}
           </div>
         ) : (
-          <p className="help-text">Vérifiez son empreinte pour ouvrir ses vaults : c'est ce qui prouve que les clés viennent bien de cette personne.</p>
+          <p className="help-text">{t("Vérifiez son empreinte pour ouvrir ses vaults : c'est ce qui prouve que les clés viennent bien de cette personne.")}</p>
         )
       )}
 
       {confirm === "request" && (
         <ConfirmDialog
-          title={`Demander l'accès aux vaults de ${g.grantor.email} ?`}
-          message={`Cette personne le verra à sa prochaine connexion et pourra refuser. Sans refus, vous lirez ${n > 1 ? `ses ${n} vaults confiés` : "le vault confié"} dans ${days(g.wait_days)}.`}
-          confirmLabel="Demander"
-          onConfirm={() => { setConfirm(null); void act("request", () => api.emergencyAction(g.id, "request"), "Demande envoyée."); }}
+          title={t("Demander l'accès aux vaults de {0} ?", g.grantor.email)}
+          message={t("Cette personne le verra à sa prochaine connexion et pourra refuser. Sans refus, vous lirez {0} dans {1}.", n > 1 ? t("ses {0} vaults confiés", n) : t("le vault confié"), days(g.wait_days))}
+          confirmLabel={t("Demander")}
+          onConfirm={() => { setConfirm(null); void act("request", () => api.emergencyAction(g.id, "request"), t("Demande envoyée.")); }}
           onCancel={() => setConfirm(null)}
         />
       )}
       {confirm === "renounce" && (
         <ConfirmDialog
-          title={`Renoncer à être le contact d'urgence de ${g.grantor.email} ?`}
-          message="Les clés qui vous étaient confiées sont effacées du serveur. Il faudra une nouvelle désignation pour revenir."
-          confirmLabel="Renoncer"
+          title={t("Renoncer à être le contact d'urgence de {0} ?", g.grantor.email)}
+          message={t("Les clés qui vous étaient confiées sont effacées du serveur. Il faudra une nouvelle désignation pour revenir.")}
+          confirmLabel={t("Renoncer")}
           danger
-          onConfirm={() => { setConfirm(null); void act("renounce", () => api.deleteEmergency(g.id), "Désignation retirée."); }}
+          onConfirm={() => { setConfirm(null); void act("renounce", () => api.deleteEmergency(g.id), t("Désignation retirée.")); }}
           onCancel={() => setConfirm(null)}
         />
       )}
@@ -365,12 +366,12 @@ export function EmergencyBanner({ grants, onOpen }: { grants: EmergencyGrant[]; 
       {pending.map((g) => (
         <div key={g.id} className="callout callout-warn flex flex-wrap items-center gap-3 text-[12.5px]">
           <p className="min-w-0 flex-1">
-            <span className="font-medium">Accès d'urgence</span> —{" "}
+            <span className="font-medium">{t("Accès d'urgence")}</span> —{" "}
             {g.status === "requested"
-              ? <>{g.grantee.email} a demandé l'accès à vos vaults ; il l'aura le {formatWhen(g.access_at)} sauf refus.</>
-              : <>{g.grantee.email} lit vos vaults confiés depuis le {formatWhen(g.access_at)}.</>}
+              ? <>{g.grantee.email} {t("a demandé l'accès à vos vaults ; il l'aura le")} {formatWhen(g.access_at)} {t("sauf refus.")}</>
+              : <>{g.grantee.email} {t("lit vos vaults confiés depuis le")} {formatWhen(g.access_at)}.</>}
           </p>
-          <button onClick={onOpen} className="btn btn-secondary btn-sm">{g.status === "requested" ? "Répondre" : "Voir"}</button>
+          <button onClick={onOpen} className="btn btn-secondary btn-sm">{g.status === "requested" ? t("Répondre") : t("Voir")}</button>
         </div>
       ))}
     </div>

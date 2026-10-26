@@ -21,6 +21,7 @@ import { KIND_LABELS, KIND_LABELS_PLURAL, type CustomIcon, type GuiVaultEntity, 
 import { useModalSurface } from "../hooks/useModalSurface";
 import { ItemTile } from "./ItemTree";
 import { IconChevronRight } from "./ui-icons";
+import { t } from "../lib/i18n";
 
 const cache = new Map<string, DecodedItem[]>();
 
@@ -37,31 +38,31 @@ const MAX_ITEMS = 50;
 
 function pages(vaults: VaultView[]): Entry[] {
   const all: Entry[] = [
-    { kind: "page", key: "generator", label: "Générateur de mots de passe", keywords: "générer phrase de passe clé ssh", route: { page: "generator" } },
-    { kind: "page", key: "totp", label: "Codes 2FA", keywords: "authentificateur totp otp code", route: { page: "totp" } },
-    { kind: "page", key: "invitations", label: "Invitations reçues", keywords: "partage", route: { page: "invitations" } },
-    { kind: "page", key: "settings-apparence", label: "Paramètres — Apparence", keywords: "thème couleur police", route: { page: "settings", section: "apparence" } },
-    { kind: "page", key: "settings-compte", label: "Paramètres — Compte", keywords: "empreinte e-mail", route: { page: "settings", section: "compte" } },
-    { kind: "page", key: "settings-securite", label: "Paramètres — Sécurité", keywords: "mot de passe maître totp verrouiller presse-papiers", route: { page: "settings", section: "securite" } },
-    { kind: "page", key: "settings-saisie", label: "Paramètres — Saisie automatique", keywords: "autotype keepass raccourci séquence", route: { page: "settings", section: "saisie" } },
-    { kind: "page", key: "settings-agent-ssh", label: "Paramètres — Agent SSH", keywords: "ssh agent clé git signature openssh", route: { page: "settings", section: "agent-ssh" } },
-    { kind: "page", key: "settings-sessions", label: "Paramètres — Appareils connectés", keywords: "sessions journal", route: { page: "settings", section: "sessions" } },
+    { kind: "page", key: "generator", label: t("Générateur de mots de passe"), keywords: "générer phrase de passe clé ssh", route: { page: "generator" } },
+    { kind: "page", key: "totp", label: t("Codes 2FA"), keywords: "authentificateur totp otp code", route: { page: "totp" } },
+    { kind: "page", key: "invitations", label: t("Invitations reçues"), keywords: "partage", route: { page: "invitations" } },
+    { kind: "page", key: "settings-apparence", label: t("Paramètres — Apparence"), keywords: "thème couleur police", route: { page: "settings", section: "apparence" } },
+    { kind: "page", key: "settings-compte", label: t("Paramètres — Compte"), keywords: "empreinte e-mail", route: { page: "settings", section: "compte" } },
+    { kind: "page", key: "settings-securite", label: t("Paramètres — Sécurité"), keywords: "mot de passe maître totp verrouiller presse-papiers", route: { page: "settings", section: "securite" } },
+    { kind: "page", key: "settings-saisie", label: t("Paramètres — Saisie automatique"), keywords: "autotype keepass raccourci séquence", route: { page: "settings", section: "saisie" } },
+    { kind: "page", key: "settings-agent-ssh", label: t("Paramètres — Agent SSH"), keywords: "ssh agent clé git signature openssh", route: { page: "settings", section: "agent-ssh" } },
+    { kind: "page", key: "settings-sessions", label: t("Paramètres — Appareils connectés"), keywords: "sessions journal", route: { page: "settings", section: "sessions" } },
   ];
   // Ce que ce transport (un coffre local) ou cette plateforme (le web) n'a pas.
   const out = all.filter((p) => (p.key !== "invitations" || supports("myInvitations")) && (p.key !== "settings-sessions" || supports("sessions")) && (p.key !== "settings-saisie" || !!autoTypeBridge()) && (p.key !== "settings-agent-ssh" || !!sshAgentBridge()));
   for (const v of vaults) {
     out.push(
-      { kind: "page", key: `vault-${v.id}`, label: `Ouvrir « ${v.name} »`, keywords: "vault", route: { page: "vault", id: v.id } },
-      { kind: "page", key: `trash-${v.id}`, label: `Corbeille de « ${v.name} »`, keywords: "supprimés restaurer", route: { page: "vault-trash", id: v.id } },
-      { kind: "page", key: `settings-${v.id}`, label: `Réglages de « ${v.name} »`, keywords: "membres invitations clé rotation", route: { page: "vault-settings", id: v.id } },
-      { kind: "page", key: `tools-${v.id}`, label: `Importer / exporter « ${v.name} »`, keywords: "import export bitwarden csv", route: { page: "vault-tools", id: v.id } },
+      { kind: "page", key: `vault-${v.id}`, label: t("Ouvrir « {0} »", v.name), keywords: "vault", route: { page: "vault", id: v.id } },
+      { kind: "page", key: `trash-${v.id}`, label: t("Corbeille de « {0} »", v.name), keywords: "supprimés restaurer", route: { page: "vault-trash", id: v.id } },
+      { kind: "page", key: `settings-${v.id}`, label: t("Réglages de « {0} »", v.name), keywords: "membres invitations clé rotation", route: { page: "vault-settings", id: v.id } },
+      { kind: "page", key: `tools-${v.id}`, label: t("Importer / exporter « {0} »", v.name), keywords: "import export bitwarden csv", route: { page: "vault-tools", id: v.id } },
     );
   }
   return out;
 }
 
 export function SearchPalette({ ctx, onClose }: { ctx: PageContext; onClose: () => void }) {
-  const { ref, dialogProps } = useModalSurface({ onClose, label: "Recherche globale" });
+  const { ref, dialogProps } = useModalSurface({ onClose, label: t("Recherche globale") });
   const ask = useReprompt();
   const vaults = ctx.session.vaults;
   const [query, setQuery] = useState("");
@@ -138,17 +139,17 @@ export function SearchPalette({ ctx, onClose }: { ctx: PageContext; onClose: () 
     if (e?.kind !== "item") return;
     const what = which === "secret" ? primarySecret(e.payload) : primaryUser(e.payload);
     if (!what) {
-      ctx.error(`Rien à copier (${which === "secret" ? "secret" : "utilisateur"}) pour « ${e.entity.name} ».`);
+      ctx.error(t("Rien à copier ({0}) pour « {1} ».", which === "secret" ? "secret" : "utilisateur", e.entity.name));
       return;
     }
     onClose();
     void (which === "secret" ? ask(e.payload) : Promise.resolve(true)).then(async (go) => {
-      if (go && (await copyText(what.value))) ctx.notify(`${what.label} de « ${e.entity.name} » copié.`);
+      if (go && (await copyText(what.value))) ctx.notify(t("{0} de « {1} » copié.", what.label, e.entity.name));
     });
   };
 
   const current = results[active];
-  const groupOf = (e: Entry) => (e.kind === "item" ? capitalize(KIND_LABELS_PLURAL[e.entity.kind]) : "Aller à");
+  const groupOf = (e: Entry) => (e.kind === "item" ? capitalize(KIND_LABELS_PLURAL[e.entity.kind]) : t("Aller à"));
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-[rgba(5,6,8,0.55)] px-4 pt-[12vh] max-md:bg-[var(--c-bg)] max-md:p-0" onClick={onClose}>
       {/* Mobile : plein écran (maquette `MRecherche`). */}
@@ -170,16 +171,16 @@ export function SearchPalette({ ctx, onClose }: { ctx: PageContext; onClose: () 
                 copy(current, e.shiftKey ? "user" : "secret");
               }
             }}
-            placeholder="Rechercher dans tous les vaults, ou aller à une page"
-            aria-label="Rechercher"
+            placeholder={t("Rechercher dans tous les vaults, ou aller à une page")}
+            aria-label={t("Rechercher")}
             className="min-w-0 flex-1 bg-transparent py-4 text-[16px] text-[var(--c-text)] outline-none placeholder:text-[var(--c-text-muted)] focus-visible:outline-none max-md:py-3"
           />
-          <button onClick={onClose} className="shrink-0 text-[15px] font-medium text-[var(--c-accent-text)] md:hidden">Annuler</button>
-          {loading ? <span className="shrink-0 text-[12px] text-[var(--c-text-muted)]">Lecture…</span> : <span className="tag max-md:hidden">Tous les vaults</span>}
-          <span className="kbd [@media(pointer:coarse)]:hidden">Échap</span>
+          <button onClick={onClose} className="shrink-0 text-[15px] font-medium text-[var(--c-accent-text)] md:hidden">{t("Annuler")}</button>
+          {loading ? <span className="shrink-0 text-[12px] text-[var(--c-text-muted)]">{t("Lecture…")}</span> : <span className="tag max-md:hidden">{t("Tous les vaults")}</span>}
+          <span className="kbd [@media(pointer:coarse)]:hidden">{t("Échap")}</span>
         </div>
-        <div className="sidebar-scroll max-h-[55vh] overflow-y-auto p-1.5 max-md:max-h-none max-md:min-h-0 max-md:flex-1 max-md:px-2.5 max-md:pb-[calc(1rem+var(--inset-bottom))]" role="listbox" aria-label="Résultats">
-          {results.length === 0 && <p className="px-4 py-8 text-center text-[13px] text-[var(--c-text-muted)]">{loading ? "Lecture des vaults…" : "Aucun résultat"}</p>}
+        <div className="sidebar-scroll max-h-[55vh] overflow-y-auto p-1.5 max-md:max-h-none max-md:min-h-0 max-md:flex-1 max-md:px-2.5 max-md:pb-[calc(1rem+var(--inset-bottom))]" role="listbox" aria-label={t("Résultats")}>
+          {results.length === 0 && <p className="px-4 py-8 text-center text-[13px] text-[var(--c-text-muted)]">{loading ? t("Lecture des vaults…") : t("Aucun résultat")}</p>}
           {results.map((e, i) => (
             <div key={e.key}>
               {(i === 0 || groupOf(results[i - 1]) !== groupOf(e)) && <p className="px-3 pb-1 pt-2.5 text-[12px] font-medium text-[var(--c-text-muted)]">{groupOf(e)}</p>}
@@ -197,7 +198,7 @@ export function SearchPalette({ ctx, onClose }: { ctx: PageContext; onClose: () 
                   <>
                     <span className="tile tile-neutral" style={{ "--tile-size": "28px" } as React.CSSProperties}><IconChevronRight size={14} /></span>
                     <span className="min-w-0 flex-1 truncate text-[13.5px] text-[var(--c-text)]"><Highlight text={e.label} query={query.trim()} /></span>
-                    {i === active && <span className="kbd [@media(pointer:coarse)]:hidden">Entrée</span>}
+                    {i === active && <span className="kbd [@media(pointer:coarse)]:hidden">{t("Entrée")}</span>}
                   </>
                 )}
               </button>
@@ -206,10 +207,10 @@ export function SearchPalette({ ctx, onClose }: { ctx: PageContext; onClose: () 
         </div>
         {/* Des raccourcis clavier : rien à dire à un doigt. */}
         <footer className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-[var(--c-border)] px-[18px] py-2.5 text-[12px] text-[var(--c-text-muted)] [@media(pointer:coarse)]:hidden">
-          <Hint keys={["↑", "↓"]}>parcourir</Hint>
-          <Hint keys={["Entrée"]}>ouvrir</Hint>
-          {current?.kind === "item" && primarySecret(current.payload) && <Hint keys={["Ctrl", "C"]}>copier {withArticle(primarySecret(current.payload)!.label)}</Hint>}
-          {current?.kind === "item" && primaryUser(current.payload) && <Hint keys={["Ctrl", "Maj", "C"]}>copier {withArticle(primaryUser(current.payload)!.label)}</Hint>}
+          <Hint keys={["↑", "↓"]}>{t("parcourir")}</Hint>
+          <Hint keys={[t("Entrée")]}>{t("ouvrir")}</Hint>
+          {current?.kind === "item" && primarySecret(current.payload) && <Hint keys={[t("Ctrl"), "C"]}>{t("copier")} {withArticle(primarySecret(current.payload)!.label)}</Hint>}
+          {current?.kind === "item" && primaryUser(current.payload) && <Hint keys={[t("Ctrl"), t("Maj"), "C"]}>{t("copier")} {withArticle(primaryUser(current.payload)!.label)}</Hint>}
         </footer>
       </div>
     </div>
@@ -248,7 +249,7 @@ function ItemRow({ entity, icons, vault, query, active }: { entity: GuiVaultEnti
         <span className="vdot" style={{ background: vaultColor(vault.id, vault.kind === "personal") }} />
         <span className="truncate">{vault.name}</span>
       </span>
-      {active && <span className="kbd [@media(pointer:coarse)]:hidden">Entrée</span>}
+      {active && <span className="kbd [@media(pointer:coarse)]:hidden">{t("Entrée")}</span>}
     </>
   );
 }

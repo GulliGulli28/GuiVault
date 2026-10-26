@@ -17,6 +17,7 @@ import { pinKdf, requireKdfNotDowngraded } from "./kdfPins";
 import { localAccount, localCreate, localOpen, localTransport, type LocalHost } from "./localHost";
 import { deviceName, type AccountBlobs, type SessionState, type VaultView } from "./session";
 import type { ImportedItem, Item, ItemVersion, LoginResponse, TrashedItem, VaultManifest } from "./types";
+import { t } from "./i18n";
 
 const b64 = toBase64;
 const unb64 = fromBase64;
@@ -33,7 +34,7 @@ export type End = Partial<Transport>;
 
 export function method<K extends keyof Transport>(end: End, name: K): Transport[K] {
   const f = end[name];
-  if (!f) throw new ApiError(501, "local_unsupported", `« ${String(name)} » manque à l'une des deux extrémités.`);
+  if (!f) throw new ApiError(501, "local_unsupported", t("« {0} » manque à l'une des deux extrémités.", String(name)));
   return f;
 }
 
@@ -159,7 +160,7 @@ async function copyVault(source: End, dest: Destination, v: TransferVault, repor
         wrapped_vault_key: b64(c.wrapVaultKey(dest.account.keypair, dest.account.keypair.publicKey, v.id, v.key)),
       });
     } catch (e) {
-      if (e instanceof ApiError && e.status === 409) throw new Error("Un vault de même identifiant existe déjà là-bas, à quelqu'un d'autre.", { cause: e });
+      if (e instanceof ApiError && e.status === 409) throw new Error(t("Un vault de même identifiant existe déjà là-bas, à quelqu'un d'autre."), { cause: e });
       throw e;
     }
   }
@@ -232,20 +233,20 @@ export async function unlockWith(password: string, blobs: AccountBlobs): Promise
     return { account: c.unlockAccount(master.stretchedKey, unb64(blobs.protected_user_key), unb64(blobs.protected_private_key)), authKey: master.authKey };
   } catch {
     master.authKey.fill(0);
-    throw new Error("Mot de passe maître incorrect.");
+    throw new Error(t("Mot de passe maître incorrect."));
   } finally {
     master.stretchedKey.fill(0);
   }
 }
 
 function requireBlobs(state: SessionState): AccountBlobs {
-  if (!state.blobs) throw new Error("Cette session ne garde pas le compte enveloppé : reconnectez-vous, puis recommencez.");
+  if (!state.blobs) throw new Error(t("Cette session ne garde pas le compte enveloppé : reconnectez-vous, puis recommencez."));
   return state.blobs;
 }
 
 function personalOf(state: SessionState): VaultView {
   const p = state.vaults.find((v) => v.kind === "personal");
-  if (!p) throw new Error("Pas de vault personnel dans cette session.");
+  if (!p) throw new Error(t("Pas de vault personnel dans cette session."));
   return p;
 }
 

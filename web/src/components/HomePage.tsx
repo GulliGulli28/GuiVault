@@ -20,6 +20,7 @@ import { NARROW, useMediaQuery } from "../hooks/useMediaQuery";
 import { copyText, Dropdown, formatAgo } from "./ui";
 import { Guarded, useReprompt } from "./Reprompt";
 import { GettingStarted } from "./GettingStarted";
+import { t, locale, plural } from "../lib/i18n";
 
 /** Un élément tel que l'accueil le montre : son entité (nom, ligne
  * secondaire, épinglé) et de quoi l'ouvrir. */
@@ -33,7 +34,7 @@ const QUICK = 6;
 /** Le prénom affiché : la première partie de l'e-mail, capitalisée. */
 function firstName(email: string): string {
   const part = email.split("@")[0].split(/[.\-_+]/)[0] ?? "";
-  return part ? part.charAt(0).toLocaleUpperCase("fr-FR") + part.slice(1) : "";
+  return part ? part.charAt(0).toLocaleUpperCase(locale()) + part.slice(1) : "";
 }
 
 /** L'accueil (`docs/DESIGN.md`) : l'accès rapide (épinglés, puis les plus
@@ -80,27 +81,27 @@ export function HomePage({ ctx }: { ctx: PageContext }) {
       <div className="m-page">
         <header className="m-head">
           <Logo size={30} />
-          <h1 className="m-title min-w-0 flex-1 truncate text-[22px]">{local ? name : `Bonjour ${name}`}</h1>
+          <h1 className="m-title min-w-0 flex-1 truncate text-[22px]">{local ? name : t("Bonjour {0}", name)}</h1>
           <BubbleButton ctx={ctx} />
-          <button onClick={ctx.lock} className="m-icon border border-[var(--c-border-strong)] bg-[var(--c-surface)]" aria-label="Verrouiller" title="Verrouiller"><IconLock size={18} /></button>
+          <button onClick={ctx.lock} className="m-icon border border-[var(--c-border-strong)] bg-[var(--c-surface)]" aria-label={t("Verrouiller")} title={t("Verrouiller")}><IconLock size={18} /></button>
         </header>
         <div className="m-body">
           <button onClick={ctx.search} className="m-search text-left">
             <IconSearch size={18} />
-            <span className="min-w-0 flex-1 truncate">Rechercher dans {session.vaults.length > 1 ? `${session.vaults.length} coffres` : "le coffre"}</span>
+            <span className="min-w-0 flex-1 truncate">{t("Rechercher dans")} {session.vaults.length > 1 ? `${session.vaults.length} coffres` : t("le coffre")}</span>
           </button>
           <GettingStarted session={session} secrets={loading ? null : entries.length} mobile />
           {supports("myInvitations") && session.invitations.map((inv) => (
             <div key={inv.id} className="m-card flex min-w-0 items-center gap-3 px-3.5 py-3">
               <span className="tile shrink-0 rounded-full" style={{ "--tile-size": "36px", "--tile-h": 25 } as React.CSSProperties}>{personInitials(inv.inviter_email)}</span>
-              <p className="clamp-2 min-w-0 flex-1 text-[14px]"><b className="font-semibold">{inv.inviter_email}</b> vous invite dans un vault partagé</p>
-              <a href={routeHash({ page: "invitations" })} className="m-btn m-btn-primary h-10 px-3.5 text-[14px]">Voir</a>
+              <p className="clamp-2 min-w-0 flex-1 text-[14px]"><b className="font-semibold">{inv.inviter_email}</b> {t("vous invite dans un vault partagé")}</p>
+              <a href={routeHash({ page: "invitations" })} className="m-btn m-btn-primary h-10 px-3.5 text-[14px]">{t("Voir")}</a>
             </div>
           ))}
           <section className="flex flex-col gap-2.5" aria-labelledby="m-quick">
-            <h2 id="m-quick" className="text-[17px] font-semibold">Accès rapide</h2>
+            <h2 id="m-quick" className="text-[17px] font-semibold">{t("Accès rapide")}</h2>
             {quick.length === 0 ? (
-              <div className="m-card px-4 py-8 text-center text-[14px] text-[var(--c-text-muted)]">{loading ? "Lecture des coffres…" : "Rien à montrer pour l'instant."}</div>
+              <div className="m-card px-4 py-8 text-center text-[14px] text-[var(--c-text-muted)]">{loading ? t("Lecture des coffres…") : t("Rien à montrer pour l'instant.")}</div>
             ) : (
               <div className="grid grid-cols-2 gap-2.5">
                 {quick.map((e) => (
@@ -118,8 +119,8 @@ export function HomePage({ ctx }: { ctx: PageContext }) {
           {codes.length > 0 && (
             <section className="m-card px-4 py-1.5" aria-labelledby="m-otp">
               <div className="flex min-h-[48px] items-center gap-2.5">
-                <h2 id="m-otp" className="min-w-0 flex-1 text-[17px] font-semibold">Codes 2FA</h2>
-                <a href={routeHash({ page: "totp" })} className="text-[14px]">Tout voir</a>
+                <h2 id="m-otp" className="min-w-0 flex-1 text-[17px] font-semibold">{t("Codes 2FA")}</h2>
+                <a href={routeHash({ page: "totp" })} className="text-[14px]">{t("Tout voir")}</a>
               </div>
               <div className="m-list">
                 {codes.map((e) => (
@@ -134,8 +135,8 @@ export function HomePage({ ctx }: { ctx: PageContext }) {
           <a href={routeHash({ page: "health" })} className="m-card flex min-w-0 items-center gap-3.5 px-4 py-3.5 text-[var(--c-text)] hover:no-underline">
             <span className="whitespace-nowrap"><span className="text-[26px] font-semibold">{loading ? "…" : health.score}</span><span className="text-[var(--c-text-muted)]"> /100</span></span>
             <span className="flex min-w-0 flex-1 flex-col">
-              <span className="font-medium">Santé</span>
-              <span className={`truncate text-[13px] ${health.issues ? "text-[var(--c-warn-text)]" : "text-[var(--c-text-muted)]"}`}>{health.issues ? `${health.issues} ${health.issues > 1 ? "éléments à corriger" : "élément à corriger"}` : "Rien à corriger"}</span>
+              <span className="font-medium">{t("Santé")}</span>
+              <span className={`truncate text-[13px] ${health.issues ? "text-[var(--c-warn-text)]" : "text-[var(--c-text-muted)]"}`}>{health.issues ? `${health.issues} ${health.issues > 1 ? t("éléments à corriger") : t("élément à corriger")}` : t("Rien à corriger")}</span>
             </span>
             <IconChevronRight size={16} className="shrink-0 text-[var(--c-text-faint)]" />
           </a>
@@ -149,10 +150,10 @@ export function HomePage({ ctx }: { ctx: PageContext }) {
       <div className="mx-auto flex max-w-[1320px] flex-col gap-7 px-10 py-8 max-md:px-4">
         <header className="flex flex-wrap items-end gap-4">
           <div className="min-w-[240px] flex-1">
-            <h1 className="page-title truncate">{local ? name : `Bonjour ${name}`}</h1>
+            <h1 className="page-title truncate">{local ? name : t("Bonjour {0}", name)}</h1>
             <p className="page-sub">
-              {session.vaults.length} {session.vaults.length > 1 ? "coffres" : "coffre"}
-              {!loading && <> · {total} {total > 1 ? "éléments" : "élément"}</>}
+              {plural(session.vaults.length, "{0} coffre", "{0} coffres")}
+              {!loading && <> · {plural(total, "{0} élément", "{0} éléments")}</>}
             </p>
           </div>
           {target && <NewMenu ctx={ctx} defaultVault={target.id} />}
@@ -162,9 +163,9 @@ export function HomePage({ ctx }: { ctx: PageContext }) {
           <div key={inv.id} className="card flex flex-wrap items-center gap-x-3.5 gap-y-2 px-[18px] py-3.5">
             <span className="tile h-8 w-8 rounded-full text-[12px]" style={{ "--tile-h": 25 } as React.CSSProperties}>{personInitials(inv.inviter_email)}</span>
             <p className="min-w-[220px] flex-1 truncate text-[13.5px]">
-              <b className="font-semibold">{inv.inviter_email}</b> vous invite dans un vault partagé comme {ROLE_LABELS[inv.role]}.
+              <b className="font-semibold">{inv.inviter_email}</b> {t("vous invite dans un vault partagé comme")} {ROLE_LABELS[inv.role]}.
             </p>
-            <a href={routeHash({ page: "invitations" })} className="btn btn-secondary">Voir l'invitation</a>
+            <a href={routeHash({ page: "invitations" })} className="btn btn-secondary">{t("Voir l'invitation")}</a>
           </div>
         ))}
 
@@ -174,11 +175,11 @@ export function HomePage({ ctx }: { ctx: PageContext }) {
           <div className="flex min-w-0 flex-[999_1_520px] flex-col gap-6">
             <section aria-labelledby="home-quick">
               <div className="mb-3 flex items-baseline justify-between gap-3">
-                <h2 id="home-quick" className="section-title">Accès rapide</h2>
-                <span className="text-[12.5px] text-[var(--c-text-muted)]">Épinglés, puis les plus récents</span>
+                <h2 id="home-quick" className="section-title">{t("Accès rapide")}</h2>
+                <span className="text-[12.5px] text-[var(--c-text-muted)]">{t("Épinglés, puis les plus récents")}</span>
               </div>
               {quick.length === 0 ? (
-                <div className="card px-5 py-8 text-center text-[13px] text-[var(--c-text-muted)]">{loading ? "Lecture des coffres…" : "Rien à montrer pour l'instant."}</div>
+                <div className="card px-5 py-8 text-center text-[13px] text-[var(--c-text-muted)]">{loading ? t("Lecture des coffres…") : t("Rien à montrer pour l'instant.")}</div>
               ) : (
                 <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-2.5">
                   {quick.map((e) => {
@@ -195,12 +196,12 @@ export function HomePage({ ctx }: { ctx: PageContext }) {
                             onClick={() => void ask(e.item.payload).then(async (go) => {
                               if (!go) return;
                               const ok = await copyText(secret.value);
-                              if (ok) ctx.notify(`${secret.label.charAt(0).toUpperCase()}${secret.label.slice(1)} copié.`);
-                              else ctx.error("Copie refusée par le navigateur.");
+                              if (ok) ctx.notify(t("{0}{1} copié.", secret.label.charAt(0).toUpperCase(), secret.label.slice(1)));
+                              else ctx.error(t("Copie refusée par le navigateur."));
                             })}
                             className="btn btn-ghost btn-icon"
-                            title={`Copier ${secret.label}`}
-                            aria-label={`Copier ${secret.label} de ${e.entity.name}`}
+                            title={t("Copier {0}", secret.label)}
+                            aria-label={t("Copier {0} de {1}", secret.label, e.entity.name)}
                           >
                             <IconCopy size={15} />
                           </button>
@@ -214,7 +215,7 @@ export function HomePage({ ctx }: { ctx: PageContext }) {
 
             {recent.length > 0 && (
               <section aria-labelledby="home-recent" className="card px-5 py-4">
-                <h2 id="home-recent" className="section-title mb-1.5">Modifiés récemment</h2>
+                <h2 id="home-recent" className="section-title mb-1.5">{t("Modifiés récemment")}</h2>
                 <div className="divide-y divide-[var(--c-border)]">
                   {recent.slice(0, 5).map((e) => (
                     <button key={`${e.vault.id}-${e.item.id}`} onClick={() => open(e)} className="flex w-full min-w-0 items-center gap-3 py-2.5 text-left">
@@ -236,8 +237,8 @@ export function HomePage({ ctx }: { ctx: PageContext }) {
             {codes.length > 0 && (
               <section aria-labelledby="home-otp" className="card px-5 py-4">
                 <div className="mb-1.5 flex items-baseline justify-between gap-3">
-                  <h2 id="home-otp" className="section-title">Codes 2FA</h2>
-                  <a href={routeHash({ page: "totp" })} className="text-[12.5px]">Tout voir</a>
+                  <h2 id="home-otp" className="section-title">{t("Codes 2FA")}</h2>
+                  <a href={routeHash({ page: "totp" })} className="text-[12.5px]">{t("Tout voir")}</a>
                 </div>
                 <div className="divide-y divide-[var(--c-border)]">
                   {codes.map((e) => (
@@ -252,29 +253,29 @@ export function HomePage({ ctx }: { ctx: PageContext }) {
 
             <section aria-labelledby="home-health" className="card flex flex-col gap-3 px-5 py-4">
               <div className="flex items-baseline justify-between gap-3">
-                <h2 id="home-health" className="section-title">Santé</h2>
+                <h2 id="home-health" className="section-title">{t("Santé")}</h2>
                 <span className="whitespace-nowrap"><span className="text-[24px] font-semibold tracking-[-0.02em]">{loading ? "…" : health.score}</span><span className="text-[var(--c-text-muted)]"> / 100</span></span>
               </div>
               <HealthBar total={health.total} weak={health.weak} reused={health.reused} />
               {health.issues > 0 ? (
                 <a href={routeHash({ page: "health" })} className="callout callout-warn flex items-center justify-between gap-2 font-medium hover:no-underline">
-                  <span className="truncate">{health.issues} {health.issues > 1 ? "éléments à corriger" : "élément à corriger"}</span>
+                  <span className="truncate">{health.issues} {health.issues > 1 ? t("éléments à corriger") : t("élément à corriger")}</span>
                   <IconChevronRight size={14} />
                 </a>
               ) : (
-                <p className="text-[13px] text-[var(--c-text-muted)]">{loading ? "Analyse…" : "Rien à corriger."}</p>
+                <p className="text-[13px] text-[var(--c-text-muted)]">{loading ? t("Analyse…") : t("Rien à corriger.")}</p>
               )}
             </section>
 
             <section aria-labelledby="home-vaults" className="card px-5 py-4">
-              <h2 id="home-vaults" className="section-title mb-1.5">Coffres</h2>
+              <h2 id="home-vaults" className="section-title mb-1.5">{t("Coffres")}</h2>
               <div className="divide-y divide-[var(--c-border)]">
                 {session.vaults.map((v) => (
                   <a key={v.id} href={routeHash({ page: "vault", id: v.id })} className="flex min-w-0 items-center gap-2.5 py-2.5 text-[var(--c-text)] hover:no-underline">
                     <span className="vdot h-2.5 w-2.5" style={{ background: vaultColor(v.id, v.kind === "personal", colors) }} />
                     <span className="min-w-0 flex-1 truncate font-medium">{v.name}</span>
                     <span className="shrink-0 whitespace-nowrap text-[12.5px] text-[var(--c-text-muted)]">
-                      {counts[v.id] !== undefined ? `${counts[v.id]} · ` : ""}{v.kind === "personal" ? "personnel" : ROLE_LABELS[v.role]}
+                      {counts[v.id] !== undefined ? `${counts[v.id]} · ` : ""}{v.kind === "personal" ? t("personnel") : ROLE_LABELS[v.role]}
                     </span>
                   </a>
                 ))}
@@ -292,7 +293,7 @@ export function HealthBar({ total, weak, reused }: { total: number; weak: number
   const ok = Math.max(0, total - weak - reused);
   if (total === 0) return <div className="h-2 rounded bg-[var(--c-bg3)]" />;
   return (
-    <div className="flex h-2 gap-[3px]" role="img" aria-label={`${ok} sains, ${weak} faibles, ${reused} réutilisés`}>
+    <div className="flex h-2 gap-[3px]" role="img" aria-label={t("{0} sains, {1} faibles, {2} réutilisés", ok, weak, reused)}>
       {ok > 0 && <span className="rounded-l rounded-r-none bg-[var(--c-ok)] first:rounded-l last:rounded-r" style={{ flex: ok }} />}
       {weak > 0 && <span className="bg-[var(--c-warn)] first:rounded-l last:rounded-r" style={{ flex: weak }} />}
       {reused > 0 && <span className="bg-[var(--c-danger)] first:rounded-l last:rounded-r" style={{ flex: reused }} />}
@@ -311,11 +312,11 @@ function NewMenu({ ctx, defaultVault }: { ctx: PageContext; defaultVault: string
   return (
     <>
       <Dropdown
-        label="Nouvel élément"
+        label={t("Nouvel élément")}
         className="w-64"
         trigger={({ open, toggle }) => (
           <button onClick={toggle} aria-expanded={open} aria-haspopup="menu" className="btn btn-primary btn-lg">
-            <IconPlus size={15} /> Nouvel élément <IconChevronDown size={13} />
+            <IconPlus size={15} /> {t("Nouvel élément")} <IconChevronDown size={13} />
           </button>
         )}
       >
@@ -323,7 +324,7 @@ function NewMenu({ ctx, defaultVault }: { ctx: PageContext; defaultVault: string
           <>
             {writable.length > 1 && (
               <>
-                <p className="px-3.5 pb-1 pt-1.5 text-[12px] font-medium text-[var(--c-text-muted)]">Dans</p>
+                <p className="px-3.5 pb-1 pt-1.5 text-[12px] font-medium text-[var(--c-text-muted)]">{t("Dans")}</p>
                 {writable.map((v) => (
                   <button key={v.id} role="menuitemradio" aria-checked={v.id === vaultId} data-active={v.id === vaultId ? "true" : undefined} onClick={() => setVaultId(v.id)} className="menu-item">
                     <span className="vdot" style={{ background: vaultColor(v.id, v.kind === "personal", colors) }} />
@@ -339,13 +340,13 @@ function NewMenu({ ctx, defaultVault }: { ctx: PageContext; defaultVault: string
               const Icon = KIND_ICONS[k];
               return (
                 <button key={k} role="menuitem" onClick={() => { close(); navigate({ page: "vault", id: vaultId, create: k }); }} className="menu-item">
-                  <Icon size={14} /> {k === "group" ? "Dossier" : KIND_LABELS[k].charAt(0).toUpperCase() + KIND_LABELS[k].slice(1)}
+                  <Icon size={14} /> {k === "group" ? t("Dossier") : KIND_LABELS[k].charAt(0).toUpperCase() + KIND_LABELS[k].slice(1)}
                 </button>
               );
             })}
             <div className="menu-sep" />
             <button role="menuitem" onClick={() => { close(); setCreating(true); }} className="menu-item">
-              <IconVault size={14} /> {ctx.session.local ? "Nouveau vault" : "Nouveau vault partagé"}
+              <IconVault size={14} /> {ctx.session.local ? t("Nouveau vault") : t("Nouveau vault partagé")}
             </button>
           </>
         )}

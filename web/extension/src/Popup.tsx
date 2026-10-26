@@ -35,6 +35,7 @@ import { copyText, formatAgo, InfoTip, PasswordInput, SettingRow } from "../../s
 import { clearLockReason, lock, lockReason, loadItemsCache, loadPopupState, loadSession, loadSettings, parseOtpPatterns, POPUP_STATE_TTL_MS, saveItemsCache, savePopupState, saveSession, saveSettings, saveTokens, touchLock, type ItemsCache, type LockReason, type PopupView, type Settings } from "./store";
 import { deleteItem, saveLogin, savePayload } from "./vaultops";
 import type { FillTabReply, PopupToBackground } from "./messages";
+import { t, translated } from "../../src/lib/i18n";
 
 /** Les entrées du menu « Nouveau » : les secrets d'abord, puis les entités
  * Guiterm — le même menu que l'interface web. */
@@ -288,7 +289,7 @@ export function Popup() {
         const { search } = describeSecret(p);
         const entity = entities.get(it.id)!;
         const sub = entity.subtitle ?? (p.kind === "key" ? p.key.path : "");
-        const base: Entry = { vaultId: v.id, vaultName: v.name, item: it, payload: p, name: payloadName(p) || "(sans nom)", subtitle: sub, search: `${search} ${sub}`, entity, customIcons };
+        const base: Entry = { vaultId: v.id, vaultName: v.name, item: it, payload: p, name: payloadName(p) || t("(sans nom)"), subtitle: sub, search: `${search} ${sub}`, entity, customIcons };
         const entry: Entry = p.kind === "login" ? ({ ...base, login: p.login } as LoginEntry) : base;
         out.push(entry);
       }
@@ -322,17 +323,17 @@ export function Popup() {
     if (!(await ask({ kind: "login", login: e.login }))) return;
     try {
       const r = await chrome.runtime.sendMessage<PopupToBackground, FillTabReply>({ type: "guivault-fill-tab", tabId, loginId: e.login.id, what, frameId });
-      if (!r) return say("Pas de réponse de la page.");
+      if (!r) return say(t("Pas de réponse de la page."));
       if (!r.ok) {
         if (r.reason === "confirm") return setFrameConfirm({ entry: e, what, frameId: r.frameId, host: r.frameHost });
-        return say(r.reason === "locked" ? "GuiVault est verrouillé." : r.reason === "no-page" ? "Impossible de remplir sur cette page." : r.reason === "not-found" ? "Identifiant introuvable." : what === "totp" ? "Aucun champ de code trouvé." : "Aucun champ de connexion trouvé sur cette page.");
+        return say(r.reason === "locked" ? t("GuiVault est verrouillé.") : r.reason === "no-page" ? t("Impossible de remplir sur cette page.") : r.reason === "not-found" ? t("Identifiant introuvable.") : what === "totp" ? t("Aucun champ de code trouvé.") : t("Aucun champ de connexion trouvé sur cette page."));
       }
       const f = r.filled;
-      if (what === "totp") say(f.totp ? "Code rempli." : "Aucun champ de code trouvé.");
-      else say(f.password ? (f.username ? "Rempli." : "Mot de passe rempli (utilisateur non trouvé).") : f.username ? "Utilisateur rempli (pas de champ mot de passe)." : "Aucun champ de connexion trouvé sur cette page.");
+      if (what === "totp") say(f.totp ? t("Code rempli.") : t("Aucun champ de code trouvé."));
+      else say(f.password ? (f.username ? t("Rempli.") : t("Mot de passe rempli (utilisateur non trouvé).")) : f.username ? t("Utilisateur rempli (pas de champ mot de passe).") : t("Aucun champ de connexion trouvé sur cette page."));
       if (f.password || f.username || f.totp) window.close();
     } catch (err) {
-      say(`Impossible sur cette page : ${errorMessage(err)}`);
+      say(t("Impossible sur cette page : {0}", errorMessage(err)));
     }
   };
 
@@ -378,7 +379,7 @@ export function Popup() {
     },
   });
 
-  if (!settings || screen.kind === "loading") return <div className="p-4 text-[12px] text-[var(--c-text-muted)]">Chargement…</div>;
+  if (!settings || screen.kind === "loading") return <div className="p-4 text-[12px] text-[var(--c-text-muted)]">{t("Chargement…")}</div>;
 
   /** Prendre acte d'un écart au manifeste, puis relire le vault. */
   const acceptProblems = async (vault: VaultView) => {
@@ -403,21 +404,21 @@ export function Popup() {
         {/* Le logo grise quand le coffre est verrouillé — comme l'icône de
             l'extension dans la barre du navigateur. */}
         <Logo size={24} locked={screen.kind !== "vault"} />
-        <span className="min-w-0 flex-1 truncate text-[14px] font-semibold">GuiVault</span>
+        <span className="min-w-0 flex-1 truncate text-[14px] font-semibold">{t("GuiVault")}</span>
         {screen.kind === "vault" ? (
           <span className="flex items-center">
-            <button onClick={() => void sync(screen.state, cache)} className="btn btn-ghost btn-icon" title="Rafraîchir" aria-label="Rafraîchir"><IconRefresh size={15} className={refreshing ? "animate-spin" : ""} /></button>
-            {!screen.state.local && <a href={settings.serverUrl} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-icon" title="Ouvrir le coffre (interface web)" aria-label="Ouvrir le coffre"><IconExternal size={15} /></a>}
-            <button onClick={() => go(view.kind === "settings" ? { kind: "list" } : { kind: "settings" })} className={`btn btn-icon ${view.kind === "settings" ? "btn-toggled" : "btn-ghost"}`} title="Réglages" aria-label="Réglages" aria-pressed={view.kind === "settings"}><IconSettings size={15} /></button>
-            <button onClick={() => void doLock()} className="btn btn-ghost btn-icon" title="Verrouiller" aria-label="Verrouiller"><IconLock size={15} /></button>
+            <button onClick={() => void sync(screen.state, cache)} className="btn btn-ghost btn-icon" title={t("Rafraîchir")} aria-label={t("Rafraîchir")}><IconRefresh size={15} className={refreshing ? "animate-spin" : ""} /></button>
+            {!screen.state.local && <a href={settings.serverUrl} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-icon" title={t("Ouvrir le coffre (interface web)")} aria-label={t("Ouvrir le coffre")}><IconExternal size={15} /></a>}
+            <button onClick={() => go(view.kind === "settings" ? { kind: "list" } : { kind: "settings" })} className={`btn btn-icon ${view.kind === "settings" ? "btn-toggled" : "btn-ghost"}`} title={t("Réglages")} aria-label={t("Réglages")} aria-pressed={view.kind === "settings"}><IconSettings size={15} /></button>
+            <button onClick={() => void doLock()} className="btn btn-ghost btn-icon" title={t("Verrouiller")} aria-label={t("Verrouiller")}><IconLock size={15} /></button>
           </span>
-        ) : screen.kind === "login" && <span className="tag">Verrouillé</span>}
+        ) : screen.kind === "login" && <span className="tag">{t("Verrouillé")}</span>}
       </header>
       {screen.kind === "vault" && screen.state.offline && (
         <div role="status" className="shrink-0 px-3.5 pt-2.5">
           <div className="callout callout-warn flex items-center gap-2 py-2">
-            <span className="min-w-0 flex-1 truncate">Hors ligne · copie du {new Date(screen.state.offline.savedAt).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}</span>
-            <button onClick={() => void doLock()} className="btn btn-secondary btn-sm shrink-0">Se reconnecter</button>
+            <span className="min-w-0 flex-1 truncate">{t("Hors ligne · copie du")} {new Date(screen.state.offline.savedAt).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}</span>
+            <button onClick={() => void doLock()} className="btn btn-secondary btn-sm shrink-0">{t("Se reconnecter")}</button>
           </div>
         </div>
       )}
@@ -464,7 +465,7 @@ export function Popup() {
                 throw e;
               }
               await reloadCache();
-              say(`« ${payloadName(p)} » enregistré.`);
+              say(t("« {0} » enregistré.", payloadName(p)));
               go({ kind: "detail", id: payloadEntity(p).id });
             }}
             onCancel={() => go({ kind: "detail", id: current.item.id })}
@@ -473,8 +474,8 @@ export function Popup() {
       ) : view.kind === "new" ? (
         <div className="flex min-h-0 flex-1 flex-col">
           <label className="flex shrink-0 items-center gap-2 border-b border-[var(--c-border)] px-3 py-1.5 text-[12px] text-[var(--c-text-secondary)]">
-            {KIND_LABELS_PLURAL[view.itemKind].replace(/s$/, "")} dans
-            <select value={view.vaultId} onChange={(e) => { setView({ ...view, vaultId: e.target.value }); setSeed(draft); }} className="input h-6 w-auto text-[12px]" aria-label="Vault">
+            {KIND_LABELS_PLURAL[view.itemKind].replace(/s$/, "")} {t("dans")}
+            <select value={view.vaultId} onChange={(e) => { setView({ ...view, vaultId: e.target.value }); setSeed(draft); }} className="input h-6 w-auto text-[12px]" aria-label={t("Vault")}>
               {screen.state.vaults.filter((v) => v.role !== "reader").map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
             </select>
           </label>
@@ -488,7 +489,7 @@ export function Popup() {
               if (p.kind === "login" && canFill && p.login.uris.length === 0) p.login.uris = [{ uri: new URL(pageUrl!).origin, match: null }];
               await savePayload(view.vaultId, p);
               await reloadCache();
-              say(`« ${payloadName(p)} » enregistré.`);
+              say(t("« {0} » enregistré.", payloadName(p)));
               go({ kind: "detail", id: payloadEntity(p).id });
             }}
             onCancel={() => go({ kind: "list" })}
@@ -509,7 +510,7 @@ export function Popup() {
             try {
               await deleteItem(current.vaultId, current.item.id);
               await reloadCache();
-              say(`« ${current.name} » supprimé.`);
+              say(t("« {0} » supprimé.", current.name));
               go({ kind: "list" });
             } catch (e) {
               say(errorMessage(e));
@@ -520,10 +521,10 @@ export function Popup() {
       ) : (
         <>
           <div className="shrink-0 px-3.5 pt-2.5">
-            <div className="segmented flex w-full" role="tablist" aria-label="Vue">
-              {(["vaults", "totp", "generator"] as Tab[]).map((t) => (
-                <button key={t} role="tab" aria-selected={tab === t} data-active={tab === t} onClick={() => setTab(t)} className="flex-1">
-                  {t === "vaults" ? "Coffres" : t === "totp" ? "Codes" : "Générateur"}
+            <div className="segmented flex w-full" role="tablist" aria-label={t("Vue")}>
+              {(["vaults", "totp", "generator"] as Tab[]).map((name) => (
+                <button key={name} role="tab" aria-selected={tab === name} data-active={tab === name} onClick={() => setTab(name)} className="flex-1">
+                  {name === "vaults" ? t("Coffres") : name === "totp" ? t("Codes") : t("Générateur")}
                 </button>
               ))}
             </div>
@@ -534,7 +535,7 @@ export function Popup() {
               <section data-section="page-codes" className="mb-3.5 flex flex-col gap-1.5">
                 <div className="flex min-w-0 items-center gap-1.5 px-0.5 text-[12px] font-medium text-[var(--c-text-muted)]">
                   <IconGlobe size={13} />
-                  <span className="min-w-0 flex-1 truncate">Sur {pageHost}</span>
+                  <span className="min-w-0 flex-1 truncate">{t("Sur")} {pageHost}</span>
                 </div>
                 <div className="card divide-y divide-[var(--c-border)]">
                   {forPage.filter((e) => e.login.totp).map((e) => (
@@ -544,7 +545,7 @@ export function Popup() {
                         <span className="truncate text-[13.5px] font-medium">{e.name}</span>
                         <TotpCode secret={e.login.totp!} />
                       </div>
-                      <button onClick={() => void fill(e, "totp")} className="btn btn-primary" title="Remplir le code dans la page">Remplir</button>
+                      <button onClick={() => void fill(e, "totp")} className="btn btn-primary" title={t("Remplir le code dans la page")}>{t("Remplir")}</button>
                     </div>
                   ))}
                 </div>
@@ -558,7 +559,7 @@ export function Popup() {
                   try {
                     await saveLogin(e.vaultId, { ...e.login, totp: null }, e.revision);
                     await reloadCache();
-                    say(`Code de « ${e.login.name} » retiré.`);
+                    say(t("Code de « {0} » retiré.", e.login.name));
                   } catch (err) {
                     say(errorMessage(err));
                   }
@@ -571,7 +572,7 @@ export function Popup() {
                   <section data-section="page" className="flex flex-col gap-1.5">
                     <div className="flex min-w-0 items-center gap-1.5 px-0.5 text-[12px] font-medium text-[var(--c-text-muted)]">
                       <IconGlobe size={13} />
-                      <span className="min-w-0 flex-1 truncate">Sur {pageHost}</span>
+                      <span className="min-w-0 flex-1 truncate">{t("Sur")} {pageHost}</span>
                       <span>{forPage.length}</span>
                     </div>
                     <div className="card divide-y divide-[var(--c-border)]">
@@ -581,13 +582,13 @@ export function Popup() {
                 )}
                 <label className="flex h-9 min-w-0 items-center gap-2 rounded-[9px] border border-[var(--c-border)] bg-[var(--c-surface)] px-2.5 text-[var(--c-text-muted)] focus-within:border-[var(--c-accent)]">
                   <IconSearch size={14} />
-                  <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={`Rechercher dans ${screen.state.vaults.length > 1 ? `${screen.state.vaults.length} coffres` : "le coffre"}`} aria-label="Rechercher" className="min-w-0 flex-1 bg-transparent text-[13.5px] text-[var(--c-text)] outline-none placeholder:text-[var(--c-text-muted)] focus-visible:outline-none" />
+                  <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t("Rechercher dans {0}", screen.state.vaults.length > 1 ? `${screen.state.vaults.length} coffres` : t("le coffre"))} aria-label={t("Rechercher")} className="min-w-0 flex-1 bg-transparent text-[13.5px] text-[var(--c-text)] outline-none placeholder:text-[var(--c-text-muted)] focus-visible:outline-none" />
                 </label>
                 {entries.some((e) => e.payload.kind !== "login") && (
-                  <div className="-mx-3.5 flex gap-1.5 overflow-x-auto px-3.5 [scrollbar-width:none]" role="tablist" aria-label="Type d'élément">
+                  <div className="-mx-3.5 flex gap-1.5 overflow-x-auto px-3.5 [scrollbar-width:none]" role="tablist" aria-label={t("Type d'élément")}>
                     {FILTERS.filter((f) => f === "all" || (counts[f] ?? 0) > 0).map((f) => (
                       <button key={f} role="tab" aria-selected={filter === f} onClick={() => setFilter(f)} className={`inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full border px-3 text-[12.5px] ${filter === f ? "border-[var(--c-text)] bg-[var(--c-text)] text-[var(--c-bg2)]" : "border-[var(--c-border)] text-[var(--c-text-secondary)] hover:border-[var(--c-border-strong)]"}`}>
-                        {f === "all" ? "Tout" : capitalize(KIND_LABELS_PLURAL[f])}<span className="opacity-60">{counts[f]}</span>
+                        {f === "all" ? t("Tout") : capitalize(KIND_LABELS_PLURAL[f])}<span className="opacity-60">{counts[f]}</span>
                       </button>
                     ))}
                   </div>
@@ -619,15 +620,15 @@ export function Popup() {
                     </Section>
                   );
                 })}
-                {entries.length === 0 && <p className="px-2 py-8 text-center text-[13px] text-[var(--c-text-muted)]">Rien pour l'instant.</p>}
+                {entries.length === 0 && <p className="px-2 py-8 text-center text-[13px] text-[var(--c-text-muted)]">{t("Rien pour l'instant.")}</p>}
               </div>
             )}
           </div>
           <footer className="flex min-h-[40px] shrink-0 items-center gap-2 border-t border-[var(--c-border)] pl-3.5 pr-2 text-[12px] text-[var(--c-text-muted)]">
-            <span className="min-w-0 flex-1 truncate">{canFill ? <>Remplir depuis la page : <span className="kbd">Ctrl Maj L</span></> : "Cet onglet n'est pas une page web."}</span>
+            <span className="min-w-0 flex-1 truncate">{canFill ? <>{t("Remplir depuis la page :")} <span className="kbd">{t("Ctrl Maj L")}</span></> : t("Cet onglet n'est pas une page web.")}</span>
             {screen.state.vaults.some((v) => v.role !== "reader") && (
               <div className="relative">
-                <button onClick={() => setNewMenu((m) => !m)} className="btn btn-ghost btn-sm text-[var(--c-accent-text)]" aria-haspopup="menu" aria-expanded={newMenu}><IconPlus size={13} /> Nouveau</button>
+                <button onClick={() => setNewMenu((m) => !m)} className="btn btn-ghost btn-sm text-[var(--c-accent-text)]" aria-haspopup="menu" aria-expanded={newMenu}><IconPlus size={13} /> {t("Nouveau")}</button>
                 {newMenu && (
                   <>
                     <div className="fixed inset-0 z-10" onClick={() => setNewMenu(false)} />
@@ -650,11 +651,11 @@ export function Popup() {
         </>
       )}
       {frameConfirm && (
-        <div role="alertdialog" aria-label="Remplir dans un cadre" className="callout callout-warn absolute inset-x-3 bottom-12 z-30 space-y-2.5 shadow-[var(--shadow-md)]">
-          <p><b className="font-semibold">Remplir dans {frameConfirm.host} ?</b> Ce cadre ne correspond pas à « {frameConfirm.entry.login.name} » : seulement si c'est bien la connexion du site, pas une publicité.</p>
+        <div role="alertdialog" aria-label={t("Remplir dans un cadre")} className="callout callout-warn absolute inset-x-3 bottom-12 z-30 space-y-2.5 shadow-[var(--shadow-md)]">
+          <p><b className="font-semibold">{t("Remplir dans")} {frameConfirm.host} ?</b> {t("Ce cadre ne correspond pas à «")} {frameConfirm.entry.login.name} {t("» : seulement si c'est bien la connexion du site, pas une publicité.")}</p>
           <div className="flex justify-end gap-2">
-            <button onClick={() => setFrameConfirm(null)} className="btn btn-ghost">Annuler</button>
-            <button onClick={() => { const c = frameConfirm; setFrameConfirm(null); void fill(c.entry, c.what, c.frameId); }} className="btn btn-primary">Remplir quand même</button>
+            <button onClick={() => setFrameConfirm(null)} className="btn btn-ghost">{t("Annuler")}</button>
+            <button onClick={() => { const c = frameConfirm; setFrameConfirm(null); void fill(c.entry, c.what, c.frameId); }} className="btn btn-primary">{t("Remplir quand même")}</button>
           </div>
         </div>
       )}
@@ -662,7 +663,7 @@ export function Popup() {
         <div role="status" className="popover absolute inset-x-3 bottom-12 z-20 flex items-center gap-2.5 px-3 py-2.5 text-[13px]">
           <IconCheck size={15} className="shrink-0 text-[var(--c-ok)]" />
           <span className="min-w-0 flex-1 truncate">{notice}</span>
-          {/copié/.test(notice) && <span className="shrink-0 text-[12px] text-[var(--c-text-muted)]">vidé après le délai</span>}
+          {/copié/.test(notice) && <span className="shrink-0 text-[12px] text-[var(--c-text-muted)]">{t("vidé après le délai")}</span>}
         </div>
       )}
       {merging.dialog}
@@ -692,17 +693,17 @@ function SiteRow({ entry, onFill, onOpen, say }: { entry: LoginEntry; onFill: (e
   const ask = useReprompt();
   const copy = async () => {
     if (!(await ask(entry.payload))) return;
-    say((await copyText(entry.login.password)) ? "Mot de passe copié." : "Copie refusée par le navigateur.");
+    say((await copyText(entry.login.password)) ? t("Mot de passe copié.") : t("Copie refusée par le navigateur."));
   };
   return (
     <div className="flex min-w-0 items-center gap-2.5 py-2.5 pl-3 pr-2.5">
       <ItemTile entity={entry.entity} customIcons={entry.customIcons} size={32} />
-      <button onClick={onOpen} className="flex min-w-0 flex-1 flex-col text-left" title={`Ouvrir « ${entry.name} »`}>
+      <button onClick={onOpen} className="flex min-w-0 flex-1 flex-col text-left" title={t("Ouvrir « {0} »", entry.name)}>
         <span className="truncate text-[13.5px] font-medium">{entry.name}</span>
         <span className="truncate text-[12.5px] text-[var(--c-text-muted)]">{entry.login.username || entry.subtitle || "—"}</span>
       </button>
-      {entry.login.password && <button onClick={() => void copy()} className="btn btn-ghost btn-icon" title="Copier le mot de passe" aria-label="Copier le mot de passe"><IconCopy size={15} /></button>}
-      <button onClick={() => void onFill(entry, "credentials")} className="btn btn-primary" title="Remplir la page">Remplir</button>
+      {entry.login.password && <button onClick={() => void copy()} className="btn btn-ghost btn-icon" title={t("Copier le mot de passe")} aria-label={t("Copier le mot de passe")}><IconCopy size={15} /></button>}
+      <button onClick={() => void onFill(entry, "credentials")} className="btn btn-primary" title={t("Remplir la page")}>{t("Remplir")}</button>
     </div>
   );
 }
@@ -713,13 +714,13 @@ function LoginActions({ entry, canFill, onFill, say }: { entry: LoginEntry; canF
   const ask = useReprompt();
   const copy = (label: string, v: string, guarded = false) => async () => {
     if (guarded && !(await ask(entry.payload))) return;
-    say((await copyText(v)) ? `${label} copié.` : "Copie refusée par le navigateur.");
+    say((await copyText(v)) ? t("{0} copié.", label) : t("Copie refusée par le navigateur."));
   };
   return (
     <>
-      {entry.login.username && <button onClick={copy("Utilisateur", entry.login.username)} className="btn btn-ghost btn-sm btn-icon" title="Copier l'utilisateur" aria-label="Copier l'utilisateur"><IconIdentity size={13} /></button>}
-      {entry.login.password && <button onClick={copy("Mot de passe", entry.login.password, true)} className="btn btn-ghost btn-sm btn-icon" title="Copier le mot de passe" aria-label="Copier le mot de passe"><IconCopy size={13} /></button>}
-      {canFill && <button onClick={() => void onFill(entry, "credentials")} className="btn btn-secondary btn-sm" title="Remplir la page">Remplir</button>}
+      {entry.login.username && <button onClick={copy(t("Utilisateur"), entry.login.username)} className="btn btn-ghost btn-sm btn-icon" title={t("Copier l'utilisateur")} aria-label={t("Copier l'utilisateur")}><IconIdentity size={13} /></button>}
+      {entry.login.password && <button onClick={copy(t("Mot de passe"), entry.login.password, true)} className="btn btn-ghost btn-sm btn-icon" title={t("Copier le mot de passe")} aria-label={t("Copier le mot de passe")}><IconCopy size={13} /></button>}
+      {canFill && <button onClick={() => void onFill(entry, "credentials")} className="btn btn-secondary btn-sm" title={t("Remplir la page")}>{t("Remplir")}</button>}
     </>
   );
 }
@@ -733,16 +734,16 @@ function Detail({ entry, vault, offline, index, canFill, writable, onBack, onFil
   const locked = needsReprompt(entry.payload);
   const copy = (label: string, v: string) => async () => {
     if (!(await ask(entry.payload))) return;
-    say((await copyText(v)) ? `${label} copié.` : "Copie refusée par le navigateur.");
+    say((await copyText(v)) ? t("{0} copié.", label) : t("Copie refusée par le navigateur."));
   };
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex min-h-[48px] shrink-0 items-center gap-1 border-b border-[var(--c-border)] px-1.5">
-        <button onClick={onBack} className="btn btn-ghost btn-icon" title="Retour" aria-label="Retour"><IconChevronRight size={15} className="rotate-180" /></button>
+        <button onClick={onBack} className="btn btn-ghost btn-icon" title={t("Retour")} aria-label={t("Retour")}><IconChevronRight size={15} className="rotate-180" /></button>
         <span className="min-w-0 flex-1 truncate text-[12.5px] text-[var(--c-text-muted)]">{entry.vaultName}{entry.entity.path ? ` · ${entry.entity.path}` : ""}</span>
         {/* Un vault en lecture (ou la copie hors ligne) ne se modifie pas d'ici. */}
-        {writable && <button onClick={() => void ask(entry.payload).then((ok) => { if (ok) onEdit(); })} className="btn btn-ghost btn-icon" title="Modifier" aria-label="Modifier"><IconEdit size={15} /></button>}
-        {writable && <button onClick={() => setConfirm(true)} className="btn btn-ghost btn-icon hover:text-[var(--c-danger)]" title="Supprimer" aria-label="Supprimer"><IconTrash size={15} /></button>}
+        {writable && <button onClick={() => void ask(entry.payload).then((ok) => { if (ok) onEdit(); })} className="btn btn-ghost btn-icon" title={t("Modifier")} aria-label={t("Modifier")}><IconEdit size={15} /></button>}
+        {writable && <button onClick={() => setConfirm(true)} className="btn btn-ghost btn-icon hover:text-[var(--c-danger)]" title={t("Supprimer")} aria-label={t("Supprimer")}><IconTrash size={15} /></button>}
       </div>
       <div className="sidebar-scroll min-h-0 flex-1 overflow-y-auto px-3.5 pb-5 pt-4">
         <div className="flex flex-col gap-4">
@@ -758,17 +759,17 @@ function Detail({ entry, vault, offline, index, canFill, writable, onBack, onFil
           {login && (canFill || login.login.password) && (
             <div className="flex flex-col gap-2">
               <div className="flex gap-2">
-                {canFill && <button onClick={() => void onFill(login, "credentials")} className="btn btn-primary btn-lg min-w-0 flex-1">Remplir la page<span className="kbd">Ctrl Maj L</span></button>}
-                {login.login.password && <button onClick={copy("Mot de passe", login.login.password)} className={`btn btn-secondary btn-lg ${canFill ? "" : "flex-1"}`}><IconCopy size={15} /> Mot de passe</button>}
+                {canFill && <button onClick={() => void onFill(login, "credentials")} className="btn btn-primary btn-lg min-w-0 flex-1">{t("Remplir la page")}<span className="kbd">{t("Ctrl Maj L")}</span></button>}
+                {login.login.password && <button onClick={copy(t("Mot de passe"), login.login.password)} className={`btn btn-secondary btn-lg ${canFill ? "" : "flex-1"}`}><IconCopy size={15} /> {t("Mot de passe")}</button>}
               </div>
-              {canFill && login.login.totp && <button onClick={() => void onFill(login, "totp")} className="btn btn-secondary w-full">Remplir le code 2FA</button>}
+              {canFill && login.login.totp && <button onClick={() => void onFill(login, "totp")} className="btn btn-secondary w-full">{t("Remplir le code 2FA")}</button>}
             </div>
           )}
           {locked ? (
             <div className="card flex items-center gap-3 px-3.5 py-3">
               <IconLock size={16} className="shrink-0 text-[var(--c-text-muted)]" />
-              <span className="min-w-0 flex-1 text-[13px]">Protégé par le mot de passe maître</span>
-              <button onClick={() => void ask(entry.payload).then((ok) => { if (ok) setUnlocks((n) => n + 1); })} className="btn btn-primary">Afficher</button>
+              <span className="min-w-0 flex-1 text-[13px]">{t("Protégé par le mot de passe maître")}</span>
+              <button onClick={() => void ask(entry.payload).then((ok) => { if (ok) setUnlocks((n) => n + 1); })} className="btn btn-primary">{t("Afficher")}</button>
             </div>
           ) : (
             <>
@@ -783,14 +784,14 @@ function Detail({ entry, vault, offline, index, canFill, writable, onBack, onFil
         </div>
       </div>
       <footer className="flex min-h-[36px] shrink-0 items-center border-t border-[var(--c-border)] px-3.5 text-[12px] text-[var(--c-text-muted)]">
-        <span className="truncate" title={entry.item.updatedAt}>Modifié {formatAgo(entry.item.updatedAt)}</span>
+        <span className="truncate" title={entry.item.updatedAt}>{t("Modifié")} {formatAgo(entry.item.updatedAt)}</span>
       </footer>
       {confirm && (
         <div className="popover absolute inset-x-3 bottom-12 z-30 p-3.5">
-          <p className="mb-3 text-[13px]">Supprimer « <span className="font-medium">{entry.name}</span> » ? Il reste dans la corbeille du vault.</p>
+          <p className="mb-3 text-[13px]">{t("Supprimer «")} <span className="font-medium">{entry.name}</span> {t("» ? Il reste dans la corbeille du vault.")}</p>
           <div className="flex justify-end gap-2">
-            <button onClick={() => setConfirm(false)} className="btn btn-ghost">Annuler</button>
-            <button onClick={() => void onDelete()} className="btn btn-danger">Supprimer</button>
+            <button onClick={() => setConfirm(false)} className="btn btn-ghost">{t("Annuler")}</button>
+            <button onClick={() => void onDelete()} className="btn btn-danger">{t("Supprimer")}</button>
           </div>
         </div>
       )}
@@ -808,26 +809,26 @@ function SettingsView({ settings, state, say, onSettings, onBack }: { settings: 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex min-h-[48px] shrink-0 items-center gap-1 border-b border-[var(--c-border)] px-1.5">
-        <button onClick={onBack} className="btn btn-ghost btn-icon" title="Retour" aria-label="Retour"><IconChevronRight size={15} className="rotate-180" /></button>
-        <span className="min-w-0 flex-1 truncate text-[14px] font-semibold">Réglages</span>
+        <button onClick={onBack} className="btn btn-ghost btn-icon" title={t("Retour")} aria-label={t("Retour")}><IconChevronRight size={15} className="rotate-180" /></button>
+        <span className="min-w-0 flex-1 truncate text-[14px] font-semibold">{t("Réglages")}</span>
       </div>
       <div className="sidebar-scroll min-h-0 flex-1 space-y-5 overflow-y-auto px-3.5 pb-5 pt-4 [&_.setting-row]:px-3.5 [&_.setting-row]:py-3">
         <section className="flex flex-col gap-2">
-          <h2 className="eyebrow">Dans les pages</h2>
+          <h2 className="eyebrow">{t("Dans les pages")}</h2>
           <div className="card">
-            <SettingRow title="Bouton GuiVault dans les champs" desc="Sur les sites dont vous avez un identifiant.">
-              {toggle("Bouton GuiVault dans les champs", settings.inlineAutofill, (v) => onSettings({ ...settings, inlineAutofill: v }))}
+            <SettingRow title={t("Bouton GuiVault dans les champs")} desc={t("Sur les sites dont vous avez un identifiant.")}>
+              {toggle(t("Bouton GuiVault dans les champs"), settings.inlineAutofill, (v) => onSettings({ ...settings, inlineAutofill: v }))}
             </SettingRow>
-            <SettingRow title="Remplir le code 2FA tout seul" desc="Quand un seul identifiant du site en a un.">
-              {toggle("Remplir le code 2FA tout seul", settings.autoTotp, (v) => onSettings({ ...settings, autoTotp: v }))}
+            <SettingRow title={t("Remplir le code 2FA tout seul")} desc={t("Quand un seul identifiant du site en a un.")}>
+              {toggle(t("Remplir le code 2FA tout seul"), settings.autoTotp, (v) => onSettings({ ...settings, autoTotp: v }))}
             </SettingRow>
             <OtpPatterns settings={settings} onSettings={onSettings} />
           </div>
         </section>
         <section className="flex flex-col gap-2">
-          <h2 className="eyebrow">Sécurité</h2>
+          <h2 className="eyebrow">{t("Sécurité")}</h2>
           <div className="card">
-            <SettingRow htmlFor="ext-lock" title="Verrouiller après">
+            <SettingRow htmlFor="ext-lock" title={t("Verrouiller après")}>
               <select id="ext-lock" value={settings.lockMinutes} onChange={(e) => onSettings({ ...settings, lockMinutes: Number(e.target.value) })} className="input w-auto">
                 {LOCK_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
@@ -837,23 +838,23 @@ function SettingsView({ settings, state, say, onSettings, onBack }: { settings: 
           </div>
         </section>
         <section className="flex flex-col gap-2">
-          <h2 className="eyebrow">Apparence</h2>
+          <h2 className="eyebrow">{t("Apparence")}</h2>
           <SettingsSyncToggle />
           <AppearanceSettings compact />
         </section>
-        <p className="truncate text-center text-[12px] text-[var(--c-text-muted)]" title={settings.serverUrl}>{state?.local ? "Coffre local" : settings.serverUrl}</p>
+        <p className="truncate text-center text-[12px] text-[var(--c-text-muted)]" title={settings.serverUrl}>{state?.local ? t("Coffre local") : settings.serverUrl}</p>
       </div>
     </div>
   );
 }
 
-const LOCK_OPTIONS = [
+const LOCK_OPTIONS = translated([
   { value: 5, label: "5 min" },
   { value: 15, label: "15 min" },
   { value: 60, label: "1 heure" },
   { value: 480, label: "8 heures" },
   { value: 0, label: "Navigateur fermé" },
-];
+], ["label"]);
 
 /** Les champs de code que la détection ne reconnaît pas : une ligne qui se
  * déplie sur ses règles (une regex par ligne). */
@@ -866,10 +867,10 @@ function OtpPatterns({ settings, onSettings }: { settings: Settings; onSettings:
     <div className="setting-row flex-col items-stretch">
       <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="flex min-w-0 items-center gap-3 text-left">
         <span className="min-w-0 flex-1">
-          <span className="setting-title block">Champs de code personnalisés</span>
-          <span className="setting-desc block">Pour les sites que GuiVault ne reconnaît pas.</span>
+          <span className="setting-title block">{t("Champs de code personnalisés")}</span>
+          <span className="setting-desc block">{t("Pour les sites que GuiVault ne reconnaît pas.")}</span>
         </span>
-        <span className="tag">{count} règle{count > 1 ? "s" : ""}</span>
+        <span className="tag">{count} {t("règle")}{count > 1 ? "s" : ""}</span>
         {open ? <IconChevronDown size={13} /> : <IconChevronRight size={13} />}
       </button>
       {open && (
@@ -880,19 +881,19 @@ function OtpPatterns({ settings, onSettings }: { settings: Settings; onSettings:
             onBlur={() => { if (text !== settings.otpPatterns) onSettings({ ...settings, otpPatterns: text }); }}
             rows={3}
             spellCheck={false}
-            aria-label="Règles des champs de code"
+            aria-label={t("Règles des champs de code")}
             placeholder={"verif_code\nsso\\.exemple\\.fr => ^pin$"}
             className="input input-mono text-[12.5px]"
           />
           <p className="flex items-center gap-1.5 text-[12.5px] text-[var(--c-text-muted)]">
-            Une regex par ligne
-            <InfoTip label="Syntaxe des règles" align="right" items={[
-              { text: "Comparée au nom, à l'id, au libellé et à l'aide du champ." },
-              { text: <><span className="font-mono">regex d'URL =&gt; regex de champ</span> la limite à certaines pages.</> },
-              { text: "Les champs « one-time-code », « 2FA », « OTP » et les codes en cases sont reconnus d'office.", tone: "ok" },
+            {t("Une regex par ligne")}
+            <InfoTip label={t("Syntaxe des règles")} align="right" items={[
+              { text: t("Comparée au nom, à l'id, au libellé et à l'aide du champ.") },
+              { text: <><span className="font-mono">{t("regex d'URL => regex de champ")}</span> {t("la limite à certaines pages.")}</> },
+              { text: t("Les champs « one-time-code », « 2FA », « OTP » et les codes en cases sont reconnus d'office."), tone: "ok" },
             ]} />
           </p>
-          {errors.length > 0 && <p className="callout callout-warn">Ligne{errors.length > 1 ? "s" : ""} {errors.join(", ")} : regex invalide, ignorée.</p>}
+          {errors.length > 0 && <p className="callout callout-warn">{t("Ligne")}{errors.length > 1 ? "s" : ""} {errors.join(", ")} {t(": regex invalide, ignorée.")}</p>}
         </div>
       )}
     </div>
@@ -925,7 +926,7 @@ function LoginView({ settings, reason, onSettings, onSession }: { settings: Sett
   const openCopy = async () => {
     if (!offlineCopy || !password) return;
     setError(null);
-    setBusy("Ouverture de la copie…");
+    setBusy(t("Ouverture de la copie…"));
     try {
       const { session } = await openOffline(offlineCopy, password);
       onSettings({ ...settings, email: email.trim().toLowerCase(), lockMinutes, inlineAutofill });
@@ -956,15 +957,15 @@ function LoginView({ settings, reason, onSettings, onSession }: { settings: Sett
     setError(null);
     const url = serverUrl.trim().replace(/\/+$/, "");
     if (!/^https?:\/\//.test(url)) {
-      setError("L'adresse du serveur doit commencer par https:// (ou http:// en local).");
+      setError(t("L'adresse du serveur doit commencer par https:// (ou http:// en local)."));
       return;
     }
-    setBusy("Vérification du serveur…");
+    setBusy(t("Vérification du serveur…"));
     try {
       setBaseUrl(url);
       await api.health();
       onSettings({ ...settings, serverUrl: url, email: email.trim().toLowerCase(), lockMinutes, inlineAutofill });
-      setBusy("Dérivation de la clé…");
+      setBusy(t("Dérivation de la clé…"));
       const tokensP = capture();
       const out = await login(email, password);
       if (out.kind === "ok") await finish(out.session, tokensP);
@@ -972,7 +973,7 @@ function LoginView({ settings, reason, onSettings, onSession }: { settings: Sett
     } catch (err) {
       const down = !(err instanceof ApiError) || err.status >= 500;
       if (down) setUnreachable(true);
-      setError(down && !(err instanceof ApiError) ? "Serveur injoignable." : errorMessage(err));
+      setError(down && !(err instanceof ApiError) ? t("Serveur injoignable.") : errorMessage(err));
     } finally {
       setBusy(null);
     }
@@ -980,15 +981,15 @@ function LoginView({ settings, reason, onSettings, onSession }: { settings: Sett
 
   if (totp) {
     return (
-      <form onSubmit={async (e) => { e.preventDefault(); setBusy("Vérification…"); setError(null); try { await totp.verify(code); } catch (err) { setError(errorMessage(err)); } finally { setBusy(null); } }} className="flex flex-col gap-4 px-7 py-6">
+      <form onSubmit={async (e) => { e.preventDefault(); setBusy(t("Vérification…")); setError(null); try { await totp.verify(code); } catch (err) { setError(errorMessage(err)); } finally { setBusy(null); } }} className="flex flex-col gap-4 px-7 py-6">
         <div>
-          <h1 className="text-[20px] font-semibold tracking-[-0.015em]">Second facteur</h1>
-          <p className="page-sub">Le code de votre application, ou un code de récupération.</p>
+          <h1 className="text-[20px] font-semibold tracking-[-0.015em]">{t("Second facteur")}</h1>
+          <p className="page-sub">{t("Le code de votre application, ou un code de récupération.")}</p>
         </div>
-        <input value={code} onChange={(e) => setCode(e.target.value)} autoFocus inputMode="numeric" autoComplete="one-time-code" placeholder="123 456" aria-label="Code" className="input input-mono h-[42px] text-center text-[16px] tracking-[0.2em]" />
+        <input value={code} onChange={(e) => setCode(e.target.value)} autoFocus inputMode="numeric" autoComplete="one-time-code" placeholder="123 456" aria-label={t("Code")} className="input input-mono h-[42px] text-center text-[16px] tracking-[0.2em]" />
         {error && <p className="callout callout-danger">{error}</p>}
-        <button type="submit" disabled={!code.trim() || busy !== null} className="btn btn-primary btn-lg w-full">{busy ?? "Valider"}</button>
-        <button type="button" onClick={() => { setTotp(null); setCode(""); }} className="btn btn-ghost w-full">Revenir</button>
+        <button type="submit" disabled={!code.trim() || busy !== null} className="btn btn-primary btn-lg w-full">{busy ?? t("Valider")}</button>
+        <button type="button" onClick={() => { setTotp(null); setCode(""); }} className="btn btn-ghost w-full">{t("Revenir")}</button>
       </form>
     );
   }
@@ -996,8 +997,8 @@ function LoginView({ settings, reason, onSettings, onSession }: { settings: Sett
   return (
     <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
       <div className="sidebar-scroll flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-7 pb-5 pt-5">
-        {reason === "expired" && <p className="callout callout-warn">Session expirée ou révoquée : reconnectez-vous.</p>}
-        {reason === "timeout" && <p className="callout">Verrouillé après inactivité.</p>}
+        {reason === "expired" && <p className="callout callout-warn">{t("Session expirée ou révoquée : reconnectez-vous.")}</p>}
+        {reason === "timeout" && <p className="callout">{t("Verrouillé après inactivité.")}</p>}
         {!more && settings.email ? (
           <div className="card flex min-w-0 items-center gap-3 px-3 py-2.5">
             <span className="tile h-[34px] w-[34px] rounded-full text-[12px]" style={{ "--tile-h": 238 } as React.CSSProperties}>{personInitials(email)}</span>
@@ -1005,48 +1006,48 @@ function LoginView({ settings, reason, onSettings, onSession }: { settings: Sett
               <span className="truncate font-medium">{email}</span>
               <span className="truncate text-[12.5px] text-[var(--c-text-muted)]">{serverUrl.replace(/^https?:\/\//, "")}</span>
             </span>
-            <button type="button" onClick={() => setMore(true)} className="btn btn-ghost text-[var(--c-accent-text)]">Changer</button>
+            <button type="button" onClick={() => setMore(true)} className="btn btn-ghost text-[var(--c-accent-text)]">{t("Changer")}</button>
           </div>
         ) : (
           <>
             <label className="block">
-              <span className="field-label">Serveur GuiVault</span>
+              <span className="field-label">{t("Serveur GuiVault")}</span>
               <input type="url" value={serverUrl} onChange={(e) => setServerUrl(e.target.value)} placeholder="https://vault.example.com" required className="input input-mono" />
             </label>
             <label className="block">
-              <span className="field-label">E-mail</span>
+              <span className="field-label">{t("E-mail")}</span>
               <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" required className="input" />
             </label>
           </>
         )}
         <label className="block">
-          <span className="field-label">Mot de passe maître</span>
+          <span className="field-label">{t("Mot de passe maître")}</span>
           <PasswordInput value={password} onChange={setPassword} autoFocus={!!settings.email} autoComplete="current-password" />
         </label>
         {error && <p className="callout callout-danger">{error}</p>}
         {unreachable && offlineCopy && (
           <div className="card flex flex-col gap-2.5 p-3">
-            <p className="text-[13px]"><b className="font-semibold">Serveur injoignable.</b> <span className="text-[var(--c-text-muted)]">Copie hors ligne du {new Date(offlineCopy.savedAt).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}, en lecture seule.</span></p>
-            <button type="button" onClick={() => void openCopy()} disabled={!password || busy !== null} className="btn btn-secondary w-full">Ouvrir la copie hors ligne</button>
+            <p className="text-[13px]"><b className="font-semibold">{t("Serveur injoignable.")}</b> <span className="text-[var(--c-text-muted)]">{t("Copie hors ligne du")} {new Date(offlineCopy.savedAt).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}{t(", en lecture seule.")}</span></p>
+            <button type="button" onClick={() => void openCopy()} disabled={!password || busy !== null} className="btn btn-secondary w-full">{t("Ouvrir la copie hors ligne")}</button>
           </div>
         )}
-        <button type="submit" disabled={!serverUrl.trim() || !email.trim() || !password || busy !== null} className="btn btn-primary btn-lg w-full">{busy ?? "Déverrouiller"}</button>
+        <button type="submit" disabled={!serverUrl.trim() || !email.trim() || !password || busy !== null} className="btn btn-primary btn-lg w-full">{busy ?? t("Déverrouiller")}</button>
         {more && (
           <div className="card [&_.setting-row]:px-3.5 [&_.setting-row]:py-3">
-            <SettingRow htmlFor="ext-login-lock" title="Verrouiller après">
+            <SettingRow htmlFor="ext-login-lock" title={t("Verrouiller après")}>
               <select id="ext-login-lock" value={lockMinutes} onChange={(e) => setLockMinutes(Number(e.target.value))} className="input w-auto">
                 {LOCK_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
             </SettingRow>
-            <SettingRow title="Bouton dans les champs" desc="Sur les sites dont vous avez un identifiant.">
-              <button type="button" role="switch" aria-checked={inlineAutofill} aria-label="Bouton dans les champs" onClick={() => setInlineAutofill(!inlineAutofill)} className="switch" />
+            <SettingRow title={t("Bouton dans les champs")} desc={t("Sur les sites dont vous avez un identifiant.")}>
+              <button type="button" role="switch" aria-checked={inlineAutofill} aria-label={t("Bouton dans les champs")} onClick={() => setInlineAutofill(!inlineAutofill)} className="switch" />
             </SettingRow>
           </div>
         )}
       </div>
       <footer className="flex min-h-[36px] shrink-0 items-center gap-2 border-t border-[var(--c-border)] px-3.5 text-[12px] text-[var(--c-text-muted)]">
         <IconLock size={13} />
-        <span className="min-w-0 flex-1 truncate">Déchiffré ici{offlineCopy ? " · copie chiffrée gardée" : ", jamais sur disque"}</span>
+        <span className="min-w-0 flex-1 truncate">{t("Déchiffré ici")}{offlineCopy ? t(" · copie chiffrée gardée") : t(", jamais sur disque")}</span>
       </footer>
     </form>
   );
@@ -1059,9 +1060,9 @@ function LoginChooser(props: { settings: Settings; reason: LockReason | null; on
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="px-7 pt-5">
-        <div className="segmented flex w-full" role="tablist" aria-label="Ouvrir">
-          <button type="button" role="tab" aria-selected={mode === "server"} data-active={mode === "server"} onClick={() => setMode("server")} className="flex-1">Serveur</button>
-          <button type="button" role="tab" aria-selected={mode === "local"} data-active={mode === "local"} onClick={() => setMode("local")} className="flex-1">Coffre local</button>
+        <div className="segmented flex w-full" role="tablist" aria-label={t("Ouvrir")}>
+          <button type="button" role="tab" aria-selected={mode === "server"} data-active={mode === "server"} onClick={() => setMode("server")} className="flex-1">{t("Serveur")}</button>
+          <button type="button" role="tab" aria-selected={mode === "local"} data-active={mode === "local"} onClick={() => setMode("local")} className="flex-1">{t("Coffre local")}</button>
         </div>
       </div>
       {mode === "local" ? <LocalLoginView {...props} /> : <LoginView {...props} />}
@@ -1091,7 +1092,7 @@ function LocalLoginView({ settings, reason, onSettings, onSession }: { settings:
     e.preventDefault();
     if (!path) return;
     setError(null);
-    setBusy("Dérivation de la clé…");
+    setBusy(t("Dérivation de la clé…"));
     try {
       const state = await openLocal(nativeCoffre(path), path, password);
       onSettings({ ...settings, mode: "local", localPath: path });
@@ -1107,12 +1108,12 @@ function LocalLoginView({ settings, reason, onSettings, onSession }: { settings:
   return (
     <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
       <div className="sidebar-scroll flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-7 pb-5 pt-5">
-        {reason === "timeout" && <p className="callout">Verrouillé après inactivité.</p>}
+        {reason === "timeout" && <p className="callout">{t("Verrouillé après inactivité.")}</p>}
         {coffres === null ? (
-          <p className="text-[13px] text-[var(--c-text-muted)]">Recherche des coffres de l'application…</p>
+          <p className="text-[13px] text-[var(--c-text-muted)]">{t("Recherche des coffres de l'application…")}</p>
         ) : coffres.length > 0 ? (
-          <div role="radiogroup" aria-label="Coffre" className="flex flex-col gap-1.5">
-            <span className="field-label">Coffre</span>
+          <div role="radiogroup" aria-label={t("Coffre")} className="flex flex-col gap-1.5">
+            <span className="field-label">{t("Coffre")}</span>
             {coffres.map((p) => (
               <label key={p} className={`card flex min-w-0 cursor-pointer items-center gap-3 px-3 py-2.5 ${path === p ? "border-[var(--c-accent)] shadow-[0_0_0_1px_var(--c-accent)]" : ""}`}>
                 <input type="radio" name="coffre" checked={path === p} onChange={() => setPath(p)} className="sr-only" />
@@ -1126,20 +1127,20 @@ function LocalLoginView({ settings, reason, onSettings, onSession }: { settings:
             ))}
           </div>
         ) : !error ? (
-          <p className="callout">Aucun coffre : ouvrez ou créez d'abord un coffre local dans l'application GuiVault.</p>
+          <p className="callout">{t("Aucun coffre : ouvrez ou créez d'abord un coffre local dans l'application GuiVault.")}</p>
         ) : null}
         {coffres && coffres.length > 0 && (
           <label className="block">
-            <span className="field-label">Mot de passe maître</span>
+            <span className="field-label">{t("Mot de passe maître")}</span>
             <PasswordInput value={password} onChange={setPassword} autoFocus autoComplete="current-password" />
           </label>
         )}
         {error && <p className="callout callout-danger">{error}</p>}
-        {coffres && coffres.length > 0 && <button type="submit" disabled={!path || !password || busy !== null} className="btn btn-primary btn-lg w-full">{busy ?? "Déverrouiller"}</button>}
+        {coffres && coffres.length > 0 && <button type="submit" disabled={!path || !password || busy !== null} className="btn btn-primary btn-lg w-full">{busy ?? t("Déverrouiller")}</button>}
       </div>
       <footer className="flex min-h-[36px] shrink-0 items-center gap-2 border-t border-[var(--c-border)] px-3.5 text-[12px] text-[var(--c-text-muted)]">
         <IconLock size={13} />
-        <span className="min-w-0 flex-1 truncate">Déchiffré ici · l'application ne passe que du chiffré</span>
+        <span className="min-w-0 flex-1 truncate">{t("Déchiffré ici · l'application ne passe que du chiffré")}</span>
       </footer>
     </form>
   );
@@ -1150,7 +1151,7 @@ function LocalLoginView({ settings, reason, onSettings, onSession }: { settings:
 function ClipboardSelect() {
   const [seconds, setSeconds] = useState(loadClearSeconds);
   return (
-    <SettingRow htmlFor="ext-clear" title="Vider le presse-papiers" desc="Seulement si la valeur copiée y est encore.">
+    <SettingRow htmlFor="ext-clear" title={t("Vider le presse-papiers")} desc={t("Seulement si la valeur copiée y est encore.")}>
       <select id="ext-clear" value={seconds} onChange={(e) => { const n = Number(e.target.value); setSeconds(n); saveClearSeconds(n); }} className="input w-auto">
         {CLEAR_CHOICES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
       </select>

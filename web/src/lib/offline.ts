@@ -16,6 +16,7 @@
 import { api, baseUrl } from "./api";
 import type { AccountBlobs, SessionState } from "./session";
 import type { Item, UserProfile, Vault } from "./types";
+import { t } from "./i18n";
 
 export interface OfflineCopy {
   version: 1;
@@ -78,7 +79,7 @@ async function saveCopy(copy: OfflineCopy) {
  * compte enveloppé reçu à la connexion : une session reprise d'avant ne
  * l'a pas, il faut alors se reconnecter. */
 export async function enableOffline(state: SessionState): Promise<OfflineCopy> {
-  if (!state.blobs) throw new Error("Reconnectez-vous pour activer la copie hors ligne : cette session ne garde pas de quoi l'ouvrir.");
+  if (!state.blobs) throw new Error(t("Reconnectez-vous pour activer la copie hors ligne : cette session ne garde pas de quoi l'ouvrir."));
   const res = await api.sync();
   const copy: OfflineCopy = { version: 1, email: state.user.email, user: res.user, blobs: state.blobs, vaults: res.vaults, items: {}, savedAt: new Date().toISOString() };
   await saveCopy(copy);

@@ -14,8 +14,9 @@ import { Field, FormShell, useSeed } from "./common";
 import { AutoTypeFields } from "../AutoType";
 import { autoTypeBridge } from "../../lib/platform";
 import { SecretFooter, SecretHeader } from "./SecretBits";
+import { t, translated } from "../../lib/i18n";
 
-const MATCH_LABELS: Record<UriMatch, string> = { domain: "domaine", host: "hôte", startsWith: "commence par", exact: "exact", regex: "expression régulière", never: "jamais" };
+const MATCH_LABELS: Record<UriMatch, string> = translated({ domain: "domaine", host: "hôte", startsWith: "commence par", exact: "exact", regex: "expression régulière", never: "jamais" });
 
 export function LoginForm({ initial, index, defaultGroupId, onSave, onCancel }: {
   initial?: Login;
@@ -34,10 +35,10 @@ export function LoginForm({ initial, index, defaultGroupId, onSave, onCancel }: 
     setQrError(null);
     try {
       const text = await decodeQrImage(file);
-      if (!text || !parseTotp(text)) setQrError("Pas de QR code TOTP lisible dans cette image.");
+      if (!text || !parseTotp(text)) setQrError(t("Pas de QR code TOTP lisible dans cette image."));
       else setLogin({ ...login, totp: text });
     } catch {
-      setQrError("Image illisible.");
+      setQrError(t("Image illisible."));
     }
   };
 
@@ -60,17 +61,17 @@ export function LoginForm({ initial, index, defaultGroupId, onSave, onCancel }: 
   const setUri = (i: number, patch: Partial<LoginUri>) => setLogin({ ...login, uris: login.uris.map((u, j) => (j === i ? { ...u, ...patch } : u)) });
 
   return (
-    <FormShell title={initial ? `Modifier « ${initial.name} »` : "Nouvel identifiant"} onSave={save} onCancel={onCancel} validate={() => (login.name.trim() ? login.totp && !totp ? "Le secret TOTP ne se lit pas (URI otpauth:// ou base32 attendu)." : null : "Le nom est obligatoire.")}>
-      <SecretHeader value={login} onChange={setLogin} placeholder="GitHub, banque, Wi-Fi…" />
-      <Field label="Utilisateur">
+    <FormShell title={initial ? t("Modifier « {0} »", initial.name) : t("Nouvel identifiant")} onSave={save} onCancel={onCancel} validate={() => (login.name.trim() ? login.totp && !totp ? t("Le secret TOTP ne se lit pas (URI otpauth:// ou base32 attendu).") : null : t("Le nom est obligatoire."))}>
+      <SecretHeader value={login} onChange={setLogin} placeholder={t("GitHub, banque, Wi-Fi…")} />
+      <Field label={t("Utilisateur")}>
         <input value={login.username} onChange={(e) => setLogin({ ...login, username: e.target.value })} autoComplete="off" className="input input-mono" />
       </Field>
       <div>
         <div className="flex items-end gap-1.5">
-          <Field label="Mot de passe" className="min-w-0 flex-1">
+          <Field label={t("Mot de passe")} className="min-w-0 flex-1">
             <PasswordInput value={login.password} onChange={(password) => setLogin({ ...login, password })} autoComplete="new-password" />
           </Field>
-          <button type="button" onClick={() => setShowGenerator((g) => !g)} aria-pressed={showGenerator} className={`btn btn-icon ${showGenerator ? "btn-toggled" : "btn-secondary"}`} title="Générer un mot de passe" aria-label="Générer un mot de passe"><IconDice size={14} /></button>
+          <button type="button" onClick={() => setShowGenerator((g) => !g)} aria-pressed={showGenerator} className={`btn btn-icon ${showGenerator ? "btn-toggled" : "btn-secondary"}`} title={t("Générer un mot de passe")} aria-label={t("Générer un mot de passe")}><IconDice size={14} /></button>
         </div>
         <PasswordStrength password={login.password} className="mt-1" />
         {showGenerator && (
@@ -80,23 +81,23 @@ export function LoginForm({ initial, index, defaultGroupId, onSave, onCancel }: 
         )}
       </div>
 
-      <Field group label="Sites (URI)" hint="Le premier s'affiche dans la liste ; la correspondance guide le remplissage.">
+      <Field group label={t("Sites (URI)")} hint={t("Le premier s'affiche dans la liste ; la correspondance guide le remplissage.")}>
         <div className="space-y-1">
           {login.uris.map((u, i) => (
             <div key={i} className="grid grid-cols-[1fr_auto_auto] items-center gap-1">
-              <input value={u.uri} onChange={(e) => setUri(i, { uri: e.target.value })} placeholder="https://example.com" aria-label={`Site ${i + 1}`} className="input input-mono" />
-              <select value={u.match ?? ""} onChange={(e) => setUri(i, { match: (e.target.value || null) as UriMatch | null })} aria-label={`Correspondance du site ${i + 1}`} className="input w-auto">
-                <option value="">par défaut</option>
+              <input value={u.uri} onChange={(e) => setUri(i, { uri: e.target.value })} placeholder="https://example.com" aria-label={t("Site {0}", i + 1)} className="input input-mono" />
+              <select value={u.match ?? ""} onChange={(e) => setUri(i, { match: (e.target.value || null) as UriMatch | null })} aria-label={t("Correspondance du site {0}", i + 1)} className="input w-auto">
+                <option value="">{t("par défaut")}</option>
                 {(Object.keys(MATCH_LABELS) as UriMatch[]).map((m) => <option key={m} value={m}>{MATCH_LABELS[m]}</option>)}
               </select>
-              <button type="button" onClick={() => setLogin({ ...login, uris: login.uris.filter((_, j) => j !== i) })} aria-label="Retirer le site" className="btn btn-ghost btn-sm btn-icon hover:text-[var(--c-danger)]"><IconClose size={11} /></button>
+              <button type="button" onClick={() => setLogin({ ...login, uris: login.uris.filter((_, j) => j !== i) })} aria-label={t("Retirer le site")} className="btn btn-ghost btn-sm btn-icon hover:text-[var(--c-danger)]"><IconClose size={11} /></button>
             </div>
           ))}
-          <button type="button" onClick={() => setLogin({ ...login, uris: [...login.uris, { uri: "", match: null }] })} className="btn btn-secondary btn-sm"><IconPlus size={11} /> Ajouter un site</button>
+          <button type="button" onClick={() => setLogin({ ...login, uris: [...login.uris, { uri: "", match: null }] })} className="btn btn-secondary btn-sm"><IconPlus size={11} /> {t("Ajouter un site")}</button>
         </div>
       </Field>
 
-      <Field label="Secret TOTP" hint="Lien otpauth://, secret base32 ou image du QR code (Ctrl+V).">
+      <Field label={t("Secret TOTP")} hint={t("Lien otpauth://, secret base32 ou image du QR code (Ctrl+V).")}>
         <input
           value={login.totp ?? ""}
           onChange={(e) => setLogin({ ...login, totp: e.target.value || null })}
@@ -107,22 +108,22 @@ export function LoginForm({ initial, index, defaultGroupId, onSave, onCancel }: 
           className="input input-mono"
         />
         {totp && <div className="mt-1.5"><TotpCode secret={login.totp!} compact /></div>}
-        <FileButton label="Image du QR code" accept="image/*" className="mt-1.5" onFile={(f) => void readQr(f)} />
+        <FileButton label={t("Image du QR code")} accept="image/*" className="mt-1.5" onFile={(f) => void readQr(f)} />
         {qrError && <p className="help-text text-[var(--c-danger)]">{qrError}</p>}
       </Field>
 
       {login.passkeys.length > 0 && (
-        <Field group label="Passkeys">
+        <Field group label={t("Passkeys")}>
           <div className="space-y-1">
             {login.passkeys.map((k, i) => (
               <div key={k.credentialId} className="flex items-center gap-2 rounded-md border border-[var(--c-border)] px-2 py-1.5 text-[12px]">
                 <IconPasskey size={13} className="shrink-0 text-[var(--c-text-muted)]" />
                 <span className="min-w-0 flex-1 truncate text-[var(--c-text)]">{k.rpName || k.rpId}{k.userName ? ` — ${k.userName}` : ""} <span className="text-[var(--c-text-faint)]">· {formatWhen(k.createdAt)}</span></span>
-                <button type="button" onClick={() => setLogin({ ...login, passkeys: login.passkeys.filter((_, j) => j !== i) })} aria-label="Retirer la passkey" className="btn btn-ghost btn-sm btn-icon hover:text-[var(--c-danger)]"><IconClose size={11} /></button>
+                <button type="button" onClick={() => setLogin({ ...login, passkeys: login.passkeys.filter((_, j) => j !== i) })} aria-label={t("Retirer la passkey")} className="btn btn-ghost btn-sm btn-icon hover:text-[var(--c-danger)]"><IconClose size={11} /></button>
               </div>
             ))}
           </div>
-          <p className="help-text mt-1">Une passkey se crée depuis l'extension ou Guiterm.</p>
+          <p className="help-text mt-1">{t("Une passkey se crée depuis l'extension ou Guiterm.")}</p>
         </Field>
       )}
 

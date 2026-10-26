@@ -9,6 +9,7 @@ import { setCoffreFileBridge } from "../../src/lib/platform";
 import { freePath } from "./dialogs";
 import { isMobile } from "./mobile";
 import { coffreName, rememberCoffre } from "./recents";
+import { t } from "../../src/lib/i18n";
 
 /** Les refus du Rust sont des erreurs d'API (`toApiError`) ; ceux du plugin
  * Kotlin (`invoke.reject`), un objet `{ message }`. */
@@ -33,7 +34,7 @@ export function installCoffreFiles() {
       const into = await call<string>("local_staging");
       const r = await call<{ picked: boolean; name?: string }>("plugin:coffrefile|pick", { into });
       if (!r.picked) return null;
-      const dest = await freePath(r.name || "Coffre importé");
+      const dest = await freePath(r.name || t("Coffre importé"));
       if (!dest) return null;
       await call<void>("local_import", { staging: into, dest });
       rememberCoffre(dest);

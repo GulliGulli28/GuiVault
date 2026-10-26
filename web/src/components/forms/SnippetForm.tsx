@@ -2,6 +2,7 @@ import { useState } from "react";
 import { uuid } from "../../lib/bytes";
 import type { Payload, Snippet } from "../../lib/types";
 import { Checkbox, Field, FormShell, TagsInput, useSeed } from "./common";
+import { t } from "../../lib/i18n";
 
 export function SnippetForm({ initial, onSave, onCancel }: { initial?: Snippet; onSave: (p: Payload) => Promise<void>; onCancel: () => void }) {
   const seed = useSeed(initial, (p) => (p.kind === "snippet" ? p.snippet : undefined));
@@ -16,15 +17,15 @@ export function SnippetForm({ initial, onSave, onCancel }: { initial?: Snippet; 
   };
 
   return (
-    <FormShell title={initial ? `Modifier « ${initial.name} »` : "Nouveau snippet"} onSave={save} onCancel={onCancel} validate={() => (name.trim() ? command.trim() ? null : "La commande est vide." : "Le nom est obligatoire.")}>
-      <Field label="Nom">
+    <FormShell title={initial ? t("Modifier « {0} »", initial.name) : t("Nouveau snippet")} onSave={save} onCancel={onCancel} validate={() => (name.trim() ? command.trim() ? null : t("La commande est vide.") : t("Le nom est obligatoire."))}>
+      <Field label={t("Nom")}>
         <input value={name} onChange={(e) => setName(e.target.value)} autoFocus className="input" />
       </Field>
-      <Field label={adaptive ? "Programme adaptatif" : "Commande"} hint="Peut contenir des {{variables}}, demandées avant l'exécution.">
+      <Field label={adaptive ? t("Programme adaptatif") : t("Commande")} hint={t("Peut contenir des {{variables}}, demandées avant l'exécution.")}>
         <textarea value={command} onChange={(e) => setCommand(e.target.value)} rows={8} spellCheck={false} className="input input-mono" />
       </Field>
-      <Checkbox checked={adaptive} onChange={setAdaptive} label="Snippet adaptatif" hint="Un programme du moteur adaptatif de Guiterm, résolu par hôte et par plateforme, plutôt qu'une commande littérale." />
-      <Field label="Étiquettes">
+      <Checkbox checked={adaptive} onChange={setAdaptive} label={t("Snippet adaptatif")} hint={t("Un programme du moteur adaptatif de Guiterm, résolu par hôte et par plateforme, plutôt qu'une commande littérale.")} />
+      <Field label={t("Étiquettes")}>
         <TagsInput value={tags} onChange={setTags} />
       </Field>
     </FormShell>

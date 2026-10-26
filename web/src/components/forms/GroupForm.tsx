@@ -6,6 +6,7 @@ import type { CustomIcon, Group, Payload } from "../../lib/types";
 import { IconField } from "../IconPicker";
 import { IconClose, IconFolder } from "../ui-icons";
 import { Field, FormShell, GroupSelect, useSeed } from "./common";
+import { t } from "../../lib/i18n";
 
 export function GroupForm({ initial, index, defaultParentId, onSave, onCancel, onAddIcon }: {
   initial?: Group;
@@ -33,25 +34,25 @@ export function GroupForm({ initial, index, defaultParentId, onSave, onCancel, o
   const foreign = color !== null && !(color in ACCENT_COLORS);
 
   return (
-    <FormShell title={initial ? `Modifier « ${initial.name} »` : "Nouveau dossier"} onSave={save} onCancel={onCancel} validate={() => (name.trim() ? null : "Le nom est obligatoire.")}>
-      <Field label="Nom">
-        <input value={name} onChange={(e) => setName(e.target.value)} autoFocus placeholder="Mon dossier" className="input" />
+    <FormShell title={initial ? t("Modifier « {0} »", initial.name) : t("Nouveau dossier")} onSave={save} onCancel={onCancel} validate={() => (name.trim() ? null : t("Le nom est obligatoire."))}>
+      <Field label={t("Nom")}>
+        <input value={name} onChange={(e) => setName(e.target.value)} autoFocus placeholder={t("Mon dossier")} className="input" />
       </Field>
-      <Field label="Dossier parent">
+      <Field label={t("Dossier parent")}>
         <GroupSelect groups={index.groups} value={parentId} onChange={setParentId} exclude={initial?.id} />
       </Field>
-      <Field group label="Icône" hint="Celle de la banque de Guiterm, ou une icône du vault.">
+      <Field group label={t("Icône")} hint={t("Celle de la banque de Guiterm, ou une icône du vault.")}>
         <IconField value={icon} onChange={setIcon} customIcons={index.icons} onAddIcon={onAddIcon} fallback={<IconFolder size={14} />} />
       </Field>
       {/* Les huit accents de Guiterm, par leur nom : c'est ce que ses onglets
           et cette liste savent colorer. */}
-      <Field group label="Couleur (affichée sur les onglets de Guiterm)">
+      <Field group label={t("Couleur (affichée sur les onglets de Guiterm)")}>
         <div className="flex flex-wrap items-center gap-1.5">
           <button
             type="button"
             onClick={() => setColor(null)}
-            title="Aucune couleur"
-            aria-label="Aucune couleur"
+            title={t("Aucune couleur")}
+            aria-label={t("Aucune couleur")}
             aria-pressed={color === null}
             className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 text-[var(--c-text-muted)] ${color === null ? "border-[var(--c-text)]" : "border-transparent hover:border-[var(--c-border-strong)]"}`}
             style={{ background: "var(--c-bg3)" }}
@@ -71,7 +72,7 @@ export function GroupForm({ initial, index, defaultParentId, onSave, onCancel, o
             />
           ))}
           {foreign && (
-            <span className="flex items-center gap-1.5 text-[11.5px] text-[var(--c-text-muted)]" title="Couleur écrite par un autre client">
+            <span className="flex items-center gap-1.5 text-[11.5px] text-[var(--c-text-muted)]" title={t("Couleur écrite par un autre client")}>
               <span className="h-6 w-6 rounded-full border-2 border-[var(--c-text)]" style={{ background: /^#[0-9a-f]{6}$/i.test(color) ? color : "var(--c-bg3)" }} />
               <span className="kbd">{color}</span>
             </span>

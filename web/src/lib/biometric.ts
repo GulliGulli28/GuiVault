@@ -13,6 +13,7 @@ import { fromBase64, toBase64, utf8 } from "./bytes";
 import type { LocalHost } from "./localHost";
 import { biometricBridge, type BiometricPasswordReason } from "./platform";
 import { openLocalWithUserKey, resumeWithUserKey, type AccountBlobs, type LockedTarget, type SessionState } from "./session";
+import { t, translated } from "./i18n";
 
 export { biometricBridge };
 
@@ -48,19 +49,19 @@ export function touchBiometric(state: SessionState): void {
   if (b && id) void b.touch(id).catch(() => {});
 }
 
-export const PASSWORD_REASONS: Record<BiometricPasswordReason, string> = {
+export const PASSWORD_REASONS: Record<BiometricPasswordReason, string> = translated({
   reboot: "Mot de passe requis après un redémarrage",
   age: "Mot de passe requis tous les 14 jours",
-};
+});
 
 export type BiometricUnlock<T> = { kind: "ok"; value: T } | { kind: "cancel" } | { kind: "password"; message: string };
 
-const FAILURES: Record<string, string> = {
+const FAILURES: Record<string, string> = translated({
   lockout: "Trop d'essais : utilisez le mot de passe maître.",
   invalidated: "Les empreintes du téléphone ont changé : le mot de passe maître, puis réactivez la biométrie.",
   none: "La biométrie n'est plus activée pour ce coffre.",
   password: "Le mot de passe maître est requis.",
-};
+});
 
 async function openSealed(id: string, subtitle?: string): Promise<BiometricUnlock<Sealed>> {
   const b = biometricBridge();
@@ -69,7 +70,7 @@ async function openSealed(id: string, subtitle?: string): Promise<BiometricUnloc
   if (!r.ok) {
     if (r.reason === "cancel") return { kind: "cancel" };
     if (r.reason === "password") return { kind: "password", message: PASSWORD_REASONS[r.message as BiometricPasswordReason] ?? FAILURES.password };
-    return { kind: "password", message: FAILURES[r.reason] ?? r.message ?? "Échec de la biométrie." };
+    return { kind: "password", message: FAILURES[r.reason] ?? r.message ?? t("Échec de la biométrie.") };
   }
   const bytes = fromBase64(r.secret);
   try {
@@ -169,7 +170,7 @@ export function useBiometricSetting(session: SessionState): {
         setEnabled(false);
         return null;
       }
-      if (!session.blobs) return "Reconnectez-vous avec le mot de passe maître pour l'activer.";
+      if (!session.blobs) return t("Reconnectez-vous avec le mot de passe maître pour l'activer.");
       const sealed: Sealed = { v: 1, user_key: toBase64(session.account.userKey), blobs: session.blobs };
       const bytes = utf8.encode(JSON.stringify(sealed));
       const r = await b.enable(id, toBase64(bytes));
@@ -178,7 +179,7 @@ export function useBiometricSetting(session: SessionState): {
         setEnabled(true);
         return null;
       }
-      return r.reason === "cancel" ? null : FAILURES[r.reason] ?? r.message ?? "Échec de la biométrie.";
+      return r.reason === "cancel" ? null : FAILURES[r.reason] ?? r.message ?? t("Échec de la biométrie.");
     } finally {
       setBusy(false);
     }

@@ -5,6 +5,7 @@ import type { DecodedItem } from "./session";
 import { payloadName } from "./session";
 import { describeSecret } from "./items";
 import { KIND_LABELS, SQL_ENGINE_LABELS, type CustomIcon, type Group, type GuiVaultEntity, type Host, type Payload, type PrivateKey, type Snippet, type SqlConnection } from "./types";
+import { t, translated } from "./i18n";
 
 export interface VaultIndex {
   groups: Group[];
@@ -115,7 +116,7 @@ export function toEntities(items: DecodedItem[]): GuiVaultEntity[] {
     const parentId = parentOf(it.payload);
     const { subtitle, search } = describeSecret(it.payload);
     const favorite = payloadEntityFavorite(it.payload) || undefined;
-    out.push({ id: it.id, kind: it.payload.kind, name: payloadName(it.payload) || "(sans nom)", path: groupPath(groups, parentId), parentId, subtitle: subtitle || undefined, search: search || undefined, favorite, updatedAt: it.updatedAt, createdAt: it.createdAt, ...describeEntity(it.payload) });
+    out.push({ id: it.id, kind: it.payload.kind, name: payloadName(it.payload) || t("(sans nom)"), path: groupPath(groups, parentId), parentId, subtitle: subtitle || undefined, search: search || undefined, favorite, updatedAt: it.updatedAt, createdAt: it.createdAt, ...describeEntity(it.payload) });
   }
   return out;
 }
@@ -148,13 +149,13 @@ function describeEntity(p: Payload): Pick<GuiVaultEntity, "mono" | "icon" | "hos
     case "snippet":
       return { subtitle: p.snippet.command.split("\n")[0].slice(0, 80) || undefined, mono: true, tags: p.snippet.tags?.length ? p.snippet.tags : undefined };
     case "key":
-      return { subtitle: p.passphrase ? "protégée par passphrase" : undefined };
+      return { subtitle: p.passphrase ? t("protégée par passphrase") : undefined };
     case "runbook": {
       const n = p.runbook.steps.length;
-      return { subtitle: p.runbook.description.split("\n")[0].slice(0, 80) || undefined, badge: `${n} étape${n > 1 ? "s" : ""}` };
+      return { subtitle: p.runbook.description.split("\n")[0].slice(0, 80) || undefined, badge: t("{0} étape{1}", n, n > 1 ? "s" : "") };
     }
     case "aws":
-      return { badge: p.aws.authType === "sso" ? "SSO" : "clés" };
+      return { badge: p.aws.authType === "sso" ? "SSO" : t("clés") };
     default:
       return {};
   }
@@ -187,11 +188,11 @@ export function filterEntities(entities: GuiVaultEntity[], keep: (e: GuiVaultEnt
  * liste à plat, le plus récent en tête — ce qu'on vient de toucher. */
 export type SortMode = "name" | "updated" | "created";
 
-export const SORT_LABELS: Record<SortMode, string> = {
+export const SORT_LABELS: Record<SortMode, string> = translated({
   name: "Nom (dossiers)",
   updated: "Modifiés récemment",
   created: "Créés récemment",
-};
+});
 
 /** Mot à mot, sur les mêmes champs que `matches` de `vaultTree.ts` : tous
  * les mots doivent correspondre. `extra` : ce qu'un appelant ajoute (le nom

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { parseTotp, totpCode, totpRemaining } from "../lib/totp";
 import { CopyButton } from "./ui";
+import { t } from "../lib/i18n";
 
 /** Le code TOTP courant d'un identifiant, avec le temps qui reste avant le
  * suivant. Recalculé chaque seconde ; le secret ne quitte pas la page. */
@@ -27,7 +28,7 @@ export function TotpCode({ secret, compact, size }: { secret: string; compact?: 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [secret]);
 
-  if (!params) return <span className="text-[12px] text-[var(--c-danger)]">secret TOTP illisible</span>;
+  if (!params) return <span className="text-[12px] text-[var(--c-danger)]">{t("secret TOTP illisible")}</span>;
   const pretty = code.length === 6 ? `${code.slice(0, 3)} ${code.slice(3)}` : code;
   const fraction = remaining / params.period;
   return (
@@ -39,7 +40,7 @@ export function TotpCode({ secret, compact, size }: { secret: string; compact?: 
           <circle cx="10" cy="10" r="8" fill="none" stroke={remaining <= 5 ? "var(--c-warn)" : "var(--c-accent)"} strokeWidth="3" strokeDasharray={`${fraction * 50.27} 50.27`} />
         </svg>
       </span>
-      {code && <CopyButton value={code} label="Copier le code" />}
+      {code && <CopyButton value={code} label={t("Copier le code")} />}
     </span>
   );
 }

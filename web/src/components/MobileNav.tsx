@@ -3,6 +3,7 @@ import { navigate, routeHash, type Route } from "../lib/route";
 import { healthSummary, useAllItems } from "../lib/allItems";
 import { IconDice, IconHome, IconPulse, IconShieldClock } from "./secret-icons";
 import { IconSettings, IconVault } from "./ui-icons";
+import { t } from "../lib/i18n";
 
 const LAST_VAULT = "guivault.lastVault";
 
@@ -52,12 +53,12 @@ export interface MobileTab {
  * l'autre dans `App`). */
 export function mobileTabs(ctx: PageContext, issues = 0): MobileTab[] {
   return [
-    { key: "home", label: "Accueil", route: { page: "home" }, icon: <IconHome size={22} /> },
-    { key: "vaults", label: "Coffres", route: vaultTab(ctx), icon: <IconVault size={22} /> },
-    { key: "codes", label: "Codes", route: { page: "totp" }, icon: <IconShieldClock size={22} /> },
-    { key: "health", label: "Santé", route: { page: "health" }, icon: <IconPulse size={22} />, badge: issues },
-    { key: "generator", label: "Générateur", route: { page: "generator" }, icon: <IconDice size={22} /> },
-    { key: "more", label: "Réglages", route: { page: "more" }, icon: <IconSettings size={22} /> },
+    { key: "home", label: t("Accueil"), route: { page: "home" }, icon: <IconHome size={22} /> },
+    { key: "vaults", label: t("Coffres"), route: vaultTab(ctx), icon: <IconVault size={22} /> },
+    { key: "codes", label: t("Codes"), route: { page: "totp" }, icon: <IconShieldClock size={22} /> },
+    { key: "health", label: t("Santé"), route: { page: "health" }, icon: <IconPulse size={22} />, badge: issues },
+    { key: "generator", label: t("Générateur"), route: { page: "generator" }, icon: <IconDice size={22} /> },
+    { key: "more", label: t("Réglages"), route: { page: "more" }, icon: <IconSettings size={22} /> },
   ];
 }
 
@@ -71,20 +72,20 @@ export function MobileNav({ ctx, route }: { ctx: PageContext; route: Route }) {
   const active = tabOf(route);
   const tabs = mobileTabs(ctx, issues);
   return (
-    <nav aria-label="Principal" className="m-nav">
-      {tabs.map((t) => t.route && (
+    <nav aria-label={t("Principal")} className="m-nav">
+      {tabs.map((tab) => tab.route && (
         <a
-          key={t.key}
-          href={routeHash(t.route)}
-          onClick={(e) => { e.preventDefault(); navigate(t.route!); }}
-          aria-current={active === t.key ? "page" : undefined}
+          key={tab.key}
+          href={routeHash(tab.route)}
+          onClick={(e) => { e.preventDefault(); navigate(tab.route!); }}
+          aria-current={active === tab.key ? "page" : undefined}
           className="m-tab"
         >
           <span className="relative">
-            {t.icon}
-            {!!t.badge && <span className="badge absolute -right-2.5 -top-1.5" aria-label={`${t.badge} à traiter`}>{t.badge}</span>}
+            {tab.icon}
+            {!!tab.badge && <span className="badge absolute -right-2.5 -top-1.5" aria-label={t("{0} à traiter", tab.badge)}>{tab.badge}</span>}
           </span>
-          <span className="truncate">{t.label}</span>
+          <span className="truncate">{tab.label}</span>
         </a>
       ))}
     </nav>

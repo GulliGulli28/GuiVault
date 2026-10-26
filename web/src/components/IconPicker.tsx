@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { uuid } from "../lib/bytes";
 import type { CustomIcon } from "../lib/types";
 import { BUILTIN_ICONS, CATEGORY_LABELS, type BuiltinIconDef } from "./icons";
+import { t } from "../lib/i18n";
 
 /** Le sélecteur d'icône de Guiterm (`IconPicker.tsx`), même banque, mêmes
  * onglets — la « Banque » et « Mes icônes », qui sont ici les icônes du
@@ -43,7 +44,7 @@ export function IconPicker({ value, customIcons, onSelect, onClose, onAddIcon }:
   const loadFile = (file: File | undefined) => {
     if (!file) return;
     if (file.size > MAX_BYTES) {
-      setImportError("64 Ko au plus.");
+      setImportError(t("64 Ko au plus."));
       return;
     }
     const r = new FileReader();
@@ -81,10 +82,10 @@ export function IconPicker({ value, customIcons, onSelect, onClose, onAddIcon }:
   return (
     <div ref={ref} className="popover mt-2 w-72 max-w-full p-3">
       <div className="mb-2.5 flex items-center gap-1">
-        <button type="button" onClick={() => setTab("builtin")} className={btnClass(tab === "builtin")}>Banque</button>
-        <button type="button" onClick={() => setTab("custom")} className={btnClass(tab === "custom")}>Mes icônes</button>
+        <button type="button" onClick={() => setTab("builtin")} className={btnClass(tab === "builtin")}>{t("Banque")}</button>
+        <button type="button" onClick={() => setTab("custom")} className={btnClass(tab === "custom")}>{t("Mes icônes")}</button>
         {value && (
-          <button type="button" onClick={() => onSelect(null)} className="btn btn-ghost btn-sm ml-auto text-[var(--c-danger)]">Retirer l'icône</button>
+          <button type="button" onClick={() => onSelect(null)} className="btn btn-ghost btn-sm ml-auto text-[var(--c-danger)]">{t("Retirer l'icône")}</button>
         )}
       </div>
 
@@ -119,16 +120,16 @@ export function IconPicker({ value, customIcons, onSelect, onClose, onAddIcon }:
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <img src={importDataUrl} width={40} height={40} className="rounded bg-[var(--c-bg3)] object-contain" alt="" />
-                <input value={importName} onChange={(e) => setImportName(e.target.value)} placeholder="Nom de l'icône" aria-label="Nom de l'icône" className="input flex-1" autoFocus />
+                <input value={importName} onChange={(e) => setImportName(e.target.value)} placeholder={t("Nom de l'icône")} aria-label={t("Nom de l'icône")} className="input flex-1" autoFocus />
               </div>
               <div className="flex gap-1.5">
-                <button type="button" onClick={() => void confirmImport()} disabled={busy || !importName.trim()} className="btn btn-primary flex-1">{busy ? "Enregistrement…" : "Enregistrer dans le vault"}</button>
-                <button type="button" onClick={() => setImportDataUrl(null)} className="btn btn-secondary">Annuler</button>
+                <button type="button" onClick={() => void confirmImport()} disabled={busy || !importName.trim()} className="btn btn-primary flex-1">{busy ? t("Enregistrement…") : t("Enregistrer dans le vault")}</button>
+                <button type="button" onClick={() => setImportDataUrl(null)} className="btn btn-secondary">{t("Annuler")}</button>
               </div>
             </div>
           ) : (
             <>
-              {customIcons.length === 0 && <p className="py-3 text-center text-xs text-[var(--c-text-muted)]">Aucune icône dans ce vault</p>}
+              {customIcons.length === 0 && <p className="py-3 text-center text-xs text-[var(--c-text-muted)]">{t("Aucune icône dans ce vault")}</p>}
               <div className="grid grid-cols-5 gap-1">
                 {customIcons.map((icon) => (
                   <button
@@ -145,11 +146,11 @@ export function IconPicker({ value, customIcons, onSelect, onClose, onAddIcon }:
               </div>
               {onAddIcon ? (
                 <label className="mt-2 block w-full cursor-pointer rounded-md border border-dashed border-[var(--c-border)] py-1.5 text-center text-xs text-[var(--c-text-muted)] hover:border-[var(--c-accent)] hover:text-[var(--c-accent-text)]">
-                  + Importer une icône
+                  {t("+ Importer une icône")}
                   <input type="file" accept="image/svg+xml,image/png,image/webp" onChange={(e) => loadFile(e.target.files?.[0])} className="sr-only" />
                 </label>
               ) : (
-                <p className="help-text mt-2 text-center">Ajoutez-en avec « Nouveau → Icône ».</p>
+                <p className="help-text mt-2 text-center">{t("Ajoutez-en avec « Nouveau → Icône ».")}</p>
               )}
             </>
           )}
@@ -176,8 +177,8 @@ export function IconField({ value, onChange, customIcons, onAddIcon, fallback }:
         <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-[var(--c-border)] bg-[var(--c-bg3)] text-[var(--c-text-muted)]">
           {value ? <IconPreview iconId={value} customIcons={customIcons} fallback={fallback} /> : fallback}
         </div>
-        <button type="button" onClick={() => setOpen((v) => !v)} className="btn btn-secondary">{value ? "Changer l'icône" : "Choisir une icône"}</button>
-        {value && <button type="button" onClick={() => onChange(null)} className="btn btn-ghost btn-sm">Retirer</button>}
+        <button type="button" onClick={() => setOpen((v) => !v)} className="btn btn-secondary">{value ? t("Changer l'icône") : t("Choisir une icône")}</button>
+        {value && <button type="button" onClick={() => onChange(null)} className="btn btn-ghost btn-sm">{t("Retirer")}</button>}
       </div>
       {open && (
         <IconPicker
@@ -199,5 +200,5 @@ function IconPreview({ iconId, customIcons, fallback }: { iconId: string; custom
   if (custom) return <img src={custom.dataUrl} width={18} height={18} className="rounded object-contain" alt={custom.name} />;
   // Une icône qu'on ne sait pas dessiner (venue d'un autre vault) : on
   // garde son identifiant, on le dit.
-  return <span title={`Icône inconnue ici : ${iconId}`}>{fallback}</span>;
+  return <span title={t("Icône inconnue ici : {0}", iconId)}>{fallback}</span>;
 }

@@ -4,6 +4,7 @@ import { uuid } from "../../lib/bytes";
 import { SQL_ENGINE_LABELS, type DbTunnel, type Payload, type SqlConnection, type SqlEngine } from "../../lib/types";
 import { PasswordInput } from "../ui";
 import { Checkbox, Field, FormShell, GroupSelect, HostSelect, TagsInput, parsePort, useSeed } from "./common";
+import { t } from "../../lib/i18n";
 
 const DEFAULT_PORT: Record<SqlEngine, number> = { mysql: 3306, postgres: 5432, redis: 6379, sqlite: 0, mongodb: 27017 };
 
@@ -68,21 +69,21 @@ export function SqlConnectionForm({ initial, index, defaultGroupId, onSave, onCa
   };
 
   const validate = () => {
-    if (!label.trim()) return "Le nom est obligatoire.";
-    if (isServer && !address.trim()) return "L'adresse du serveur est obligatoire.";
-    if (engine === "sqlite" && !path.trim()) return "Le chemin du fichier est obligatoire.";
-    if (engine === "mongodb" && !/^mongodb(\+srv)?:\/\//.test(connectionString.trim())) return "La chaîne doit commencer par mongodb:// ou mongodb+srv://.";
-    if (tunnelKind === "sshHost" && !tunnelHostId) return "Choisissez l'hôte SSH du tunnel.";
-    if (tunnelKind === "ssm" && !ssmTarget.trim()) return "Indiquez l'instance SSM cible.";
+    if (!label.trim()) return t("Le nom est obligatoire.");
+    if (isServer && !address.trim()) return t("L'adresse du serveur est obligatoire.");
+    if (engine === "sqlite" && !path.trim()) return t("Le chemin du fichier est obligatoire.");
+    if (engine === "mongodb" && !/^mongodb(\+srv)?:\/\//.test(connectionString.trim())) return t("La chaîne doit commencer par mongodb:// ou mongodb+srv://.");
+    if (tunnelKind === "sshHost" && !tunnelHostId) return t("Choisissez l'hôte SSH du tunnel.");
+    if (tunnelKind === "ssm" && !ssmTarget.trim()) return t("Indiquez l'instance SSM cible.");
     return null;
   };
 
   return (
-    <FormShell title={initial ? `Modifier « ${initial.connection.label} »` : "Nouvelle connexion"} onSave={save} onCancel={onCancel} validate={validate}>
-      <Field label="Nom">
+    <FormShell title={initial ? t("Modifier « {0} »", initial.connection.label) : t("Nouvelle connexion")} onSave={save} onCancel={onCancel} validate={validate}>
+      <Field label={t("Nom")}>
         <input value={label} onChange={(e) => setLabel(e.target.value)} autoFocus className="input" />
       </Field>
-      <Field label="Moteur">
+      <Field label={t("Moteur")}>
         <select
           value={engine}
           onChange={(e) => {
@@ -99,24 +100,24 @@ export function SqlConnectionForm({ initial, index, defaultGroupId, onSave, onCa
       {isServer && (
         <>
           <div className="grid grid-cols-[1fr_5.5rem] gap-2">
-            <Field label="Adresse"><input value={address} onChange={(e) => setAddress(e.target.value)} className="input input-mono" /></Field>
-            <Field label="Port"><input value={port} onChange={(e) => setPort(e.target.value)} inputMode="numeric" className="input input-mono" /></Field>
+            <Field label={t("Adresse")}><input value={address} onChange={(e) => setAddress(e.target.value)} className="input input-mono" /></Field>
+            <Field label={t("Port")}><input value={port} onChange={(e) => setPort(e.target.value)} inputMode="numeric" className="input input-mono" /></Field>
           </div>
           <div className="grid grid-cols-2 gap-2">
-            <Field label={engine === "redis" ? "Utilisateur ACL (optionnel)" : "Utilisateur"}><input value={username} onChange={(e) => setUsername(e.target.value)} className="input input-mono" /></Field>
-            <Field label={engine === "redis" ? "Index de base (0-15)" : engine === "postgres" ? "Base" : "Base (optionnelle)"}><input value={database} onChange={(e) => setDatabase(e.target.value)} className="input input-mono" /></Field>
+            <Field label={engine === "redis" ? t("Utilisateur ACL (optionnel)") : t("Utilisateur")}><input value={username} onChange={(e) => setUsername(e.target.value)} className="input input-mono" /></Field>
+            <Field label={engine === "redis" ? t("Index de base (0-15)") : engine === "postgres" ? t("Base") : t("Base (optionnelle)")}><input value={database} onChange={(e) => setDatabase(e.target.value)} className="input input-mono" /></Field>
           </div>
-          <Field label="Mot de passe"><PasswordInput value={password} onChange={setPassword} autoComplete="off" /></Field>
-          {engine === "redis" && <Checkbox checked={tls} onChange={setTls} label="TLS (rediss://)" />}
+          <Field label={t("Mot de passe")}><PasswordInput value={password} onChange={setPassword} autoComplete="off" /></Field>
+          {engine === "redis" && <Checkbox checked={tls} onChange={setTls} label={t("TLS (rediss://)")} />}
         </>
       )}
 
       {engine === "sqlite" && (
         <>
-          <Field label="Fichier" hint={sqliteHostId ? "Sur l'hôte choisi : récupéré par SFTP à l'ouverture, réécrit à la fermeture." : "Sur la machine qui ouvre la connexion."}>
+          <Field label={t("Fichier")} hint={sqliteHostId ? t("Sur l'hôte choisi : récupéré par SFTP à l'ouverture, réécrit à la fermeture.") : t("Sur la machine qui ouvre la connexion.")}>
             <input value={path} onChange={(e) => setPath(e.target.value)} placeholder="/var/lib/app/data.db" className="input input-mono" />
           </Field>
-          <Field label="Sur l'hôte">
+          <Field label={t("Sur l'hôte")}>
             <HostSelect index={index} value={sqliteHostId} onChange={setSqliteHostId} none="Cette machine" />
           </Field>
         </>
@@ -124,43 +125,43 @@ export function SqlConnectionForm({ initial, index, defaultGroupId, onSave, onCa
 
       {engine === "mongodb" && (
         <>
-          <Field label="Chaîne de connexion">
+          <Field label={t("Chaîne de connexion")}>
             <input value={connectionString} onChange={(e) => setConnectionString(e.target.value)} placeholder="mongodb://host:27017/db" className="input input-mono" />
           </Field>
           <div className="grid grid-cols-2 gap-2">
-            <Field label="Utilisateur (si absent de la chaîne)"><input value={username} onChange={(e) => setUsername(e.target.value)} className="input input-mono" /></Field>
-            <Field label="Mot de passe"><PasswordInput value={password} onChange={setPassword} autoComplete="off" /></Field>
+            <Field label={t("Utilisateur (si absent de la chaîne)")}><input value={username} onChange={(e) => setUsername(e.target.value)} className="input input-mono" /></Field>
+            <Field label={t("Mot de passe")}><PasswordInput value={password} onChange={setPassword} autoComplete="off" /></Field>
           </div>
-          <Checkbox checked={tls} onChange={setTls} label="TLS" hint="DocumentDB n'accepte rien d'autre." />
+          <Checkbox checked={tls} onChange={setTls} label="TLS" hint={t("DocumentDB n'accepte rien d'autre.")} />
           {tls && (
             <>
-              <Field label="Fichier CA (optionnel)"><input value={tlsCaFile} onChange={(e) => setTlsCaFile(e.target.value)} className="input input-mono" /></Field>
-              <Checkbox checked={tlsInsecure} onChange={setTlsInsecure} label="Ne pas vérifier le certificat" hint="Nécessaire pour combiner TLS et tunnel SSH." />
+              <Field label={t("Fichier CA (optionnel)")}><input value={tlsCaFile} onChange={(e) => setTlsCaFile(e.target.value)} className="input input-mono" /></Field>
+              <Checkbox checked={tlsInsecure} onChange={setTlsInsecure} label={t("Ne pas vérifier le certificat")} hint={t("Nécessaire pour combiner TLS et tunnel SSH.")} />
             </>
           )}
         </>
       )}
 
       {engine !== "sqlite" && (
-        <Field group label="Connexion">
-          <select aria-label="Mode de connexion" value={tunnelKind} onChange={(e) => setTunnelKind(e.target.value as TunnelKind)} className="input">
-            <option value="direct">Directe</option>
-            <option value="sshHost">Tunnel via un hôte SSH</option>
-            <option value="ssm">Tunnel AWS SSM</option>
+        <Field group label={t("Connexion")}>
+          <select aria-label={t("Mode de connexion")} value={tunnelKind} onChange={(e) => setTunnelKind(e.target.value as TunnelKind)} className="input">
+            <option value="direct">{t("Directe")}</option>
+            <option value="sshHost">{t("Tunnel via un hôte SSH")}</option>
+            <option value="ssm">{t("Tunnel AWS SSM")}</option>
           </select>
-          {tunnelKind === "sshHost" && <div className="mt-1.5"><HostSelect index={index} value={tunnelHostId} onChange={setTunnelHostId} none="Choisir un hôte…" label="Hôte du tunnel" /></div>}
+          {tunnelKind === "sshHost" && <div className="mt-1.5"><HostSelect index={index} value={tunnelHostId} onChange={setTunnelHostId} none="Choisir un hôte…" label={t("Hôte du tunnel")} /></div>}
           {tunnelKind === "ssm" && (
             <div className="mt-1.5 grid grid-cols-[2fr_1fr_1fr] gap-1.5">
               <input value={ssmTarget} onChange={(e) => setSsmTarget(e.target.value)} placeholder="i-0123456789abcdef0" className="input input-mono" />
               <input value={ssmProfile} onChange={(e) => setSsmProfile(e.target.value)} placeholder="profil" className="input input-mono" />
-              <input value={ssmRegion} onChange={(e) => setSsmRegion(e.target.value)} placeholder="région" className="input input-mono" />
+              <input value={ssmRegion} onChange={(e) => setSsmRegion(e.target.value)} placeholder={t("région")} className="input input-mono" />
             </div>
           )}
         </Field>
       )}
 
-      <Field label="Dossier"><GroupSelect groups={index.groups} value={groupId} onChange={setGroupId} /></Field>
-      <Field label="Étiquettes"><TagsInput value={tags} onChange={setTags} /></Field>
+      <Field label={t("Dossier")}><GroupSelect groups={index.groups} value={groupId} onChange={setGroupId} /></Field>
+      <Field label={t("Étiquettes")}><TagsInput value={tags} onChange={setTags} /></Field>
     </FormShell>
   );
 }

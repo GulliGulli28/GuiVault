@@ -198,6 +198,10 @@ celle de `html`.
   (« Windows », « Application »).
 - **Vocabulaire** : « Codes 2FA » (pas « Authentificateur »), « Vider le
   presse-papiers », « 18 éléments » (pas « élément(s) »).
+- **Deux langues** : le français s'écrit dans le code (`t("…")`), l'anglais
+  dans `src/i18n/en.json`. En anglais : « vault » pour un vault comme pour un
+  coffre local (« local vault »), « login » pour un identifiant, phrases
+  courtes à l'impératif comme en français.
 - **Débordements** : tout nom, e-mail ou URL est tronqué (`.trunc`, avec un
   `min-width: 0` sur le parent flex) ou coupé (`.break`, `.clamp2`). Les
   barres d'outils passent à la ligne (`flex-wrap`). Les maquettes

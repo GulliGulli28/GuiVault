@@ -7,6 +7,7 @@ import { IconField } from "../IconPicker";
 import { IconClose, IconDocker, IconHosts, IconKubernetes, IconMonitor } from "../ui-icons";
 import { PasswordInput } from "../ui";
 import { Checkbox, Field, FormShell, GroupSelect, HostSelect, TagsInput, parsePort, useSeed } from "./common";
+import { t } from "../../lib/i18n";
 
 type AuthKind = "password" | "agent" | "keyboardInteractive" | "privateKey";
 
@@ -65,8 +66,8 @@ export function HostForm({ initial, index, defaultGroupId, onSave, onCancel, onA
   const showPort = kind === "ssh" || kind === "rdp";
   const showAuth = kind === "ssh" || kind === "rdp";
   const sshExtras = kind === "ssh";
-  const addressLabel = kind === "dockerExec" ? "Socket ou hôte du démon Docker" : kind === "k8sExec" ? "Contexte kubeconfig" : "Adresse";
-  const usernameLabel = kind === "k8sExec" ? "Namespace par défaut" : "Utilisateur";
+  const addressLabel = kind === "dockerExec" ? t("Socket ou hôte du démon Docker") : kind === "k8sExec" ? t("Contexte kubeconfig") : t("Adresse");
+  const usernameLabel = kind === "k8sExec" ? t("Namespace par défaut") : t("Utilisateur");
 
   const buildAuth = (): AuthMethod => {
     if (!showAuth) return "password";
@@ -108,10 +109,10 @@ export function HostForm({ initial, index, defaultGroupId, onSave, onCancel, onA
   };
 
   const validate = () => {
-    if (!label.trim()) return "Le nom est obligatoire.";
+    if (!label.trim()) return t("Le nom est obligatoire.");
     if (kind !== "dockerExec" && !address.trim()) return `${addressLabel} : obligatoire.`;
-    if (kind === "dockerExec" && !dockerVia && !address.trim()) return "Indiquez le socket du démon, ou un hôte SSH relais.";
-    if (showAuth && authKind === "privateKey" && !keyId && !keyPath.trim()) return "Choisissez une clé du trousseau ou indiquez son chemin.";
+    if (kind === "dockerExec" && !dockerVia && !address.trim()) return t("Indiquez le socket du démon, ou un hôte SSH relais.");
+    if (showAuth && authKind === "privateKey" && !keyId && !keyPath.trim()) return t("Choisissez une clé du trousseau ou indiquez son chemin.");
     return null;
   };
 
@@ -126,12 +127,12 @@ export function HostForm({ initial, index, defaultGroupId, onSave, onCancel, onA
   const otherHosts = index.hosts.filter((x) => x.id !== h?.id && (x.kind ?? "ssh") === "ssh");
 
   return (
-    <FormShell title={initial ? `Modifier « ${initial.host.label} »` : "Nouvel hôte"} onSave={save} onCancel={onCancel} validate={validate}>
-      <Field label="Nom">
+    <FormShell title={initial ? t("Modifier « {0} »", initial.host.label) : t("Nouvel hôte")} onSave={save} onCancel={onCancel} validate={validate}>
+      <Field label={t("Nom")}>
         <input value={label} onChange={(e) => setLabel(e.target.value)} autoFocus className="input" />
       </Field>
 
-      <Field group label="Type de connexion">
+      <Field group label={t("Type de connexion")}>
         <div className="grid grid-cols-2 gap-1.5">
           {HOST_KINDS.map(({ key, Icon }) => (
             <button
@@ -158,112 +159,112 @@ export function HostForm({ initial, index, defaultGroupId, onSave, onCancel, onA
           <input
             value={address}
             onChange={(e) => setAddress(e.target.value)}
-            placeholder={kind === "dockerExec" ? (dockerVia ? "ignoré : voir l'hôte SSH relais" : "unix:///var/run/docker.sock") : kind === "k8sExec" ? "mon-cluster" : "srv.example.com"}
+            placeholder={kind === "dockerExec" ? (dockerVia ? t("ignoré : voir l'hôte SSH relais") : "unix:///var/run/docker.sock") : kind === "k8sExec" ? "mon-cluster" : "srv.example.com"}
             disabled={kind === "dockerExec" && !!dockerVia}
             className="input input-mono disabled:opacity-40"
           />
         </Field>
         {showPort && (
-          <Field label="Port">
+          <Field label={t("Port")}>
             <input value={port} onChange={(e) => setPort(e.target.value)} inputMode="numeric" className="input input-mono" />
           </Field>
         )}
       </div>
       {kind === "dockerExec" && (
-        <Field label="Via un hôte SSH (bastion)" hint={dockerVia ? "Le démon Docker par défaut de cet hôte SSH sera utilisé ; le socket ci-dessus est ignoré." : "Utile quand le démon distant n'expose pas de port TCP."}>
+        <Field label={t("Via un hôte SSH (bastion)")} hint={dockerVia ? t("Le démon Docker par défaut de cet hôte SSH sera utilisé ; le socket ci-dessus est ignoré.") : t("Utile quand le démon distant n'expose pas de port TCP.")}>
           <HostSelect index={index} value={dockerVia} onChange={setDockerVia} exclude={h?.id} />
         </Field>
       )}
-      {kind === "k8sExec" && <p className="help-text -mt-1.5">Authentifié par kubeconfig ; le pod se choisit à la connexion.</p>}
+      {kind === "k8sExec" && <p className="help-text -mt-1.5">{t("Authentifié par kubeconfig ; le pod se choisit à la connexion.")}</p>}
 
       <Field label={usernameLabel}>
         <input value={username} onChange={(e) => setUsername(e.target.value)} className="input" />
       </Field>
 
       {showAuth && (
-        <Field label="Authentification">
+        <Field label={t("Authentification")}>
           <select value={authKind} onChange={(e) => setAuthKind(e.target.value as AuthKind)} className="input" disabled={kind === "rdp"}>
-            <option value="password">Mot de passe</option>
-            <option value="privateKey">Clé privée</option>
-            <option value="agent">Agent SSH</option>
-            <option value="keyboardInteractive">Keyboard-interactive (MFA / OTP)</option>
+            <option value="password">{t("Mot de passe")}</option>
+            <option value="privateKey">{t("Clé privée")}</option>
+            <option value="agent">{t("Agent SSH")}</option>
+            <option value="keyboardInteractive">{t("Keyboard-interactive (MFA / OTP)")}</option>
           </select>
         </Field>
       )}
       {showAuth && authKind === "agent" && sshExtras && (
-        <Checkbox checked={agentForward} onChange={setAgentForward} label="Transférer l'agent SSH" hint="Seulement vers un hôte de confiance." />
+        <Checkbox checked={agentForward} onChange={setAgentForward} label={t("Transférer l'agent SSH")} hint={t("Seulement vers un hôte de confiance.")} />
       )}
       {showAuth && authKind === "privateKey" && (
         <>
-          <Field label="Clé du trousseau" hint="Une clé du vault : son contenu et sa passphrase la suivent.">
+          <Field label={t("Clé du trousseau")} hint={t("Une clé du vault : son contenu et sa passphrase la suivent.")}>
             <select value={keyId ?? ""} onChange={(e) => setKeyId(e.target.value || null)} className="input">
-              <option value="">— par chemin —</option>
+              <option value="">{t("— par chemin —")}</option>
               {index.keys.map((k) => <option key={k.id} value={k.id}>{k.name}</option>)}
             </select>
           </Field>
           {!keyId && (
-            <Field label="Chemin de la clé privée" hint="Sur la machine qui se connecte.">
+            <Field label={t("Chemin de la clé privée")} hint={t("Sur la machine qui se connecte.")}>
               <input value={keyPath} onChange={(e) => setKeyPath(e.target.value)} placeholder="~/.ssh/id_ed25519" className="input input-mono" />
             </Field>
           )}
-          <Field label="Certificat (optionnel)" hint="Certificat OpenSSH présenté avec la clé.">
+          <Field label={t("Certificat (optionnel)")} hint={t("Certificat OpenSSH présenté avec la clé.")}>
             <input value={certPath} onChange={(e) => setCertPath(e.target.value)} placeholder="~/.ssh/id_ed25519-cert.pub" className="input input-mono" />
           </Field>
         </>
       )}
       {showAuth && (authKind === "password" || (authKind === "privateKey" && !keyId)) && (
-        <Field label={authKind === "password" ? "Mot de passe" : "Passphrase (optionnelle)"}>
+        <Field label={authKind === "password" ? t("Mot de passe") : t("Passphrase (optionnelle)")}>
           <PasswordInput value={authKind === "password" ? password : passphrase} onChange={authKind === "password" ? setPassword : setPassphrase} autoComplete="off" />
         </Field>
       )}
 
       {sshExtras && (
-        <Field group label="Chaîne de bastions" hint="Dans l'ordre de traversée · exclut la commande de proxy.">
+        <Field group label={t("Chaîne de bastions")} hint={t("Dans l'ordre de traversée · exclut la commande de proxy.")}>
           <div className="space-y-1">
             {jumpVia.map((id, i) => (
               <div key={`${id}-${i}`} className="flex items-center gap-1">
-                <span className="input flex items-center">{otherHosts.find((x) => x.id === id)?.label ?? `hôte inconnu (${id.slice(0, 8)})`}</span>
-                <button type="button" onClick={() => setJumpVia(move(jumpVia, i, -1))} disabled={i === 0} aria-label="Monter" className="btn btn-ghost btn-sm btn-icon disabled:opacity-20">↑</button>
-                <button type="button" onClick={() => setJumpVia(move(jumpVia, i, 1))} disabled={i === jumpVia.length - 1} aria-label="Descendre" className="btn btn-ghost btn-sm btn-icon disabled:opacity-20">↓</button>
-                <button type="button" onClick={() => setJumpVia(jumpVia.filter((_, j) => j !== i))} aria-label="Retirer" className="btn btn-ghost btn-sm btn-icon hover:text-[var(--c-danger)]"><IconClose size={11} /></button>
+                <span className="input flex items-center">{otherHosts.find((x) => x.id === id)?.label ?? t("hôte inconnu ({0})", id.slice(0, 8))}</span>
+                <button type="button" onClick={() => setJumpVia(move(jumpVia, i, -1))} disabled={i === 0} aria-label={t("Monter")} className="btn btn-ghost btn-sm btn-icon disabled:opacity-20">↑</button>
+                <button type="button" onClick={() => setJumpVia(move(jumpVia, i, 1))} disabled={i === jumpVia.length - 1} aria-label={t("Descendre")} className="btn btn-ghost btn-sm btn-icon disabled:opacity-20">↓</button>
+                <button type="button" onClick={() => setJumpVia(jumpVia.filter((_, j) => j !== i))} aria-label={t("Retirer")} className="btn btn-ghost btn-sm btn-icon hover:text-[var(--c-danger)]"><IconClose size={11} /></button>
               </div>
             ))}
             <select value="" onChange={(e) => { if (e.target.value) setJumpVia([...jumpVia, e.target.value]); }} className="input" disabled={!!proxyCommand.trim()}>
-              <option value="">Ajouter un relais…</option>
+              <option value="">{t("Ajouter un relais…")}</option>
               {otherHosts.filter((x) => !jumpVia.includes(x.id)).map((x) => <option key={x.id} value={x.id}>{x.label}</option>)}
             </select>
           </div>
         </Field>
       )}
       {sshExtras && (
-        <Field label="Commande de proxy" hint="ProxyCommand OpenSSH (%h, %p, %r) · remplace les bastions.">
-          <input value={proxyCommand} onChange={(e) => setProxyCommand(e.target.value)} placeholder="aws ssm start-session --target %h --document-name AWS-StartSSHSession --parameters portNumber=%p" className="input input-mono" />
+        <Field label={t("Commande de proxy")} hint={t("ProxyCommand OpenSSH (%h, %p, %r) · remplace les bastions.")}>
+          <input value={proxyCommand} onChange={(e) => setProxyCommand(e.target.value)} placeholder={t("aws ssm start-session --target %h --document-name AWS-StartSSHSession --parameters portNumber=%p")} className="input input-mono" />
         </Field>
       )}
 
-      <Field label="Dossier">
+      <Field label={t("Dossier")}>
         <GroupSelect groups={index.groups} value={groupId} onChange={setGroupId} />
       </Field>
-      <Field label="Étiquettes">
+      <Field label={t("Étiquettes")}>
         <TagsInput value={tags} onChange={setTags} />
       </Field>
-      <Field group label="Icône" hint="Sans choix : celle du genre d'hôte.">
+      <Field group label={t("Icône")} hint={t("Sans choix : celle du genre d'hôte.")}>
         <IconField value={icon} onChange={setIcon} customIcons={index.icons} onAddIcon={onAddIcon} fallback={(() => { const K = HOST_KINDS.find((k) => k.key === kind)?.Icon ?? IconHosts; return <K size={14} />; })()} />
       </Field>
 
       {kind !== "rdp" && (
-        <Field group label="Snippets au démarrage">
+        <Field group label={t("Snippets au démarrage")}>
           <div className="space-y-1">
             {startupSnippets.map((id, i) => (
               <div key={`${id}-${i}`} className="flex items-center gap-1">
-                <span className="input flex items-center">{index.snippets.find((x) => x.id === id)?.name ?? `snippet inconnu (${id.slice(0, 8)})`}</span>
-                <button type="button" onClick={() => setStartupSnippets(move(startupSnippets, i, -1))} disabled={i === 0} aria-label="Monter" className="btn btn-ghost btn-sm btn-icon disabled:opacity-20">↑</button>
-                <button type="button" onClick={() => setStartupSnippets(move(startupSnippets, i, 1))} disabled={i === startupSnippets.length - 1} aria-label="Descendre" className="btn btn-ghost btn-sm btn-icon disabled:opacity-20">↓</button>
-                <button type="button" onClick={() => setStartupSnippets(startupSnippets.filter((_, j) => j !== i))} aria-label="Retirer" className="btn btn-ghost btn-sm btn-icon hover:text-[var(--c-danger)]"><IconClose size={11} /></button>
+                <span className="input flex items-center">{index.snippets.find((x) => x.id === id)?.name ?? t("snippet inconnu ({0})", id.slice(0, 8))}</span>
+                <button type="button" onClick={() => setStartupSnippets(move(startupSnippets, i, -1))} disabled={i === 0} aria-label={t("Monter")} className="btn btn-ghost btn-sm btn-icon disabled:opacity-20">↑</button>
+                <button type="button" onClick={() => setStartupSnippets(move(startupSnippets, i, 1))} disabled={i === startupSnippets.length - 1} aria-label={t("Descendre")} className="btn btn-ghost btn-sm btn-icon disabled:opacity-20">↓</button>
+                <button type="button" onClick={() => setStartupSnippets(startupSnippets.filter((_, j) => j !== i))} aria-label={t("Retirer")} className="btn btn-ghost btn-sm btn-icon hover:text-[var(--c-danger)]"><IconClose size={11} /></button>
               </div>
             ))}
             <select value="" onChange={(e) => { if (e.target.value) setStartupSnippets([...startupSnippets, e.target.value]); }} className="input">
-              <option value="">Ajouter un snippet…</option>
+              <option value="">{t("Ajouter un snippet…")}</option>
               {index.snippets.filter((x) => !startupSnippets.includes(x.id)).map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
             </select>
           </div>
@@ -271,7 +272,7 @@ export function HostForm({ initial, index, defaultGroupId, onSave, onCancel, onA
       )}
 
       {kind !== "rdp" && (
-        <Field group label="Variables d'environnement" hint="Une variable secrète est chiffrée à part.">
+        <Field group label={t("Variables d'environnement")} hint={t("Une variable secrète est chiffrée à part.")}>
           <div className="space-y-1">
             {envVars.map((v, i) => (
               <div key={i} className="grid grid-cols-[1fr_1fr_auto_auto] items-center gap-1">
@@ -281,27 +282,27 @@ export function HostForm({ initial, index, defaultGroupId, onSave, onCancel, onA
                 ) : (
                   <input value={v.value} onChange={(e) => setEnvVars(envVars.map((x, j) => (j === i ? { ...x, value: e.target.value } : x)))} placeholder="valeur" className="input input-mono" />
                 )}
-                <label className="flex items-center gap-1 text-[11px] text-[var(--c-text-muted)]" title="Valeur secrète">
+                <label className="flex items-center gap-1 text-[11px] text-[var(--c-text-muted)]" title={t("Valeur secrète")}>
                   <input type="checkbox" checked={!!v.secret} onChange={(e) => setEnvVars(envVars.map((x, j) => (j === i ? { ...x, secret: e.target.checked } : x)))} />
-                  secret
+                  {t("secret")}
                 </label>
-                <button type="button" onClick={() => setEnvVars(envVars.filter((_, j) => j !== i))} aria-label="Retirer" className="btn btn-ghost btn-sm btn-icon hover:text-[var(--c-danger)]"><IconClose size={11} /></button>
+                <button type="button" onClick={() => setEnvVars(envVars.filter((_, j) => j !== i))} aria-label={t("Retirer")} className="btn btn-ghost btn-sm btn-icon hover:text-[var(--c-danger)]"><IconClose size={11} /></button>
               </div>
             ))}
-            <button type="button" onClick={() => setEnvVars([...envVars, { key: "", value: "", secret: false, secretValue: "" }])} className="btn btn-secondary btn-sm">Ajouter une variable</button>
+            <button type="button" onClick={() => setEnvVars([...envVars, { key: "", value: "", secret: false, secretValue: "" }])} className="btn btn-secondary btn-sm">{t("Ajouter une variable")}</button>
           </div>
         </Field>
       )}
 
       {sshExtras && (
         <div className="grid grid-cols-2 gap-2">
-          <Field label="Keepalive (s, 0 = désactivé)">
+          <Field label={t("Keepalive (s, 0 = désactivé)")}>
             <input value={keepalive} onChange={(e) => setKeepalive(e.target.value)} inputMode="numeric" className="input" />
           </Field>
-          <Field label="Session persistante">
+          <Field label={t("Session persistante")}>
             <select value={persistentShell} onChange={(e) => setPersistentShell(e.target.value as PersistentShellMode)} className="input">
-              <option value="off">Désactivée</option>
-              <option value="tmux">tmux</option>
+              <option value="off">{t("Désactivée")}</option>
+              <option value="tmux">{t("tmux")}</option>
             </select>
           </Field>
         </div>

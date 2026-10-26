@@ -6,23 +6,24 @@ import { ConfirmDialog } from "./ConfirmDialog";
 import { IconChevronRight, IconTrash } from "./ui-icons";
 import { navigate } from "../lib/route";
 import { Eyebrow, Field, formatWhen, InfoTip, Loading, Modal, useDelayed } from "./ui";
+import { t, translated, locale, plural } from "../lib/i18n";
 
-const REGISTRATION_LABELS: Record<AdminOverview["registration"], string> = {
+const REGISTRATION_LABELS: Record<AdminOverview["registration"], string> = translated({
   open: "ouvertes à tous",
   invite_only: "sur invitation",
   closed: "fermées",
-};
+});
 
 const MIB = 1024 * 1024;
 
 /** Octets en unités binaires, à la française. */
 function formatBytes(n: number): string {
   if (n < 1024) return `${n} o`;
-  const units = ["Kio", "Mio", "Gio", "Tio"];
+  const units = [t("Kio"), t("Mio"), t("Gio"), t("Tio")];
   let v = n / 1024;
   let i = 0;
   while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
-  return `${v.toLocaleString("fr-FR", { maximumFractionDigits: v < 10 ? 1 : 0 })} ${units[i]}`;
+  return `${v.toLocaleString(locale(), { maximumFractionDigits: v < 10 ? 1 : 0 })} ${units[i]}`;
 }
 
 /** L'administration du serveur : son état, les comptes (désactiver, quota,
@@ -70,15 +71,15 @@ export function AdminPage({ ctx }: { ctx: PageContext }) {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <header className="flex min-h-[64px] shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-[var(--c-border)] px-6 py-3 max-md:px-3 max-md:pt-[calc(0.75rem+var(--inset-top))]">
-        <button onClick={() => navigate({ page: "more" })} className="btn btn-ghost btn-icon md:hidden" title="Retour aux réglages" aria-label="Retour aux réglages"><IconChevronRight size={14} className="rotate-180" /></button>
+        <button onClick={() => navigate({ page: "more" })} className="btn btn-ghost btn-icon md:hidden" title={t("Retour aux réglages")} aria-label={t("Retour aux réglages")}><IconChevronRight size={14} className="rotate-180" /></button>
         <div className="min-w-0 flex-1">
-          <h1 className="truncate text-[18px] font-semibold tracking-[-0.015em]">Administration</h1>
+          <h1 className="truncate text-[18px] font-semibold tracking-[-0.015em]">{t("Administration")}</h1>
           <p className="flex items-center gap-1.5 text-[12.5px] text-[var(--c-text-muted)]">
-            Comptes et volumes, jamais leur contenu
-            <InfoTip label="Ce que voit un administrateur" items={[
-              { text: "Les comptes, leurs dates et la taille de ce qu'ils stockent.", tone: "ok" },
-              { text: "Aucune clé : pas plus que le serveur.", tone: "ok" },
-              { text: <>Le rôle se donne depuis le serveur : <code className="font-mono">guivault admin grant &lt;email&gt;</code>.</> },
+            {t("Comptes et volumes, jamais leur contenu")}
+            <InfoTip label={t("Ce que voit un administrateur")} items={[
+              { text: t("Les comptes, leurs dates et la taille de ce qu'ils stockent."), tone: "ok" },
+              { text: t("Aucune clé : pas plus que le serveur."), tone: "ok" },
+              { text: <>{t("Le rôle se donne depuis le serveur :")} <code className="font-mono">{t("guivault admin grant <email>")}</code>.</> },
             ]} />
           </p>
         </div>
@@ -99,12 +100,12 @@ export function AdminPage({ ctx }: { ctx: PageContext }) {
             />
             <section className="max-w-3xl space-y-1.5">
               <div className="flex items-center gap-2">
-                <Eyebrow>Comptes ({users.length})</Eyebrow>
+                <Eyebrow>{t("Comptes (")}{users.length})</Eyebrow>
                 <input
                   value={filter}
                   onChange={(e) => setFilter(e.target.value)}
-                  placeholder="Filtrer par adresse"
-                  aria-label="Filtrer les comptes par adresse"
+                  placeholder={t("Filtrer par adresse")}
+                  aria-label={t("Filtrer les comptes par adresse")}
                   className="input ml-auto h-7 max-w-[220px] text-[12px]"
                 />
               </div>
@@ -116,23 +117,23 @@ export function AdminPage({ ctx }: { ctx: PageContext }) {
                     <div className="min-w-0 flex-1">
                       <p className="flex min-w-0 flex-wrap items-center gap-1.5 text-[12.5px] text-[var(--c-text)]">
                         <span className="truncate">{u.email}</span>
-                        {self && <span className="tag shrink-0">vous</span>}
-                        {u.is_admin && <span className="tag shrink-0">administrateur</span>}
-                        {u.disabled_at && <span className="tag shrink-0 text-[var(--c-danger)]" title={`Depuis le ${formatWhen(u.disabled_at)}`}>désactivé</span>}
-                        {u.totp_enabled && <span className="tag shrink-0" title="Second facteur activé">2FA</span>}
+                        {self && <span className="tag shrink-0">{t("vous")}</span>}
+                        {u.is_admin && <span className="tag shrink-0">{t("administrateur")}</span>}
+                        {u.disabled_at && <span className="tag shrink-0 text-[var(--c-danger)]" title={t("Depuis le {0}", formatWhen(u.disabled_at))}>{t("désactivé")}</span>}
+                        {u.totp_enabled && <span className="tag shrink-0" title={t("Second facteur activé")}>{t("2FA")}</span>}
                       </p>
                       <p className="text-[11px] text-[var(--c-text-muted)]">
-                        créé le {formatWhen(u.created_at)}
-                        {` · ${u.last_seen_at ? `vu le ${formatWhen(u.last_seen_at)}` : "jamais vu"}`}
-                        {` · ${u.active_sessions} session${u.active_sessions > 1 ? "s" : ""}`}
-                        {` · ${u.vaults_owned} vault${u.vaults_owned > 1 ? "s" : ""}`}
-                        {u.vaults_joined > 0 ? ` (+${u.vaults_joined} partagé${u.vaults_joined > 1 ? "s" : ""})` : ""}
-                        {` · ${u.items} élément${u.items > 1 ? "s" : ""}`}
+                        {t("créé le")} {formatWhen(u.created_at)}
+                        {` · ${u.last_seen_at ? t("vu le {0}", formatWhen(u.last_seen_at)) : t("jamais vu")}`}
+                        {t(" · {0} session{1}", u.active_sessions, u.active_sessions > 1 ? "s" : "")}
+                        {t(" · {0} vault{1}", u.vaults_owned, u.vaults_owned > 1 ? "s" : "")}
+                        {u.vaults_joined > 0 ? t(" (+{0} partagé{1})", u.vaults_joined, u.vaults_joined > 1 ? "s" : "") : ""}
+                        {t(" · {0} élément{1}", u.items, u.items > 1 ? "s" : "")}
                       </p>
                       <p className="text-[11px] text-[var(--c-text-muted)]">
                         {formatBytes(u.storage_bytes)}
-                        {quota > 0 ? ` sur ${formatBytes(quota)}` : " · sans quota"}
-                        {u.quota_bytes !== null ? " (propre au compte)" : ""}
+                        {quota > 0 ? ` sur ${formatBytes(quota)}` : t(" · sans quota")}
+                        {u.quota_bytes !== null ? t(" (propre au compte)") : ""}
                       </p>
                       {quota > 0 && (
                         <div className="mt-1 h-1 max-w-[240px] overflow-hidden rounded-full bg-[var(--c-bg3)]" aria-hidden="true">
@@ -143,21 +144,21 @@ export function AdminPage({ ctx }: { ctx: PageContext }) {
                         </div>
                       )}
                     </div>
-                    <button onClick={() => setQuotaFor(u)} className="btn btn-ghost btn-sm" aria-label={`Quota de ${u.email}`}>Quota…</button>
+                    <button onClick={() => setQuotaFor(u)} className="btn btn-ghost btn-sm" aria-label={t("Quota de {0}", u.email)}>{t("Quota…")}</button>
                     {!self && !u.is_admin && (
                       <>
                         {u.disabled_at ? (
-                          <button onClick={() => void act(() => api.adminEnable(u.id), `${u.email} peut de nouveau se connecter.`)} className="btn btn-secondary btn-sm" aria-label={`Réactiver ${u.email}`}>Réactiver</button>
+                          <button onClick={() => void act(() => api.adminEnable(u.id), t("{0} peut de nouveau se connecter.", u.email))} className="btn btn-secondary btn-sm" aria-label={t("Réactiver {0}", u.email)}>{t("Réactiver")}</button>
                         ) : (
-                          <button onClick={() => setDisabling(u)} className="btn btn-ghost btn-sm" aria-label={`Désactiver ${u.email}`}>Désactiver</button>
+                          <button onClick={() => setDisabling(u)} className="btn btn-ghost btn-sm" aria-label={t("Désactiver {0}", u.email)}>{t("Désactiver")}</button>
                         )}
-                        <button onClick={() => setDeleting(u)} className="btn btn-ghost btn-sm btn-icon hover:text-[var(--c-danger)]" title="Supprimer le compte" aria-label={`Supprimer ${u.email}`}><IconTrash size={12} /></button>
+                        <button onClick={() => setDeleting(u)} className="btn btn-ghost btn-sm btn-icon hover:text-[var(--c-danger)]" title={t("Supprimer le compte")} aria-label={t("Supprimer {0}", u.email)}><IconTrash size={12} /></button>
                       </>
                     )}
                   </div>
                 );
               })}
-              {shown.length === 0 && <p className="text-[12.5px] text-[var(--c-text-muted)]">Aucun compte ne correspond.</p>}
+              {shown.length === 0 && <p className="text-[12.5px] text-[var(--c-text-muted)]">{t("Aucun compte ne correspond.")}</p>}
             </section>
           </>
         )}
@@ -167,16 +168,16 @@ export function AdminPage({ ctx }: { ctx: PageContext }) {
           user={quotaFor}
           defaultQuota={overview?.default_quota_bytes ?? 0}
           onClose={closeQuota}
-          onSave={async (q) => { setQuotaFor(null); await act(() => api.adminSetQuota(quotaFor.id, q), "Quota enregistré."); }}
+          onSave={async (q) => { setQuotaFor(null); await act(() => api.adminSetQuota(quotaFor.id, q), t("Quota enregistré.")); }}
         />
       )}
       {disabling && (
         <ConfirmDialog
-          title={`Désactiver ${disabling.email} ?`}
-          message="Ses sessions sont coupées et il ne peut plus se connecter. Rien n'est effacé : ses vaults restent, et les autres membres de ses vaults partagés continuent. Réversible."
-          confirmLabel="Désactiver"
+          title={t("Désactiver {0} ?", disabling.email)}
+          message={t("Ses sessions sont coupées et il ne peut plus se connecter. Rien n'est effacé : ses vaults restent, et les autres membres de ses vaults partagés continuent. Réversible.")}
+          confirmLabel={t("Désactiver")}
           danger
-          onConfirm={() => { const u = disabling; setDisabling(null); void act(() => api.adminDisable(u.id), `${u.email} est désactivé.`); }}
+          onConfirm={() => { const u = disabling; setDisabling(null); void act(() => api.adminDisable(u.id), t("{0} est désactivé.", u.email)); }}
           onCancel={() => setDisabling(null)}
         />
       )}
@@ -184,7 +185,7 @@ export function AdminPage({ ctx }: { ctx: PageContext }) {
         <DeleteUserDialog
           user={deleting}
           onClose={closeDelete}
-          onDeleted={() => { notify(`Compte ${deleting.email} supprimé.`); setDeleting(null); load(); }}
+          onDeleted={() => { notify(t("Compte {0} supprimé.", deleting.email)); setDeleting(null); load(); }}
         />
       )}
     </div>
@@ -208,7 +209,7 @@ function ServerSummary({ overview: o, ctx }: { overview: AdminOverview; ctx: Pag
     setTesting(true);
     try {
       await api.adminMailTest();
-      ctx.notify("E-mail d'essai envoyé : regardez votre boîte.");
+      ctx.notify(t("E-mail d'essai envoyé : regardez votre boîte."));
     } catch (e) {
       ctx.error(errorMessage(e));
     } finally {
@@ -217,40 +218,40 @@ function ServerSummary({ overview: o, ctx }: { overview: AdminOverview; ctx: Pag
   };
   return (
     <section className="max-w-3xl space-y-1.5">
-      <Eyebrow>Serveur</Eyebrow>
+      <Eyebrow>{t("Serveur")}</Eyebrow>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <Stat label="Comptes" value={String(o.users)} detail={[o.disabled_users ? `${o.disabled_users} désactivé${o.disabled_users > 1 ? "s" : ""}` : "", `${o.admins} admin${o.admins > 1 ? "s" : ""}`].filter(Boolean).join(" · ")} />
-        <Stat label="Vaults" value={String(o.vaults)} detail={`${o.shared_vaults} partagé${o.shared_vaults > 1 ? "s" : ""}`} />
-        <Stat label="Éléments" value={String(o.items)} detail={formatBytes(o.storage_bytes)} />
-        <Stat label="Sessions actives" value={String(o.active_sessions)} detail={`${o.sends} lien${o.sends > 1 ? "s" : ""} de partage`} />
+        <Stat label={t("Comptes")} value={String(o.users)} detail={[o.disabled_users ? t("{0} désactivé{1}", o.disabled_users, o.disabled_users > 1 ? "s" : "") : "", `${o.admins} admin${o.admins > 1 ? "s" : ""}`].filter(Boolean).join(" · ")} />
+        <Stat label={t("Vaults")} value={String(o.vaults)} detail={t("{0} partagé{1}", o.shared_vaults, o.shared_vaults > 1 ? "s" : "")} />
+        <Stat label={t("Éléments")} value={String(o.items)} detail={formatBytes(o.storage_bytes)} />
+        <Stat label={t("Sessions actives")} value={String(o.active_sessions)} detail={t("{0} lien{1} de partage", o.sends, o.sends > 1 ? "s" : "")} />
       </div>
       <div className="card space-y-0.5 p-2.5 text-[12px] text-[var(--c-text-secondary)]">
-        <p>Inscriptions : <span className="text-[var(--c-text)]">{REGISTRATION_LABELS[o.registration]}</span> <span className="text-[var(--c-text-muted)]">(GUIVAULT_REGISTRATION)</span></p>
-        <p>Quota par défaut : <span className="text-[var(--c-text)]">{o.default_quota_bytes > 0 ? formatBytes(o.default_quota_bytes) : "aucun"}</span> <span className="text-[var(--c-text-muted)]">(GUIVAULT_QUOTA_MB)</span></p>
-        <p>Adresses admises : <span className="text-[var(--c-text)]">{ips(o.allowed_ips)}</span> ; pour l'administration : <span className="text-[var(--c-text)]">{ips(o.admin_allowed_ips)}</span></p>
+        <p>{t("Inscriptions :")} <span className="text-[var(--c-text)]">{REGISTRATION_LABELS[o.registration]}</span> <span className="text-[var(--c-text-muted)]">{t("(GUIVAULT_REGISTRATION)")}</span></p>
+        <p>{t("Quota par défaut :")} <span className="text-[var(--c-text)]">{o.default_quota_bytes > 0 ? formatBytes(o.default_quota_bytes) : "aucun"}</span> <span className="text-[var(--c-text-muted)]">{t("(GUIVAULT_QUOTA_MB)")}</span></p>
+        <p>{t("Adresses admises :")} <span className="text-[var(--c-text)]">{ips(o.allowed_ips)}</span> {t("; pour l'administration :")} <span className="text-[var(--c-text)]">{ips(o.admin_allowed_ips)}</span></p>
         <p className="flex flex-wrap items-center gap-x-2">
           <span>
-            E-mails :{" "}
+            {t("E-mails :")}{" "}
             {o.mail_enabled ? (
-              <span className="text-[var(--c-text)]">activés</span>
+              <span className="text-[var(--c-text)]">{t("activés")}</span>
             ) : o.mail_error ? (
-              <span className="text-[var(--c-danger)]">inutilisables — {o.mail_error}</span>
+              <span className="text-[var(--c-danger)]">{t("inutilisables —")} {o.mail_error}</span>
             ) : (
-              <span className="text-[var(--c-text)]">aucun</span>
+              <span className="text-[var(--c-text)]">{t("aucun")}</span>
             )}{" "}
-            <span className="text-[var(--c-text-muted)]">(GUIVAULT_SMTP_URL, facultatif : rien n'en dépend)</span>
+            <span className="text-[var(--c-text-muted)]">{t("(GUIVAULT_SMTP_URL, facultatif : rien n'en dépend)")}</span>
           </span>
           {o.mail_enabled && (
-            <button onClick={() => void mailTest()} disabled={testing} className="btn btn-ghost btn-sm">{testing ? "Envoi…" : "Envoyer un e-mail d'essai"}</button>
+            <button onClick={() => void mailTest()} disabled={testing} className="btn btn-ghost btn-sm">{testing ? t("Envoi…") : t("Envoyer un e-mail d'essai")}</button>
           )}
         </p>
-        <p className="text-[var(--c-text-muted)]">GuiVault {o.server_version}</p>
+        <p className="text-[var(--c-text-muted)]">{t("GuiVault")} {o.server_version}</p>
       </div>
     </section>
   );
 }
 
-const TRIGGERS: Record<BackupRun["triggered_by"], string> = { schedule: "automatique", admin: "depuis l'administration", shell: "depuis le serveur" };
+const TRIGGERS: Record<BackupRun["triggered_by"], string> = translated({ schedule: "automatique", admin: "depuis l'administration", shell: "depuis le serveur" });
 
 /** Les sauvegardes : réglage, dernier état (en rouge si la dernière a
  * échoué ou si la dernière réussie est trop vieille), les derniers passages,
@@ -290,46 +291,46 @@ function BackupsSection({ ctx }: { ctx: PageContext }) {
   return (
     <section className="max-w-3xl space-y-1.5">
       <div className="flex items-center gap-2">
-        <Eyebrow>Sauvegardes</Eyebrow>
+        <Eyebrow>{t("Sauvegardes")}</Eyebrow>
         {status.enabled && (
           <button onClick={() => void start()} disabled={running} className="btn btn-secondary btn-sm ml-auto">
-            {running ? "Sauvegarde en cours…" : "Sauvegarder maintenant"}
+            {running ? t("Sauvegarde en cours…") : t("Sauvegarder maintenant")}
           </button>
         )}
       </div>
       {!status.enabled ? (
         <p className="help-text">
-          Pas de sauvegarde automatique : définissez <code className="font-mono">GUIVAULT_BACKUP_DIR</code> (voir le README). À la main : <code className="font-mono">guivault backup create</code>.
+          {t("Pas de sauvegarde automatique : définissez")} <code className="font-mono">{t("GUIVAULT_BACKUP_DIR")}</code> {t("(voir le README). À la main :")} <code className="font-mono">{t("guivault backup create")}</code>.
         </p>
       ) : (
         <p className="help-text">
-          Toutes les {status.interval_hours} h dans <code className="font-mono">{status.dir}</code>, les {status.keep} dernières gardées.{" "}
+          {t("Toutes les")} {status.interval_hours} {t("h dans")} <code className="font-mono">{status.dir}</code>{t(", les")} {status.keep} {t("dernières gardées.")}{" "}
           {status.restore_check
-            ? "Chacune est relue, puis restaurée dans une base d'essai et comparée ligne à ligne."
-            : "Chacune est relue et contrôlée ; pour la restaurer aussi à chaque fois dans une base d'essai, définissez GUIVAULT_BACKUP_VERIFY_DATABASE_URL."}
-          {" "}Copiez ce dossier ailleurs : une sauvegarde sur le même disque ne protège pas de sa perte.
+            ? t("Chacune est relue, puis restaurée dans une base d'essai et comparée ligne à ligne.")
+            : t("Chacune est relue et contrôlée ; pour la restaurer aussi à chaque fois dans une base d'essai, définissez GUIVAULT_BACKUP_VERIFY_DATABASE_URL.")}
+          {" "}{t("Copiez ce dossier ailleurs : une sauvegarde sur le même disque ne protège pas de sa perte.")}
         </p>
       )}
       {last?.error && last.finished_at && (
-        <p className="callout callout-danger">La dernière sauvegarde a échoué ({formatWhen(last.started_at)}) : {last.error}</p>
+        <p className="callout callout-danger">{t("La dernière sauvegarde a échoué (")}{formatWhen(last.started_at)}) : {last.error}</p>
       )}
       {!last?.error && stale && (
-        <p className="callout callout-warn">{lastOk ? `Aucune sauvegarde réussie depuis le ${formatWhen(lastOk.started_at)}.` : "Aucune sauvegarde réussie pour l'instant."}</p>
+        <p className="callout callout-warn">{lastOk ? t("Aucune sauvegarde réussie depuis le {0}.", formatWhen(lastOk.started_at)) : t("Aucune sauvegarde réussie pour l'instant.")}</p>
       )}
       {status.runs.slice(0, 8).map((r) => (
         <div key={r.id} className="card flex min-w-0 items-center gap-2 p-2.5" data-testid="backup-run">
           <div className="min-w-0 flex-1">
             <p className="flex min-w-0 flex-wrap items-center gap-1.5 text-[12.5px] text-[var(--c-text)]">
               <span className="truncate font-mono text-[12px]">{r.file ?? "—"}</span>
-              {!r.finished_at && <span className="tag shrink-0">en cours</span>}
-              {r.verified === "restore" && <span className="tag shrink-0" title="Restaurée dans une base d'essai, puis re-sauvegardée à l'identique">restaurée</span>}
-              {r.verified === "file" && <span className="tag shrink-0" title="Relue en entier : gzip, lignes, nombres et empreintes">relue</span>}
-              {r.error && <span className="tag shrink-0 text-[var(--c-danger)]">échouée</span>}
+              {!r.finished_at && <span className="tag shrink-0">{t("en cours")}</span>}
+              {r.verified === "restore" && <span className="tag shrink-0" title={t("Restaurée dans une base d'essai, puis re-sauvegardée à l'identique")}>{t("restaurée")}</span>}
+              {r.verified === "file" && <span className="tag shrink-0" title={t("Relue en entier : gzip, lignes, nombres et empreintes")}>{t("relue")}</span>}
+              {r.error && <span className="tag shrink-0 text-[var(--c-danger)]">{t("échouée")}</span>}
             </p>
             <p className="text-[11px] text-[var(--c-text-muted)]">
               {formatWhen(r.started_at)} · {TRIGGERS[r.triggered_by] ?? r.triggered_by}
               {r.bytes !== null ? ` · ${formatBytes(r.bytes)}` : ""}
-              {r.row_count !== null ? ` · ${r.row_count} lignes` : ""}
+              {r.row_count !== null ? t(" · {0} lignes", r.row_count) : ""}
               {r.error ? ` · ${r.error}` : ""}
             </p>
           </div>
@@ -356,7 +357,7 @@ function RegistrationsSection({ registrations, registration, mailEnabled, onChan
     setBusy(true);
     try {
       const r = await api.adminOpenRegistration(email.trim(), days);
-      ctx.notify(`${r.email} peut créer son compte jusqu'au ${formatWhen(r.expires_at)}.`);
+      ctx.notify(t("{0} peut créer son compte jusqu'au {1}.", r.email, formatWhen(r.expires_at)));
       setEmail("");
       onChange();
     } catch (err) {
@@ -367,30 +368,30 @@ function RegistrationsSection({ registrations, registration, mailEnabled, onChan
   };
   return (
     <section className="max-w-3xl space-y-1.5">
-      <Eyebrow>Inscriptions autorisées</Eyebrow>
+      <Eyebrow>{t("Inscriptions autorisées")}</Eyebrow>
       <p className="help-text">
         {registration === "open"
-          ? "Les inscriptions sont ouvertes à tous : inutile d'autoriser une adresse."
-          : "Autorisez une adresse à créer son compte malgré des inscriptions " + REGISTRATION_LABELS[registration] + ". " +
-            (mailEnabled ? "Un e-mail l'en prévient" : "Donnez-lui l'adresse de ce serveur") + " ; l'autorisation sert une fois."}
+          ? t("Les inscriptions sont ouvertes à tous : inutile d'autoriser une adresse.")
+          : t("Autorisez une adresse à créer son compte malgré des inscriptions ") + REGISTRATION_LABELS[registration] + ". " +
+            (mailEnabled ? t("Un e-mail l'en prévient") : t("Donnez-lui l'adresse de ce serveur")) + t(" ; l'autorisation sert une fois.")}
       </p>
       <form onSubmit={submit} className="flex flex-wrap items-end gap-2">
-        <Field label="Adresse e-mail" className="min-w-[220px] flex-1">
+        <Field label={t("Adresse e-mail")} className="min-w-[220px] flex-1">
           <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="input" autoComplete="off" />
         </Field>
-        <Field label="Valable">
+        <Field label={t("Valable")}>
           <select value={days} onChange={(e) => setDays(Number(e.target.value))} className="input">
-            {DAYS.map((d) => <option key={d} value={d}>{d} jours</option>)}
+            {DAYS.map((d) => <option key={d} value={d}>{d} {t("jours")}</option>)}
           </select>
         </Field>
-        <button type="submit" disabled={busy || !email.trim()} className="btn btn-primary">Autoriser</button>
+        <button type="submit" disabled={busy || !email.trim()} className="btn btn-primary">{t("Autoriser")}</button>
       </form>
       {registrations.map((r) => (
         <div key={r.email} className="card flex min-w-0 items-center gap-2 p-2.5">
           <div className="min-w-0 flex-1">
             <p className="truncate text-[12.5px] text-[var(--c-text)]">{r.email}</p>
             <p className="text-[11px] text-[var(--c-text-muted)]">
-              jusqu'au {formatWhen(r.expires_at)}{r.invited_by ? ` · par ${r.invited_by}` : ""}
+              {t("jusqu'au")} {formatWhen(r.expires_at)}{r.invited_by ? t(" · par {0}", r.invited_by) : ""}
             </p>
           </div>
           <button
@@ -398,9 +399,9 @@ function RegistrationsSection({ registrations, registration, mailEnabled, onChan
               try { await api.adminCloseRegistration(r.email); onChange(); } catch (e) { ctx.error(errorMessage(e)); }
             }}
             className="btn btn-ghost btn-sm"
-            aria-label={`Retirer l'autorisation de ${r.email}`}
+            aria-label={t("Retirer l'autorisation de {0}", r.email)}
           >
-            Retirer
+            {t("Retirer")}
           </button>
         </div>
       ))}
@@ -423,35 +424,34 @@ function QuotaDialog({ user, defaultQuota, onClose, onSave }: {
     void onSave(mode === "server" ? null : mode === "none" ? 0 : Number(mib) * MIB);
   };
   return (
-    <Modal title={`Quota de ${user.email}`} onClose={onClose}>
+    <Modal title={t("Quota de {0}", user.email)} onClose={onClose}>
       <form onSubmit={submit} className="space-y-3">
         <p className="help-text">
-          Ce que le compte stocke dans les vaults qu'il possède — ceux qu'il partage compris, quel que soit le membre qui écrit. Actuellement {formatBytes(user.storage_bytes)}.
-          Un quota dépassé bloque ce qui grossit, jamais ce qui allège.
+          {t("Ce que le compte stocke dans les vaults qu'il possède — ceux qu'il partage compris, quel que soit le membre qui écrit. Actuellement")} {formatBytes(user.storage_bytes)}{t(". Un quota dépassé bloque ce qui grossit, jamais ce qui allège.")}
         </p>
         <fieldset className="space-y-1.5 text-[12.5px]">
-          <legend className="sr-only">Quota</legend>
+          <legend className="sr-only">{t("Quota")}</legend>
           <label className="flex items-center gap-2">
             <input type="radio" name="quota" checked={mode === "server"} onChange={() => setMode("server")} />
-            Celui du serveur ({defaultQuota > 0 ? formatBytes(defaultQuota) : "aucun"})
+            {t("Celui du serveur (")}{defaultQuota > 0 ? formatBytes(defaultQuota) : "aucun"})
           </label>
           <label className="flex items-center gap-2">
             <input type="radio" name="quota" checked={mode === "none"} onChange={() => setMode("none")} />
-            Aucun quota
+            {t("Aucun quota")}
           </label>
           <label className="flex items-center gap-2">
             <input type="radio" name="quota" checked={mode === "custom"} onChange={() => setMode("custom")} />
-            Propre au compte
+            {t("Propre au compte")}
           </label>
         </fieldset>
         {mode === "custom" && (
-          <Field label="Quota en Mio">
+          <Field label={t("Quota en Mio")}>
             <input type="number" min={1} step={1} value={mib} onChange={(e) => setMib(e.target.value)} className="input w-32" autoFocus />
           </Field>
         )}
         <div className="flex justify-end gap-2">
-          <button type="button" onClick={onClose} className="btn btn-ghost">Annuler</button>
-          <button type="submit" disabled={!valid} className="btn btn-primary">Enregistrer</button>
+          <button type="button" onClick={onClose} className="btn btn-ghost">{t("Annuler")}</button>
+          <button type="submit" disabled={!valid} className="btn btn-primary">{t("Enregistrer")}</button>
         </div>
       </form>
     </Modal>
@@ -475,21 +475,20 @@ function DeleteUserDialog({ user, onClose, onDeleted }: { user: AdminUserInfo; o
     }
   };
   return (
-    <Modal title={`Supprimer ${user.email}`} onClose={onClose}>
+    <Modal title={t("Supprimer {0}", user.email)} onClose={onClose}>
       <form onSubmit={submit} className="space-y-3">
         <p className="callout callout-danger">
-          Irréversible. Son vault personnel et les vaults dont il est le seul membre sont effacés ; ses liens de partage et ses accès d'urgence aussi.
-          Les vaults qu'il partage avec d'autres ne sont pas perdus : ils passent au membre le mieux placé (rôle le plus haut, puis le plus ancien).
+          {t("Irréversible. Son vault personnel et les vaults dont il est le seul membre sont effacés ; ses liens de partage et ses accès d'urgence aussi. Les vaults qu'il partage avec d'autres ne sont pas perdus : ils passent au membre le mieux placé (rôle le plus haut, puis le plus ancien).")}
         </p>
-        {user.vaults_owned > 0 && <p className="help-text">{user.vaults_owned} vault{user.vaults_owned > 1 ? "s" : ""} possédé{user.vaults_owned > 1 ? "s" : ""}, {user.items} élément{user.items > 1 ? "s" : ""}.</p>}
+        {user.vaults_owned > 0 && <p className="help-text">{plural(user.vaults_owned, "{0} vault possédé", "{0} vaults possédés")}, {plural(user.items, "{0} élément.", "{0} éléments.")}</p>}
         <div>
-          <label htmlFor="admin-delete-confirm" className="field-label">Tapez son adresse pour confirmer</label>
+          <label htmlFor="admin-delete-confirm" className="field-label">{t("Tapez son adresse pour confirmer")}</label>
           <input id="admin-delete-confirm" value={typed} onChange={(e) => setTyped(e.target.value)} placeholder={user.email} className="input" autoFocus />
         </div>
         {err && <p className="callout callout-danger">{err}</p>}
         <div className="flex justify-end gap-2">
-          <button type="button" onClick={onClose} className="btn btn-ghost">Annuler</button>
-          <button type="submit" disabled={busy || typed.trim().toLowerCase() !== user.email.toLowerCase()} className="btn btn-danger">{busy ? "Suppression…" : "Supprimer définitivement"}</button>
+          <button type="button" onClick={onClose} className="btn btn-ghost">{t("Annuler")}</button>
+          <button type="submit" disabled={busy || typed.trim().toLowerCase() !== user.email.toLowerCase()} className="btn btn-danger">{busy ? t("Suppression…") : t("Supprimer définitivement")}</button>
         </div>
       </form>
     </Modal>

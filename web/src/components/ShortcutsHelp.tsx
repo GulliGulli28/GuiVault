@@ -1,8 +1,9 @@
 /** Les raccourcis clavier (« ? ») : ceux d'un vault, et la recherche
  * globale, qui vaut partout. */
 import { useModalSurface } from "../hooks/useModalSurface";
+import { t, translated } from "../lib/i18n";
 
-export const VAULT_SHORTCUTS: { keys: string[]; label: string }[] = [
+export const VAULT_SHORTCUTS: { keys: string[]; label: string }[] = translated([
   { keys: ["Ctrl", "K"], label: "Rechercher dans tous les vaults (partout)" },
   { keys: ["/"], label: "Filtrer ce vault" },
   { keys: ["↑", "↓"], label: "Élément précédent / suivant (ou j / k)" },
@@ -13,17 +14,17 @@ export const VAULT_SHORTCUTS: { keys: string[]; label: string }[] = [
   { keys: ["f"], label: "Favori" },
   { keys: ["Suppr"], label: "Supprimer (vers la corbeille)" },
   { keys: ["?"], label: "Cette aide" },
-];
+], ["label"]);
 
 export function ShortcutsHelp({ onClose }: { onClose: () => void }) {
-  const { ref, dialogProps } = useModalSurface({ onClose, label: "Raccourcis clavier" });
+  const { ref, dialogProps } = useModalSurface({ onClose, label: t("Raccourcis clavier") });
   return (
     <>
       <div className="fixed inset-0 z-40 bg-black/50" onClick={onClose} />
       <div ref={ref} {...dialogProps} className="modal fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 p-4">
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-[14px] font-semibold text-[var(--c-text)]">Raccourcis clavier</h2>
-          <button onClick={onClose} className="btn btn-ghost btn-sm" autoFocus>Fermer</button>
+          <h2 className="text-[14px] font-semibold text-[var(--c-text)]">{t("Raccourcis clavier")}</h2>
+          <button onClick={onClose} className="btn btn-ghost btn-sm" autoFocus>{t("Fermer")}</button>
         </div>
         <table className="w-full text-[12.5px]">
           <tbody>
@@ -35,7 +36,7 @@ export function ShortcutsHelp({ onClose }: { onClose: () => void }) {
             ))}
           </tbody>
         </table>
-        <p className="help-text mt-3">Les touches seules ne font rien pendant qu'on écrit dans un champ.</p>
+        <p className="help-text mt-3">{t("Les touches seules ne font rien pendant qu'on écrit dans un champ.")}</p>
       </div>
     </>
   );

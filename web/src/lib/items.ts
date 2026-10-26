@@ -2,6 +2,7 @@
  * décrire pour la liste, le fouiller. */
 import { uuid } from "./bytes";
 import type { ApiKey, AwsAccess, Card, Identity, Login, Note, Payload, SecretKind } from "./types";
+import { language, plural, t } from "./i18n";
 
 /** Les anciens mots de passe gardés sur un identifiant. */
 export const PASSWORD_HISTORY_MAX = 10;
@@ -89,12 +90,12 @@ export function uriHost(uri: string): string {
 /** Marque de carte devinée depuis le numéro, quand elle n'est pas dite. */
 export function cardBrand(number: string): string {
   const n = number.replace(/\D/g, "");
-  if (/^4/.test(n)) return "Visa";
-  if (/^(5[1-5]|2[2-7])/.test(n)) return "Mastercard";
-  if (/^3[47]/.test(n)) return "American Express";
-  if (/^(6011|65|64[4-9])/.test(n)) return "Discover";
+  if (/^4/.test(n)) return t("Visa");
+  if (/^(5[1-5]|2[2-7])/.test(n)) return t("Mastercard");
+  if (/^3[47]/.test(n)) return t("American Express");
+  if (/^(6011|65|64[4-9])/.test(n)) return t("Discover");
   if (/^35/.test(n)) return "JCB";
-  if (/^3(0[0-5]|[68])/.test(n)) return "Diners Club";
+  if (/^3(0[0-5]|[68])/.test(n)) return t("Diners Club");
   return "";
 }
 
@@ -124,7 +125,7 @@ export function describeSecret(p: Payload): { subtitle: string; search: string }
       const a = p.aws;
       const accounts = Array.from(new Set(a.profiles.map((x) => x.accountId).filter(Boolean)));
       const subtitle = a.authType === "sso"
-        ? [a.ssoStartUrl ? uriHost(a.ssoStartUrl) : "SSO", a.profiles.length ? `${a.profiles.length} profil${a.profiles.length > 1 ? "s" : ""}` : ""].filter(Boolean).join(" · ")
+        ? [a.ssoStartUrl ? uriHost(a.ssoStartUrl) : "SSO", a.profiles.length ? plural(a.profiles.length, "{0} profil", "{0} profils") : ""].filter(Boolean).join(" · ")
         : [a.accessKeyId, a.profiles.map((x) => x.name).filter(Boolean).join(", ")].filter(Boolean).join(" · ");
       return { subtitle, search: [a.ssoStartUrl, a.ssoSessionName, a.accessKeyId, ...accounts, ...a.profiles.flatMap((x) => [x.name, x.roleName])].join(" ") };
     }
@@ -135,7 +136,7 @@ export function describeSecret(p: Payload): { subtitle: string; search: string }
     case "api-key": {
       const k = p.apiKey;
       const expired = k.expiresAt && k.expiresAt < new Date().toISOString().slice(0, 10);
-      return { subtitle: [k.service, k.keyId, expired ? "expirée" : k.expiresAt ? `expire le ${k.expiresAt}` : ""].filter(Boolean).join(" · "), search: [k.service, k.url, k.keyId, k.scopes].join(" ") };
+      return { subtitle: [k.service, k.keyId, expired ? t("expirée") : k.expiresAt ? t("expire le {0}", k.expiresAt) : ""].filter(Boolean).join(" · "), search: [k.service, k.url, k.keyId, k.scopes].join(" ") };
     }
     default:
       return { subtitle: "", search: "" };
@@ -149,14 +150,14 @@ export function describeSecret(p: Payload): { subtitle: string; search: string }
 export function primarySecret(p: Payload): { label: string; value: string } | null {
   const pick = (label: string, value: string | null | undefined) => (value ? { label, value } : null);
   switch (p.kind) {
-    case "login": return pick("Mot de passe", p.login.password);
-    case "card": return pick("Numéro de carte", p.card.number);
-    case "api-key": return pick("Secret", p.apiKey.secret);
-    case "aws": return pick("Clé secrète", p.aws.secretAccessKey);
-    case "note": return pick("Contenu", p.note.content);
-    case "host": return pick("Mot de passe", p.secrets?.password);
-    case "sql-connection": return pick("Mot de passe", p.password);
-    case "snippet": return pick("Commande", p.snippet.command);
+    case "login": return pick(t("Mot de passe"), p.login.password);
+    case "card": return pick(t("Numéro de carte"), p.card.number);
+    case "api-key": return pick(t("Secret"), p.apiKey.secret);
+    case "aws": return pick(t("Clé secrète"), p.aws.secretAccessKey);
+    case "note": return pick(t("Contenu"), p.note.content);
+    case "host": return pick(t("Mot de passe"), p.secrets?.password);
+    case "sql-connection": return pick(t("Mot de passe"), p.password);
+    case "snippet": return pick(t("Commande"), p.snippet.command);
     default: return null;
   }
 }
@@ -165,6 +166,7 @@ export function primarySecret(p: Payload): { label: string; value: string } | nu
  * champ de `primarySecret` / `primaryUser` avec son article. */
 export function withArticle(label: string): string {
   const l = label.toLowerCase();
+  if (language() === "en") return `the ${l}`;
   const feminine = ["clé secrète", "commande"];
   if (/^[aeéèêiouh]/.test(l)) return `l'${l}`;
   return feminine.includes(l) ? `la ${l}` : `le ${l}`;
@@ -174,13 +176,13 @@ export function withArticle(label: string): string {
 export function primaryUser(p: Payload): { label: string; value: string } | null {
   const pick = (label: string, value: string | null | undefined) => (value ? { label, value } : null);
   switch (p.kind) {
-    case "login": return pick("Utilisateur", p.login.username);
-    case "identity": return pick("E-mail", p.identity.email) ?? pick("Utilisateur", p.identity.username);
-    case "api-key": return pick("Identifiant de clé", p.apiKey.keyId);
-    case "aws": return pick("Access key id", p.aws.accessKeyId);
-    case "card": return pick("Titulaire", p.card.cardholderName);
-    case "host": return pick("Utilisateur", p.host.username);
-    case "sql-connection": return pick("Utilisateur", typeof p.connection.username === "string" ? p.connection.username : null);
+    case "login": return pick(t("Utilisateur"), p.login.username);
+    case "identity": return pick(t("E-mail"), p.identity.email) ?? pick(t("Utilisateur"), p.identity.username);
+    case "api-key": return pick(t("Identifiant de clé"), p.apiKey.keyId);
+    case "aws": return pick(t("Access key id"), p.aws.accessKeyId);
+    case "card": return pick(t("Titulaire"), p.card.cardholderName);
+    case "host": return pick(t("Utilisateur"), p.host.username);
+    case "sql-connection": return pick(t("Utilisateur"), typeof p.connection.username === "string" ? p.connection.username : null);
     default: return null;
   }
 }

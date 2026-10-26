@@ -7,13 +7,14 @@ import { fingerprintTrust, pinFingerprint, type FingerprintTrust } from "../lib/
 import { useModalSurface } from "../hooks/useModalSurface";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { IconCheck, IconClose, IconCopy, IconEye, IconEyeOff, IconUpload } from "./ui-icons";
+import { t, locale } from "../lib/i18n";
 
 // ─── Presse-papier ───────────────────────────────────────────────────────────
 
 // Ce qui est copié s'efface au bout du délai réglé (`lib/clipboard.ts`).
 export { copyText };
 
-export function CopyButton({ value, label = "Copier", size = 15, className = "" }: { value: string; label?: string; size?: number; className?: string }) {
+export function CopyButton({ value, label = t("Copier"), size = 15, className = "" }: { value: string; label?: string; size?: number; className?: string }) {
   const [copied, setCopied] = useState(false);
   return (
     <button
@@ -40,7 +41,7 @@ export function Fingerprint({ value }: { value: string }) {
   return (
     <span className="flex min-w-0 max-w-full items-start gap-1">
       <code className="min-w-0 break-all font-mono text-[12px] leading-snug text-[var(--c-text)]">{value}</code>
-      <CopyButton value={value} label="Copier l'empreinte" size={13} className="h-7 w-7" />
+      <CopyButton value={value} label={t("Copier l'empreinte")} size={13} className="h-7 w-7" />
     </span>
   );
 }
@@ -52,29 +53,29 @@ export function TrustBadge({ email, fingerprint, onPinned }: { email: string; fi
   const [confirm, setConfirm] = useState(false);
   const trust: FingerprintTrust = fingerprintTrust(email, fingerprint);
   if (trust.kind === "pinned") {
-    return <span className="tag tag-accent" title="Empreinte vérifiée et épinglée">vérifiée</span>;
+    return <span className="tag tag-accent" title={t("Empreinte vérifiée et épinglée")}>{t("vérifiée")}</span>;
   }
   return (
     <>
       {trust.kind === "changed" ? (
-        <span className="tag" style={{ background: "color-mix(in srgb, var(--c-danger) 15%, transparent)", color: "var(--c-danger)" }} title={`Empreinte précédemment vérifiée : ${trust.previous}`}>
-          clé changée !
+        <span className="tag" style={{ background: "color-mix(in srgb, var(--c-danger) 15%, transparent)", color: "var(--c-danger)" }} title={t("Empreinte précédemment vérifiée : {0}", trust.previous)}>
+          {t("clé changée !")}
         </span>
       ) : (
-        <span className="tag" title="Empreinte jamais vérifiée">non vérifiée</span>
+        <span className="tag" title={t("Empreinte jamais vérifiée")}>{t("non vérifiée")}</span>
       )}
-      <button type="button" onClick={() => setConfirm(true)} className="btn btn-secondary btn-sm">Vérifier…</button>
+      <button type="button" onClick={() => setConfirm(true)} className="btn btn-secondary btn-sm">{t("Vérifier…")}</button>
       {confirm && (
         <ConfirmDialog
-          title={`Vérifier l'empreinte de ${email}`}
+          title={t("Vérifier l'empreinte de {0}", email)}
           message={
             (trust.kind === "changed"
-              ? `ATTENTION : la clé de ${email} a changé depuis la dernière vérification (${trust.previous}). Si cette personne n'a pas recréé son compte, quelqu'un se fait passer pour elle — ou le serveur ment. `
+              ? t("ATTENTION : la clé de {0} a changé depuis la dernière vérification ({1}). Si cette personne n'a pas recréé son compte, quelqu'un se fait passer pour elle — ou le serveur ment. ", email, trust.previous)
               : "") +
-            `Demandez à ${email} son empreinte par un autre canal (de vive voix, messagerie interne — elle est affichée dans son panneau GuiVault et sur sa page Compte) et comparez-la à : ${fingerprint}. ` +
-            "Ne confirmez que si les deux sont identiques : c'est la seule protection contre un serveur qui substituerait sa propre clé pour lire vos vaults partagés."
+            t("Demandez à {0} son empreinte par un autre canal (de vive voix, messagerie interne — elle est affichée dans son panneau GuiVault et sur sa page Compte) et comparez-la à : {1}. ", email, fingerprint) +
+            t("Ne confirmez que si les deux sont identiques : c'est la seule protection contre un serveur qui substituerait sa propre clé pour lire vos vaults partagés.")
           }
-          confirmLabel="Elles sont identiques, épingler"
+          confirmLabel={t("Elles sont identiques, épingler")}
           danger={trust.kind === "changed"}
           onConfirm={() => {
             setConfirm(false);
@@ -97,7 +98,7 @@ export function SecretValue({ value, mono = true }: { value: string; mono?: bool
   return (
     <span className="flex min-w-0 items-center gap-0.5">
       <span className={`min-w-0 flex-1 break-all ${mono ? "font-mono text-[13.5px]" : "text-[13.5px]"} text-[var(--c-text)] ${shown ? "" : "tracking-[0.12em]"}`}>{shown ? <ColoredSecret value={value} /> : "•".repeat(Math.min(14, Math.max(8, value.length)))}</span>
-      <button type="button" onClick={() => setShown((s) => !s)} className="btn btn-ghost btn-icon text-[var(--c-text-muted)]" title={shown ? "Masquer" : "Révéler"} aria-label={shown ? "Masquer" : "Révéler"}>
+      <button type="button" onClick={() => setShown((s) => !s)} className="btn btn-ghost btn-icon text-[var(--c-text-muted)]" title={shown ? t("Masquer") : t("Révéler")} aria-label={shown ? t("Masquer") : t("Révéler")}>
         {shown ? <IconEyeOff size={15} /> : <IconEye size={15} />}
       </button>
       <CopyButton value={value} />
@@ -144,7 +145,7 @@ export function PasswordInput({ value, onChange, placeholder, autoFocus, autoCom
         autoComplete={autoComplete}
         className="input pr-10"
       />
-      <button type="button" onClick={() => setShown((s) => !s)} tabIndex={-1} className="absolute right-1 top-1/2 -translate-y-1/2 btn btn-ghost btn-sm btn-icon text-[var(--c-text-muted)]" title={shown ? "Masquer" : "Afficher"}>
+      <button type="button" onClick={() => setShown((s) => !s)} tabIndex={-1} className="absolute right-1 top-1/2 -translate-y-1/2 btn btn-ghost btn-sm btn-icon text-[var(--c-text-muted)]" title={shown ? t("Masquer") : t("Afficher")}>
         {shown ? <IconEyeOff size={14} /> : <IconEye size={14} />}
       </button>
     </div>
@@ -317,7 +318,7 @@ export function Modal({ title, onClose, children, wide }: { title: string; onClo
       <div ref={ref} {...dialogProps} className={`modal fixed left-1/2 top-1/2 z-50 flex max-h-[90vh] w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 flex-col ${wide ? "max-w-2xl" : "max-w-lg"}`}>
         <div className="flex items-center justify-between gap-2 px-6 pb-1 pt-5">
           <h2 className="min-w-0 truncate text-[18px] font-semibold text-[var(--c-text)]">{title}</h2>
-          <button onClick={onClose} className="btn btn-ghost btn-icon" title="Fermer" aria-label="Fermer"><IconClose size={14} /></button>
+          <button onClick={onClose} className="btn btn-ghost btn-icon" title={t("Fermer")} aria-label={t("Fermer")}><IconClose size={14} /></button>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-6 pt-3">{children}</div>
       </div>
@@ -352,11 +353,11 @@ export function useToasts() {
 export function Toasts({ toasts, onDismiss }: { toasts: Toast[]; onDismiss: (id: number) => void }) {
   return (
     <div className="toast-stack pointer-events-none fixed bottom-3 right-3 z-[60] flex w-[min(24rem,calc(100%-1.5rem))] flex-col gap-2">
-      {toasts.map((t) => (
-        <div key={t.id} role={t.kind === "error" ? "alert" : "status"} className={`pointer-events-auto popover flex items-start gap-2.5 px-3.5 py-2.5 text-[13px] text-[var(--c-text)] ${t.kind === "error" ? "border border-[color-mix(in_srgb,var(--c-danger)_40%,transparent)]" : ""}`}>
-          {t.kind === "error" ? <span className="mt-[5px] h-2 w-2 shrink-0 rounded-full bg-[var(--c-danger)]" /> : <IconCheck size={15} className="mt-0.5 shrink-0 text-[var(--c-ok)]" />}
-          <span className="min-w-0 flex-1 break-words leading-relaxed">{t.message}</span>
-          <button onClick={() => onDismiss(t.id)} className="btn btn-ghost btn-sm btn-icon -my-1 -mr-1.5" title="Fermer" aria-label="Fermer"><IconClose size={12} /></button>
+      {toasts.map((toast) => (
+        <div key={toast.id} role={toast.kind === "error" ? "alert" : "status"} className={`pointer-events-auto popover flex items-start gap-2.5 px-3.5 py-2.5 text-[13px] text-[var(--c-text)] ${toast.kind === "error" ? "border border-[color-mix(in_srgb,var(--c-danger)_40%,transparent)]" : ""}`}>
+          {toast.kind === "error" ? <span className="mt-[5px] h-2 w-2 shrink-0 rounded-full bg-[var(--c-danger)]" /> : <IconCheck size={15} className="mt-0.5 shrink-0 text-[var(--c-ok)]" />}
+          <span className="min-w-0 flex-1 break-words leading-relaxed">{toast.message}</span>
+          <button onClick={() => onDismiss(toast.id)} className="btn btn-ghost btn-sm btn-icon -my-1 -mr-1.5" title={t("Fermer")} aria-label={t("Fermer")}><IconClose size={12} /></button>
         </div>
       ))}
     </div>
@@ -372,13 +373,13 @@ export function useDelayed(active: boolean, ms = 250): boolean {
       setShown(false);
       return;
     }
-    const t = setTimeout(() => setShown(true), ms);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setShown(true), ms);
+    return () => clearTimeout(timer);
   }, [active, ms]);
   return shown;
 }
 
-export function Loading({ label = "Chargement…" }: { label?: string }) {
+export function Loading({ label = t("Chargement…") }: { label?: string }) {
   return <p className="px-2 py-6 text-center text-[13px] text-[var(--c-text-muted)]">{label}</p>;
 }
 
@@ -386,20 +387,20 @@ export function Loading({ label = "Chargement…" }: { label?: string }) {
  * 5 min », « hier », « il y a 3 j », puis la date courte. */
 export function formatAgo(iso: string | null | undefined, now = Date.now()): string {
   if (!iso) return "jamais";
-  const t = new Date(iso).getTime();
-  const s = Math.max(0, Math.round((now - t) / 1000));
-  if (s < 60) return "à l'instant";
-  if (s < 3600) return `il y a ${Math.floor(s / 60)} min`;
-  if (s < 86400) return `il y a ${Math.floor(s / 3600)} h`;
+  const at = new Date(iso).getTime();
+  const s = Math.max(0, Math.round((now - at) / 1000));
+  if (s < 60) return t("à l'instant");
+  if (s < 3600) return t("il y a {0} min", Math.floor(s / 60));
+  if (s < 86400) return t("il y a {0} h", Math.floor(s / 3600));
   const days = Math.floor(s / 86400);
   if (days === 1) return "hier";
-  if (days < 7) return `il y a ${days} j`;
-  return new Date(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: new Date(iso).getFullYear() === new Date(now).getFullYear() ? undefined : "numeric" });
+  if (days < 7) return t("il y a {0} j", days);
+  return new Date(iso).toLocaleDateString(locale(), { day: "numeric", month: "short", year: new Date(iso).getFullYear() === new Date(now).getFullYear() ? undefined : "numeric" });
 }
 
 /** Une date en français, quel que soit le réglage du navigateur : le reste
  * de l'interface l'est. */
 export function formatWhen(iso: string | null | undefined): string {
   if (!iso) return "jamais";
-  return new Date(iso).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" });
+  return new Date(iso).toLocaleString(locale(), { dateStyle: "short", timeStyle: "short" });
 }

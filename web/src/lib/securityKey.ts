@@ -7,6 +7,7 @@
 import { api } from "./api";
 import { fromBase64, toBase64 } from "./bytes";
 import type { LoginResponse } from "./types";
+import { t } from "./i18n";
 
 const buf = (b64: string): ArrayBuffer => fromBase64(b64).slice().buffer;
 const bytes = (b: ArrayBuffer | ArrayBufferView): Uint8Array => (b instanceof ArrayBuffer ? new Uint8Array(b) : new Uint8Array(b.buffer, b.byteOffset, b.byteLength));
@@ -22,7 +23,7 @@ export async function signSecondFactor(totpToken: string): Promise<LoginResponse
       timeout: 120_000,
     },
   })) as PublicKeyCredential | null;
-  if (!got) throw new Error("Clé de sécurité : annulé.");
+  if (!got) throw new Error(t("Clé de sécurité : annulé."));
   const response = got.response as AuthenticatorAssertionResponse;
   return api.secondFactorWebauthn({
     totp_token: totpToken,

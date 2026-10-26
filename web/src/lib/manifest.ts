@@ -6,6 +6,7 @@
 import { sha256 } from "@noble/hashes/sha2.js";
 import * as c from "./crypto";
 import { toBase64Url, utf8 } from "./bytes";
+import { t } from "./i18n";
 
 export const MANIFEST_ID = "00000000-0000-0000-0000-000000000000";
 export const MANIFEST_TYPE = "manifest";
@@ -43,7 +44,7 @@ export function sealManifest(vaultKey: Uint8Array, vaultId: string, m: Manifest)
 export function openManifest(vaultKey: Uint8Array, vaultId: string, blob: Uint8Array): Manifest {
   const m = JSON.parse(utf8.decode(c.openItem(vaultKey, vaultId, MANIFEST_ID, MANIFEST_TYPE, blob))) as Manifest;
   if (m?.v !== MANIFEST_VERSION || !Number.isInteger(m.counter) || typeof m.items !== "object" || m.items === null) {
-    throw new Error("manifeste de format inconnu");
+    throw new Error(t("manifeste de format inconnu"));
   }
   return m;
 }
@@ -104,15 +105,15 @@ export function problemItem(p: ManifestProblem): string | null {
 export function problemText(p: ManifestProblem, nameOf: (id: string) => string | undefined = () => undefined): string {
   const item = (id: string) => {
     const name = nameOf(id);
-    return name ? `« ${name} »` : `l'élément ${id}`;
+    return name ? `« ${name} »` : t("l'élément {0}", id);
   };
   switch (p.kind) {
-    case "missing": return `le serveur ne sert plus le manifeste de ce vault (vu ici jusqu'à la version ${p.seen})`;
-    case "unreadable": return "le manifeste ne s'ouvre pas avec la clé du vault";
-    case "mismatch": return `le manifeste (version ${p.counter}) ne correspond pas à la révision annoncée (${p.revision})`;
-    case "rollback": return `le manifeste est revenu à la version ${p.counter}, alors que la ${p.seen} a déjà été vue ici`;
-    case "unexpected": return `${item(p.itemId)} n'est pas dans le manifeste (ajouté hors des clients, ou revenu après suppression)`;
-    case "altered": return `${item(p.itemId)} n'est pas la version annoncée par le manifeste (une ancienne version rejouée ?)`;
-    case "withheld": return `${item(p.itemId)} est dans le manifeste mais le serveur ne le sert pas`;
+    case "missing": return t("le serveur ne sert plus le manifeste de ce vault (vu ici jusqu'à la version {0})", p.seen);
+    case "unreadable": return t("le manifeste ne s'ouvre pas avec la clé du vault");
+    case "mismatch": return t("le manifeste (version {0}) ne correspond pas à la révision annoncée ({1})", p.counter, p.revision);
+    case "rollback": return t("le manifeste est revenu à la version {0}, alors que la {1} a déjà été vue ici", p.counter, p.seen);
+    case "unexpected": return t("{0} n'est pas dans le manifeste (ajouté hors des clients, ou revenu après suppression)", item(p.itemId));
+    case "altered": return t("{0} n'est pas la version annoncée par le manifeste (une ancienne version rejouée ?)", item(p.itemId));
+    case "withheld": return t("{0} est dans le manifeste mais le serveur ne le sert pas", item(p.itemId));
   }
 }

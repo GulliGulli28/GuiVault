@@ -13,6 +13,7 @@
  * les empreintes (`pins.ts`). */
 import { baseUrl } from "./api";
 import type { KdfParams } from "./crypto";
+import { t } from "./i18n";
 
 const KEY = "guivault.kdf-pins";
 
@@ -44,9 +45,9 @@ export function requireKdfNotDowngraded(email: string, params: KdfParams) {
   const pinned = pinnedKdf(email);
   if (pinned && kdfWeakerThan(params, pinned)) {
     throw new Error(
-      `Le serveur demande une dérivation plus faible qu'à votre dernière connexion depuis ce navigateur ` +
-        `(Argon2id m=${params.m_cost} Kio, t=${params.t_cost} au lieu de m=${pinned.m_cost} Kio, t=${pinned.t_cost}) : ` +
-        "connexion refusée, rien n'a été envoyé. Le serveur est peut-être compromis — prévenez son administrateur.",
+      t("Le serveur demande une dérivation plus faible qu'à votre dernière connexion depuis ce navigateur ") +
+        t("(Argon2id m={0} Kio, t={1} au lieu de m={2} Kio, t={3}) : ", params.m_cost, params.t_cost, pinned.m_cost, pinned.t_cost) +
+        t("connexion refusée, rien n'a été envoyé. Le serveur est peut-être compromis — prévenez son administrateur."),
     );
   }
 }

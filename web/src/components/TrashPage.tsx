@@ -15,10 +15,11 @@ import { ConfirmDialog } from "./ConfirmDialog";
 import { ItemView } from "./ItemView";
 import { KIND_ICONS } from "./ItemTree";
 import { formatWhen, Loading } from "./ui";
+import { t } from "../lib/i18n";
 
 export function TrashPage({ ctx, vaultId }: { ctx: PageContext; vaultId: string }) {
   const vault = ctx.session.vaults.find((v) => v.id === vaultId);
-  if (!vault) return <p className="p-6 text-[12.5px] text-[var(--c-text-muted)]">Ce vault n'existe pas (ou plus).</p>;
+  if (!vault) return <p className="p-6 text-[12.5px] text-[var(--c-text-muted)]">{t("Ce vault n'existe pas (ou plus).")}</p>;
   return <Body key={vault.id} ctx={ctx} vault={vault} />;
 }
 
@@ -63,29 +64,29 @@ function Body({ ctx, vault }: { ctx: PageContext; vault: VaultView }) {
     }
   };
 
-  const nameOf = (e: Entry) => (e.decoded.ok ? payloadName(e.decoded.payload) : `élément illisible (${e.t.item_id.slice(0, 8)})`);
+  const nameOf = (e: Entry) => (e.decoded.ok ? payloadName(e.decoded.payload) : t("élément illisible ({0})", e.t.item_id.slice(0, 8)));
   const current = entries?.find((e) => e.t.item_id === selected) ?? null;
 
   return (
     <div className="flex h-full min-h-0 flex-col">
       <header className="flex min-h-[64px] shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-[var(--c-border)] px-6 py-3 max-md:px-3 max-md:pt-[calc(0.75rem+var(--inset-top))]">
-        <button onClick={() => navigate({ page: "vault", id: vault.id })} className="btn btn-ghost btn-icon" title={`Retour à ${vault.name}`} aria-label={`Retour à ${vault.name}`}><IconChevronRight size={14} className="rotate-180" /></button>
+        <button onClick={() => navigate({ page: "vault", id: vault.id })} className="btn btn-ghost btn-icon" title={t("Retour à {0}", vault.name)} aria-label={t("Retour à {0}", vault.name)}><IconChevronRight size={14} className="rotate-180" /></button>
         <div className="min-w-0 flex-1">
-          <h1 className="truncate text-[18px] font-semibold tracking-[-0.015em]">Corbeille</h1>
-          <p className="truncate text-[12.5px] text-[var(--c-text-muted)]">{vault.name}{entries ? ` · ${entries.length} ${entries.length > 1 ? "éléments" : "élément"}` : ""}</p>
+          <h1 className="truncate text-[18px] font-semibold tracking-[-0.015em]">{t("Corbeille")}</h1>
+          <p className="truncate text-[12.5px] text-[var(--c-text-muted)]">{vault.name}{entries ? ` · ${entries.length} ${entries.length > 1 ? t("éléments") : t("élément")}` : ""}</p>
         </div>
         {writable && entries && entries.length > 0 && (
-          <button onClick={() => setConfirm({ kind: "empty" })} disabled={busy} className="btn btn-danger">Vider la corbeille</button>
+          <button onClick={() => setConfirm({ kind: "empty" })} disabled={busy} className="btn btn-danger">{t("Vider la corbeille")}</button>
         )}
       </header>
 
       {entries === null ? (
         <div className="p-6"><Loading /></div>
       ) : entries.length === 0 ? (
-        <p className="p-6 text-[12.5px] text-[var(--c-text-muted)]">La corbeille est vide. Un élément supprimé y reste un temps, chiffré comme le reste du vault, avant d'être effacé pour de bon.</p>
+        <p className="p-6 text-[12.5px] text-[var(--c-text-muted)]">{t("La corbeille est vide. Un élément supprimé y reste un temps, chiffré comme le reste du vault, avant d'être effacé pour de bon.")}</p>
       ) : (
         <div className="flex min-h-0 flex-1 flex-col md:flex-row">
-          <ul className={`sidebar-scroll shrink-0 overflow-y-auto border-[var(--c-border)] p-2 md:w-80 md:border-r ${current ? "max-md:hidden" : ""}`} aria-label="Éléments supprimés">
+          <ul className={`sidebar-scroll shrink-0 overflow-y-auto border-[var(--c-border)] p-2 md:w-80 md:border-r ${current ? "max-md:hidden" : ""}`} aria-label={t("Éléments supprimés")}>
             {entries.map((e) => {
               const kind = (e.decoded.ok ? e.decoded.payload.kind : e.t.item_type) as ItemKind;
               const Icon = KIND_ICONS[kind as keyof typeof KIND_ICONS];
@@ -96,7 +97,7 @@ function Body({ ctx, vault }: { ctx: PageContext; vault: VaultView }) {
                     <span className="flex min-w-0 flex-1 flex-col leading-tight">
                       <span className="truncate text-[12.5px] text-[var(--c-text)]">{nameOf(e)}</span>
                       <span className="truncate text-[11px] text-[var(--c-text-muted)]">
-                        {KIND_LABELS[kind] ?? e.t.item_type} · supprimé {e.t.deleted_by ? `par ${e.t.deleted_by} ` : ""}le {formatWhen(e.t.deleted_at)}
+                        {KIND_LABELS[kind] ?? e.t.item_type} {t("· supprimé")} {e.t.deleted_by ? `par ${e.t.deleted_by} ` : ""}{t("le")} {formatWhen(e.t.deleted_at)}
                       </span>
                     </span>
                   </button>
@@ -106,24 +107,24 @@ function Body({ ctx, vault }: { ctx: PageContext; vault: VaultView }) {
           </ul>
           <section className="sidebar-scroll min-h-0 flex-1 overflow-y-auto p-4">
             {!current ? (
-              <p className="text-center text-[12.5px] text-[var(--c-text-muted)] md:pt-12">Choisissez un élément pour le voir ou le restaurer.</p>
+              <p className="text-center text-[12.5px] text-[var(--c-text-muted)] md:pt-12">{t("Choisissez un élément pour le voir ou le restaurer.")}</p>
             ) : (
               <div className="max-w-2xl space-y-3">
-                <button onClick={() => setSelected(null)} className="btn btn-ghost btn-sm md:hidden">← Liste</button>
+                <button onClick={() => setSelected(null)} className="btn btn-ghost btn-sm md:hidden">{t("← Liste")}</button>
                 <div className="flex flex-wrap items-center gap-2">
                   <h2 className="min-w-0 flex-1 truncate text-[13px] font-semibold text-[var(--c-text)]">{nameOf(current)}</h2>
                   {writable && (
                     <>
-                      <button onClick={() => void act(() => restoreVersion(vault, current.t, undefined), `« ${nameOf(current)} » restauré.`)} disabled={busy || !current.decoded.ok} className="btn btn-primary btn-sm">Restaurer</button>
-                      <button onClick={() => setConfirm({ kind: "purge", entry: current })} disabled={busy} className="btn btn-ghost btn-sm hover:text-[var(--c-danger)]">Supprimer définitivement</button>
+                      <button onClick={() => void act(() => restoreVersion(vault, current.t, undefined), t("« {0} » restauré.", nameOf(current)))} disabled={busy || !current.decoded.ok} className="btn btn-primary btn-sm">{t("Restaurer")}</button>
+                      <button onClick={() => setConfirm({ kind: "purge", entry: current })} disabled={busy} className="btn btn-ghost btn-sm hover:text-[var(--c-danger)]">{t("Supprimer définitivement")}</button>
                     </>
                   )}
                 </div>
-                <p className="help-text">Effacé pour de bon le {formatWhen(current.t.expires_at)}. Restauré, il revient là où il était, sur chaque appareil synchronisé.</p>
+                <p className="help-text">{t("Effacé pour de bon le")} {formatWhen(current.t.expires_at)}{t(". Restauré, il revient là où il était, sur chaque appareil synchronisé.")}</p>
                 {current.decoded.ok ? (
                   <ItemView payload={current.decoded.payload} index={index} />
                 ) : (
-                  <p className="callout callout-danger">Cette version ne s'ouvre pas avec la clé actuelle du vault : {current.decoded.error}.</p>
+                  <p className="callout callout-danger">{t("Cette version ne s'ouvre pas avec la clé actuelle du vault :")} {current.decoded.error}.</p>
                 )}
               </div>
             )}
@@ -133,21 +134,21 @@ function Body({ ctx, vault }: { ctx: PageContext; vault: VaultView }) {
 
       {confirm?.kind === "purge" && (
         <ConfirmDialog
-          title={`Supprimer définitivement « ${nameOf(confirm.entry)} » ?`}
-          message="Sa dernière version et son historique sont effacés du serveur : il ne pourra plus être restauré."
-          confirmLabel="Supprimer définitivement"
+          title={t("Supprimer définitivement « {0} » ?", nameOf(confirm.entry))}
+          message={t("Sa dernière version et son historique sont effacés du serveur : il ne pourra plus être restauré.")}
+          confirmLabel={t("Supprimer définitivement")}
           danger
-          onConfirm={() => { const e = confirm.entry; setConfirm(null); void act(() => api.purgeTrashItem(vault.id, e.t.item_id), "Supprimé définitivement."); }}
+          onConfirm={() => { const e = confirm.entry; setConfirm(null); void act(() => api.purgeTrashItem(vault.id, e.t.item_id), t("Supprimé définitivement.")); }}
           onCancel={() => setConfirm(null)}
         />
       )}
       {confirm?.kind === "empty" && (
         <ConfirmDialog
-          title="Vider la corbeille ?"
-          message={`Les ${entries?.length ?? 0} élément(s) de la corbeille de « ${vault.name} » sont effacés du serveur, historique compris : ils ne pourront plus être restaurés.`}
-          confirmLabel="Vider"
+          title={t("Vider la corbeille ?")}
+          message={t("Les {0} élément(s) de la corbeille de « {1} » sont effacés du serveur, historique compris : ils ne pourront plus être restaurés.", entries?.length ?? 0, vault.name)}
+          confirmLabel={t("Vider")}
           danger
-          onConfirm={() => { setConfirm(null); void act(() => api.emptyTrash(vault.id), "Corbeille vidée."); }}
+          onConfirm={() => { setConfirm(null); void act(() => api.emptyTrash(vault.id), t("Corbeille vidée.")); }}
           onCancel={() => setConfirm(null)}
         />
       )}

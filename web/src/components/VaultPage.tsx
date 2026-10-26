@@ -37,6 +37,7 @@ import { IconCheck, IconChevronDown, IconChevronRight, IconCopy, IconEdit, IconE
 import { copyText, Dropdown, formatAgo, formatWhen, Loading, Modal, useDelayed } from "./ui";
 import { PaneHandle, usePersistedPane } from "../hooks/usePersistedPane";
 import { NARROW, TOUCH, useMediaQuery } from "../hooks/useMediaQuery";
+import { plural, t } from "../lib/i18n";
 
 /** `groupId` : le dossier où créer (bouton « + » d'un dossier) ; absent, le
  * dossier de l'élément sélectionné. */
@@ -53,7 +54,7 @@ const FILTERS: Filter[] = ["all", "favorites", "login", "note", "card", "identit
 /** Un vault : son contenu à gauche, la fiche ou le formulaire à droite. */
 export function VaultPage({ ctx, vaultId, itemId, create }: { ctx: PageContext; vaultId: string; itemId?: string; create?: string }) {
   const vault = findVault(ctx.session, vaultId);
-  if (!vault) return <p className="p-6 text-[13px] text-[var(--c-text-muted)]">Ce vault n'existe pas (ou plus).</p>;
+  if (!vault) return <p className="p-6 text-[13px] text-[var(--c-text-muted)]">{t("Ce vault n'existe pas (ou plus).")}</p>;
   const kind = NEW_KINDS.find((k): k is ItemKind => k !== "sep" && k === create);
   return <VaultBody key={vault.id} ctx={ctx} vault={vault} itemId={itemId} create={kind} />;
 }
@@ -223,7 +224,7 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
   const acceptProblems = async () => {
     try {
       await acceptIntegrity(vault);
-      ctx.notify(canWrite(vault.role) && !emergency ? "Manifeste réécrit d'après ce que sert le serveur." : "Pris acte.");
+      ctx.notify(canWrite(vault.role) && !emergency ? t("Manifeste réécrit d'après ce que sert le serveur.") : t("Pris acte."));
     } catch (e) {
       ctx.error(errorMessage(e));
     }
@@ -264,7 +265,7 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
       }
       throw e;
     }
-    await leaveEdit(payload, `« ${payloadName(payload)} » enregistré.`);
+    await leaveEdit(payload, t("« {0} » enregistré.", payloadName(payload)));
   };
 
   const remove = async () => {
@@ -272,7 +273,7 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
     setConfirmDelete(false);
     try {
       await deleteItem(vault, current.id);
-      ctx.notify("Élément supprimé.");
+      ctx.notify(t("Élément supprimé."));
       setSelected(null);
       await load();
     } catch (e) {
@@ -286,7 +287,7 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
     setMoveTo(null);
     try {
       await moveItem(vault, dest, current);
-      ctx.notify(`« ${payloadName(current.payload)} » déplacé vers « ${dest.name} ».`);
+      ctx.notify(t("« {0} » déplacé vers « {1} ».", payloadName(current.payload), dest.name));
       setSelected(null);
       await load();
     } catch (e) {
@@ -328,12 +329,12 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
     const copy = (label: string, value: string, guarded = false) => async () => {
       if (guarded && !(await ask(it.payload))) return;
       const ok = await copyText(value);
-      if (ok) ctx.notify(`${label} copié.`);
+      if (ok) ctx.notify(t("{0} copié.", label));
     };
     return (
       <>
-        {l.username && <button onClick={copy("Utilisateur", l.username)} className="btn btn-ghost btn-sm" title="Copier l'utilisateur" aria-label="Copier l'utilisateur">U</button>}
-        {l.password && <button onClick={copy("Mot de passe", l.password, true)} className="btn btn-ghost btn-sm btn-icon" title="Copier le mot de passe" aria-label="Copier le mot de passe"><IconCopy size={11} /></button>}
+        {l.username && <button onClick={copy(t("Utilisateur"), l.username)} className="btn btn-ghost btn-sm" title={t("Copier l'utilisateur")} aria-label={t("Copier l'utilisateur")}>{t("U")}</button>}
+        {l.password && <button onClick={copy(t("Mot de passe"), l.password, true)} className="btn btn-ghost btn-sm btn-icon" title={t("Copier le mot de passe")} aria-label={t("Copier le mot de passe")}><IconCopy size={11} /></button>}
       </>
     );
   };
@@ -350,16 +351,16 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
     if (!n) return;
     try {
       if (n.mode === "create") {
-        if (nameTaken(name, n.parentId)) return ctx.error(`Un dossier « ${name} » existe déjà à ce niveau.`);
+        if (nameTaken(name, n.parentId)) return ctx.error(t("Un dossier « {0} » existe déjà à ce niveau.", name));
         await putPayload(vault, { kind: "group", group: { id: uuid(), name, parentId: n.parentId, color: null } });
-        ctx.notify(`Dossier « ${name} » créé.`);
+        ctx.notify(t("Dossier « {0} » créé.", name));
       } else {
         const it = index.byId.get(n.id);
         if (!it || it.payload.kind !== "group") return;
         const g = it.payload.group;
-        if (nameTaken(name, g.parentId ?? null, g.id)) return ctx.error(`Un dossier « ${name} » existe déjà à ce niveau.`);
+        if (nameTaken(name, g.parentId ?? null, g.id)) return ctx.error(t("Un dossier « {0} » existe déjà à ce niveau.", name));
         await putPayload(vault, { kind: "group", group: { ...g, name } }, it.revision);
-        ctx.notify(`Dossier renommé en « ${name} ».`);
+        ctx.notify(t("Dossier renommé en « {0} ».", name));
       }
     } catch (e) {
       ctx.error(errorMessage(e));
@@ -373,11 +374,11 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
     if (!it) return;
     const next = withParent(it.payload, folderId);
     if (!next) return;
-    if (next.kind === "group" && nameTaken(next.group.name, folderId, id)) return ctx.error(`Un dossier « ${next.group.name} » existe déjà à cet endroit.`);
+    if (next.kind === "group" && nameTaken(next.group.name, folderId, id)) return ctx.error(t("Un dossier « {0} » existe déjà à cet endroit.", next.group.name));
     try {
       await changeItem(vault, it, (p) => withParent(p, folderId));
       const dest = folderId ? index.groups.find((g) => g.id === folderId)?.name : null;
-      ctx.notify(`« ${payloadName(next)} » rangé ${dest ? `dans « ${dest} »` : "à la racine"}.`);
+      ctx.notify(t("« {0} » rangé {1}.", payloadName(next), dest ? t("dans « {0} »", dest) : t("à la racine")));
     } catch (e) {
       ctx.error(errorMessage(e));
     }
@@ -386,10 +387,10 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
 
   const folderActions = (folder: GuiVaultEntity) => (
     <>
-      <button onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setFolderMenu({ folderId: folder.id, x: r.right, y: r.bottom }); }} className="btn btn-ghost btn-sm btn-icon" title="Nouvel élément dans ce dossier" aria-label={`Nouvel élément dans ${folder.name}`}><IconPlus size={12} /></button>
-      <button onClick={() => setNaming({ mode: "create", parentId: folder.id })} className="btn btn-ghost btn-sm btn-icon" title="Nouveau sous-dossier" aria-label={`Nouveau sous-dossier dans ${folder.name}`}><IconFolder size={12} /></button>
-      <button onClick={() => setNaming({ mode: "rename", id: folder.id })} className="btn btn-ghost btn-sm btn-icon" title="Renommer" aria-label={`Renommer ${folder.name}`}><IconEdit size={12} /></button>
-      <button onClick={() => { setSelected(folder.id); setMode({ kind: "view" }); }} className={`btn btn-ghost btn-sm ${selected === folder.id ? "btn-toggled" : ""}`} title="Ouvrir le dossier : icône, couleur, suppression">ouvrir</button>
+      <button onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setFolderMenu({ folderId: folder.id, x: r.right, y: r.bottom }); }} className="btn btn-ghost btn-sm btn-icon" title={t("Nouvel élément dans ce dossier")} aria-label={t("Nouvel élément dans {0}", folder.name)}><IconPlus size={12} /></button>
+      <button onClick={() => setNaming({ mode: "create", parentId: folder.id })} className="btn btn-ghost btn-sm btn-icon" title={t("Nouveau sous-dossier")} aria-label={t("Nouveau sous-dossier dans {0}", folder.name)}><IconFolder size={12} /></button>
+      <button onClick={() => setNaming({ mode: "rename", id: folder.id })} className="btn btn-ghost btn-sm btn-icon" title={t("Renommer")} aria-label={t("Renommer {0}", folder.name)}><IconEdit size={12} /></button>
+      <button onClick={() => { setSelected(folder.id); setMode({ kind: "view" }); }} className={`btn btn-ghost btn-sm ${selected === folder.id ? "btn-toggled" : ""}`} title={t("Ouvrir le dossier : icône, couleur, suppression")}>{t("ouvrir")}</button>
     </>
   );
 
@@ -415,7 +416,7 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
     const copy = (what: { label: string; value: string } | null, guarded = false) => {
       if (!what) return;
       e.preventDefault();
-      void (guarded ? ask(payload) : Promise.resolve(true)).then((go) => go && copyText(what.value).then((ok) => ok && ctx.notify(`${what.label} copié.`)));
+      void (guarded ? ask(payload) : Promise.resolve(true)).then((go) => go && copyText(what.value).then((ok) => ok && ctx.notify(t("{0} copié.", what.label))));
     };
     const guarded = (fn: () => void) => { e.preventDefault(); void ask(payload).then((go) => go && fn()); };
     switch (e.key) {
@@ -434,52 +435,52 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
   }, []);
 
   const entity = current?.ok ? entities.find((e) => e.id === current.id) : undefined;
-  const filterLabel = (f: Filter) => (f === "all" ? "Tous les types" : f === "favorites" ? "Favoris" : capitalize(KIND_LABELS_PLURAL[f]));
+  const filterLabel = (f: Filter) => (f === "all" ? t("Tous les types") : f === "favorites" ? t("Favoris") : capitalize(KIND_LABELS_PLURAL[f]));
   const copyValue = (what: { label: string; value: string } | null) => {
     if (!what) return;
-    void copyText(what.value).then((ok) => (ok ? ctx.notify(`${what.label} copié.`) : ctx.error("Copie refusée par le navigateur.")));
+    void copyText(what.value).then((ok) => (ok ? ctx.notify(t("{0} copié.", what.label)) : ctx.error(t("Copie refusée par le navigateur."))));
   };
   /** `fn` après le mot de passe maître si l'élément ouvert est protégé. */
   const guard = (fn: () => void) => void ask(current?.ok ? current.payload : null).then((go) => go && fn());
   const locked = !!current?.ok && needsReprompt(current.payload);
   const copyTotp = (secret: string) => {
     const params = parseTotp(secret);
-    if (!params) return ctx.error("Secret TOTP illisible.");
-    void totpCode(params).then((code) => copyValue({ label: "Code 2FA", value: code }));
+    if (!params) return ctx.error(t("Secret TOTP illisible."));
+    void totpCode(params).then((code) => copyValue({ label: t("Code 2FA"), value: code }));
   };
 
   const vaultMenu = (
     <Dropdown
-      label="Le vault"
+      label={t("Le vault")}
       className="w-60"
-      trigger={({ open, toggle }) => <button onClick={toggle} aria-expanded={open} aria-haspopup="menu" className="btn btn-ghost btn-icon" title="Le vault : couleur, corbeille, import, réglages" aria-label="Actions du vault"><IconDots size={16} /></button>}
+      trigger={({ open, toggle }) => <button onClick={toggle} aria-expanded={open} aria-haspopup="menu" className="btn btn-ghost btn-icon" title={t("Le vault : couleur, corbeille, import, réglages")} aria-label={t("Actions du vault")}><IconDots size={16} /></button>}
     >
       {(close) => (
         <>
           <div className="px-3.5 pb-2 pt-1.5">
-            <p className="mb-2 text-[12px] font-medium text-[var(--c-text-muted)]">Couleur</p>
+            <p className="mb-2 text-[12px] font-medium text-[var(--c-text-muted)]">{t("Couleur")}</p>
             <div className="flex flex-wrap gap-1.5">
               {VAULT_COLORS.map((c) => {
                 const on = vaultColorName(vault.id, vault.kind === "personal", colors) === c;
-                return <button key={c} onClick={() => setVaultColor(vault.id, c)} aria-pressed={on} title={ACCENT_COLORS[c].label} aria-label={`Couleur ${ACCENT_COLORS[c].label}`} className={`h-5 w-5 rounded-full ${on ? "ring-2 ring-[var(--c-text)] ring-offset-2 ring-offset-[var(--c-raised)]" : ""}`} style={{ background: ACCENT_COLORS[c].c500 }} />;
+                return <button key={c} onClick={() => setVaultColor(vault.id, c)} aria-pressed={on} title={ACCENT_COLORS[c].label} aria-label={t("Couleur {0}", ACCENT_COLORS[c].label)} className={`h-5 w-5 rounded-full ${on ? "ring-2 ring-[var(--c-text)] ring-offset-2 ring-offset-[var(--c-raised)]" : ""}`} style={{ background: ACCENT_COLORS[c].c500 }} />;
               })}
             </div>
           </div>
           <div className="menu-sep" />
-          <button role="menuitem" className="menu-item" onClick={() => { close(); void load(); }}><IconRefresh size={14} /> Recharger</button>
-          <button role="menuitem" className="menu-item" onClick={() => { close(); navigate({ page: "vault-tools", id: vault.id }); }}><IconTools size={14} /> {emergency ? "Exporter" : "Importer ou exporter"}</button>
-          {!emergency && <button role="menuitem" className="menu-item" onClick={() => { close(); navigate({ page: "vault-trash", id: vault.id }); }}><IconTrash size={14} /> Corbeille</button>}
-          {!emergency && <button role="menuitem" className="menu-item" onClick={() => { close(); navigate({ page: "vault-settings", id: vault.id }); }}><IconSettings size={14} /> Membres et réglages</button>}
-          <button role="menuitem" className="menu-item" onClick={() => { close(); setHelp(true); }}><IconKeyboard size={14} /> Raccourcis clavier</button>
+          <button role="menuitem" className="menu-item" onClick={() => { close(); void load(); }}><IconRefresh size={14} /> {t("Recharger")}</button>
+          <button role="menuitem" className="menu-item" onClick={() => { close(); navigate({ page: "vault-tools", id: vault.id }); }}><IconTools size={14} /> {emergency ? t("Exporter") : t("Importer ou exporter")}</button>
+          {!emergency && <button role="menuitem" className="menu-item" onClick={() => { close(); navigate({ page: "vault-trash", id: vault.id }); }}><IconTrash size={14} /> {t("Corbeille")}</button>}
+          {!emergency && <button role="menuitem" className="menu-item" onClick={() => { close(); navigate({ page: "vault-settings", id: vault.id }); }}><IconSettings size={14} /> {t("Membres et réglages")}</button>}
+          <button role="menuitem" className="menu-item" onClick={() => { close(); setHelp(true); }}><IconKeyboard size={14} /> {t("Raccourcis clavier")}</button>
         </>
       )}
     </Dropdown>
   );
   const sortMenu = (
     <Dropdown
-      label="Trier"
+      label={t("Trier")}
       className="w-52"
-      trigger={({ open, toggle }) => <button onClick={toggle} aria-expanded={open} aria-haspopup="menu" className="btn btn-secondary btn-icon" title={`Trier : ${SORT_LABELS[sort]}`} aria-label="Trier"><IconSort size={15} /></button>}
+      trigger={({ open, toggle }) => <button onClick={toggle} aria-expanded={open} aria-haspopup="menu" className="btn btn-secondary btn-icon" title={t("Trier : {0}", SORT_LABELS[sort])} aria-label={t("Trier")}><IconSort size={15} /></button>}
     >
       {(close) => (Object.keys(SORT_LABELS) as SortMode[]).map((m) => (
         <button key={m} role="menuitemradio" aria-checked={sort === m} data-active={sort === m ? "true" : undefined} onClick={() => { setSort(m); close(); }} className="menu-item">
@@ -509,7 +510,7 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
 
       <div className="flex min-h-0 flex-1 flex-col min-[1100px]:flex-row">
         <section
-          aria-label="Éléments du vault"
+          aria-label={t("Éléments du vault")}
           style={{ "--list-w": `${list.value}px` } as React.CSSProperties}
           className={`m-enter relative flex min-h-0 flex-col bg-[var(--c-bg)] min-[1100px]:w-[var(--list-w)] min-[1100px]:shrink-0 ${mode.kind !== "view" || current ? "max-[1099.98px]:hidden" : "max-[1099.98px]:flex-1"}`}
         >
@@ -519,7 +520,7 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
                   des vaults ; « + » flottant pour créer. */}
               <div className="m-head">
                 <Dropdown
-                  label="Coffres"
+                  label={t("Coffres")}
                   align="left"
                   className="w-72"
                   wrapperClassName="flex min-w-0 flex-1"
@@ -541,7 +542,7 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
                       ))}
                       <div className="menu-sep" />
                       <button role="menuitem" onClick={() => { close(); setNewVault(true); }} className="menu-item">
-                        <IconPlus size={14} /> {ctx.session.local ? "Nouveau vault" : "Nouveau vault partagé"}
+                        <IconPlus size={14} /> {ctx.session.local ? t("Nouveau vault") : t("Nouveau vault partagé")}
                       </button>
                     </>
                   )}
@@ -553,13 +554,13 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
               <div className="flex flex-col gap-3 px-4 pb-2.5">
                 <label className="m-search">
                   <IconSearch size={18} />
-                  <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Filtrer ce coffre" aria-label="Filtrer ce vault" />
+                  <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t("Filtrer ce coffre")} aria-label={t("Filtrer ce vault")} />
                 </label>
                 {entities.length > 0 && (
-                  <div className="m-chips" role="tablist" aria-label="Type d'élément">
+                  <div className="m-chips" role="tablist" aria-label={t("Type d'élément")}>
                     {FILTERS.filter((f) => f === "all" || (counts[f] ?? 0) > 0).map((f) => (
                       <button key={f} role="tab" aria-selected={filter === f} onClick={() => setFilter(f)} className="m-chip">
-                        {f === "all" ? "Tout" : filterLabel(f)}{f === "all" && <span className="opacity-70">{counts.all}</span>}
+                        {f === "all" ? t("Tout") : filterLabel(f)}{f === "all" && <span className="opacity-70">{counts.all}</span>}
                       </button>
                     ))}
                   </div>
@@ -571,16 +572,16 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
             <div className="flex min-w-0 items-center gap-2">
               <span className="vdot h-2.5 w-2.5" style={{ background: vaultColor(vault.id, vault.kind === "personal", colors) }} />
               <h1 className="min-w-0 truncate text-[18px] font-semibold tracking-[-0.015em] text-[var(--c-text)]" title={vault.name}>{vault.name}</h1>
-              <span className="shrink-0 whitespace-nowrap text-[12.5px] text-[var(--c-text-muted)]" title={`Révision ${vault.revision}`}>{items ? `${entities.filter((e) => e.kind !== "group" && e.kind !== "icon").length} éléments` : ""}</span>
+              <span className="shrink-0 whitespace-nowrap text-[12.5px] text-[var(--c-text-muted)]" title={t("Révision {0}", vault.revision)}>{items ? plural(entities.filter((e) => e.kind !== "group" && e.kind !== "icon").length, "{0} élément", "{0} éléments") : ""}</span>
               <span className="flex-1" />
               {vaultMenu}
               {writable && (
                 <div className="relative">
-                  <button ref={newButton} onClick={() => setNewMenu((m) => !m)} className="btn btn-primary" aria-haspopup="menu" aria-expanded={newMenu}><IconPlus size={14} /> Nouveau</button>
+                  <button ref={newButton} onClick={() => setNewMenu((m) => !m)} className="btn btn-primary" aria-haspopup="menu" aria-expanded={newMenu}><IconPlus size={14} /> {t("Nouveau")}</button>
                   {newMenu && (
                     <>
                       <div className="fixed inset-0 z-10" onClick={() => setNewMenu(false)} />
-                      <div className="popover absolute right-0 z-20 mt-1.5 w-52" role="menu" aria-label="Nouvel élément">{kindsMenu}</div>
+                      <div className="popover absolute right-0 z-20 mt-1.5 w-52" role="menu" aria-label={t("Nouvel élément")}>{kindsMenu}</div>
                     </>
                   )}
                 </div>
@@ -589,7 +590,7 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
             {(emergency || vault.kind !== "personal" || (vault.keyFrom.kind === "member" && !pinnedEmailFor(vault.keyFrom.fingerprint))) && (
               <div className="flex flex-wrap items-center gap-1.5">
                 {emergency ? (
-                  <span className="tag tag-accent max-w-full truncate" title={`Confié par ${emergency.grantor} par l'accès d'urgence : lecture seule`}>Confié par {emergency.grantor}</span>
+                  <span className="tag tag-accent max-w-full truncate" title={t("Confié par {0} par l'accès d'urgence : lecture seule", emergency.grantor)}>{t("Confié par")} {emergency.grantor}</span>
                 ) : vault.kind !== "personal" && (
                   <span className="tag" title={ROLE_HINTS[vault.role]}>{capitalize(ROLE_LABELS[vault.role])}</span>
                 )}
@@ -598,9 +599,9 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
                     type="button"
                     onClick={() => navigate({ page: "vault-settings", id: vault.id })}
                     className="tag tag-warn"
-                    title="La clé de ce vault vous a été remise par quelqu'un dont vous n'avez pas vérifié l'empreinte — voir les réglages du vault"
+                    title={t("La clé de ce vault vous a été remise par quelqu'un dont vous n'avez pas vérifié l'empreinte — voir les réglages du vault")}
                   >
-                    Clé non vérifiée
+                    {t("Clé non vérifiée")}
                   </button>
                 )}
               </div>
@@ -608,15 +609,15 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
             <div className="flex min-w-0 items-center gap-2">
               <label className="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-[9px] border border-[var(--c-border)] bg-[var(--c-surface)] px-2.5 text-[var(--c-text-muted)] focus-within:border-[var(--c-accent)]">
                 <IconSearch size={14} />
-                <input ref={filterRef} value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => { if (e.key === "Escape") { e.currentTarget.blur(); if (query) setQuery(""); } }} placeholder="Filtrer ce vault" aria-label="Filtrer ce vault" className="min-w-0 flex-1 bg-transparent text-[13.5px] text-[var(--c-text)] outline-none placeholder:text-[var(--c-text-muted)] focus-visible:outline-none" />
+                <input ref={filterRef} value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => { if (e.key === "Escape") { e.currentTarget.blur(); if (query) setQuery(""); } }} placeholder={t("Filtrer ce vault")} aria-label={t("Filtrer ce vault")} className="min-w-0 flex-1 bg-transparent text-[13.5px] text-[var(--c-text)] outline-none placeholder:text-[var(--c-text-muted)] focus-visible:outline-none" />
                 {!touch && !query && <span className="kbd">/</span>}
               </label>
               {entities.length > 0 && (
                 <Dropdown
-                  label="Type d'élément"
+                  label={t("Type d'élément")}
                   className="w-56"
                   trigger={({ open, toggle }) => (
-                    <button onClick={toggle} aria-expanded={open} aria-haspopup="menu" className={`btn max-w-[9.5rem] ${filter === "all" ? "btn-secondary" : "btn-toggled"}`} title="Type d'élément">
+                    <button onClick={toggle} aria-expanded={open} aria-haspopup="menu" className={`btn max-w-[9.5rem] ${filter === "all" ? "btn-secondary" : "btn-toggled"}`} title={t("Type d'élément")}>
                       <span className="truncate">{filterLabel(filter)}</span><IconChevronDown size={12} />
                     </button>
                   )}
@@ -631,7 +632,7 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
               )}
               {sortMenu}
               {writable && (
-                <button onClick={() => { setQuery(""); setFilter("all"); setNaming({ mode: "create", parentId: null }); }} className="btn btn-secondary btn-icon shrink-0 max-sm:hidden" title="Nouveau dossier (à la racine ; le bouton d'un dossier en crée un dedans)" aria-label="Nouveau dossier"><IconFolderPlus size={15} /></button>
+                <button onClick={() => { setQuery(""); setFilter("all"); setNaming({ mode: "create", parentId: null }); }} className="btn btn-secondary btn-icon shrink-0 max-sm:hidden" title={t("Nouveau dossier (à la racine ; le bouton d'un dossier en crée un dedans)")} aria-label={t("Nouveau dossier")}><IconFolderPlus size={15} /></button>
               )}
             </div>
           </header>
@@ -647,22 +648,22 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
                 sort={sort}
                 keyboard={mode.kind === "view"}
                 alerts={alerts}
-                emptyMessage={writable ? "Ce vault est vide." : "Rien ici pour l'instant."}
+                emptyMessage={writable ? t("Ce vault est vide.") : t("Rien ici pour l'instant.")}
                 {...(writable && sort === "name" ? { folderActions, naming, onName: (n: string) => void submitFolderName(n), onNameCancel: () => setNaming(null), onMove: (id: string, folderId: string | null) => void moveToFolder(id, folderId) } : {})}
               />
             )}
           </div>
           {narrow && writable && (
-            <button onClick={() => setNewMenu(true)} className="m-fab" aria-label="Nouvel élément" title="Nouvel élément"><IconPlus size={24} /></button>
+            <button onClick={() => setNewMenu(true)} className="m-fab" aria-label={t("Nouvel élément")} title={t("Nouvel élément")}><IconPlus size={24} /></button>
           )}
         </section>
         {newVault && <NewVaultDialog ctx={ctx} onClose={closeNewVault} />}
-        {narrow && newMenu && <Modal title="Nouvel élément" onClose={closeNewMenu}><div role="menu" aria-label="Nouvel élément" className="-mx-3">{kindsMenu}</div></Modal>}
+        {narrow && newMenu && <Modal title={t("Nouvel élément")} onClose={closeNewMenu}><div role="menu" aria-label={t("Nouvel élément")} className="-mx-3">{kindsMenu}</div></Modal>}
 
         <div className="hidden min-[1100px]:contents"><PaneHandle onMouseDown={list.onMouseDown} /></div>
         <section data-noswipe className={`m-push flex min-h-0 flex-1 flex-col border-l border-[var(--c-border)] max-[1099.98px]:border-l-0 ${mode.kind === "view" && !current ? "max-[1099.98px]:hidden" : ""} ${list.isDragging ? "pointer-events-none select-none" : ""}`}>
           {stale && mode.kind !== "view" && (
-            <p className="callout callout-warn m-4 mb-0">Ce vault a changé entre-temps : l'enregistrement proposera de fusionner.</p>
+            <p className="callout callout-warn m-4 mb-0">{t("Ce vault a changé entre-temps : l'enregistrement proposera de fusionner.")}</p>
           )}
           {mode.kind === "new" && (
             <ItemForm key={`${mode.itemKind}-${mode.groupId ?? ""}-${mode.draft ? payloadEntity(mode.draft).id : ""}`} kind={mode.itemKind} draft={mode.draft} index={index} defaultGroupId={mode.groupId !== undefined ? mode.groupId : selectedGroupId} onSave={(p) => save(p)} onCancel={() => setMode({ kind: "view" })} onAddIcon={addIcon} />
@@ -675,8 +676,8 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
               {items && items.length > 0 && (
                 <>
                   <span className="flex h-11 w-11 items-center justify-center rounded-xl border border-dashed border-[var(--c-border-strong)] text-[var(--c-text-muted)]"><IconVault size={20} /></span>
-                  <p className="text-[13.5px] text-[var(--c-text-muted)]">Choisissez un élément.</p>
-                  {!touch && <p className="flex items-center gap-1.5 text-[12.5px] text-[var(--c-text-faint)]"><span className="kbd">/</span> filtrer <span className="kbd">?</span> raccourcis</p>}
+                  <p className="text-[13.5px] text-[var(--c-text-muted)]">{t("Choisissez un élément.")}</p>
+                  {!touch && <p className="flex items-center gap-1.5 text-[12.5px] text-[var(--c-text-faint)]"><span className="kbd">/</span> {t("filtrer")} <span className="kbd">?</span> {t("raccourcis")}</p>}
                 </>
               )}
             </div>
@@ -684,7 +685,7 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
           {mode.kind === "view" && current && (
             <>
               <div className="flex min-h-[52px] shrink-0 flex-wrap items-center gap-2 border-b border-[var(--c-border)] px-5 py-2 max-md:px-3 max-md:pt-[calc(0.5rem+var(--inset-top))]">
-                <button onClick={() => setSelected(null)} className="btn btn-ghost btn-sm min-[1100px]:hidden max-md:-ml-1 max-md:h-11 max-md:w-11 max-md:px-0" aria-label="Retour à la liste"><IconChevronRight size={14} className="rotate-180 max-md:h-5 max-md:w-5" /><span className="max-md:hidden">Liste</span></button>
+                <button onClick={() => setSelected(null)} className="btn btn-ghost btn-sm min-[1100px]:hidden max-md:-ml-1 max-md:h-11 max-md:w-11 max-md:px-0" aria-label={t("Retour à la liste")}><IconChevronRight size={14} className="rotate-180 max-md:h-5 max-md:w-5" /><span className="max-md:hidden">{t("Liste")}</span></button>
                 <div className="flex min-w-0 flex-1 items-center gap-2 text-[13px] text-[var(--c-text-muted)] max-md:text-[14px]">
                   <span className="truncate">{vault.name}</span>
                   {entity?.path && <><IconChevronRight size={12} className="shrink-0 text-[var(--c-text-faint)]" /><span className="truncate">{entity.path}</span></>}
@@ -692,38 +693,38 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
                 {current.ok && current.payload.kind === "login" && autoTypeBridge() && (() => {
                   const login = current.payload.login;
                   return (
-                    <button onClick={() => guard(() => void performAutoType(login).catch((e) => ctx.error(`Saisie automatique : ${errorMessage(e)}`)))} disabled={login.autoType?.enabled === false} className="btn btn-ghost btn-icon" title={login.autoType?.enabled === false ? "Saisie automatique désactivée pour cet identifiant" : "Saisie automatique : GuiVault se réduit et le tape dans la fenêtre d'avant"} aria-label="Saisie automatique"><IconKeyboard size={15} /></button>
+                    <button onClick={() => guard(() => void performAutoType(login).catch((e) => ctx.error(t("Saisie automatique : {0}", errorMessage(e)))))} disabled={login.autoType?.enabled === false} className="btn btn-ghost btn-icon" title={login.autoType?.enabled === false ? t("Saisie automatique désactivée pour cet identifiant") : t("Saisie automatique : GuiVault se réduit et le tape dans la fenêtre d'avant")} aria-label={t("Saisie automatique")}><IconKeyboard size={15} /></button>
                   );
                 })()}
                 {!emergency && isSecretItem && supports("createSend") && (
-                  <button onClick={() => guard(() => setSharing(true))} className="btn btn-secondary" title="Partager par lien : une copie chiffrée, qui expire"><IconLink size={14} /> <span className="max-sm:hidden">Partager</span></button>
+                  <button onClick={() => guard(() => setSharing(true))} className="btn btn-secondary" title={t("Partager par lien : une copie chiffrée, qui expire")}><IconLink size={14} /> <span className="max-sm:hidden">{t("Partager")}</span></button>
                 )}
-                {writable && current.ok && <button onClick={() => guard(() => setMode({ kind: "edit" }))} className="btn btn-secondary"><IconEdit size={14} /> <span className="max-sm:hidden">Modifier</span></button>}
+                {writable && current.ok && <button onClick={() => guard(() => setMode({ kind: "edit" }))} className="btn btn-secondary"><IconEdit size={14} /> <span className="max-sm:hidden">{t("Modifier")}</span></button>}
                 <Dropdown
-                  label="Plus d'actions"
+                  label={t("Plus d'actions")}
                   className="w-60"
-                  trigger={({ open, toggle }) => <button onClick={toggle} aria-expanded={open} aria-haspopup="menu" className="btn btn-ghost btn-icon" title="Plus d'actions" aria-label="Plus d'actions"><IconDots size={16} /></button>}
+                  trigger={({ open, toggle }) => <button onClick={toggle} aria-expanded={open} aria-haspopup="menu" className="btn btn-ghost btn-icon" title={t("Plus d'actions")} aria-label={t("Plus d'actions")}><IconDots size={16} /></button>}
                 >
                   {(close) => (
                     <>
-                      {!emergency && <button role="menuitem" className="menu-item" onClick={() => { close(); guard(() => setHistory(true)); }}><IconHistory size={14} /> Historique<span className="flex-1" />{!touch && <span className="kbd">H</span>}</button>}
+                      {!emergency && <button role="menuitem" className="menu-item" onClick={() => { close(); guard(() => setHistory(true)); }}><IconHistory size={14} /> {t("Historique")}<span className="flex-1" />{!touch && <span className="kbd">{t("H")}</span>}</button>}
                       {writable && current.ok && current.payload.kind !== "group" && (
-                        <button role="menuitem" className="menu-item" onClick={() => { close(); const p = current.payload; guard(() => setMode({ kind: "new", itemKind: p.kind, draft: duplicateOf(p) })); }}><IconCopy size={14} /> Dupliquer</button>
+                        <button role="menuitem" className="menu-item" onClick={() => { close(); const p = current.payload; guard(() => setMode({ kind: "new", itemKind: p.kind, draft: duplicateOf(p) })); }}><IconCopy size={14} /> {t("Dupliquer")}</button>
                       )}
                       {writable && current.ok && otherWritable.map((v) => (
                         <button key={v.id} role="menuitem" className="menu-item" onClick={() => { close(); setMoveTo(v); }}>
                           <span className="vdot" style={{ background: vaultColor(v.id, v.kind === "personal", colors) }} />
-                          <span className="min-w-0 flex-1 truncate">Déplacer vers {v.name}</span>
+                          <span className="min-w-0 flex-1 truncate">{t("Déplacer vers")} {v.name}</span>
                         </button>
                       ))}
-                      {writable && <><div className="menu-sep" /><button role="menuitem" className="menu-item text-[var(--c-danger-text)]" onClick={() => { close(); setConfirmDelete(true); }}><IconTrash size={14} /> Supprimer<span className="flex-1" />{!touch && <span className="kbd">Suppr</span>}</button></>}
+                      {writable && <><div className="menu-sep" /><button role="menuitem" className="menu-item text-[var(--c-danger-text)]" onClick={() => { close(); setConfirmDelete(true); }}><IconTrash size={14} /> {t("Supprimer")}<span className="flex-1" />{!touch && <span className="kbd">{t("Suppr")}</span>}</button></>}
                     </>
                   )}
                 </Dropdown>
               </div>
               <div className="sidebar-scroll min-h-0 flex-1 overflow-y-auto px-8 pb-10 pt-7 max-md:px-4 max-md:pt-5">
                 <div className="flex max-w-[1180px] flex-col gap-6">
-                  {alerts.has(current.id) && <p className="callout callout-danger">{capitalize(alerts.get(current.id)!)} : ne vous y fiez pas avant de l'avoir vérifié.</p>}
+                  {alerts.has(current.id) && <p className="callout callout-danger">{capitalize(alerts.get(current.id)!)} {t(": ne vous y fiez pas avant de l'avoir vérifié.")}</p>}
                   {current.ok ? (
                     <>
                       {/* Mobile (maquette `MFiche`) : centré, la tuile en grand. */}
@@ -731,25 +732,25 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
                         {entity && <ItemTile entity={entity} customIcons={index.icons} size={narrow ? 72 : 56} />}
                         <div className="flex min-w-0 flex-1 flex-col gap-1 max-md:w-full max-md:items-center">
                           <div className="flex min-w-0 items-center gap-1.5 max-md:max-w-full">
-                            <h2 className="min-w-0 truncate text-[24px] font-semibold tracking-[-0.02em] text-[var(--c-text)] max-md:line-clamp-2 max-md:whitespace-normal" title={payloadName(current.payload)}>{payloadName(current.payload) || "(sans nom)"}</h2>
+                            <h2 className="min-w-0 truncate text-[24px] font-semibold tracking-[-0.02em] text-[var(--c-text)] max-md:line-clamp-2 max-md:whitespace-normal" title={payloadName(current.payload)}>{payloadName(current.payload) || t("(sans nom)")}</h2>
                             {writable && isSecretItem && (() => {
                               const fav = !!(payloadEntity(current.payload).favorite);
-                              return <button onClick={() => void toggleFavorite()} aria-pressed={fav} className="btn btn-ghost btn-icon shrink-0" style={{ color: fav ? "#f5c04a" : undefined }} title={fav ? "Retirer des épinglés" : "Épingler"} aria-label={fav ? "Retirer des épinglés" : "Épingler"}><IconStar size={17} filled={fav} /></button>;
+                              return <button onClick={() => void toggleFavorite()} aria-pressed={fav} className="btn btn-ghost btn-icon shrink-0" style={{ color: fav ? "#f5c04a" : undefined }} title={fav ? t("Retirer des épinglés") : t("Épingler")} aria-label={fav ? t("Retirer des épinglés") : t("Épingler")}><IconStar size={17} filled={fav} /></button>;
                             })()}
                           </div>
                           <p className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-[13px] text-[var(--c-text-muted)] max-md:justify-center max-md:text-[14px]">
                             {current.payload.kind === "login" && current.payload.login.uris[0]?.uri && <><a href={current.payload.login.uris[0].uri} target="_blank" rel="noopener noreferrer" className="max-w-[260px] truncate">{uriHost(current.payload.login.uris[0].uri)}</a><span>·</span></>}
                             <span>{capitalize(KIND_LABELS[current.payload.kind])}</span>
                             <span>·</span>
-                            <span title={`${formatWhen(current.updatedAt)} · révision ${current.revision}`}>Modifié {formatAgo(current.updatedAt)}</span>
+                            <span title={t("{0} · révision {1}", formatWhen(current.updatedAt), current.revision)}>{t("Modifié")} {formatAgo(current.updatedAt)}</span>
                           </p>
                         </div>
                       </div>
                       {locked ? (
                         <div className="card flex flex-wrap items-center gap-3 px-4 py-3.5">
                           <IconLock size={18} className="shrink-0 text-[var(--c-text-muted)]" />
-                          <span className="min-w-0 flex-1 text-[13.5px]">Protégé par le mot de passe maître</span>
-                          <button onClick={() => void ask(current.payload).then((ok) => ok && setUnlocks((n) => n + 1))} className="btn btn-primary">Afficher</button>
+                          <span className="min-w-0 flex-1 text-[13.5px]">{t("Protégé par le mot de passe maître")}</span>
+                          <button onClick={() => void ask(current.payload).then((ok) => ok && setUnlocks((n) => n + 1))} className="btn btn-primary">{t("Afficher")}</button>
                         </div>
                       ) : (<>
                       {(() => {
@@ -761,11 +762,11 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
                         if (!secret && !user && !totp && !site) return null;
                         return (
                           <div className="flex flex-wrap gap-2 max-md:flex-nowrap">
-                            {secret && <button onClick={() => copyValue(secret)} className="btn btn-primary btn-lg max-md:h-[50px] max-md:min-w-0 max-md:flex-1 max-md:rounded-[14px] max-md:text-[15px]"><IconCopy size={15} /> <span className="truncate">Copier {withArticle(secret.label)}</span>{!touch && <span className="kbd">C</span>}</button>}
+                            {secret && <button onClick={() => copyValue(secret)} className="btn btn-primary btn-lg max-md:h-[50px] max-md:min-w-0 max-md:flex-1 max-md:rounded-[14px] max-md:text-[15px]"><IconCopy size={15} /> <span className="truncate">{t("Copier")} {withArticle(secret.label)}</span>{!touch && <span className="kbd">{t("C")}</span>}</button>}
                             {/* Mobile : l'utilisateur et le code se copient depuis leur ligne. */}
-                            {user && <button onClick={() => copyValue(user)} className="btn btn-secondary btn-lg max-md:hidden"><IconCopy size={15} /> Copier {withArticle(user.label)}</button>}
-                            {totp && <button onClick={() => copyTotp(totp)} className="btn btn-secondary btn-lg max-md:hidden"><IconShieldClock size={15} /> Copier le code 2FA</button>}
-                            {site && /^https?:\/\//i.test(site) && <a href={site} target="_blank" rel="noopener noreferrer" className="btn btn-secondary btn-lg hover:no-underline max-md:h-[50px] max-md:w-[50px] max-md:rounded-[14px] max-md:px-0" aria-label="Ouvrir le site"><IconExternal size={15} /> <span className="max-md:hidden">Ouvrir le site</span></a>}
+                            {user && <button onClick={() => copyValue(user)} className="btn btn-secondary btn-lg max-md:hidden"><IconCopy size={15} /> {t("Copier")} {withArticle(user.label)}</button>}
+                            {totp && <button onClick={() => copyTotp(totp)} className="btn btn-secondary btn-lg max-md:hidden"><IconShieldClock size={15} /> {t("Copier le code 2FA")}</button>}
+                            {site && /^https?:\/\//i.test(site) && <a href={site} target="_blank" rel="noopener noreferrer" className="btn btn-secondary btn-lg hover:no-underline max-md:h-[50px] max-md:w-[50px] max-md:rounded-[14px] max-md:px-0" aria-label={t("Ouvrir le site")}><IconExternal size={15} /> <span className="max-md:hidden">{t("Ouvrir le site")}</span></a>}
                           </div>
                         );
                       })()}
@@ -782,7 +783,7 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
                       </>)}
                     </>
                   ) : (
-                    <p className="callout callout-danger">Impossible de déchiffrer cet élément : {current.error}. Il a peut-être été chiffré avec une clé de vault antérieure, ou altéré.</p>
+                    <p className="callout callout-danger">{t("Impossible de déchiffrer cet élément :")} {current.error}{t(". Il a peut-être été chiffré avec une clé de vault antérieure, ou altéré.")}</p>
                   )}
                 </div>
               </div>
@@ -814,9 +815,9 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
       )}
       {confirmDelete && current && (
         <ConfirmDialog
-          title={`Supprimer « ${current.ok ? payloadName(current.payload) : current.id.slice(0, 8)} » ?`}
-          message={(current.ok && current.payload.kind === "group" ? "Le dossier est supprimé ; ce qu'il contient remonte à la racine lors de la prochaine synchronisation de chaque appareil." : "Chaque appareil synchronisé le retire à son tour.") + " Il reste dans la corbeille du vault, d'où il peut être restauré."}
-          confirmLabel="Supprimer"
+          title={t("Supprimer « {0} » ?", current.ok ? payloadName(current.payload) : current.id.slice(0, 8))}
+          message={(current.ok && current.payload.kind === "group" ? t("Le dossier est supprimé ; ce qu'il contient remonte à la racine lors de la prochaine synchronisation de chaque appareil.") : t("Chaque appareil synchronisé le retire à son tour.")) + t(" Il reste dans la corbeille du vault, d'où il peut être restauré.")}
+          confirmLabel={t("Supprimer")}
           danger
           onConfirm={remove}
           onCancel={() => setConfirmDelete(false)}
@@ -832,18 +833,18 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
           index={index}
           writable={writable}
           onClose={closeHistory}
-          onRestored={() => { setHistory(false); ctx.notify("Version restaurée."); void load(); }}
+          onRestored={() => { setHistory(false); ctx.notify(t("Version restaurée.")); void load(); }}
         />
       )}
       {moveTo && current?.ok && (
         <ConfirmDialog
-          title={`Déplacer vers « ${moveTo.name} » ?`}
-          message={`« ${payloadName(current.payload)} » est re-chiffré sous la clé de ${moveTo.name} et retiré d'ici. ${moveTo.kind === "shared" ? "Tous les membres de ce vault pourront le lire, secrets compris." : ""} Ce qu'il référence (dossier, clé du trousseau, relais) ne suit pas : déplacez-les aussi si besoin.`}
-          confirmLabel="Déplacer"
+          title={t("Déplacer vers « {0} » ?", moveTo.name)}
+          message={t("« {0} » est re-chiffré sous la clé de {1} et retiré d'ici. {2} Ce qu'il référence (dossier, clé du trousseau, relais) ne suit pas : déplacez-les aussi si besoin.", payloadName(current.payload), moveTo.name, moveTo.kind === "shared" ? t("Tous les membres de ce vault pourront le lire, secrets compris.") : "")}
+          confirmLabel={t("Déplacer")}
           onConfirm={doMove}
           onCancel={() => setMoveTo(null)}
         >
-          {current.payload.kind === "group" && <p className="callout callout-warn">Seul le dossier lui-même est déplacé, pas son contenu.</p>}
+          {current.payload.kind === "group" && <p className="callout callout-warn">{t("Seul le dossier lui-même est déplacé, pas son contenu.")}</p>}
         </ConfirmDialog>
       )}
     </div>

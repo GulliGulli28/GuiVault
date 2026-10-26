@@ -48,7 +48,9 @@ test.beforeAll(async () => {
     channel: "chromium",
     headless: true,
     viewport: { width: 1100, height: 800 },
-    args: [`--disable-extensions-except=${EXTENSION}`, `--load-extension=${EXTENSION}`, "--host-resolver-rules=MAP *.test 127.0.0.1"],
+    // Les textes vérifiés sont ceux de l'interface en français.
+    locale: "fr-FR",
+    args: [`--disable-extensions-except=${EXTENSION}`, `--load-extension=${EXTENSION}`, "--host-resolver-rules=MAP *.test 127.0.0.1", "--lang=fr-FR"],
   });
   const worker = context.serviceWorkers()[0] ?? (await context.waitForEvent("serviceworker"));
   extensionId = new URL(worker.url()).host;

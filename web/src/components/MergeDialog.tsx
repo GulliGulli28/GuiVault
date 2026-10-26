@@ -10,6 +10,7 @@ import { buildMerge, planMerge, type MergeField, type MergePlan, type Side } fro
 import { decodeItem, payloadName, RevisionConflict, type VaultView } from "../lib/session";
 import type { Group, Payload } from "../lib/types";
 import { SecretValue } from "./ui";
+import { t } from "../lib/i18n";
 
 /** Un enregistrement refusé parce que l'élément a changé entre-temps :
  * `base`, la version ouverte ; `mine`, la nôtre ; `theirs`, celle du serveur
@@ -53,7 +54,7 @@ export function useMerge({ vault, index, write, done, discard }: {
     if (plan.fromMine.length === 0 && plan.conflicts.length === 0) {
       // Rien de nous qui n'y soit déjà : pas d'écriture.
       setMerge(null);
-      void done(theirs.payload, `« ${payloadName(mine)} » : la version enregistrée contient déjà vos modifications.`);
+      void done(theirs.payload, t("« {0} » : la version enregistrée contient déjà vos modifications.", payloadName(mine)));
       return true;
     }
     setMerge({ name: payloadName(mine), base, mine, theirs: theirs.payload, revision: theirs.revision, plan });
@@ -71,12 +72,12 @@ export function useMerge({ vault, index, write, done, discard }: {
       throw e;
     }
     setMerge(null);
-    await done(merged, `« ${payloadName(merged)} » enregistré ${merge.theirs ? "(versions fusionnées)" : "(recréé)"}.`);
+    await done(merged, t("« {0} » enregistré {1}.", payloadName(merged), merge.theirs ? t("(versions fusionnées)") : t("(recréé)")));
   };
 
   const dialog = merge ? (
     <MergeDialog
-      key={merge.revision ?? "supprimé"}
+      key={merge.revision ?? t("supprimé")}
       name={merge.name}
       plan={merge.plan}
       deleted={!merge.theirs}
@@ -104,7 +105,7 @@ export function MergeDialog({ name, plan, deleted, index, onSave, onBack, onDisc
   onBack: () => void;
   onDiscard: () => void;
 }) {
-  const title = deleted ? `« ${name} » a été supprimé entre-temps` : `« ${name} » a été modifié entre-temps`;
+  const title = deleted ? t("« {0} » a été supprimé entre-temps", name) : t("« {0} » a été modifié entre-temps", name);
   const { ref, dialogProps } = useModalSurface({ onClose: onBack, label: title });
   const [choices, setChoices] = useState<Record<string, Side>>({});
   const [busy, setBusy] = useState(false);
@@ -131,17 +132,16 @@ export function MergeDialog({ name, plan, deleted, index, onSave, onBack, onDisc
         <div className="sidebar-scroll mt-1.5 min-h-0 flex-1 space-y-3 overflow-y-auto text-[12.5px] leading-relaxed text-[var(--c-text-secondary)]">
           {deleted || !plan ? (
             <p>
-              Un autre appareil ou un autre membre l'a supprimé pendant que vous le modifiiez ; il est dans la corbeille du vault.
-              Le recréer avec votre version, ou abandonner vos modifications ?
+              {t("Un autre appareil ou un autre membre l'a supprimé pendant que vous le modifiiez ; il est dans la corbeille du vault. Le recréer avec votre version, ou abandonner vos modifications ?")}
             </p>
           ) : (
             <>
-              <p>Un autre appareil ou un autre membre l'a enregistré pendant que vous le modifiiez. La fusion des deux versions :</p>
-              {plan.fromTheirs.length > 0 && <p><span className="font-medium text-[var(--c-text)]">Repris de la version enregistrée :</span> {labels(plan.fromTheirs)}.</p>}
-              {plan.fromMine.length > 0 && <p><span className="font-medium text-[var(--c-text)]">Gardé de la vôtre :</span> {labels(plan.fromMine)}.</p>}
+              <p>{t("Un autre appareil ou un autre membre l'a enregistré pendant que vous le modifiiez. La fusion des deux versions :")}</p>
+              {plan.fromTheirs.length > 0 && <p><span className="font-medium text-[var(--c-text)]">{t("Repris de la version enregistrée :")}</span> {labels(plan.fromTheirs)}.</p>}
+              {plan.fromMine.length > 0 && <p><span className="font-medium text-[var(--c-text)]">{t("Gardé de la vôtre :")}</span> {labels(plan.fromMine)}.</p>}
               {plan.conflicts.length > 0 && (
                 <div className="space-y-2">
-                  <p className="font-medium text-[var(--c-text)]">Modifié des deux côtés — à choisir :</p>
+                  <p className="font-medium text-[var(--c-text)]">{t("Modifié des deux côtés — à choisir :")}</p>
                   {plan.conflicts.map((f) => (
                     <fieldset key={f.path} className="card space-y-1.5 p-2.5">
                       <legend className="px-1 text-[12px] font-medium text-[var(--c-text)]">{f.label}</legend>
@@ -157,14 +157,14 @@ export function MergeDialog({ name, plan, deleted, index, onSave, onBack, onDisc
                               onChange={() => setChoices((c) => ({ ...c, [f.path]: side }))}
                               className="mt-1"
                             />
-                            <label htmlFor={id} className="w-40 shrink-0 cursor-pointer whitespace-nowrap text-[var(--c-text)]">{side === "mine" ? "Ma version" : "Version enregistrée"}</label>
+                            <label htmlFor={id} className="w-40 shrink-0 cursor-pointer whitespace-nowrap text-[var(--c-text)]">{side === "mine" ? t("Ma version") : t("Version enregistrée")}</label>
                             <div className="min-w-0 flex-1">{value(f, side === "mine" ? f.mine : f.theirs, groups)}</div>
                           </div>
                         );
                       })}
                     </fieldset>
                   ))}
-                  {passwordChosen && <p className="help-text">Le mot de passe écarté est gardé dans l'historique de l'élément.</p>}
+                  {passwordChosen && <p className="help-text">{t("Le mot de passe écarté est gardé dans l'historique de l'élément.")}</p>}
                 </div>
               )}
             </>
@@ -172,10 +172,10 @@ export function MergeDialog({ name, plan, deleted, index, onSave, onBack, onDisc
           {error && <p className="callout callout-danger">{error}</p>}
         </div>
         <div className="mt-4 flex flex-wrap justify-end gap-2">
-          <button onClick={onBack} className="btn btn-ghost">Revenir à mes modifications</button>
-          <button onClick={onDiscard} className="btn btn-secondary">Abandonner les miennes</button>
+          <button onClick={onBack} className="btn btn-ghost">{t("Revenir à mes modifications")}</button>
+          <button onClick={onDiscard} className="btn btn-secondary">{t("Abandonner les miennes")}</button>
           <button onClick={() => void save()} disabled={busy} autoFocus className="btn btn-primary">
-            {busy ? "Enregistrement…" : deleted || !plan ? "Recréer avec ma version" : "Enregistrer la fusion"}
+            {busy ? t("Enregistrement…") : deleted || !plan ? t("Recréer avec ma version") : t("Enregistrer la fusion")}
           </button>
         </div>
       </div>
@@ -190,11 +190,11 @@ function labels(fields: MergeField[]): string {
 /** Une valeur de champ, lisible : secret masqué, dossier par son chemin,
  * tableau résumé. */
 function value(f: MergeField, v: unknown, groups: Map<string, Group>): ReactNode {
-  const empty = <span className="text-[var(--c-text-faint)]">(vide)</span>;
+  const empty = <span className="text-[var(--c-text-faint)]">{t("(vide)")}</span>;
   if (v === undefined || v === null || v === "" || (Array.isArray(v) && v.length === 0)) return empty;
   if (f.secret && typeof v === "string") return <SecretValue value={v} />;
   const last = f.path.split(".").pop();
-  if ((last === "groupId" || last === "parentId") && typeof v === "string") return <span className="text-[var(--c-text)]">{groupPath(groups, v) || "Racine"}</span>;
+  if ((last === "groupId" || last === "parentId") && typeof v === "string") return <span className="text-[var(--c-text)]">{groupPath(groups, v) || t("Racine")}</span>;
   if (typeof v === "boolean") return <span className="text-[var(--c-text)]">{v ? "oui" : "non"}</span>;
   const text = Array.isArray(v) ? v.map(summarize).join(", ") : summarize(v);
   return <span className="block truncate text-[var(--c-text)]" title={text}>{text}</span>;

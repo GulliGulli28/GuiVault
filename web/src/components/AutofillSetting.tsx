@@ -4,6 +4,7 @@ import { useAllItems } from "../lib/allItems";
 import { autofillBridge, buildAutofillIndex, useAutofillStatus } from "../lib/autofill";
 import { SettingRow } from "./ui";
 import { IconLogin } from "./secret-icons";
+import { t } from "../lib/i18n";
 
 /** Android : tant qu'un coffre est ouvert et que GuiVault est le service de
  * remplissage, l'index de ses identifiants suit (`lib/autofill.ts`) — à
@@ -36,28 +37,28 @@ export function AutofillSetting({ ctx, mobile }: { ctx: Pick<PageContext, "error
   const { status, refresh } = useAutofillStatus();
   if (!status?.supported) return null;
   const desc = !status.enabled
-    ? "GuiVault propose vos identifiants dans les autres applications"
+    ? t("GuiVault propose vos identifiants dans les autres applications")
     : status.biometric
-      ? "Coffre fermé : une empreinte, puis on remplit"
-      : "Seulement quand GuiVault est ouvert (pas d'empreinte enregistrée)";
+      ? t("Coffre fermé : une empreinte, puis on remplit")
+      : t("Seulement quand GuiVault est ouvert (pas d'empreinte enregistrée)");
   const toggle = () => {
     const b = autofillBridge();
     if (!b) return;
-    if (status.enabled) void b.disable().then(() => { refresh(); ctx.notify("Remplissage désactivé."); }, () => ctx.error("Le remplissage n'a pas pu être désactivé."));
-    else void b.request().catch(() => ctx.error("Les réglages d'Android ne se sont pas ouverts."));
+    if (status.enabled) void b.disable().then(() => { refresh(); ctx.notify(t("Remplissage désactivé.")); }, () => ctx.error(t("Le remplissage n'a pas pu être désactivé.")));
+    else void b.request().catch(() => ctx.error(t("Les réglages d'Android ne se sont pas ouverts.")));
   };
-  const control = <button type="button" role="switch" aria-checked={status.enabled} aria-label="Remplir les autres applications" onClick={toggle} className="switch" />;
+  const control = <button type="button" role="switch" aria-checked={status.enabled} aria-label={t("Remplir les autres applications")} onClick={toggle} className="switch" />;
   if (mobile) {
     return (
       <div className="m-set">
         <IconLogin size={18} className="shrink-0 text-[var(--c-text-muted)]" />
         <span className="flex min-w-0 flex-1 flex-col">
-          <span>Remplir les autres applications</span>
+          <span>{t("Remplir les autres applications")}</span>
           <span className="text-[13px] text-[var(--c-text-muted)]">{desc}</span>
         </span>
         {control}
       </div>
     );
   }
-  return <SettingRow title="Remplir les autres applications" desc={desc}>{control}</SettingRow>;
+  return <SettingRow title={t("Remplir les autres applications")} desc={desc}>{control}</SettingRow>;
 }

@@ -5,6 +5,7 @@ import { SshKeyGenerator } from "../GeneratorPanel";
 import { IconDice } from "../secret-icons";
 import { FileButton, PasswordInput } from "../ui";
 import { Field, FormShell, useSeed } from "./common";
+import { t } from "../../lib/i18n";
 
 export function KeyForm({ initial, onSave, onCancel }: {
   initial?: { key: PrivateKey; content?: string | null; passphrase?: string | null };
@@ -34,19 +35,19 @@ export function KeyForm({ initial, onSave, onCancel }: {
   };
 
   return (
-    <FormShell title={initial ? `Modifier « ${initial.key.name} »` : "Nouvelle clé"} onSave={save} onCancel={onCancel} validate={() => (name.trim() ? content.trim() || path.trim() ? null : "Indiquez le contenu de la clé, ou au moins son chemin." : "Le nom est obligatoire.")}>
-      <Field label="Nom">
+    <FormShell title={initial ? t("Modifier « {0} »", initial.key.name) : t("Nouvelle clé")} onSave={save} onCancel={onCancel} validate={() => (name.trim() ? content.trim() || path.trim() ? null : t("Indiquez le contenu de la clé, ou au moins son chemin.") : t("Le nom est obligatoire."))}>
+      <Field label={t("Nom")}>
         <input value={name} onChange={(e) => setName(e.target.value)} autoFocus className="input" />
       </Field>
       <div>
         <div className="flex items-end gap-1.5">
-          <Field label="Contenu de la clé privée" className="min-w-0 flex-1">
-            <textarea value={content} onChange={(e) => { setContent(e.target.value); setPublicKey(null); }} rows={8} spellCheck={false} placeholder="-----BEGIN OPENSSH PRIVATE KEY-----" className="input input-mono" />
+          <Field label={t("Contenu de la clé privée")} className="min-w-0 flex-1">
+            <textarea value={content} onChange={(e) => { setContent(e.target.value); setPublicKey(null); }} rows={8} spellCheck={false} placeholder={t("-----BEGIN OPENSSH PRIVATE KEY-----")} className="input input-mono" />
           </Field>
-          <button type="button" onClick={() => setShowGenerator((g) => !g)} aria-pressed={showGenerator} className={`btn btn-icon self-start mt-[18px] ${showGenerator ? "btn-toggled" : "btn-secondary"}`} title="Générer une paire de clés" aria-label="Générer une paire de clés"><IconDice size={14} /></button>
+          <button type="button" onClick={() => setShowGenerator((g) => !g)} aria-pressed={showGenerator} className={`btn btn-icon self-start mt-[18px] ${showGenerator ? "btn-toggled" : "btn-secondary"}`} title={t("Générer une paire de clés")} aria-label={t("Générer une paire de clés")}><IconDice size={14} /></button>
         </div>
-        <p className="help-text mt-1">Collé, chargé ou généré ici · chiffré dans le vault.</p>
-        <FileButton label="Charger un fichier de clé" className="mt-1.5" onFile={(f) => { loadFile(f); setPublicKey(null); }} />
+        <p className="help-text mt-1">{t("Collé, chargé ou généré ici · chiffré dans le vault.")}</p>
+        <FileButton label={t("Charger un fichier de clé")} className="mt-1.5" onFile={(f) => { loadFile(f); setPublicKey(null); }} />
         {showGenerator && (
           <div className="card mt-2 p-3">
             <SshKeyGenerator
@@ -62,13 +63,13 @@ export function KeyForm({ initial, onSave, onCancel }: {
           </div>
         )}
         {publicKey && (
-          <p className="callout mt-2 break-all font-mono text-[11px]">Clé publique à déposer sur les serveurs : {publicKey}</p>
+          <p className="callout mt-2 break-all font-mono text-[11px]">{t("Clé publique à déposer sur les serveurs :")} {publicKey}</p>
         )}
       </div>
-      <Field label="Chemin (optionnel)" hint="Sans contenu, la clé est lue à ce chemin.">
+      <Field label={t("Chemin (optionnel)")} hint={t("Sans contenu, la clé est lue à ce chemin.")}>
         <input value={path} onChange={(e) => setPath(e.target.value)} placeholder="~/.ssh/id_ed25519" className="input input-mono" />
       </Field>
-      <Field label="Passphrase (optionnelle)">
+      <Field label={t("Passphrase (optionnelle)")}>
         <PasswordInput value={passphrase} onChange={setPassphrase} autoComplete="off" />
       </Field>
     </FormShell>

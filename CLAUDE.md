@@ -324,6 +324,15 @@ tests s'ignorent avec un avertissement, ils n'échouent pas.
 - Ids de vaults et d'items choisis par le client (ils sont dans l'AAD).
 - Commentaires en français, code et identifiants en anglais, comme Guiterm.
 - Côté web : libellés en français, mêmes mots que Guiterm (« vault »,
-  « hôte », « épingler », rôles `lecteur/éditeur/admin/propriétaire`).
+  « hôte », « épingler », rôles `lecteur/éditeur/admin/propriétaire`),
+  **toujours** passés par `t("…")` (`lib/i18n.ts` : le français est la
+  clé ; paramètres `{0}` ; `plural(n, "…", "…")` pour un nombre ; une table
+  de libellés au niveau du module : `translated(table, ["label"])`, jamais
+  sans liste de champs si elle porte aussi des identifiants). Leur anglais
+  va dans `src/i18n/en.json` — `node scripts/i18n.mjs` dit ce qui manque,
+  `i18n.test.ts` le bloque ; le script de page de l'extension a son
+  sous-catalogue (`--content`). Pas de phrase coupée en morceaux autour
+  d'une variable ni d'accord fait à la main (`n > 1 ? "s" : ""`). Erreurs du
+  serveur : par code (`lib/errorText.ts`, une phrase par nouveau code).
   L'aide d'un champ va *hors* du `<label>` (sinon elle entre dans son nom
   accessible) ; un éditeur composite prend `<Field group>`.

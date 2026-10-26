@@ -12,6 +12,7 @@ import { estimateStrength } from "./generator";
 import type { DecodedItem, VaultView } from "./session";
 import type { TwoFactorSite } from "./types";
 import { registrableDomain } from "./urimatch";
+import { t } from "./i18n";
 
 /** Un item lisible et le vault où il vit. */
 export interface HealthEntry {
@@ -35,9 +36,9 @@ export function secretsOf(entry: HealthEntry): SecretRef[] {
     if (value) out.push({ entry, label, value });
   };
   switch (p.kind) {
-    case "login": add("mot de passe", p.login.password); break;
-    case "host": add("mot de passe", p.secrets?.password); add("passphrase", p.secrets?.passphrase); break;
-    case "sql-connection": add("mot de passe", p.password); break;
+    case "login": add(t("mot de passe"), p.login.password); break;
+    case "host": add(t("mot de passe"), p.secrets?.password); add("passphrase", p.secrets?.passphrase); break;
+    case "sql-connection": add(t("mot de passe"), p.password); break;
     case "key": add("passphrase", p.passphrase); break;
   }
   return out;
@@ -118,9 +119,9 @@ export function findExpiring(entries: HealthEntry[], now: Date, days = 30): Expi
     let date: Date | null = null;
     let what = "";
     if (p.kind === "api-key" && p.apiKey.expiresAt) {
-      const t = Date.parse(`${p.apiKey.expiresAt}T23:59:59Z`);
-      date = Number.isNaN(t) ? null : new Date(t);
-      what = "clé d'API";
+      const end = Date.parse(`${p.apiKey.expiresAt}T23:59:59Z`);
+      date = Number.isNaN(end) ? null : new Date(end);
+      what = t("clé d'API");
     } else if (p.kind === "card") {
       date = cardEnd(p.card.expMonth, p.card.expYear);
       what = "carte";
@@ -184,7 +185,7 @@ export function countInRange(body: string, suffix: string): number {
  * l'adresse IP de l'appareil. Sur demande seulement. */
 export async function directRange(prefix: string): Promise<string> {
   const res = await fetch(`https://api.pwnedpasswords.com/range/${encodeURIComponent(prefix)}`, { headers: { "Add-Padding": "true" }, cache: "no-store" });
-  if (!res.ok) throw new Error(`Have I Been Pwned répond ${res.status}`);
+  if (!res.ok) throw new Error(t("Have I Been Pwned répond {0}", res.status));
   return res.text();
 }
 

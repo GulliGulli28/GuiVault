@@ -2,12 +2,13 @@ import type { ReactNode } from "react";
 import { navigate, type Route } from "../lib/route";
 import { IconChevronRight } from "./ui-icons";
 import { BubbleButton } from "./BubbleButton";
+import { t } from "../lib/i18n";
 
 /** Le gabarit d'une page (`docs/DESIGN.md`) : un titre, un sous-titre d'une
  * ligne au plus — pas de paragraphe d'explication —, les actions à droite,
  * puis le contenu dans une colonne de largeur bornée. `back` : le lien vers
  * la page d'où l'on vient (un vault, depuis ses réglages). */
-export function Page({ title, sub, actions, back, mobileBack = { label: "Réglages", route: { page: "more" } }, children, width = "max-w-[1000px]", align = "center" }: {
+export function Page({ title, sub, actions, back, mobileBack = { label: t("Réglages"), route: { page: "more" } }, children, width = "max-w-[1000px]", align = "center" }: {
   title: ReactNode;
   sub?: ReactNode;
   actions?: ReactNode;

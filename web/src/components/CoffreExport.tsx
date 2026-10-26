@@ -4,6 +4,7 @@ import { useState } from "react";
 import { errorMessage } from "../lib/api";
 import { coffreFileBridge } from "../lib/platform";
 import { InfoTip, SettingRow } from "./ui";
+import { t } from "../lib/i18n";
 
 export function CoffreExport({ path, onDone, onError }: { path: string; onDone: (name: string) => void; onError: (m: string) => void }) {
   const [busy, setBusy] = useState(false);
@@ -23,15 +24,15 @@ export function CoffreExport({ path, onDone, onError }: { path: string; onDone: 
   return (
     <div className="card">
       <SettingRow
-        title={<>Exporter le coffre <InfoTip label="Pourquoi exporter" items={[
-          { text: "Désinstaller l'application efface ses coffres.", tone: "warn" },
-          { text: "L'archive est chiffrée : sans le mot de passe maître, illisible.", tone: "ok" },
-          { text: "Elle s'importe ici, ou s'ouvre au bureau une fois décompressée." },
-          { text: "Les sauvegardes de l'appareil n'y sont pas." },
+        title={<>{t("Exporter le coffre")} <InfoTip label={t("Pourquoi exporter")} items={[
+          { text: t("Désinstaller l'application efface ses coffres."), tone: "warn" },
+          { text: t("L'archive est chiffrée : sans le mot de passe maître, illisible."), tone: "ok" },
+          { text: t("Elle s'importe ici, ou s'ouvre au bureau une fois décompressée.") },
+          { text: t("Les sauvegardes de l'appareil n'y sont pas.") },
         ]} /></>}
-        desc="Une archive .zip à ranger hors du téléphone."
+        desc={t("Une archive .zip à ranger hors du téléphone.")}
       >
-        <button onClick={() => void run()} disabled={busy} className="btn btn-secondary">{busy ? "Export…" : "Exporter…"}</button>
+        <button onClick={() => void run()} disabled={busy} className="btn btn-secondary">{busy ? t("Export…") : t("Exporter…")}</button>
       </SettingRow>
     </div>
   );

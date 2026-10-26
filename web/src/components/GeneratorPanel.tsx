@@ -6,6 +6,7 @@ import { PasswordStrength } from "./PasswordStrength";
 import { IconRefresh } from "./ui-icons";
 import { CopyButton } from "./ui";
 import { onSettingsApplied, settingsChanged } from "../lib/syncedSettings";
+import { t } from "../lib/i18n";
 
 const KEY = "guivault.generator";
 
@@ -59,9 +60,9 @@ export function GeneratorPanel({ onUse, onUseKey, compact, initialMode }: { onUs
     <div className={compact ? "space-y-2.5" : "space-y-4"}>
       {!lockedToKey && (
         <div className="segmented">
-          <button type="button" data-active={mode === "password"} onClick={() => pick("password")}>Mot de passe</button>
-          <button type="button" data-active={mode === "passphrase"} onClick={() => pick("passphrase")}>Phrase de passe</button>
-          {!onUse && <button type="button" data-active={mode === "sshkey"} onClick={() => pick("sshkey")}>Clé SSH</button>}
+          <button type="button" data-active={mode === "password"} onClick={() => pick("password")}>{t("Mot de passe")}</button>
+          <button type="button" data-active={mode === "passphrase"} onClick={() => pick("passphrase")}>{t("Phrase de passe")}</button>
+          {!onUse && <button type="button" data-active={mode === "sshkey"} onClick={() => pick("sshkey")}>{t("Clé SSH")}</button>}
         </div>
       )}
       {mode === "sshkey" ? (
@@ -75,45 +76,45 @@ export function GeneratorPanel({ onUse, onUseKey, compact, initialMode }: { onUs
               <span key={i} style={{ color: /\d/.test(ch) ? "var(--c-warn-text)" : /[^A-Za-z0-9]/.test(ch) ? "var(--c-danger-text)" : undefined }}>{ch}</span>
             ))}
           </output>
-          <button type="button" onClick={() => regenerate(opts)} className="btn btn-ghost btn-icon text-[var(--c-text-muted)]" title="Regénérer" aria-label="Regénérer"><IconRefresh size={15} /></button>
-          <CopyButton value={value} label="Copier" />
+          <button type="button" onClick={() => regenerate(opts)} className="btn btn-ghost btn-icon text-[var(--c-text-muted)]" title={t("Regénérer")} aria-label={t("Regénérer")}><IconRefresh size={15} /></button>
+          <CopyButton value={value} label={t("Copier")} />
         </div>
         <div className="mt-3 flex items-center justify-between gap-2">
           <PasswordStrength password={value} />
-          {onUse && <button type="button" onClick={() => onUse(value)} className="btn btn-primary">Utiliser</button>}
+          {onUse && <button type="button" onClick={() => onUse(value)} className="btn btn-primary">{t("Utiliser")}</button>}
         </div>
       </div>
 
       {mode === "password" ? (
         <div className="space-y-2.5">
           <label className="block">
-            <span className="field-label">Longueur : {pw.length}</span>
+            <span className="field-label">{t("Longueur :")} {pw.length}</span>
             <input type="range" min={8} max={64} value={pw.length} onChange={(e) => setPw({ length: Number(e.target.value) })} className="w-full" />
           </label>
           <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
-            <Check label="Minuscules (a-z)" checked={pw.lowercase} onChange={(v) => setPw({ lowercase: v })} />
-            <Check label="Majuscules (A-Z)" checked={pw.uppercase} onChange={(v) => setPw({ uppercase: v })} />
-            <Check label="Chiffres (0-9)" checked={pw.digits} onChange={(v) => setPw({ digits: v })} />
-            <Check label="Symboles (!@#$…)" checked={pw.symbols} onChange={(v) => setPw({ symbols: v })} />
-            <Check label="Éviter les ambigus (l, 1, I, O, 0)" checked={pw.avoidAmbiguous} onChange={(v) => setPw({ avoidAmbiguous: v })} />
+            <Check label={t("Minuscules (a-z)")} checked={pw.lowercase} onChange={(v) => setPw({ lowercase: v })} />
+            <Check label={t("Majuscules (A-Z)")} checked={pw.uppercase} onChange={(v) => setPw({ uppercase: v })} />
+            <Check label={t("Chiffres (0-9)")} checked={pw.digits} onChange={(v) => setPw({ digits: v })} />
+            <Check label={t("Symboles (!@#$…)")} checked={pw.symbols} onChange={(v) => setPw({ symbols: v })} />
+            <Check label={t("Éviter les ambigus (l, 1, I, O, 0)")} checked={pw.avoidAmbiguous} onChange={(v) => setPw({ avoidAmbiguous: v })} />
           </div>
           <div className="grid grid-cols-2 gap-2">
-            <label className="block"><span className="field-label">Chiffres minimum</span><input type="number" min={0} max={10} value={pw.minDigits} disabled={!pw.digits} onChange={(e) => setPw({ minDigits: Number(e.target.value) })} className="input" /></label>
-            <label className="block"><span className="field-label">Symboles minimum</span><input type="number" min={0} max={10} value={pw.minSymbols} disabled={!pw.symbols} onChange={(e) => setPw({ minSymbols: Number(e.target.value) })} className="input" /></label>
+            <label className="block"><span className="field-label">{t("Chiffres minimum")}</span><input type="number" min={0} max={10} value={pw.minDigits} disabled={!pw.digits} onChange={(e) => setPw({ minDigits: Number(e.target.value) })} className="input" /></label>
+            <label className="block"><span className="field-label">{t("Symboles minimum")}</span><input type="number" min={0} max={10} value={pw.minSymbols} disabled={!pw.symbols} onChange={(e) => setPw({ minSymbols: Number(e.target.value) })} className="input" /></label>
           </div>
         </div>
       ) : (
         <div className="space-y-2.5">
           <label className="block">
-            <span className="field-label">Mots : {pp.words}</span>
+            <span className="field-label">{t("Mots :")} {pp.words}</span>
             <input type="range" min={3} max={12} value={pp.words} onChange={(e) => setPp({ words: Number(e.target.value) })} className="w-full" />
           </label>
-          <label className="block"><span className="field-label">Séparateur</span><input value={pp.separator} maxLength={3} onChange={(e) => setPp({ separator: e.target.value })} className="input input-mono w-20" /></label>
+          <label className="block"><span className="field-label">{t("Séparateur")}</span><input value={pp.separator} maxLength={3} onChange={(e) => setPp({ separator: e.target.value })} className="input input-mono w-20" /></label>
           <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
-            <Check label="Majuscule initiale" checked={pp.capitalize} onChange={(v) => setPp({ capitalize: v })} />
-            <Check label="Ajouter un chiffre" checked={pp.includeNumber} onChange={(v) => setPp({ includeNumber: v })} />
+            <Check label={t("Majuscule initiale")} checked={pp.capitalize} onChange={(v) => setPp({ capitalize: v })} />
+            <Check label={t("Ajouter un chiffre")} checked={pp.includeNumber} onChange={(v) => setPp({ includeNumber: v })} />
           </div>
-          <p className="help-text">Liste de l'EFF · ≈ 12,9 bits par mot.</p>
+          <p className="help-text">{t("Liste de l'EFF · ≈ 12,9 bits par mot.")}</p>
         </div>
       )}
         </>
@@ -178,16 +179,16 @@ export function SshKeyGenerator({ compact, onUse }: { compact?: boolean; onUse?:
     <div className={compact ? "space-y-2.5" : "space-y-3"}>
       <div className="grid grid-cols-[1fr_auto] gap-2">
         <label className="block">
-          <span className="field-label">Type</span>
+          <span className="field-label">{t("Type")}</span>
           <select value={opts.type} onChange={(e) => { const type = e.target.value as SshKeyOptions["type"]; set({ type, bits: type === "rsa" ? 3072 : 256 }); }} className="input">
-            <option value="ed25519">Ed25519 (recommandé)</option>
-            <option value="rsa">RSA</option>
-            <option value="ecdsa">ECDSA</option>
+            <option value="ed25519">{t("Ed25519 (recommandé)")}</option>
+            <option value="rsa">{t("RSA")}</option>
+            <option value="ecdsa">{t("ECDSA")}</option>
           </select>
         </label>
         {sizes.length > 0 && (
           <label className="block">
-            <span className="field-label">Taille</span>
+            <span className="field-label">{t("Taille")}</span>
             <select value={opts.bits} onChange={(e) => set({ bits: Number(e.target.value) })} className="input w-24">
               {sizes.map((b) => <option key={b} value={b}>{b}</option>)}
             </select>
@@ -195,34 +196,34 @@ export function SshKeyGenerator({ compact, onUse }: { compact?: boolean; onUse?:
         )}
       </div>
       <label className="block">
-        <span className="field-label">Commentaire</span>
+        <span className="field-label">{t("Commentaire")}</span>
         <input value={opts.comment} onChange={(e) => set({ comment: e.target.value })} placeholder="alice@portable" className="input input-mono" />
       </label>
       <div className="flex items-center justify-between gap-2">
-        <span className="help-text">Sans passphrase : le coffre la protège.</span>
-        <button type="button" onClick={() => void run(opts)} disabled={busy} className="btn btn-secondary btn-sm shrink-0"><IconRefresh size={12} /> {busy ? "Génération…" : key ? "Regénérer" : "Générer"}</button>
+        <span className="help-text">{t("Sans passphrase : le coffre la protège.")}</span>
+        <button type="button" onClick={() => void run(opts)} disabled={busy} className="btn btn-secondary btn-sm shrink-0"><IconRefresh size={12} /> {busy ? t("Génération…") : key ? t("Regénérer") : t("Générer")}</button>
       </div>
       {error && <p className="callout callout-danger">{error}</p>}
       {key && (
         <div className="card space-y-2 p-3">
           <div className="flex items-start gap-2">
             <span className="min-w-0 flex-1">
-              <span className="block text-[11px] font-medium text-[var(--c-text-secondary)]">Clé publique ({key.type})</span>
+              <span className="block text-[11px] font-medium text-[var(--c-text-secondary)]">{t("Clé publique (")}{key.type})</span>
               <code className="block break-all font-mono text-[11px] leading-snug text-[var(--c-text)]">{key.publicKey.trim()}</code>
             </span>
-            <CopyButton value={key.publicKey} label="Copier la clé publique" />
+            <CopyButton value={key.publicKey} label={t("Copier la clé publique")} />
           </div>
           <div className="flex items-center gap-2">
             <span className="min-w-0 flex-1">
-              <span className="block text-[11px] font-medium text-[var(--c-text-secondary)]">Empreinte</span>
+              <span className="block text-[11px] font-medium text-[var(--c-text-secondary)]">{t("Empreinte")}</span>
               <code className="block break-all font-mono text-[11px] text-[var(--c-text)]">{key.fingerprint}</code>
             </span>
-            <CopyButton value={key.fingerprint} label="Copier l'empreinte" />
+            <CopyButton value={key.fingerprint} label={t("Copier l'empreinte")} />
           </div>
           <div className="flex items-center justify-end gap-1.5 border-t border-[var(--c-border)] pt-2">
-            <CopyButton value={key.privateKey} label="Copier la clé privée" />
-            <span className="mr-auto text-[11px] text-[var(--c-text-muted)]">clé privée</span>
-            {onUse && <button type="button" onClick={() => onUse(key, opts)} className="btn btn-primary btn-sm">Utiliser</button>}
+            <CopyButton value={key.privateKey} label={t("Copier la clé privée")} />
+            <span className="mr-auto text-[11px] text-[var(--c-text-muted)]">{t("clé privée")}</span>
+            {onUse && <button type="button" onClick={() => onUse(key, opts)} className="btn btn-primary btn-sm">{t("Utiliser")}</button>}
           </div>
         </div>
       )}
@@ -241,7 +242,7 @@ function Check({ label, checked, onChange }: { label: string; checked: boolean; 
 
 export function GeneratorPage() {
   return (
-    <Page title="Générateur" sub="Mots de passe, phrases de passe et clés SSH, générés ici." width="max-w-[760px]" align="left" mobileBack={null}>
+    <Page title={t("Générateur")} sub={t("Mots de passe, phrases de passe et clés SSH, générés ici.")} width="max-w-[760px]" align="left" mobileBack={null}>
       <GeneratorPanel />
     </Page>
   );

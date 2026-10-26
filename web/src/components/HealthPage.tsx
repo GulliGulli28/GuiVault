@@ -15,6 +15,7 @@ import { IconInfo } from "./secret-icons";
 import { IconCheck, IconChevronRight, IconSearch } from "./ui-icons";
 import { NARROW, useMediaQuery } from "../hooks/useMediaQuery";
 import { Loading, useDelayed } from "./ui";
+import { t, translated, locale, plural } from "../lib/i18n";
 
 /** Le rapport de santé : ce qui mérite d'être changé dans le coffre, calculé
  * dans ce navigateur. Les fuites seulement sur demande (k-anonymat, relayé
@@ -100,20 +101,20 @@ export function HealthPage({ ctx }: { ctx: PageContext }) {
   const issues = useMemo<Issue[]>(() => {
     if (!report) return [];
     const out: Issue[] = [];
-    for (const s of leaked ?? []) out.push({ kind: "leaked", entry: s.entry, detail: `${capitalize(s.label)} vu ${(pwned!.get(s.value) ?? 0).toLocaleString("fr-FR")} fois dans des fuites` });
+    for (const s of leaked ?? []) out.push({ kind: "leaked", entry: s.entry, detail: t("{0} vu {1} fois dans des fuites", capitalize(s.label), (pwned!.get(s.value) ?? 0).toLocaleString(locale())) });
     for (const g of report.reused) for (const s of g) {
-      const others = g.filter((o) => o !== s).map((o) => payloadName(o.entry.item.payload) || "(sans nom)");
-      out.push({ kind: "reused", entry: s.entry, detail: `Même ${s.label} que ${others.length > 1 ? `${others.length} autres éléments` : `« ${others[0]} »`}` });
+      const others = g.filter((o) => o !== s).map((o) => payloadName(o.entry.item.payload) || t("(sans nom)"));
+      out.push({ kind: "reused", entry: s.entry, detail: t("Même {0} que {1}", s.label, others.length > 1 ? t("{0} autres éléments", others.length) : `« ${others[0]} »`) });
     }
-    for (const s of report.weak) out.push({ kind: "weak", entry: s.entry, detail: `${capitalize(s.label)} facile à deviner` });
-    for (const m of report.missingTotp ?? []) out.push({ kind: "totp", entry: m.entry, detail: `${m.site.name} accepte un code TOTP`, link: m.site.documentation ?? undefined });
-    for (const o of report.old) out.push({ kind: "old", entry: o.entry, detail: `Mot de passe du ${o.since.toLocaleDateString("fr-FR")}` });
-    for (const x of report.expiring) out.push({ kind: "expiring", entry: x.entry, detail: `${capitalize(x.what)} ${x.expired ? "expirée le" : "expire le"} ${x.date.toLocaleDateString("fr-FR", { timeZone: "UTC" })}` });
+    for (const s of report.weak) out.push({ kind: "weak", entry: s.entry, detail: t("{0} facile à deviner", capitalize(s.label)) });
+    for (const m of report.missingTotp ?? []) out.push({ kind: "totp", entry: m.entry, detail: t("{0} accepte un code TOTP", m.site.name), link: m.site.documentation ?? undefined });
+    for (const o of report.old) out.push({ kind: "old", entry: o.entry, detail: t("Mot de passe du {0}", o.since.toLocaleDateString(locale())) });
+    for (const x of report.expiring) out.push({ kind: "expiring", entry: x.entry, detail: `${capitalize(x.what)} ${x.expired ? t("expirée le") : t("expire le")} ${x.date.toLocaleDateString(locale(), { timeZone: "UTC" })}` });
     // Une ligne par groupe de doublons, pas par élément.
     for (const g of report.duplicates) {
-      const names = g.map((e) => `« ${payloadName(e.item.payload) || "(sans nom)"} »`);
-      const what = g[0].item.payload.kind === "card" ? "même carte" : "même compte";
-      out.push({ kind: "duplicate", entry: g[0], group: g, detail: `${capitalize(what)} ${g.length > 2 ? `${g.length} fois` : "deux fois"} : ${names.join(", ")}` });
+      const names = g.map((e) => `« ${payloadName(e.item.payload) || t("(sans nom)")} »`);
+      const what = g[0].item.payload.kind === "card" ? t("même carte") : t("même compte");
+      out.push({ kind: "duplicate", entry: g[0], group: g, detail: `${capitalize(what)} ${g.length > 2 ? `${g.length} fois` : t("deux fois")} : ${names.join(", ")}` });
     }
     return out;
   }, [report, leaked, pwned]);
@@ -134,30 +135,30 @@ export function HealthPage({ ctx }: { ctx: PageContext }) {
   const counts = (k: IssueKind) => open.filter((i) => i.kind === k).length;
   const shown = tab === "ignored" ? hidden : tab === "all" ? open.filter((i) => i.kind !== "old") : open.filter((i) => i.kind === tab);
   const next = !report ? null
-    : counts("leaked") > 0 ? `Changer ${counts("leaked")} mot${counts("leaked") > 1 ? "s" : ""} de passe fuité${counts("leaked") > 1 ? "s" : ""}`
-    : counts("reused") > 0 ? `Changer ${counts("reused")} secrets réutilisés`
-    : counts("weak") > 0 ? `Renforcer ${counts("weak")} secret${counts("weak") > 1 ? "s" : ""} faible${counts("weak") > 1 ? "s" : ""}`
-    : counts("totp") > 0 ? `Ajouter la 2FA sur ${counts("totp")} site${counts("totp") > 1 ? "s" : ""}`
+    : counts("leaked") > 0 ? t("Changer {0} mot{1} de passe fuité{2}", counts("leaked"), counts("leaked") > 1 ? "s" : "", counts("leaked") > 1 ? "s" : "")
+    : counts("reused") > 0 ? t("Changer {0} secrets réutilisés", counts("reused"))
+    : counts("weak") > 0 ? t("Renforcer {0} secret{1} faible{2}", counts("weak"), counts("weak") > 1 ? "s" : "", counts("weak") > 1 ? "s" : "")
+    : counts("totp") > 0 ? t("Ajouter la 2FA sur {0} site{1}", counts("totp"), counts("totp") > 1 ? "s" : "")
     : null;
-  const lookupsOff = direct ? null : lookups === false ? (offline ? "Hors ligne" : "Désactivé sur ce serveur") : null;
+  const lookupsOff = direct ? null : lookups === false ? (offline ? t("Hors ligne") : t("Désactivé sur ce serveur")) : null;
 
   return (
     <Page
       mobileBack={null}
-      title="Santé du coffre"
+      title={t("Santé du coffre")}
       sub={
         <span className="relative inline-flex flex-wrap items-center gap-1.5">
-          Analysée sur cet appareil · {session.vaults.length} {session.vaults.length > 1 ? "coffres" : "coffre"}{report ? ` · ${report.secrets.length} secrets` : ""}
-          <button onClick={() => setInfo((o) => !o)} aria-expanded={info} className="btn btn-ghost btn-icon h-6 w-6" title="Comment l'analyse est faite" aria-label="Comment l'analyse est faite"><IconInfo size={15} /></button>
+          {plural(session.vaults.length, "Analysée sur cet appareil · {0} coffre", "Analysée sur cet appareil · {0} coffres")}{report ? t(" · {0} secrets", report.secrets.length) : ""}
+          <button onClick={() => setInfo((o) => !o)} aria-expanded={info} className="btn btn-ghost btn-icon h-6 w-6" title={t("Comment l'analyse est faite")} aria-label={t("Comment l'analyse est faite")}><IconInfo size={15} /></button>
           {info && (
             <>
               <span className="fixed inset-0 z-10" onClick={() => setInfo(false)} />
               <span role="tooltip" className="popover absolute left-0 top-8 z-20 flex w-[320px] max-w-[calc(100vw-2rem)] flex-col gap-2 p-3.5 text-[13px] text-[var(--c-text-secondary)]">
-                <span className="flex gap-2"><IconCheck size={15} className="mt-0.5 shrink-0 text-[var(--c-ok)]" />Calculée ici, le serveur ne voit pas ce rapport</span>
-                <span className="flex gap-2"><IconCheck size={15} className="mt-0.5 shrink-0 text-[var(--c-ok)]" />Fuites : seuls 5 caractères de l'empreinte partent, à la demande</span>
+                <span className="flex gap-2"><IconCheck size={15} className="mt-0.5 shrink-0 text-[var(--c-ok)]" />{t("Calculée ici, le serveur ne voit pas ce rapport")}</span>
+                <span className="flex gap-2"><IconCheck size={15} className="mt-0.5 shrink-0 text-[var(--c-ok)]" />{t("Fuites : seuls 5 caractères de l'empreinte partent, à la demande")}</span>
                 {direct
-                  ? <span className="flex gap-2"><IconInfo size={15} className="mt-0.5 shrink-0 text-[var(--c-text-muted)]" />Coffre local : Have I Been Pwned est interrogé directement et voit l'adresse IP de cet appareil</span>
-                  : <span className="flex gap-2"><IconCheck size={15} className="mt-0.5 shrink-0 text-[var(--c-ok)]" />Sites 2FA : liste publique relayée par le serveur</span>}
+                  ? <span className="flex gap-2"><IconInfo size={15} className="mt-0.5 shrink-0 text-[var(--c-text-muted)]" />{t("Coffre local : Have I Been Pwned est interrogé directement et voit l'adresse IP de cet appareil")}</span>
+                  : <span className="flex gap-2"><IconCheck size={15} className="mt-0.5 shrink-0 text-[var(--c-ok)]" />{t("Sites 2FA : liste publique relayée par le serveur")}</span>}
               </span>
             </>
           )}
@@ -165,33 +166,33 @@ export function HealthPage({ ctx }: { ctx: PageContext }) {
       }
       actions={(direct || lookups !== false) && report && leaked === null ? (
         <button onClick={() => void runPwned()} disabled={progress !== null || (!direct && lookups === null) || report.secrets.length === 0} className="btn btn-secondary btn-lg">
-          <IconSearch size={15} /> {progress ? `Recherche… ${progress.done}/${progress.total || "?"}` : "Vérifier les fuites"}
+          <IconSearch size={15} /> {progress ? t("Recherche… {0}/{1}", progress.done, progress.total || "?") : t("Vérifier les fuites")}
         </button>
       ) : undefined}
     >
       {!report ? (slow ? <Loading /> : null) : (
         <>
-          <section aria-label="Score" className="card flex flex-wrap items-center gap-x-8 gap-y-5 px-7 py-6 max-sm:px-5">
+          <section aria-label={t("Score")} className="card flex flex-wrap items-center gap-x-8 gap-y-5 px-7 py-6 max-sm:px-5">
             <div className="whitespace-nowrap"><span className="text-[56px] font-semibold leading-none tracking-[-0.04em]">{bad.score}</span><span className="text-[16px] text-[var(--c-text-muted)]"> / 100</span></div>
             <div className="flex min-w-0 flex-[1_1_240px] flex-col gap-3">
               <HealthBar total={report.secrets.length} weak={bad.weak} reused={bad.reused} />
               <div className="flex flex-wrap gap-x-5 gap-y-1.5 text-[13px] text-[var(--c-text-secondary)]">
-                <Legend color="var(--c-ok)">{bad.healthy} sains</Legend>
-                <Legend color="var(--c-warn)">{bad.weak} faibles{leaked && leaked.length > 0 ? " ou fuités" : ""}</Legend>
-                <Legend color="var(--c-danger)">{bad.reused} réutilisés</Legend>
-                <span className="text-[var(--c-text-muted)]">{lookupsOff ? `Fuites : ${lookupsOff.toLowerCase()}` : leaked === null ? "Fuites : pas encore vérifié" : leaked.length === 0 ? "Aucune fuite connue" : `${leaked.length} fuité${leaked.length > 1 ? "s" : ""}`}</span>
+                <Legend color="var(--c-ok)">{bad.healthy} {t("sains")}</Legend>
+                <Legend color="var(--c-warn)">{bad.weak} {t("faibles")}{leaked && leaked.length > 0 ? t(" ou fuités") : ""}</Legend>
+                <Legend color="var(--c-danger)">{bad.reused} {t("réutilisés")}</Legend>
+                <span className="text-[var(--c-text-muted)]">{lookupsOff ? t("Fuites : {0}", lookupsOff.toLowerCase()) : leaked === null ? t("Fuites : pas encore vérifié") : leaked.length === 0 ? t("Aucune fuite connue") : t("{0} fuité{1}", leaked.length, leaked.length > 1 ? "s" : "")}</span>
               </div>
             </div>
             {next && (
               <div className="flex min-w-0 flex-[1_1_200px] flex-col gap-0.5 border-l border-[var(--c-border)] pl-7 max-sm:border-l-0 max-sm:pl-0">
-                <span className="text-[13px] text-[var(--c-text-muted)]">Le plus utile maintenant</span>
+                <span className="text-[13px] text-[var(--c-text-muted)]">{t("Le plus utile maintenant")}</span>
                 <span className="text-[15px] font-medium">{next}</span>
               </div>
             )}
           </section>
 
-          <section aria-label="À traiter" className="flex flex-col gap-3.5">
-            <div className="tabs" role="tablist" aria-label="Filtrer">
+          <section aria-label={t("À traiter")} className="flex flex-col gap-3.5">
+            <div className="tabs" role="tablist" aria-label={t("Filtrer")}>
               {(["all", "leaked", "reused", "weak", "totp", "duplicate", "old", "expiring", "ignored"] as Tab[]).map((t) => {
                 const n = t === "all" ? open.filter((i) => i.kind !== "old").length : t === "ignored" ? hidden.length : counts(t);
                 if (t !== "all" && n === 0) return null;
@@ -201,7 +202,7 @@ export function HealthPage({ ctx }: { ctx: PageContext }) {
             {shown.length === 0 ? (
               <div className="card empty text-[13.5px] text-[var(--c-text-muted)]">
                 <IconCheck size={20} className="text-[var(--c-ok)]" />
-                Rien à traiter.
+                {t("Rien à traiter.")}
               </div>
             ) : (
               <div className="card divide-y divide-[var(--c-border)] overflow-hidden">
@@ -209,10 +210,10 @@ export function HealthPage({ ctx }: { ctx: PageContext }) {
               </div>
             )}
             <div className="flex flex-wrap gap-2.5">
-              {report.old.length === 0 && <span className="pill max-w-full whitespace-normal"><IconCheck size={15} /> Aucun mot de passe de plus d'un an</span>}
-              {report.expiring.length === 0 && <span className="pill max-w-full whitespace-normal"><IconCheck size={15} /> Rien n'expire ce mois</span>}
-              {lookupsOff && <span className="pill max-w-full whitespace-normal">{lookupsOff} : fuites et sites 2FA indisponibles</span>}
-              {direct && <span className="pill max-w-full whitespace-normal">Coffre local : liste des sites 2FA indisponible sans serveur</span>}
+              {report.old.length === 0 && <span className="pill max-w-full whitespace-normal"><IconCheck size={15} /> {t("Aucun mot de passe de plus d'un an")}</span>}
+              {report.expiring.length === 0 && <span className="pill max-w-full whitespace-normal"><IconCheck size={15} /> {t("Rien n'expire ce mois")}</span>}
+              {lookupsOff && <span className="pill max-w-full whitespace-normal">{lookupsOff} {t(": fuites et sites 2FA indisponibles")}</span>}
+              {direct && <span className="pill max-w-full whitespace-normal">{t("Coffre local : liste des sites 2FA indisponible sans serveur")}</span>}
             </div>
           </section>
         </>
@@ -222,7 +223,7 @@ export function HealthPage({ ctx }: { ctx: PageContext }) {
           session={session}
           group={merging}
           onClose={() => setMerging(null)}
-          onMerged={(name) => { setMerging(null); ctx.notify(`Doublons fusionnés dans « ${name} ».`); void ctx.reload(); }}
+          onMerged={(name) => { setMerging(null); ctx.notify(t("Doublons fusionnés dans « {0} ».", name)); void ctx.reload(); }}
         />
       )}
     </Page>
@@ -240,8 +241,8 @@ interface Issue {
   group?: HealthEntry[];
 }
 
-const TAB_LABELS: Record<Tab, string> = { all: "À traiter", leaked: "Fuités", reused: "Réutilisés", weak: "Faibles", totp: "2FA possible", duplicate: "Doublons", old: "Plus d'un an", expiring: "Expirations", ignored: "Ignorés" };
-const CHIPS: Record<IssueKind, { label: string; tone: string; action: string }> = {
+const TAB_LABELS: Record<Tab, string> = translated({ all: "À traiter", leaked: "Fuités", reused: "Réutilisés", weak: "Faibles", totp: "2FA possible", duplicate: "Doublons", old: "Plus d'un an", expiring: "Expirations", ignored: "Ignorés" });
+const CHIPS: Record<IssueKind, { label: string; tone: string; action: string }> = translated({
   leaked: { label: "Fuité", tone: "tag-danger", action: "Changer" },
   reused: { label: "Réutilisé", tone: "tag-danger", action: "Changer" },
   weak: { label: "Faible", tone: "tag-warn", action: "Changer" },
@@ -249,7 +250,7 @@ const CHIPS: Record<IssueKind, { label: string; tone: string; action: string }> 
   duplicate: { label: "Doublon", tone: "", action: "Ouvrir" },
   old: { label: "Ancien", tone: "", action: "Ouvrir" },
   expiring: { label: "Expire", tone: "tag-warn", action: "Ouvrir" },
-};
+}, ["label", "action"]);
 
 function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
@@ -288,13 +289,13 @@ function IssueRow({ issue, onMerge, ignored, onIgnore }: { issue: Issue; onMerge
         <span className="truncate font-medium">{name}</span>
         <span className="truncate text-[12.5px] text-[var(--c-text-muted)]">
           {issue.detail}
-          {issue.link && <> · <a href={issue.link} target="_blank" rel="noreferrer noopener">comment</a></>}
+          {issue.link && <> · <a href={issue.link} target="_blank" rel="noreferrer noopener">{t("comment")}</a></>}
         </span>
       </span>
       <span className={`tag ${chip.tone}`}>{chip.label}</span>
-      <span className="w-[130px] truncate text-[12.5px] text-[var(--c-text-muted)] max-lg:hidden">{issue.entry.vault.name}{issue.entry.vault.role === "reader" ? " · lecture" : ""}</span>
-      <button onClick={() => onIgnore(!ignored)} className="btn btn-ghost ml-auto" title={ignored ? "Le signaler de nouveau" : "Ne plus signaler ce problème pour cet élément"}>{ignored ? "Reprendre" : "Ignorer"}</button>
-      {!ignored && <button onClick={open} className="btn btn-secondary">{mergeable ? "Fusionner…" : chip.action}</button>}
+      <span className="w-[130px] truncate text-[12.5px] text-[var(--c-text-muted)] max-lg:hidden">{issue.entry.vault.name}{issue.entry.vault.role === "reader" ? t(" · lecture") : ""}</span>
+      <button onClick={() => onIgnore(!ignored)} className="btn btn-ghost ml-auto" title={ignored ? t("Le signaler de nouveau") : t("Ne plus signaler ce problème pour cet élément")}>{ignored ? t("Reprendre") : t("Ignorer")}</button>
+      {!ignored && <button onClick={open} className="btn btn-secondary">{mergeable ? t("Fusionner…") : chip.action}</button>}
     </div>
   );
 }

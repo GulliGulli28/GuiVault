@@ -8,6 +8,7 @@
  * fait que choisir un chemin, ce que la boîte de dialogue ferait aussi. */
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { coffresDir, deviceCoffres, isMobile } from "./mobile";
+import { t } from "../../src/lib/i18n";
 
 declare global {
   interface Window {
@@ -39,15 +40,15 @@ export async function pickCoffre(): Promise<string | null> {
   if (forced) return forced;
   // Mobile : l'accueil liste les coffres de l'appareil, rien à choisir ici.
   if (isMobile()) return null;
-  const path = await open({ directory: true, title: "Ouvrir un coffre local" });
+  const path = await open({ directory: true, title: t("Ouvrir un coffre local") });
   return typeof path === "string" ? path : null;
 }
 
 export async function pickNewCoffre(): Promise<string | null> {
   const forced = e2ePath();
   if (forced) return forced;
-  if (isMobile()) return freePath("Mon coffre");
-  return save({ title: "Créer un coffre local", defaultPath: "Mon coffre.guivault" });
+  if (isMobile()) return freePath(t("Mon coffre"));
+  return save({ title: t("Créer un coffre local"), defaultPath: t("Mon coffre.guivault") });
 }
 
 /** Où ranger la copie restaurée d'une sauvegarde (`backupBridge.ts`). */
@@ -55,5 +56,5 @@ export async function pickRestoreDest(defaultPath: string): Promise<string | nul
   const forced = e2ePath();
   if (forced) return forced;
   if (isMobile()) return freePath(defaultPath);
-  return save({ title: "Ranger la copie restaurée", defaultPath });
+  return save({ title: t("Ranger la copie restaurée"), defaultPath });
 }

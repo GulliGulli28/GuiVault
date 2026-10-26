@@ -9,6 +9,7 @@ import { payloadEntity, type SessionState } from "../lib/session";
 import type { Payload } from "../lib/types";
 import { Modal, PasswordInput } from "./ui";
 import { IconLock } from "./ui-icons";
+import { t } from "../lib/i18n";
 
 type Ask = (payload: Payload | null | undefined) => Promise<boolean>;
 
@@ -41,7 +42,7 @@ export function useRepromptHost(session: SessionState | null): [Ask, ReactNode] 
     // Une seule question à la fois : une seconde demande remplace la première.
     if (queue.current) queue.current.resolve(false);
     return new Promise<boolean>((resolve) => {
-      const p = { name: typeof e.name === "string" && e.name ? e.name : "Cet élément", id: e.id, resolve };
+      const p = { name: typeof e.name === "string" && e.name ? e.name : t("Cet élément"), id: e.id, resolve };
       queue.current = p;
       setPending(p);
     });
@@ -82,24 +83,24 @@ function RepromptDialog({ session, name, onDone }: { session: SessionState; name
     try {
       const r = await verifyMasterPassword(session, password);
       if (r === "ok") return onDone(true);
-      setError(r === "wrong" ? "Mot de passe maître incorrect." : "Cette session ne peut pas vérifier le mot de passe (ouverte par passkey) : reconnectez-vous avec le mot de passe maître.");
+      setError(r === "wrong" ? t("Mot de passe maître incorrect.") : t("Cette session ne peut pas vérifier le mot de passe (ouverte par passkey) : reconnectez-vous avec le mot de passe maître."));
     } catch (err) {
       setError(errorMessage(err));
     }
     setBusy(false);
   };
   return (
-    <Modal title="Élément protégé" onClose={cancel}>
+    <Modal title={t("Élément protégé")} onClose={cancel}>
       <form onSubmit={submit} className="flex flex-col gap-4">
-        <p className="truncate text-[13px] text-[var(--c-text-secondary)]">« {name} » demande le mot de passe maître.</p>
+        <p className="truncate text-[13px] text-[var(--c-text-secondary)]">« {name} {t("» demande le mot de passe maître.")}</p>
         <label className="block">
-          <span className="field-label">Mot de passe maître</span>
+          <span className="field-label">{t("Mot de passe maître")}</span>
           <PasswordInput value={password} onChange={setPassword} autoComplete="current-password" autoFocus />
         </label>
         {error && <p className="callout callout-danger">{error}</p>}
         <div className="flex justify-end gap-2">
-          <button type="button" onClick={cancel} className="btn btn-ghost">Annuler</button>
-          <button type="submit" disabled={!password || busy} className="btn btn-primary">{busy ? "Vérification…" : "Déverrouiller"}</button>
+          <button type="button" onClick={cancel} className="btn btn-ghost">{t("Annuler")}</button>
+          <button type="submit" disabled={!password || busy} className="btn btn-primary">{busy ? t("Vérification…") : t("Déverrouiller")}</button>
         </div>
       </form>
     </Modal>
@@ -113,8 +114,8 @@ export function Guarded({ payload, children }: { payload: Payload; children: Rea
   const [, setUnlocks] = useState(0);
   if (!needsReprompt(payload)) return <>{children}</>;
   return (
-    <button type="button" onClick={() => void ask(payload).then((ok) => ok && setUnlocks((n) => n + 1))} className="btn btn-ghost btn-sm gap-1.5 text-[var(--c-text-muted)]" title="Protégé par le mot de passe maître">
-      <IconLock size={13} /> Afficher
+    <button type="button" onClick={() => void ask(payload).then((ok) => ok && setUnlocks((n) => n + 1))} className="btn btn-ghost btn-sm gap-1.5 text-[var(--c-text-muted)]" title={t("Protégé par le mot de passe maître")}>
+      <IconLock size={13} /> {t("Afficher")}
     </button>
   );
 }

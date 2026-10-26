@@ -1,3 +1,4 @@
+import { translated } from "./i18n";
 /** Les réglages propres à l'application (Paramètres › Application), gardés
  * sur cet appareil : quand verrouiller, et (plus tard) la zone de
  * notification. Le web et l'extension ne les voient pas. */
@@ -73,13 +74,13 @@ export function saveAppTray(s: AppTraySettings) {
  * demandé), « Verrouiller » du menu de l'icône. */
 export type LockReason = "session" | "veille" | "reduction" | "zone" | "menu";
 
-export const LOCK_MESSAGES: Record<LockReason, string> = {
+export const LOCK_MESSAGES: Record<LockReason, string> = translated({
   session: "Verrouillé : la session Windows a été verrouillée.",
   veille: "Verrouillé : l'ordinateur s'est mis en veille.",
   reduction: "Verrouillé à la réduction de la fenêtre.",
   zone: "Verrouillé : GuiVault est passé dans la zone de notification.",
   menu: "Verrouillé depuis la zone de notification.",
-};
+});
 
 /** Android : cacher l'écran aux captures et à l'aperçu des applications
  * récentes tant qu'un coffre est ouvert (`ScreenBridge`). Activé par défaut ;

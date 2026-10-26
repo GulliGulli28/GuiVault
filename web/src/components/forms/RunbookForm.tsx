@@ -4,24 +4,25 @@ import type { VaultIndex } from "../../lib/entities";
 import type { Payload, Runbook, RunbookAction, RunbookApproval, RunbookOnFailure, RunbookStep } from "../../lib/types";
 import { IconArrowUp, IconClose, IconPlus } from "../ui-icons";
 import { Field, FormShell, HostSelect, TagsInput, useSeed } from "./common";
+import { t, translated } from "../../lib/i18n";
 
-export const ON_FAILURE_LABELS: Record<RunbookOnFailure, string> = {
+export const ON_FAILURE_LABELS: Record<RunbookOnFailure, string> = translated({
   stop: "Arrêter le runbook",
   continue: "Continuer avec toutes les cibles",
   dropFailed: "Continuer sans les cibles en échec",
-};
+});
 
-export const APPROVAL_LABELS: Record<RunbookApproval, string> = {
+export const APPROVAL_LABELS: Record<RunbookApproval, string> = translated({
   beforeIrreversible: "Avant une opération irréversible",
   never: "Jamais",
   always: "Toujours",
-};
+});
 
-export const ACTION_LABELS: Record<RunbookAction["kind"], string> = {
+export const ACTION_LABELS: Record<RunbookAction["kind"], string> = translated({
   command: "Commande shell",
   program: "Programme adaptatif",
   playbook: "Playbook Ansible",
-};
+});
 
 function newStep(): RunbookStep {
   return { id: uuid(), title: "", notes: "", action: { kind: "command", command: "" }, scope: { tags: [], groups: [] }, onFailure: "stop", approval: "beforeIrreversible" };
@@ -57,85 +58,85 @@ export function RunbookForm({ initial, index, onSave, onCancel }: {
   };
 
   const validate = () => {
-    if (!rb.name.trim()) return "Le nom est obligatoire.";
-    if (rb.steps.length === 0) return "Un runbook a au moins une étape.";
+    if (!rb.name.trim()) return t("Le nom est obligatoire.");
+    if (rb.steps.length === 0) return t("Un runbook a au moins une étape.");
     const bad = rb.steps.findIndex((s) => !s.title.trim());
-    if (bad >= 0) return `L'étape ${bad + 1} n'a pas de titre.`;
+    if (bad >= 0) return t("L'étape {0} n'a pas de titre.", bad + 1);
     const empty = rb.steps.findIndex((s) => (s.action.kind === "command" ? !s.action.command.trim() : s.action.kind === "program" ? !s.action.programText.trim() : !s.action.relayHostId || !s.action.playbook.trim()));
-    if (empty >= 0) return `L'étape ${empty + 1} n'a rien à exécuter.`;
+    if (empty >= 0) return t("L'étape {0} n'a rien à exécuter.", empty + 1);
     return null;
   };
 
   return (
-    <FormShell title={initial ? `Modifier « ${initial.name} »` : "Nouveau runbook"} onSave={() => onSave({ kind: "runbook", runbook: { ...rb, name: rb.name.trim(), steps: rb.steps.map((s) => ({ ...s, title: s.title.trim() })) } })} onCancel={onCancel} validate={validate}>
-      <Field label="Nom">
-        <input value={rb.name} onChange={(e) => setRb({ ...rb, name: e.target.value })} autoFocus placeholder="Mise à jour des serveurs web" className="input" />
+    <FormShell title={initial ? t("Modifier « {0} »", initial.name) : t("Nouveau runbook")} onSave={() => onSave({ kind: "runbook", runbook: { ...rb, name: rb.name.trim(), steps: rb.steps.map((s) => ({ ...s, title: s.title.trim() })) } })} onCancel={onCancel} validate={validate}>
+      <Field label={t("Nom")}>
+        <input value={rb.name} onChange={(e) => setRb({ ...rb, name: e.target.value })} autoFocus placeholder={t("Mise à jour des serveurs web")} className="input" />
       </Field>
-      <Field label="Description" hint="Une ou deux phrases, affichées en tête et dans le rapport.">
+      <Field label={t("Description")} hint={t("Une ou deux phrases, affichées en tête et dans le rapport.")}>
         <textarea value={rb.description} onChange={(e) => setRb({ ...rb, description: e.target.value })} rows={2} className="input" />
       </Field>
-      <div role="group" aria-label="Étapes" className="space-y-2">
-        <span className="field-label">Étapes</span>
+      <div role="group" aria-label={t("Étapes")} className="space-y-2">
+        <span className="field-label">{t("Étapes")}</span>
         {rb.steps.map((s, i) => (
           <div key={s.id} className="card space-y-2 p-3">
             <div className="flex items-center gap-1.5">
               <span className="tag shrink-0">{i + 1}</span>
-              <input value={s.title} onChange={(e) => setStep(i, { title: e.target.value })} placeholder="Ce que fait l'étape, en une ligne" aria-label={`Titre de l'étape ${i + 1}`} className="input min-w-0 flex-1" />
-              <button type="button" disabled={i === 0} onClick={() => move(i, -1)} className="btn btn-ghost btn-sm btn-icon" title="Monter" aria-label={`Monter l'étape ${i + 1}`}><IconArrowUp size={11} /></button>
-              <button type="button" disabled={i === rb.steps.length - 1} onClick={() => move(i, 1)} className="btn btn-ghost btn-sm btn-icon" title="Descendre" aria-label={`Descendre l'étape ${i + 1}`}><IconArrowUp size={11} className="rotate-180" /></button>
-              <button type="button" onClick={() => setRb({ ...rb, steps: rb.steps.filter((_, j) => j !== i) })} className="btn btn-ghost btn-sm btn-icon hover:text-[var(--c-danger)]" title="Retirer" aria-label={`Retirer l'étape ${i + 1}`}><IconClose size={11} /></button>
+              <input value={s.title} onChange={(e) => setStep(i, { title: e.target.value })} placeholder={t("Ce que fait l'étape, en une ligne")} aria-label={t("Titre de l'étape {0}", i + 1)} className="input min-w-0 flex-1" />
+              <button type="button" disabled={i === 0} onClick={() => move(i, -1)} className="btn btn-ghost btn-sm btn-icon" title={t("Monter")} aria-label={t("Monter l'étape {0}", i + 1)}><IconArrowUp size={11} /></button>
+              <button type="button" disabled={i === rb.steps.length - 1} onClick={() => move(i, 1)} className="btn btn-ghost btn-sm btn-icon" title={t("Descendre")} aria-label={t("Descendre l'étape {0}", i + 1)}><IconArrowUp size={11} className="rotate-180" /></button>
+              <button type="button" onClick={() => setRb({ ...rb, steps: rb.steps.filter((_, j) => j !== i) })} className="btn btn-ghost btn-sm btn-icon hover:text-[var(--c-danger)]" title={t("Retirer")} aria-label={t("Retirer l'étape {0}", i + 1)}><IconClose size={11} /></button>
             </div>
-            <Field label="Action">
+            <Field label={t("Action")}>
               <select value={s.action.kind} onChange={(e) => setStep(i, { action: actionOf(e.target.value as RunbookAction["kind"], s.action) })} className="input">
                 {(Object.keys(ACTION_LABELS) as RunbookAction["kind"][]).map((k) => <option key={k} value={k}>{ACTION_LABELS[k]}</option>)}
               </select>
             </Field>
             {s.action.kind === "command" && (
-              <textarea value={s.action.command} onChange={(e) => setStep(i, { action: { ...s.action, kind: "command", command: e.target.value } })} rows={3} spellCheck={false} placeholder="sudo apt-get update && sudo apt-get -y upgrade" aria-label={`Commande de l'étape ${i + 1}`} className="input input-mono" />
+              <textarea value={s.action.command} onChange={(e) => setStep(i, { action: { ...s.action, kind: "command", command: e.target.value } })} rows={3} spellCheck={false} placeholder="sudo apt-get update && sudo apt-get -y upgrade" aria-label={t("Commande de l'étape {0}", i + 1)} className="input input-mono" />
             )}
             {s.action.kind === "program" && (
-              <textarea value={s.action.programText} onChange={(e) => setStep(i, { action: { ...s.action, kind: "program", programText: e.target.value } })} rows={4} spellCheck={false} aria-label={`Programme de l'étape ${i + 1}`} className="input input-mono" />
+              <textarea value={s.action.programText} onChange={(e) => setStep(i, { action: { ...s.action, kind: "program", programText: e.target.value } })} rows={4} spellCheck={false} aria-label={t("Programme de l'étape {0}", i + 1)} className="input input-mono" />
             )}
             {s.action.kind === "playbook" && (() => {
               const a = s.action;
               return (
                 <div className="grid grid-cols-2 gap-2">
-                  <Field label="Hôte relais" className="col-span-2" hint="Le nœud de contrôle Ansible.">
-                    <HostSelect index={index} value={a.relayHostId || null} none={a.relayHostLabel ? `${a.relayHostLabel} (absent de ce vault)` : "Choisir…"} onChange={(id) => setStep(i, { action: { ...a, relayHostId: id ?? "", relayHostLabel: index.hosts.find((h) => h.id === id)?.label ?? "" } })} />
+                  <Field label={t("Hôte relais")} className="col-span-2" hint={t("Le nœud de contrôle Ansible.")}>
+                    <HostSelect index={index} value={a.relayHostId || null} none={a.relayHostLabel ? t("{0} (absent de ce vault)", a.relayHostLabel) : t("Choisir…")} onChange={(id) => setStep(i, { action: { ...a, relayHostId: id ?? "", relayHostLabel: index.hosts.find((h) => h.id === id)?.label ?? "" } })} />
                   </Field>
-                  <Field label="Playbook (sur le relais)">
+                  <Field label={t("Playbook (sur le relais)")}>
                     <input value={a.playbook} onChange={(e) => setStep(i, { action: { ...a, playbook: e.target.value } })} placeholder="site.yml" className="input input-mono" />
                   </Field>
-                  <Field label="Inventaire">
-                    <input value={a.inventory} onChange={(e) => setStep(i, { action: { ...a, inventory: e.target.value } })} placeholder="celui de ansible.cfg" className="input input-mono" />
+                  <Field label={t("Inventaire")}>
+                    <input value={a.inventory} onChange={(e) => setStep(i, { action: { ...a, inventory: e.target.value } })} placeholder={t("celui de ansible.cfg")} className="input input-mono" />
                   </Field>
                 </div>
               );
             })()}
             <div className="grid grid-cols-2 gap-2">
-              <Field label="Seulement les hôtes avec ces tags">
+              <Field label={t("Seulement les hôtes avec ces tags")}>
                 <TagsInput value={s.scope.tags} onChange={(tags) => setStep(i, { scope: { ...s.scope, tags } })} />
               </Field>
-              <Field label="Et dans un de ces dossiers">
-                <TagsInput value={s.scope.groups} onChange={(groups) => setStep(i, { scope: { ...s.scope, groups } })} commas placeholder="Prod Paris, Lyon" />
+              <Field label={t("Et dans un de ces dossiers")}>
+                <TagsInput value={s.scope.groups} onChange={(groups) => setStep(i, { scope: { ...s.scope, groups } })} commas placeholder={t("Prod Paris, Lyon")} />
               </Field>
-              <Field label="En cas d'échec">
+              <Field label={t("En cas d'échec")}>
                 <select value={s.onFailure} onChange={(e) => setStep(i, { onFailure: e.target.value as RunbookOnFailure })} className="input">
                   {(Object.keys(ON_FAILURE_LABELS) as RunbookOnFailure[]).map((k) => <option key={k} value={k}>{ON_FAILURE_LABELS[k]}</option>)}
                 </select>
               </Field>
-              <Field label="Demander l'accord">
+              <Field label={t("Demander l'accord")}>
                 <select value={s.approval} onChange={(e) => setStep(i, { approval: e.target.value as RunbookApproval })} className="input">
                   {(Object.keys(APPROVAL_LABELS) as RunbookApproval[]).map((k) => <option key={k} value={k}>{APPROVAL_LABELS[k]}</option>)}
                 </select>
               </Field>
             </div>
-            <Field label="Notes" hint="Jamais exécutées.">
+            <Field label={t("Notes")} hint={t("Jamais exécutées.")}>
               <textarea value={s.notes} onChange={(e) => setStep(i, { notes: e.target.value })} rows={2} className="input" />
             </Field>
           </div>
         ))}
-        <button type="button" onClick={() => setRb({ ...rb, steps: [...rb.steps, newStep()] })} className="btn btn-secondary btn-sm"><IconPlus size={11} /> Ajouter une étape</button>
+        <button type="button" onClick={() => setRb({ ...rb, steps: [...rb.steps, newStep()] })} className="btn btn-secondary btn-sm"><IconPlus size={11} /> {t("Ajouter une étape")}</button>
       </div>
     </FormShell>
   );

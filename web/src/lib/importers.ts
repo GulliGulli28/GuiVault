@@ -9,6 +9,7 @@ import { folderPathOf, importBitwardenJson, isBitwardenJson, NeedsKeePassKey, Ne
 import { emptyLogin, emptyNote } from "./items";
 import { withParent } from "./entities";
 import type { Group, Payload } from "./types";
+import { t } from "./i18n";
 
 export { NeedsKeePassKey, NeedsPassword };
 export type { ImportResult, ImportedFile, ImportedItem };
@@ -60,7 +61,7 @@ export async function importFile(input: string | Uint8Array, password?: string, 
     try {
       doc = JSON.parse(trimmed);
     } catch {
-      throw new Error("Le fichier ressemble à du JSON mais ne se lit pas.");
+      throw new Error(t("Le fichier ressemble à du JSON mais ne se lit pas."));
     }
     return importJson(doc, password);
   }
@@ -68,7 +69,7 @@ export async function importFile(input: string | Uint8Array, password?: string, 
 }
 
 async function importJson(doc: unknown, password?: string): Promise<ImportResult> {
-  if (typeof doc !== "object" || doc === null) throw new Error("Format JSON inconnu.");
+  if (typeof doc !== "object" || doc === null) throw new Error(t("Format JSON inconnu."));
   const d = doc as Record<string, unknown>;
   if (d.format === GUIVAULT_ENCRYPTED_FORMAT) {
     if (!password) throw new NeedsPassword();
@@ -78,7 +79,7 @@ async function importJson(doc: unknown, password?: string): Promise<ImportResult
     try {
       plain = c.open(key, fromBase64(e.blob), c.AAD_EXPORT);
     } catch {
-      throw new Error("Mot de passe de l'export incorrect.");
+      throw new Error(t("Mot de passe de l'export incorrect."));
     } finally {
       key.fill(0);
     }
@@ -86,7 +87,7 @@ async function importJson(doc: unknown, password?: string): Promise<ImportResult
   }
   if (d.format === GUIVAULT_FORMAT) return importGuiVault(doc as GuiVaultExport);
   if (isBitwardenJson(doc)) return importBitwardenJson(doc, password);
-  throw new Error("Format JSON inconnu : attendu un export GuiVault ou Bitwarden.");
+  throw new Error(t("Format JSON inconnu : attendu un export GuiVault ou Bitwarden."));
 }
 
 /** Un export GuiVault : les items reviennent tels quels (mêmes ids — un
@@ -153,23 +154,23 @@ function columnIndex(header: string[]): Record<string, number> {
 
 function guessFormat(header: string[]): string {
   const h = header.map(normalize);
-  if (h.includes("login uri") && h.includes("login username")) return "Bitwarden (CSV)";
-  if (h.includes("grouping") && h.includes("extra")) return "LastPass (CSV)";
-  if (h.includes("group") && h.includes("title") && h.includes("url")) return "KeePassXC (CSV)";
-  if (h.includes("httprealm") || h.includes("formactionorigin")) return "Firefox (CSV)";
-  if (h.includes("otpauth") && h.includes("archived")) return "1Password (CSV)";
-  if (h.includes("createtime") && h.includes("vault")) return "Proton Pass (CSV)";
-  if (h[0] === "name" && h.includes("url") && h.includes("username")) return "Chrome (CSV)";
+  if (h.includes("login uri") && h.includes("login username")) return t("Bitwarden (CSV)");
+  if (h.includes("grouping") && h.includes("extra")) return t("LastPass (CSV)");
+  if (h.includes("group") && h.includes("title") && h.includes("url")) return t("KeePassXC (CSV)");
+  if (h.includes("httprealm") || h.includes("formactionorigin")) return t("Firefox (CSV)");
+  if (h.includes("otpauth") && h.includes("archived")) return t("1Password (CSV)");
+  if (h.includes("createtime") && h.includes("vault")) return t("Proton Pass (CSV)");
+  if (h[0] === "name" && h.includes("url") && h.includes("username")) return t("Chrome (CSV)");
   return "CSV";
 }
 
 export function importCsv(text: string): ImportResult {
   const rows = parseCsv(text);
-  if (rows.length < 2) throw new Error("CSV vide ou sans en-tête.");
+  if (rows.length < 2) throw new Error(t("CSV vide ou sans en-tête."));
   const header = rows[0];
   const col = columnIndex(header);
   if (col.password === undefined && col.url === undefined && col.name === undefined) {
-    throw new Error(`Colonnes non reconnues : ${header.join(", ")}. Il faut au moins un nom, une URL ou un mot de passe.`);
+    throw new Error(t("Colonnes non reconnues : {0}. Il faut au moins un nom, une URL ou un mot de passe.", header.join(", ")));
   }
   const format = guessFormat(header);
   const warnings: string[] = [];
@@ -184,7 +185,7 @@ export function importCsv(text: string): ImportResult {
     const favorite = ["1", "true", "yes", "oui"].includes(get(row, "favorite").toLowerCase()) || undefined;
     const reprompt = get(row, "reprompt") === "1" || undefined;
     const notes = get(row, "notes");
-    const name = get(row, "name") || (url ? hostOf(url) : "") || "(sans nom)";
+    const name = get(row, "name") || (url ? hostOf(url) : "") || t("(sans nom)");
     const tags = get(row, "tags").split(/[,;]/).map((t) => t.trim()).filter(Boolean);
     // Proton Pass met aussi ses cartes, identités et alias dans le CSV, sans
     // leurs champs : on en garde le nom et la note.

@@ -15,6 +15,7 @@
  * casse. */
 import { parseTotp, totpCode } from "./totp";
 import type { AutoType, Login } from "./types";
+import { t } from "./i18n";
 
 export const DEFAULT_SEQUENCE = "{USERNAME}{TAB}{PASSWORD}{ENTER}";
 
@@ -60,8 +61,8 @@ export function parseSequence(sequence: string): Token[] {
   while (i < sequence.length) {
     const c = sequence[i];
     if (c === "}") {
-      if (sequence.startsWith("}}", i)) throw new AutoTypeError("« }} » : pour une accolade fermante, écrire {}}.");
-      throw new AutoTypeError(`Accolade fermante sans ouvrante (position ${i + 1}). Pour la taper : {}}.`);
+      if (sequence.startsWith("}}", i)) throw new AutoTypeError(t("« }} » : pour une accolade fermante, écrire {}}."));
+      throw new AutoTypeError(t("Accolade fermante sans ouvrante (position {0}). Pour la taper : {}}.", i + 1));
     }
     if (c !== "{") {
       text(c);
@@ -75,31 +76,31 @@ export function parseSequence(sequence: string): Token[] {
       continue;
     }
     const end = sequence.indexOf("}", i);
-    if (end < 0) throw new AutoTypeError(`Accolade ouvrante sans fermante (position ${i + 1}).`);
+    if (end < 0) throw new AutoTypeError(t("Accolade ouvrante sans fermante (position {0}).", i + 1));
     const inner = sequence.slice(i + 1, end).trim();
     i = end + 1;
     if (/^S:/i.test(inner)) {
       const name = inner.slice(2).trim();
-      if (!name) throw new AutoTypeError("{S:…} : il manque le nom du champ.");
+      if (!name) throw new AutoTypeError(t("{S:…} : il manque le nom du champ."));
       out.push({ kind: "custom", name });
       continue;
     }
     const m = /^([A-Za-z]+)(?:\s+(\d+))?$/.exec(inner);
-    if (!m) throw new AutoTypeError(`{${inner}} : inconnu.`);
+    if (!m) throw new AutoTypeError(t("{{0}} : inconnu.", inner));
     const name = m[1].toUpperCase();
     const n = m[2] === undefined ? null : Number(m[2]);
     if (name === "DELAY") {
-      if (n === null) throw new AutoTypeError("{DELAY} : il manque la durée, en millisecondes ({DELAY 500}).");
-      if (n > MAX_DELAY) throw new AutoTypeError(`{DELAY ${n}} : ${MAX_DELAY} ms au plus.`);
+      if (n === null) throw new AutoTypeError(t("{DELAY} : il manque la durée, en millisecondes ({DELAY 500})."));
+      if (n > MAX_DELAY) throw new AutoTypeError(t("{DELAY {0}} : {1} ms au plus.", n, MAX_DELAY));
       out.push({ kind: "delay", ms: n });
     } else if (KEYS[name]) {
-      if (n !== null && (n < 1 || n > MAX_REPEAT)) throw new AutoTypeError(`{${inner}} : de 1 à ${MAX_REPEAT} fois.`);
+      if (n !== null && (n < 1 || n > MAX_REPEAT)) throw new AutoTypeError(t("{{0}} : de 1 à {1} fois.", inner, MAX_REPEAT));
       out.push({ kind: "key", key: KEYS[name], times: n ?? 1 });
     } else if (FIELDS.has(name)) {
-      if (n !== null) throw new AutoTypeError(`{${inner}} : un champ ne se répète pas.`);
+      if (n !== null) throw new AutoTypeError(t("{{0}} : un champ ne se répète pas.", inner));
       out.push({ kind: "field", name });
     } else {
-      throw new AutoTypeError(`{${inner}} : inconnu.`);
+      throw new AutoTypeError(t("{{0}} : inconnu.", inner));
     }
   }
   return out;
@@ -140,7 +141,7 @@ export async function resolveSequence(sequence: string, login: Login, now = Date
         break;
       case "custom": {
         const f = (login.fields ?? []).find((x) => x.name.toLowerCase() === tok.name.toLowerCase());
-        if (!f) throw new AutoTypeError(`{S:${tok.name}} : « ${login.name} » n'a pas de champ « ${tok.name} ».`);
+        if (!f) throw new AutoTypeError(t("{S:{0}} : « {1} » n'a pas de champ « {2} ».", tok.name, login.name, tok.name));
         text(f.value);
         break;
       }
@@ -153,7 +154,7 @@ export async function resolveSequence(sequence: string, login: Login, now = Date
           case "NOTES": text(login.notes ?? ""); break;
           case "TOTP": {
             const p = login.totp ? parseTotp(login.totp) : null;
-            if (!p) throw new AutoTypeError(`{TOTP} : « ${login.name} » n'a pas de secret TOTP.`);
+            if (!p) throw new AutoTypeError(t("{TOTP} : « {0} » n'a pas de secret TOTP.", login.name));
             text(await totpCode(p, now));
             break;
           }

@@ -11,6 +11,7 @@
  * connaît pas (champs ajoutés par Guiterm ou une version plus récente). */
 import { PASSWORD_HISTORY_MAX } from "./items";
 import type { Payload, PasswordHistoryEntry } from "./types";
+import { translated } from "./i18n";
 
 export type Side = "mine" | "theirs";
 
@@ -38,7 +39,7 @@ export interface MergePlan {
  * (les deux côtés y ajoutent l'ancien mot de passe en le changeant). */
 const UNION = new Set(["login.passwordHistory"]);
 
-const LABELS: Record<string, string> = {
+const LABELS: Record<string, string> = translated({
   name: "Nom",
   label: "Nom",
   username: "Utilisateur",
@@ -72,13 +73,13 @@ const LABELS: Record<string, string> = {
   expMonth: "Mois d'expiration",
   expYear: "Année d'expiration",
   expiresAt: "Expiration",
-};
+});
 
 /** Libellés propres à un type (`kind:clé`). */
-const KIND_LABELS: Record<string, string> = {
+const KIND_LABELS: Record<string, string> = translated({
   "key:content": "Clé privée",
   "note:content": "Contenu",
-};
+});
 
 const SECRET_KEYS = new Set(["password", "passphrase", "secret", "secretAccessKey", "totp", "number", "code", "keyValue", "ssn", "passportNumber", "licenseNumber"]);
 

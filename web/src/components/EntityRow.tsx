@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { t } from "../lib/i18n";
 
 /**
  * La ligne commune de toutes les listes de la barre latérale : un hôte, une
@@ -184,7 +185,7 @@ export function GroupRow({
     >
       <button
         onClick={onToggle}
-        aria-label={expanded ? `Replier ${name}` : `Déplier ${name}`}
+        aria-label={expanded ? t("Replier {0}", name) : t("Déplier {0}", name)}
         className="flex h-5 w-5 shrink-0 items-center justify-center rounded-sm text-[var(--c-text-muted)] hover:text-[var(--c-text)]"
       >
         <svg width="12" height="12" viewBox="0 0 16 16" fill="none" className={`transition-transform ${expanded ? "rotate-90" : ""}`}>

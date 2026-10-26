@@ -27,6 +27,7 @@ import { itemDigest, nextManifest, sealManifest, verifyManifest, type Manifest }
 import type { SessionState } from "./session";
 import { copyAttachments, copyVaults, method, unlockWith, type End, type TransferVault } from "./transfer";
 import { canWrite, type Item, type ItemVersion, type ManifestWrite } from "./types";
+import { t } from "./i18n";
 
 const b64 = toBase64;
 const unb64 = fromBase64;
@@ -139,7 +140,7 @@ async function readSide(end: End, key: Uint8Array, vaultId: string, label: strin
   const live = page.items.filter((i) => !i.deleted).map((i) => ({ id: i.id, ciphertext: unb64(i.ciphertext) }));
   const served = page.manifest ? { revision: page.manifest.revision, ciphertext: unb64(page.manifest.ciphertext) } : null;
   const { manifest, problems } = verifyManifest(key, vaultId, served, live, null);
-  if (problems.length > 0) throw new Error(`le manifeste ne correspond pas aux éléments (${label}) : ouvrez ce coffre et prenez-en acte d'abord`);
+  if (problems.length > 0) throw new Error(t("le manifeste ne correspond pas aux éléments ({0}) : ouvrez ce coffre et prenez-en acte d'abord", label));
   return { items: page.items, versions, keeper: new ManifestKeeper(key, vaultId, manifest) };
 }
 
@@ -182,7 +183,7 @@ export async function syncVaults(here: { api: End; account: UnlockedAccount; vau
   const herePersonal = here.vaults.find((v) => v.kind === "personal");
   const therePersonal = [...theirKeys.values()].find((v) => v.kind === "personal");
   if (!herePersonal || !therePersonal || herePersonal.id !== therePersonal.id) {
-    throw new Error("Ce coffre n'est pas une copie de celui-ci : pour y mettre des vaults, utilisez « Copier vers un coffre local ».");
+    throw new Error(t("Ce coffre n'est pas une copie de celui-ci : pour y mettre des vaults, utilisez « Copier vers un coffre local »."));
   }
 
   const reports: SyncReport[] = [];
@@ -197,9 +198,9 @@ export async function syncVaults(here: { api: End; account: UnlockedAccount; vau
         report.copied = "there";
         continue;
       }
-      if (!equalBytes(v.key, other.key)) throw new Error("même identifiant, clé différente : ce n'est pas le même vault");
+      if (!equalBytes(v.key, other.key)) throw new Error(t("même identifiant, clé différente : ce n'est pas le même vault"));
       const a = await readSide(here.api, v.key, v.id, "ici");
-      const b = await readSide(there.api, v.key, v.id, "la copie");
+      const b = await readSide(there.api, v.key, v.id, t("la copie"));
       const plan = planMerge(a, b);
       report.conflicts = plan.conflicts.length;
       await apply(here.api, v.id, a.keeper, plan.here);

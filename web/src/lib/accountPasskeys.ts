@@ -13,6 +13,7 @@ import * as c from "./crypto";
 import { requireKdfNotDowngraded } from "./kdfPins";
 import { deviceName, openSession, type SessionState } from "./session";
 import type { AccountPasskey } from "./types";
+import { t } from "./i18n";
 
 type Prf = { enabled?: boolean; results?: { first?: BufferSource } };
 
@@ -60,7 +61,7 @@ export async function registerPasskey(state: SessionState, name: string, passwor
         extensions: { prf: { eval: { first: salt } } } as AuthenticationExtensionsClientInputs,
       },
     })) as PublicKeyCredential | null;
-    if (!created) throw new Error("Création de la passkey annulée.");
+    if (!created) throw new Error(t("Création de la passkey annulée."));
     const ext = (created.getClientExtensionResults() as { prf?: Prf }).prf;
     if (!ext?.enabled && !ext?.results?.first) throw new Error(NO_PRF);
     const credentialId = bytes(created.rawId);
@@ -129,7 +130,7 @@ export async function registerSecurityKey(state: SessionState, name: string, pas
         timeout: 120_000,
       },
     })) as PublicKeyCredential | null;
-    if (!created) throw new Error("Enregistrement de la clé annulé.");
+    if (!created) throw new Error(t("Enregistrement de la clé annulé."));
     const response = created.response as AuthenticatorAttestationResponse;
     return await api.registerPasskey({
       challenge_id: opts.challenge_id,
@@ -157,7 +158,7 @@ export async function loginWithPasskey(): Promise<SessionState> {
       extensions: { prf: { eval: { first: buf(opts.prf_salt) } } } as AuthenticationExtensionsClientInputs,
     },
   })) as PublicKeyCredential | null;
-  if (!got) throw new Error("Connexion par passkey annulée.");
+  if (!got) throw new Error(t("Connexion par passkey annulée."));
   const prf = prfOutput(got);
   if (!prf) throw new Error(NO_PRF);
   const credentialId = bytes(got.rawId);
@@ -176,7 +177,7 @@ export async function loginWithPasskey(): Promise<SessionState> {
   try {
     userKey = c.openPasskeyUserKey(key, credentialId, fromBase64(res.passkey_user_key));
   } catch {
-    throw new Error("Cette passkey n'ouvre pas le coffre : son enveloppe ne correspond pas (passkey réenregistrée ailleurs ?).");
+    throw new Error(t("Cette passkey n'ouvre pas le coffre : son enveloppe ne correspond pas (passkey réenregistrée ailleurs ?)."));
   } finally {
     key.fill(0);
   }

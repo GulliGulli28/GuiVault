@@ -453,7 +453,13 @@ Le README le dit en tête ; chaque case cochée y retire une ligne.
   Reste : le faire depuis l'application ou l'extension (vérifier la page
   avant d'y taper le mot de passe), ce qui demanderait la liste des
   empreintes signée hors du serveur.
-- [ ] **Interface en anglais** (i18n), puis le README et `SECURITY.md`.
+- [x] **Interface en anglais** (i18n) : web, application, mobile et
+  extension (popup, service worker, script de page) — Paramètres ›
+  Apparence › Langue (Système, Français, English), par appareil ; erreurs
+  du serveur traduites par code. `lib/i18n.ts`, catalogue
+  `src/i18n/en.json` (≈ 2 200 textes), complétude vérifiée par
+  `i18n.test.ts`. Reste : le README et `SECURITY.md` en anglais, et les
+  e-mails du serveur.
 - [x] **Politique de sécurité** : [`SECURITY.md`](../SECURITY.md) à la
   racine (canal, délais visés, versions maintenues, périmètre, bonne foi) ;
   `/.well-known/security.txt` (RFC 9116) servi par chaque serveur, contact

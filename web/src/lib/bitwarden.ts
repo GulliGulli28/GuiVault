@@ -7,6 +7,7 @@ import { expand } from "@noble/hashes/hkdf.js";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { fromBase64, uuid, utf8 } from "./bytes";
 import type { Card, CustomField, Identity, Login, Note, Passkey, Payload, UriMatch } from "./types";
+import { t } from "./i18n";
 
 // ─── Types de l'export Bitwarden ────────────────────────────────────────────
 
@@ -85,7 +86,7 @@ export interface ImportResult {
 }
 
 export class NeedsPassword extends Error {
-  constructor(message = "Cet export est protégé par un mot de passe.") {
+  constructor(message = t("Cet export est protégé par un mot de passe.")) {
     super(message);
   }
 }
@@ -93,7 +94,7 @@ export class NeedsPassword extends Error {
 /** Une base KeePass : son mot de passe maître, et peut-être un fichier clé. */
 export class NeedsKeePassKey extends NeedsPassword {
   constructor() {
-    super("Base KeePass : son mot de passe maître (et son fichier clé s'il y en a un).");
+    super(t("Base KeePass : son mot de passe maître (et son fichier clé s'il y en a un)."));
   }
 }
 
@@ -140,7 +141,7 @@ function convertPasskey(c: BwFido2): Passkey {
 }
 
 function convertItem(it: BwItem, warnings: string[]): Payload | null {
-  const name = s(it.name) || "(sans nom)";
+  const name = s(it.name) || t("(sans nom)");
   const base = { id: uuid(), name, groupId: null, tags: [] as string[], favorite: it.favorite || undefined, reprompt: it.reprompt === 1 || undefined, notes: s(it.notes) || undefined, fields: convertFields(it.fields, warnings, name) };
   switch (it.type) {
     case 1: {
@@ -188,7 +189,7 @@ export function isBitwardenJson(v: unknown): v is BwExport {
 export async function importBitwardenJson(doc: BwExport, password?: string): Promise<ImportResult> {
   if (doc.encrypted) {
     if (!doc.passwordProtected || !doc.data || !doc.salt) {
-      throw new Error("Cet export Bitwarden est chiffré avec la clé du compte, pas un mot de passe : ré-exportez-le en clair ou protégé par mot de passe.");
+      throw new Error(t("Cet export Bitwarden est chiffré avec la clé du compte, pas un mot de passe : ré-exportez-le en clair ou protégé par mot de passe."));
     }
     if (!password) throw new NeedsPassword();
     const plain = await decryptPasswordProtected(doc, password);
@@ -225,14 +226,14 @@ async function decryptPasswordProtected(doc: BwExport, password: string): Promis
   try {
     await decryptEncString(doc.encKeyValidation_DO_NOT_EDIT ?? "", encKey, macKey);
   } catch {
-    throw new Error("Mot de passe de l'export incorrect.");
+    throw new Error(t("Mot de passe de l'export incorrect."));
   }
   return decryptEncString(doc.data ?? "", encKey, macKey);
 }
 
 async function decryptEncString(enc: string, encKey: Uint8Array, macKey: Uint8Array): Promise<string> {
   const m = /^2\.([^|]+)\|([^|]+)\|([^|]+)$/.exec(enc);
-  if (!m) throw new Error("EncString illisible");
+  if (!m) throw new Error(t("EncString illisible"));
   const iv = fromBase64(m[1]);
   const ct = fromBase64(m[2]);
   const mac = fromBase64(m[3]);
@@ -240,7 +241,7 @@ async function decryptEncString(enc: string, encKey: Uint8Array, macKey: Uint8Ar
   const data = new Uint8Array(iv.length + ct.length);
   data.set(iv);
   data.set(ct, iv.length);
-  if (!(await crypto.subtle.verify("HMAC", hk, mac as BufferSource, data as BufferSource))) throw new Error("MAC invalide");
+  if (!(await crypto.subtle.verify("HMAC", hk, mac as BufferSource, data as BufferSource))) throw new Error(t("MAC invalide"));
   const ak = await crypto.subtle.importKey("raw", encKey as BufferSource, "AES-CBC", false, ["decrypt"]);
   const plain = await crypto.subtle.decrypt({ name: "AES-CBC", iv: iv as BufferSource }, ak, ct as BufferSource);
   return utf8.decode(new Uint8Array(plain));

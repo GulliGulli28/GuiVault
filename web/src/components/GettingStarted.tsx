@@ -12,6 +12,7 @@ import { navigate, type Route } from "../lib/route";
 import type { SessionState } from "../lib/session";
 import { canWrite } from "../lib/types";
 import { IconCheck, IconClose } from "./ui-icons";
+import { t } from "../lib/i18n";
 
 const EXTENSION_DOC = "https://github.com/GulliGulli28/GuiVault/blob/main/docs/EXTENSION.md";
 
@@ -59,21 +60,21 @@ export function GettingStarted({ session, secrets, mobile }: { session: SessionS
   const target = session.vaults.find((v) => v.kind === "personal" && canWrite(v.role)) ?? session.vaults.find((v) => canWrite(v.role));
   const steps: Step[] = [];
   if (target && !session.offline) {
-    steps.push({ id: "import", title: "Importer vos mots de passe", desc: "Bitwarden, KeePass, Chrome, Firefox, LastPass…", detected: secrets >= 5, action: { label: "Importer", route: { page: "vault-tools", id: target.id } } });
+    steps.push({ id: "import", title: t("Importer vos mots de passe"), desc: t("Bitwarden, KeePass, Chrome, Firefox, LastPass…"), detected: secrets >= 5, action: { label: t("Importer"), route: { page: "vault-tools", id: target.id } } });
   }
   if (supports("totpStatus") && !session.offline) {
-    steps.push({ id: "2fa", title: "Activer la double authentification", desc: "Un code en plus du mot de passe maître.", detected: totp === true, action: { label: "Activer", route: { page: "settings", section: "securite" } } });
+    steps.push({ id: "2fa", title: t("Activer la double authentification"), desc: t("Un code en plus du mot de passe maître."), detected: totp === true, action: { label: t("Activer"), route: { page: "settings", section: "securite" } } });
   }
   if (biometricBridge() && bio !== undefined) {
-    steps.push({ id: "bio", title: "Déverrouiller par biométrie", desc: "Empreinte ou visage, au lieu de taper le mot de passe.", detected: bio !== null, action: { label: "Activer", route: { page: "settings", section: "securite" } } });
+    steps.push({ id: "bio", title: t("Déverrouiller par biométrie"), desc: t("Empreinte ou visage, au lieu de taper le mot de passe."), detected: bio !== null, action: { label: t("Activer"), route: { page: "settings", section: "securite" } } });
   }
   if (session.local && coffreFileBridge()) {
-    steps.push({ id: "export", title: "Exporter le coffre", desc: "Désinstaller l'application l'effacerait.", detected: false, action: { label: "Exporter", route: { page: "settings", section: "compte" } } });
+    steps.push({ id: "export", title: t("Exporter le coffre"), desc: t("Désinstaller l'application l'effacerait."), detected: false, action: { label: t("Exporter"), route: { page: "settings", section: "compte" } } });
   }
-  steps.push({ id: "extension", title: "Installer l'extension de navigateur", desc: "Remplir les sites en un clic.", detected: false, action: { label: "Comment", href: EXTENSION_DOC } });
+  steps.push({ id: "extension", title: t("Installer l'extension de navigateur"), desc: t("Remplir les sites en un clic."), detected: false, action: { label: t("Comment"), href: EXTENSION_DOC } });
   if (session.vaults.some((v) => v.kind === "shared")) {
     const shared = session.vaults.find((v) => v.kind === "shared")!;
-    steps.push({ id: "fingerprint", title: "Vérifier les empreintes de l'équipe", desc: "Par un autre canal, avant de partager.", detected: false, action: { label: "Voir", route: { page: "vault-settings", id: shared.id } } });
+    steps.push({ id: "fingerprint", title: t("Vérifier les empreintes de l'équipe"), desc: t("Par un autre canal, avant de partager."), detected: false, action: { label: t("Voir"), route: { page: "vault-settings", id: shared.id } } });
   }
 
   const doneIds = new Set(stored.done ?? []);
@@ -89,9 +90,9 @@ export function GettingStarted({ session, secrets, mobile }: { session: SessionS
   return (
     <section aria-labelledby="getting-started" className={`${mobile ? "m-card" : "card"} flex flex-col gap-1 px-4 pb-2 pt-3.5`}>
       <div className="flex items-center gap-2">
-        <h2 id="getting-started" className="section-title min-w-0 flex-1 truncate">Bien démarrer</h2>
-        <span className="text-[12.5px] text-[var(--c-text-muted)]">{steps.length - left} sur {steps.length}</span>
-        <button onClick={() => update({ ...stored, hidden: true })} className="btn btn-ghost btn-icon btn-sm" title="Masquer" aria-label="Masquer « Bien démarrer »"><IconClose size={13} /></button>
+        <h2 id="getting-started" className="section-title min-w-0 flex-1 truncate">{t("Bien démarrer")}</h2>
+        <span className="text-[12.5px] text-[var(--c-text-muted)]">{steps.length - left} {t("sur")} {steps.length}</span>
+        <button onClick={() => update({ ...stored, hidden: true })} className="btn btn-ghost btn-icon btn-sm" title={t("Masquer")} aria-label={t("Masquer « Bien démarrer »")}><IconClose size={13} /></button>
       </div>
       <ul className="divide-y divide-[var(--c-border)]">
         {steps.map((s) => {
@@ -107,7 +108,7 @@ export function GettingStarted({ session, secrets, mobile }: { session: SessionS
               </span>
               {!done && (
                 <>
-                  {!s.detected && <button onClick={() => mark(s.id)} className="btn btn-ghost btn-sm max-sm:hidden" title="C'est fait">C'est fait</button>}
+                  {!s.detected && <button onClick={() => mark(s.id)} className="btn btn-ghost btn-sm max-sm:hidden" title={t("C'est fait")}>{t("C'est fait")}</button>}
                   {s.action.href
                     ? <a href={s.action.href} target="_blank" rel="noopener noreferrer" className="btn btn-secondary btn-sm hover:no-underline" onClick={() => mark(s.id)}>{s.action.label}</a>
                     : <button onClick={() => navigate(s.action.route!)} className="btn btn-secondary btn-sm">{s.action.label}</button>}

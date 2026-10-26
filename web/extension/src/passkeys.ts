@@ -15,6 +15,7 @@ import type { Login, Passkey } from "../../src/lib/types";
 import { cborEncode } from "./cbor";
 import { loadItemsCache, loadSession } from "./store";
 import { saveLogin } from "./vaultops";
+import { t } from "../../src/lib/i18n";
 
 export function b64url(b: Uint8Array): string {
   return toBase64(b).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
@@ -162,7 +163,7 @@ export interface Attestation {
 
 export async function register(req: RegisterRequest): Promise<Attestation | { error: string }> {
   const u = await unlocked();
-  if (!u) return { error: "coffre verrouillé" };
+  if (!u) return { error: t("coffre verrouillé") };
   const pair = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]);
   const pkcs8 = new Uint8Array(await crypto.subtle.exportKey("pkcs8", pair.privateKey));
   const spki = new Uint8Array(await crypto.subtle.exportKey("spki", pair.publicKey));
@@ -188,7 +189,7 @@ export async function register(req: RegisterRequest): Promise<Attestation | { er
   // Ranger : dans l'identifiant choisi, ou un nouveau dans le vault
   // personnel (le premier vault, par construction).
   const target = req.loginId ? u.located.find((l) => l.login.id === req.loginId) : undefined;
-  if (req.loginId && !target) return { error: "identifiant introuvable" };
+  if (req.loginId && !target) return { error: t("identifiant introuvable") };
   let vault: VaultView;
   let login: Login;
   let revision: number | undefined;
@@ -198,7 +199,7 @@ export async function register(req: RegisterRequest): Promise<Attestation | { er
     revision = target.revision;
   } else {
     vault = u.state.vaults.find((v) => v.kind === "personal") ?? u.state.vaults[0];
-    if (!vault) return { error: "aucun vault" };
+    if (!vault) return { error: t("aucun vault") };
     login = { id: uuid(), name: req.rpName || req.rpId, groupId: null, tags: [], username: req.userName, password: "", uris: [{ uri: `https://${req.rpId}`, match: null }], totp: null, passkeys: [passkey], passwordHistory: [] };
   }
   try {

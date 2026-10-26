@@ -19,6 +19,7 @@ import { touchWebSession } from "../lib/persist";
 import type { AutoType, Login } from "../lib/types";
 import { Eyebrow, Field, Modal } from "./ui";
 import { IconClose, IconPlus } from "./ui-icons";
+import { t } from "../lib/i18n";
 
 interface Candidate {
   vault: VaultView;
@@ -48,7 +49,7 @@ async function allLogins(vaults: VaultView[], onError: (m: string) => void): Pro
  * remontent telles quelles. */
 async function typeLogin(login: Login, sequence: string, target?: string) {
   const bridge = autoTypeBridge();
-  if (!bridge) throw new Error("La saisie automatique n'est disponible que dans l'application.");
+  if (!bridge) throw new Error(t("La saisie automatique n'est disponible que dans l'application."));
   await bridge.type(await resolveSequence(sequence, login), target);
 }
 
@@ -89,7 +90,7 @@ export function AutoTypeHost({ ctx }: { ctx: PageContext }) {
             await typeLogin(login, matches[0].sequence, request.target);
           } catch (e) {
             await bridge.focusApp();
-            error(`Saisie automatique : ${errorMessage(e)}`);
+            error(t("Saisie automatique : {0}", errorMessage(e)));
           }
           return;
         }
@@ -110,7 +111,7 @@ export function AutoTypeHost({ ctx }: { ctx: PageContext }) {
       onPick={(c, sequence) => {
         setPicker(null);
         void ask({ kind: "login", login: c.login }).then((go) => {
-          if (go) typeLogin(c.login, sequence, picker.request.target).catch((e) => ctx.error(`Saisie automatique : ${errorMessage(e)}`));
+          if (go) typeLogin(c.login, sequence, picker.request.target).catch((e) => ctx.error(t("Saisie automatique : {0}", errorMessage(e))));
         });
       }}
     />
@@ -135,13 +136,13 @@ function AutoTypePicker({ request, matches, all, onClose, onPick }: {
       .map((c) => ({ c, sequence: sequenceOf(c.login.autoType, defaultSequence) }));
   }, [query, matches, all, defaultSequence]);
   return (
-    <Modal title="Saisie automatique" onClose={onClose}>
+    <Modal title={t("Saisie automatique")} onClose={onClose}>
       <div className="space-y-3">
         <p className="text-[12.5px] text-[var(--c-text-secondary)]">
-          Pour la fenêtre <span className="font-medium text-[var(--c-text)]">« {request.title || "sans titre"} »</span>
-          {matches.length === 0 ? " : aucun identifiant ne correspond. Cherchez-en un." : ` : ${matches.length} identifiants correspondent.`}
+          {t("Pour la fenêtre")} <span className="font-medium text-[var(--c-text)]">« {request.title || t("sans titre")} »</span>
+          {matches.length === 0 ? t(" : aucun identifiant ne correspond. Cherchez-en un.") : ` : ${matches.length} identifiants correspondent.`}
         </p>
-        <input value={query} onChange={(e) => setQuery(e.target.value)} autoFocus placeholder="Chercher un identifiant…" aria-label="Chercher un identifiant" className="input" />
+        <input value={query} onChange={(e) => setQuery(e.target.value)} autoFocus placeholder={t("Chercher un identifiant…")} aria-label={t("Chercher un identifiant")} className="input" />
         <ul className="max-h-72 overflow-y-auto">
           {shown.map(({ c, sequence }) => (
             <li key={`${c.vault.id}/${c.login.id}`}>
@@ -153,9 +154,9 @@ function AutoTypePicker({ request, matches, all, onClose, onPick }: {
               </button>
             </li>
           ))}
-          {shown.length === 0 && <li className="px-2 py-1.5 text-[12px] text-[var(--c-text-muted)]">Aucun identifiant.</li>}
+          {shown.length === 0 && <li className="px-2 py-1.5 text-[12px] text-[var(--c-text-muted)]">{t("Aucun identifiant.")}</li>}
         </ul>
-        <p className="help-text">Choisi, il est tapé dans cette fenêtre — GuiVault se réduit d'abord.</p>
+        <p className="help-text">{t("Choisi, il est tapé dans cette fenêtre — GuiVault se réduit d'abord.")}</p>
       </div>
     </Modal>
   );
@@ -183,29 +184,29 @@ export function AutoTypeFields({ value, onChange }: { value: AutoType | undefine
   const seqError = at.sequence ? sequenceError(at.sequence) : null;
   return (
     <section className="space-y-2">
-      <Eyebrow>Saisie automatique</Eyebrow>
+      <Eyebrow>{t("Saisie automatique")}</Eyebrow>
       <label className="flex items-center gap-2 text-[12.5px] text-[var(--c-text)]">
         <input type="checkbox" checked={at.enabled !== false} onChange={(e) => set({ enabled: e.target.checked ? undefined : false })} />
-        Le taper dans une autre fenêtre (raccourci global, ou depuis la fiche)
+        {t("Le taper dans une autre fenêtre (raccourci global, ou depuis la fiche)")}
       </label>
       {at.enabled !== false && (
         <>
-          <Field label="Séquence" hint={`Vide : celle de l'application, ${defaultSequence}. Champs et touches : Paramètres › Saisie automatique.`}>
+          <Field label={t("Séquence")} hint={t("Vide : celle de l'application, {0}. Champs et touches : Paramètres › Saisie automatique.", defaultSequence)}>
             <input value={at.sequence ?? ""} onChange={(e) => set({ sequence: e.target.value || undefined })} placeholder={defaultSequence} spellCheck={false} className="input input-mono" />
           </Field>
           {seqError && <p className="help-text text-[var(--c-warn)]">{seqError}</p>}
-          <div role="group" aria-label="Fenêtres associées" className="space-y-1.5">
-            <span className="field-label">Fenêtres associées</span>
+          <div role="group" aria-label={t("Fenêtres associées")} className="space-y-1.5">
+            <span className="field-label">{t("Fenêtres associées")}</span>
             {windows.map((w, i) => (
               <div key={i} className="flex gap-1.5">
-                <input value={w.title} onChange={(e) => setWindow(i, { title: e.target.value })} placeholder="*Connexion*Firefox" aria-label={`Titre de la fenêtre ${i + 1}`} className="input min-w-0 flex-1" />
-                <input value={w.sequence ?? ""} onChange={(e) => setWindow(i, { sequence: e.target.value })} placeholder="séquence (facultatif)" aria-label={`Séquence pour la fenêtre ${i + 1}`} spellCheck={false} className="input input-mono min-w-0 flex-1" />
-                <button type="button" onClick={() => set({ windows: windows.filter((_, j) => j !== i).length ? windows.filter((_, j) => j !== i) : undefined })} className="btn btn-ghost btn-sm btn-icon" aria-label={`Retirer la fenêtre ${i + 1}`}><IconClose size={11} /></button>
+                <input value={w.title} onChange={(e) => setWindow(i, { title: e.target.value })} placeholder="*Connexion*Firefox" aria-label={t("Titre de la fenêtre {0}", i + 1)} className="input min-w-0 flex-1" />
+                <input value={w.sequence ?? ""} onChange={(e) => setWindow(i, { sequence: e.target.value })} placeholder={t("séquence (facultatif)")} aria-label={t("Séquence pour la fenêtre {0}", i + 1)} spellCheck={false} className="input input-mono min-w-0 flex-1" />
+                <button type="button" onClick={() => set({ windows: windows.filter((_, j) => j !== i).length ? windows.filter((_, j) => j !== i) : undefined })} className="btn btn-ghost btn-sm btn-icon" aria-label={t("Retirer la fenêtre {0}", i + 1)}><IconClose size={11} /></button>
               </div>
             ))}
-            <button type="button" onClick={() => set({ windows: [...windows, { title: "" }] })} className="btn btn-ghost btn-sm"><IconPlus size={11} /> Ajouter une fenêtre</button>
+            <button type="button" onClick={() => set({ windows: [...windows, { title: "" }] })} className="btn btn-ghost btn-sm"><IconPlus size={11} /> {t("Ajouter une fenêtre")}</button>
           </div>
-          <p className="help-text">Proposé pour une fenêtre dont le titre contient son nom, son domaine, ou un de ces motifs (* : n'importe quoi).</p>
+          <p className="help-text">{t("Proposé pour une fenêtre dont le titre contient son nom, son domaine, ou un de ces motifs (* : n'importe quoi).")}</p>
         </>
       )}
     </section>
@@ -229,7 +230,7 @@ export function AutoTypeSettings({ notify }: { notify: (m: string) => void }) {
       const next = { ...settings, hotkey: value.trim() };
       setSettings(next);
       saveAutoTypeSettings(next);
-      notify(value.trim() ? `Raccourci global : ${value.trim()}` : "Raccourci global désactivé.");
+      notify(value.trim() ? t("Raccourci global : {0}", value.trim()) : t("Raccourci global désactivé."));
     } catch (e) {
       setHotkeyError(errorMessage(e));
     }
@@ -239,48 +240,48 @@ export function AutoTypeSettings({ notify }: { notify: (m: string) => void }) {
     <section className="max-w-2xl space-y-4">
       <div className="card space-y-3 p-3">
         <div>
-          <label htmlFor="autotype-hotkey" className="text-[12.5px] text-[var(--c-text)]">Raccourci global</label>
-          <p className="help-text">Dans n'importe quelle fenêtre, GuiVault tape l'identifiant qui correspond.</p>
+          <label htmlFor="autotype-hotkey" className="text-[12.5px] text-[var(--c-text)]">{t("Raccourci global")}</label>
+          <p className="help-text">{t("Dans n'importe quelle fenêtre, GuiVault tape l'identifiant qui correspond.")}</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <input id="autotype-hotkey" value={hotkey} onChange={(e) => setHotkey(e.target.value)} placeholder="Ctrl+Alt+A" spellCheck={false} className="input input-mono w-48" />
-          <button onClick={() => void applyHotkey(hotkey)} disabled={hotkey.trim() === settings.hotkey} className="btn btn-secondary btn-sm">Appliquer</button>
-          {settings.hotkey && <button onClick={() => { setHotkey(""); void applyHotkey(""); }} className="btn btn-ghost btn-sm">Désactiver</button>}
+          <input id="autotype-hotkey" value={hotkey} onChange={(e) => setHotkey(e.target.value)} placeholder={t("Ctrl+Alt+A")} spellCheck={false} className="input input-mono w-48" />
+          <button onClick={() => void applyHotkey(hotkey)} disabled={hotkey.trim() === settings.hotkey} className="btn btn-secondary btn-sm">{t("Appliquer")}</button>
+          {settings.hotkey && <button onClick={() => { setHotkey(""); void applyHotkey(""); }} className="btn btn-ghost btn-sm">{t("Désactiver")}</button>}
         </div>
         {hotkeyError && <p className="callout callout-danger">{hotkeyError}</p>}
       </div>
 
       <div className="card space-y-2 p-3">
         <div>
-          <label htmlFor="autotype-sequence" className="text-[12.5px] text-[var(--c-text)]">Séquence par défaut</label>
-          <p className="help-text">Celle des identifiants qui n'en ont pas.</p>
+          <label htmlFor="autotype-sequence" className="text-[12.5px] text-[var(--c-text)]">{t("Séquence par défaut")}</label>
+          <p className="help-text">{t("Celle des identifiants qui n'en ont pas.")}</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <input id="autotype-sequence" value={sequence} onChange={(e) => setSequence(e.target.value)} spellCheck={false} className="input input-mono min-w-0 flex-1" />
           <button
-            onClick={() => { const next = { ...settings, defaultSequence: sequence }; setSettings(next); saveAutoTypeSettings(next); notify("Séquence par défaut enregistrée."); }}
+            onClick={() => { const next = { ...settings, defaultSequence: sequence }; setSettings(next); saveAutoTypeSettings(next); notify(t("Séquence par défaut enregistrée.")); }}
             disabled={!!seqError || sequence === settings.defaultSequence}
             className="btn btn-secondary btn-sm"
           >
-            Enregistrer
+            {t("Enregistrer")}
           </button>
-          {sequence !== DEFAULT_SEQUENCE && <button onClick={() => setSequence(DEFAULT_SEQUENCE)} className="btn btn-ghost btn-sm">Par défaut</button>}
+          {sequence !== DEFAULT_SEQUENCE && <button onClick={() => setSequence(DEFAULT_SEQUENCE)} className="btn btn-ghost btn-sm">{t("Par défaut")}</button>}
         </div>
         {seqError && <p className="help-text text-[var(--c-warn)]">{seqError}</p>}
       </div>
 
       <div className="space-y-1.5">
-        <Eyebrow>Séquences</Eyebrow>
+        <Eyebrow>{t("Séquences")}</Eyebrow>
         <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-[12px]">
-          <dt className="font-mono text-[var(--c-text)]">{"{USERNAME} {PASSWORD}"}</dt><dd className="text-[var(--c-text-secondary)]">l'utilisateur, le mot de passe</dd>
-          <dt className="font-mono text-[var(--c-text)]">{"{TITLE} {URL} {NOTES}"}</dt><dd className="text-[var(--c-text-secondary)]">le nom, la première adresse, les notes</dd>
-          <dt className="font-mono text-[var(--c-text)]">{"{TOTP}"}</dt><dd className="text-[var(--c-text-secondary)]">le code à usage unique du moment</dd>
-          <dt className="font-mono text-[var(--c-text)]">{"{S:nom}"}</dt><dd className="text-[var(--c-text-secondary)]">un champ personnalisé</dd>
-          <dt className="font-mono text-[var(--c-text)]">{"{TAB} {ENTER} {SPACE} {ESC}"}</dt><dd className="text-[var(--c-text-secondary)]">des touches — aussi {"{BACKSPACE} {DELETE} {UP} {DOWN} {LEFT} {RIGHT} {HOME} {END} {PGUP} {PGDN}"} ; {"{TAB 3}"} répète</dd>
-          <dt className="font-mono text-[var(--c-text)]">{"{DELAY 500}"}</dt><dd className="text-[var(--c-text-secondary)]">une pause, en millisecondes</dd>
-          <dt className="font-mono text-[var(--c-text)]">{"{{} {}}"}</dt><dd className="text-[var(--c-text-secondary)]">les accolades elles-mêmes ; le reste est tapé tel quel</dd>
+          <dt className="font-mono text-[var(--c-text)]">{t("{USERNAME} {PASSWORD}")}</dt><dd className="text-[var(--c-text-secondary)]">{t("l'utilisateur, le mot de passe")}</dd>
+          <dt className="font-mono text-[var(--c-text)]">{t("{TITLE} {URL} {NOTES}")}</dt><dd className="text-[var(--c-text-secondary)]">{t("le nom, la première adresse, les notes")}</dd>
+          <dt className="font-mono text-[var(--c-text)]">{"{TOTP}"}</dt><dd className="text-[var(--c-text-secondary)]">{t("le code à usage unique du moment")}</dd>
+          <dt className="font-mono text-[var(--c-text)]">{"{S:nom}"}</dt><dd className="text-[var(--c-text-secondary)]">{t("un champ personnalisé")}</dd>
+          <dt className="font-mono text-[var(--c-text)]">{t("{TAB} {ENTER} {SPACE} {ESC}")}</dt><dd className="text-[var(--c-text-secondary)]">{t("des touches — aussi")} {t("{BACKSPACE} {DELETE} {UP} {DOWN} {LEFT} {RIGHT} {HOME} {END} {PGUP} {PGDN}")} ; {t("{TAB 3}")} {t("répète")}</dd>
+          <dt className="font-mono text-[var(--c-text)]">{t("{DELAY 500}")}</dt><dd className="text-[var(--c-text-secondary)]">{t("une pause, en millisecondes")}</dd>
+          <dt className="font-mono text-[var(--c-text)]">{"{{} {}}"}</dt><dd className="text-[var(--c-text-secondary)]">{t("les accolades elles-mêmes ; le reste est tapé tel quel")}</dd>
         </dl>
-        <p className="help-text">S'arrête si la fenêtre perd le focus : rien n'est tapé ailleurs.</p>
+        <p className="help-text">{t("S'arrête si la fenêtre perd le focus : rien n'est tapé ailleurs.")}</p>
       </div>
     </section>
   );

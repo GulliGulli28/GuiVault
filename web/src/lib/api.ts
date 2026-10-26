@@ -3,6 +3,8 @@
  * blobs restent en base64, c'est `session.ts` qui chiffre et déchiffre. */
 import type { TwoFactorSite } from "./types";
 import type { AccountPasskey, AdminOverview, AdminUserInfo, AuditEntry, BackupsStatus, EmergencyGrant, EmergencyOverview, EmergencyVault, HealthResponse, ImportItemsRequest, Invitation, Item, ItemVersion, ItemsPage, KdfParams, ManifestWrite, LoginResponse, PasskeyLoginOptions, PasskeyRegistrationOptions, PreloginResponse, SecondFactorOptions, Role, SendContent, SendInfo, SendPassword, SendSummary, RegistrationInvite, ServerAttachment, ServerEvent, Session, SyncResponse, TokenPair, TotpChallenge, TrashedItem, UserLookupResponse, UserProfile, UserSettings, Vault, VaultManifest, VaultMember } from "./types";
+import { t } from "./i18n";
+import { errorText } from "./errorText";
 
 /** Une enveloppe de clé de vault pour un contact d'urgence. */
 export interface EmergencyVaultKey {
@@ -66,7 +68,7 @@ export class ApiError extends Error {
 }
 
 export function errorMessage(e: unknown): string {
-  if (e instanceof ApiError) return e.message;
+  if (e instanceof ApiError) return errorText(e.code, e.message);
   if (e instanceof Error) return e.message;
   return String(e);
 }
@@ -110,7 +112,7 @@ async function parse<T>(res: Response): Promise<T> {
   if (!res.ok) {
     const b = (body ?? {}) as Record<string, unknown>;
     const code = typeof b.code === "string" ? b.code : `http_${res.status}`;
-    const message = typeof b.message === "string" ? b.message : res.status === 429 ? "Trop de tentatives, réessayez dans un instant." : `Erreur ${res.status}`;
+    const message = typeof b.message === "string" ? b.message : res.status === 429 ? t("Trop de tentatives, réessayez dans un instant.") : t("Erreur {0}", res.status);
     const { code: _c, message: _m, ...extra } = b;
     throw new ApiError(res.status, code, message, extra);
   }
@@ -134,10 +136,10 @@ async function rawOn<T>(conn: Connection, method: string, path: string, body?: u
 async function refreshTokens(conn: Connection): Promise<void> {
   if (!conn.refreshing) {
     conn.refreshing = (async () => {
-      const t = conn.tokens;
-      if (!t) throw new ApiError(401, "unauthorized", "Session expirée");
+      const tokens = conn.tokens;
+      if (!tokens) throw new ApiError(401, "unauthorized", t("Session expirée"));
       try {
-        const pair = await rawOn<TokenPair>(conn, "POST", "/auth/refresh", { refresh_token: t.refresh }, false);
+        const pair = await rawOn<TokenPair>(conn, "POST", "/auth/refresh", { refresh_token: tokens.refresh }, false);
         putTokens(conn, pair);
       } catch (e) {
         conn.tokens = null;
@@ -394,7 +396,7 @@ export const api = Object.fromEntries(
     name,
     (...args: unknown[]) => {
       const f = active[name] as ((...a: unknown[]) => unknown) | undefined;
-      if (!f) return Promise.reject(new ApiError(501, "local_unsupported", "Pas disponible dans un coffre local."));
+      if (!f) return Promise.reject(new ApiError(501, "local_unsupported", t("Pas disponible dans un coffre local.")));
       return f(...args);
     },
   ]),

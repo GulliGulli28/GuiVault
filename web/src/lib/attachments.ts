@@ -9,6 +9,7 @@ import { fromBase64, randomBytes, toBase64, uuid } from "./bytes";
 import * as c from "./crypto";
 import { changeItem, payloadEntity, type DecodedItem, type VaultView } from "./session";
 import type { FileAttachment, Payload } from "./types";
+import { t, locale } from "./i18n";
 
 /** La taille maximale annoncée par le serveur — ou le coffre local —
  * (chiffrée) ; `0` : désactivées. Retenue par transport : passer d'un serveur
@@ -66,7 +67,7 @@ export async function downloadAttachment(vault: VaultView, a: FileAttachment, on
     onProgress?.(i + 1, count);
   }
   const size = parts.reduce((n, p) => n + p.length, 0);
-  if (size !== a.size) throw new Error(`« ${a.name} » : ${size} octets reçus au lieu de ${a.size}`);
+  if (size !== a.size) throw new Error(t("« {0} » : {1} octets reçus au lieu de {2}", a.name, size, a.size));
   return new Blob(parts as BlobPart[], { type: a.mime || "application/octet-stream" });
 }
 
@@ -120,8 +121,8 @@ export async function removeAttachment(vault: VaultView, item: DecodedItem & { o
 }
 
 export function formatSize(bytes: number): string {
-  const n = (v: number) => v.toLocaleString("fr-FR", { maximumFractionDigits: v < 10 ? 1 : 0 });
+  const n = (v: number) => v.toLocaleString(locale(), { maximumFractionDigits: v < 10 ? 1 : 0 });
   if (bytes < 1024) return `${bytes} o`;
-  if (bytes < 1024 * 1024) return `${n(bytes / 1024)} Kio`;
-  return `${n(bytes / (1024 * 1024))} Mio`;
+  if (bytes < 1024 * 1024) return t("{0} Kio", n(bytes / 1024));
+  return t("{0} Mio", n(bytes / (1024 * 1024)));
 }

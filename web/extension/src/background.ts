@@ -19,6 +19,7 @@ import { clearClipboardIfUnchanged } from "./clipboardDom";
 import * as passkeys from "./passkeys";
 import { CLIPBOARD_ALARM, LOCK_ALARM, loadItemsCache, loadSession, loadSettings, lock, noteRecentFill, parseOtpPatterns, recentFill, saveTokens, scheduleClipboardClear, takeClipboardClear } from "./store";
 import { findLogin, saveLogin } from "./vaultops";
+import { applyLanguageSetting, asLanguageSetting, t } from "../../src/lib/i18n";
 
 // Une écriture depuis ici (enregistrer une passkey) peut rafraîchir les
 // jetons : ils doivent revenir dans la session.
@@ -52,7 +53,7 @@ async function updateIcon() {
   const has = await chrome.storage.session.get("session");
   const p = has.session ? "icons/icon" : "icons/gray";
   await chrome.action.setIcon({ path: { 16: `${p}16.png`, 32: `${p}32.png`, 48: `${p}48.png`, 128: `${p}128.png` } }).catch(() => {});
-  await chrome.action.setTitle({ title: has.session ? "GuiVault" : "GuiVault — verrouillé, cliquez pour vous reconnecter" }).catch(() => {});
+  await chrome.action.setTitle({ title: has.session ? "GuiVault" : t("GuiVault — verrouillé, cliquez pour vous reconnecter") }).catch(() => {});
 }
 
 // ─── Badge ──────────────────────────────────────────────────────────────────
@@ -119,7 +120,11 @@ chrome.tabs.onUpdated.addListener((tabId, info) => {
   if (info.status === "loading") void setFormPresent(tabId, false).then(() => updateBadge(tabId));
   else if (info.url || info.status === "complete") void updateBadge(tabId);
 });
+// La langue réglée dans le popup (recopiée par lui, `main.tsx`) : celle des
+// notifications, menus et réponses d'ici.
+void chrome.storage.local.get("language").then((r) => applyLanguageSetting(asLanguageSetting(r.language)));
 chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === "local" && changes.language) applyLanguageSetting(asLanguageSetting(changes.language.newValue));
   if (area !== "session") return;
   if (changes.session || changes.items || changes.forms) void updateActiveBadges();
   if (changes.session) void updateIcon();
@@ -180,11 +185,11 @@ async function classify(urls: string[], username: string, password: string): Pro
 
 async function saveCaptured(tabId: number, vaultId: string): Promise<{ ok: true; name: string } | { ok: false; error: string }> {
   const c = await pendingFor(tabId);
-  if (!c) return { ok: false, error: "rien à enregistrer" };
+  if (!c) return { ok: false, error: t("rien à enregistrer") };
   try {
     if (c.mode === "update" && c.loginId) {
       const found = await findLogin(c.loginId);
-      if (!found) return { ok: false, error: "identifiant introuvable" };
+      if (!found) return { ok: false, error: t("identifiant introuvable") };
       const { login, revision } = found;
       const history = login.password ? [{ password: login.password, changedAt: new Date().toISOString() }, ...login.passwordHistory].slice(0, 10) : login.passwordHistory;
       await saveLogin(found.vaultId, { ...login, password: c.password, passwordHistory: history }, revision);
@@ -283,19 +288,19 @@ chrome.runtime.onMessage.addListener((msg: ToBackground | PasskeyToBackground | 
     // l'expéditeur ; l'identifiant de partie utilisatrice doit lui
     // appartenir, sinon une page pourrait signer pour un autre site.
     if (msg.type === "guivault-passkey-candidates") {
-      if (!passkeys.rpIdAllowed(msg.rpId, origin)) return reply({ error: "rpId non autorisé pour cette origine" });
+      if (!passkeys.rpIdAllowed(msg.rpId, origin)) return reply({ error: t("rpId non autorisé pour cette origine") });
       return reply({ candidates: await passkeys.candidates(msg.rpId, msg.allow) });
     }
     if (msg.type === "guivault-passkey-assert") {
-      if (!passkeys.rpIdAllowed(msg.rpId, origin)) return reply({ error: "rpId non autorisé pour cette origine" });
+      if (!passkeys.rpIdAllowed(msg.rpId, origin)) return reply({ error: t("rpId non autorisé pour cette origine") });
       return reply({ assertion: await passkeys.assert(msg.credentialId, msg.rpId, msg.challenge, origin) });
     }
     if (msg.type === "guivault-passkey-logins") {
-      if (!passkeys.rpIdAllowed(msg.rpId, origin)) return reply({ error: "rpId non autorisé pour cette origine" });
+      if (!passkeys.rpIdAllowed(msg.rpId, origin)) return reply({ error: t("rpId non autorisé pour cette origine") });
       return reply({ logins: await passkeys.loginsForRp(msg.rpId) });
     }
     if (msg.type === "guivault-passkey-register") {
-      if (!passkeys.rpIdAllowed(msg.rpId, origin)) return reply({ error: "rpId non autorisé pour cette origine" });
+      if (!passkeys.rpIdAllowed(msg.rpId, origin)) return reply({ error: t("rpId non autorisé pour cette origine") });
       const { type: _t, ...req } = msg;
       return reply({ attestation: await passkeys.register({ ...req, origin }) });
     }
@@ -349,13 +354,13 @@ chrome.runtime.onMessage.addListener((msg: ToBackground | PasskeyToBackground | 
       if (!c || !s) return reply(null);
       const vaults = s.state.vaults.filter((v) => v.role !== "reader").map((v) => ({ id: v.id, name: v.name }));
       const personal = s.state.vaults.find((v) => v.kind === "personal");
-      const host = c.parentUrl ? `${hostOf(c.parentUrl)} (formulaire de ${hostOf(c.url)})` : hostOf(c.url);
+      const host = c.parentUrl ? t("{0} (formulaire de {1})", hostOf(c.parentUrl), hostOf(c.url)) : hostOf(c.url);
       const p: Pending = { host, username: c.username, mode: c.mode, loginName: c.loginName, vaults, defaultVaultId: personal?.id ?? vaults[0]?.id ?? "" };
       return reply(p);
     }
     if (msg.type === "guivault-save-captured") {
       const tabId = sender.tab?.id;
-      if (tabId == null) return reply({ ok: false, error: "pas d'onglet" });
+      if (tabId == null) return reply({ ok: false, error: t("pas d'onglet") });
       return reply(await saveCaptured(tabId, msg.vaultId));
     }
     if (msg.type === "guivault-dismiss-captured") {
@@ -394,7 +399,7 @@ chrome.runtime.onMessage.addListener((msg: ToBackground | PasskeyToBackground | 
     }
     if (msg.type === "guivault-create-login") {
       const url = senderUrl(sender);
-      if (!sender.tab?.url || !url) return reply({ ok: false, error: "pas d'onglet" });
+      if (!sender.tab?.url || !url) return reply({ ok: false, error: t("pas d'onglet") });
       const uri = msg.uri.trim() || new URL(url).origin;
       // Créé dans un cadre d'un autre site : l'identifiant vaut aussi pour
       // la page qui l'héberge.
@@ -462,7 +467,7 @@ async function clearClipboard(hash: string) {
       await chrome.offscreen.createDocument({
         url: "offscreen.html",
         reasons: [chrome.offscreen.Reason.CLIPBOARD],
-        justification: "Effacer du presse-papiers ce qui a été copié depuis GuiVault",
+        justification: t("Effacer du presse-papiers ce qui a été copié depuis GuiVault"),
       });
     }
     await chrome.runtime.sendMessage<OffscreenMessage>({ type: "guivault-offscreen-clipboard-clear", hash });

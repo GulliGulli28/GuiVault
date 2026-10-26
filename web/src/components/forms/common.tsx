@@ -3,6 +3,7 @@ import type { VaultIndex } from "../../lib/entities";
 import { groupPath } from "../../lib/entities";
 import type { Group, Payload } from "../../lib/types";
 import { Field } from "../ui";
+import { t } from "../../lib/i18n";
 
 export { Field };
 
@@ -29,7 +30,7 @@ export function useSeed<T>(initial: T | undefined, pick: (p: Payload) => T | und
 
 /** L'enveloppe commune des formulaires : erreur en tête, boutons en pied,
  * Entrée soumet. `onSave` peut rejeter : le message s'affiche ici. */
-export function FormShell({ title, onSave, onCancel, children, saveLabel = "Enregistrer", validate }: {
+export function FormShell({ title, onSave, onCancel, children, saveLabel = t("Enregistrer"), validate }: {
   title: string;
   onSave: () => Promise<void>;
   onCancel: () => void;
@@ -68,11 +69,11 @@ export function FormShell({ title, onSave, onCancel, children, saveLabel = "Enre
     <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
       {/* Mobile (maquette `MEdition`) : Annuler · titre · Enregistrer. */}
       <div className="flex min-h-[52px] shrink-0 items-center justify-between gap-2 border-b border-[var(--c-border)] px-5 py-2 max-md:min-h-[60px] max-md:px-3 max-md:pt-[calc(0.5rem+var(--inset-top))]">
-        <button type="button" onClick={onCancel} className="shrink-0 px-1 text-[15px] text-[var(--c-accent-text)] md:hidden">Annuler</button>
+        <button type="button" onClick={onCancel} className="shrink-0 px-1 text-[15px] text-[var(--c-accent-text)] md:hidden">{t("Annuler")}</button>
         <h2 className="min-w-0 truncate text-[15px] font-semibold text-[var(--c-text)] max-md:flex-1 max-md:text-center max-md:text-[17px]">{title}</h2>
         <div className="flex shrink-0 gap-2">
-          <button type="button" onClick={onCancel} className="btn btn-ghost max-md:hidden">Annuler</button>
-          <button type="submit" disabled={busy} className="btn btn-primary max-md:h-[38px] max-md:rounded-xl max-md:text-[15px]">{busy ? "Enregistrement…" : saveLabel}</button>
+          <button type="button" onClick={onCancel} className="btn btn-ghost max-md:hidden">{t("Annuler")}</button>
+          <button type="submit" disabled={busy} className="btn btn-primary max-md:h-[38px] max-md:rounded-xl max-md:text-[15px]">{busy ? t("Enregistrement…") : saveLabel}</button>
         </div>
       </div>
       <div className="sidebar-scroll min-h-0 flex-1 overflow-y-auto px-8 pb-10 pt-6 max-md:px-4">
@@ -107,13 +108,13 @@ export function GroupSelect({ groups, value, onChange, exclude }: { groups: Grou
     .sort((a, b) => a.path.localeCompare(b.path));
   return (
     <select value={value ?? ""} onChange={(e) => onChange(e.target.value || null)} className="input">
-      <option value="">Racine</option>
+      <option value="">{t("Racine")}</option>
       {options.map((o) => <option key={o.id} value={o.id}>{o.path}</option>)}
     </select>
   );
 }
 
-export function HostSelect({ index, value, onChange, none = "Aucun", exclude, label }: { index: VaultIndex; value: string | null; onChange: (id: string | null) => void; none?: string; exclude?: string; label?: string }) {
+export function HostSelect({ index, value, onChange, none = t("Aucun"), exclude, label }: { index: VaultIndex; value: string | null; onChange: (id: string | null) => void; none?: string; exclude?: string; label?: string }) {
   return (
     <select aria-label={label} value={value ?? ""} onChange={(e) => onChange(e.target.value || null)} className="input">
       <option value="">{none}</option>
@@ -124,7 +125,7 @@ export function HostSelect({ index, value, onChange, none = "Aucun", exclude, la
 
 /** Étiquettes séparées par des virgules ou des espaces — par des virgules
  * seulement (`commas`) pour des noms qui en contiennent (dossiers). */
-export function TagsInput({ value, onChange, placeholder = "prod, web, paris", commas }: { value: string[]; onChange: (tags: string[]) => void; placeholder?: string; commas?: boolean }) {
+export function TagsInput({ value, onChange, placeholder = t("prod, web, paris"), commas }: { value: string[]; onChange: (tags: string[]) => void; placeholder?: string; commas?: boolean }) {
   const [text, setText] = useState(value.join(", "));
   return (
     <input

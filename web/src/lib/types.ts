@@ -1,3 +1,4 @@
+import { translated } from "./i18n";
 /** Types JSON de l'API (`crates/guivault-protocol`, champs en snake_case tels
  * quels) et les entités Guiterm qu'un item déchiffré contient (camelCase,
  * mêmes noms que `src/lib/types.ts` de Guiterm — c'est ce que son moteur de
@@ -439,20 +440,20 @@ export interface UserSettings {
   updated_at: string;
 }
 
-export const ROLE_LABELS: Record<Role, string> = {
+export const ROLE_LABELS: Record<Role, string> = translated({
   reader: "lecteur",
   writer: "éditeur",
   admin: "admin",
   owner: "propriétaire",
-};
+});
 
 /** Ce qu'un rôle permet, en une ligne : c'est ce qu'on choisit en invitant. */
-export const ROLE_HINTS: Record<Role, string> = {
+export const ROLE_HINTS: Record<Role, string> = translated({
   reader: "voit les hôtes et leurs identifiants, ne modifie rien",
   writer: "peut aussi ajouter, modifier et supprimer des entités",
   admin: "peut aussi inviter, retirer des membres et faire tourner la clé",
   owner: "peut aussi supprimer le vault et transférer la propriété",
-};
+});
 
 const ROLE_RANK: Record<Role, number> = { reader: 0, writer: 1, admin: 2, owner: 3 };
 export const canWrite = (r: Role) => ROLE_RANK[r] >= ROLE_RANK.writer;
@@ -821,7 +822,7 @@ export type ItemKind = Payload["kind"];
 export type SecretKind = "login" | "note" | "card" | "identity" | "aws" | "api-key";
 export const SECRET_KINDS: SecretKind[] = ["login", "note", "card", "identity", "aws", "api-key"];
 
-export const KIND_LABELS: Record<ItemKind, string> = {
+export const KIND_LABELS: Record<ItemKind, string> = translated({
   host: "hôte",
   group: "dossier",
   key: "clé",
@@ -835,9 +836,9 @@ export const KIND_LABELS: Record<ItemKind, string> = {
   aws: "accès AWS",
   "api-key": "clé d'API",
   runbook: "runbook",
-};
+});
 
-export const KIND_LABELS_PLURAL: Record<ItemKind, string> = {
+export const KIND_LABELS_PLURAL: Record<ItemKind, string> = translated({
   host: "Hôtes",
   group: "Dossiers",
   key: "Clés",
@@ -851,7 +852,7 @@ export const KIND_LABELS_PLURAL: Record<ItemKind, string> = {
   aws: "AWS",
   "api-key": "Clés d'API",
   runbook: "Runbooks",
-};
+});
 
 export const SQL_ENGINE_LABELS: Record<SqlEngine, string> = {
   mysql: "MySQL",

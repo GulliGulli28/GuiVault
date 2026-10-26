@@ -9,6 +9,7 @@ import { fromBase64, toBase64 } from "./bytes";
 import { fingerprint } from "./crypto";
 import type { AccountBlobs, KeyFrom, SessionState, VaultView } from "./session";
 import type { TokenPair, UserProfile } from "./types";
+import { translated } from "./i18n";
 
 interface StoredVault {
   id: string;
@@ -78,13 +79,13 @@ export const DEFAULT_LOCK_MINUTES = 15;
 
 /** Les délais proposés — les mêmes que dans l'extension. `0` : jamais, la
  * session ne meurt qu'avec l'onglet. */
-export const LOCK_CHOICES: { value: number; label: string }[] = [
+export const LOCK_CHOICES: { value: number; label: string }[] = translated([
   { value: 5, label: "5 minutes d'inactivité" },
   { value: 15, label: "15 minutes d'inactivité" },
   { value: 60, label: "1 heure d'inactivité" },
   { value: 480, label: "8 heures d'inactivité" },
   { value: 0, label: "À la fermeture de l'onglet" },
-];
+], ["label"]);
 
 export function loadLockMinutes(): number {
   try {

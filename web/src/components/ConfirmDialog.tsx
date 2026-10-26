@@ -1,5 +1,6 @@
 import { useEffect, type ReactNode } from "react";
 import { useModalSurface } from "../hooks/useModalSurface";
+import { t } from "../lib/i18n";
 
 interface ConfirmDialogProps {
   title: string;
@@ -14,7 +15,7 @@ interface ConfirmDialogProps {
   onCancel: () => void;
 }
 
-export function ConfirmDialog({ title, message, children, confirmLabel = "Confirmer", cancelLabel = "Annuler", danger, onConfirm, onCancel }: ConfirmDialogProps) {
+export function ConfirmDialog({ title, message, children, confirmLabel = t("Confirmer"), cancelLabel = t("Annuler"), danger, onConfirm, onCancel }: ConfirmDialogProps) {
   const { ref, dialogProps } = useModalSurface({ onClose: onCancel, label: title });
 
   // Entrée reste ici : c'est propre à cette boîte (confirmer d'un geste), là où

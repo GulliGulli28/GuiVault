@@ -38,6 +38,7 @@ import { AutofillFeeder } from "./components/AutofillSetting";
 import { SshAgentFeeder, SshAgentPrompt } from "./components/SshAgent";
 import { Toasts, useToasts } from "./components/ui";
 import { PaneHandle, usePersistedPane } from "./hooks/usePersistedPane";
+import { locale, t, useLanguage } from "./lib/i18n";
 
 /** Ce que chaque page reçoit : la session, et de quoi la recharger, notifier,
  * signaler une erreur. */
@@ -75,6 +76,9 @@ export interface PageContext {
  * page, ou, dans l'application, l'accueil qui choisit un serveur ou un
  * coffre local (`web/app`). */
 export default function App({ Welcome = LoginScreen }: { Welcome?: ComponentType<{ onSession: (s: SessionState) => void }> }) {
+  // La langue change : l'arbre sous `App` est redessiné de neuf (clé), la
+  // session et les notifications, ici, restent.
+  const lang = useLanguage();
   // La session de l'onglet d'avant rechargement, si le délai d'inactivité
   // ne l'a pas effacée — sinon on repart de la connexion, en le disant.
   const restored = useRef(loadWebSession());
@@ -106,12 +110,12 @@ export default function App({ Welcome = LoginScreen }: { Welcome?: ComponentType
   useEffect(() => {
     const updater = updaterBridge();
     if (!updater) return;
-    const t = setTimeout(() => {
+    const timer = setTimeout(() => {
       updater.check().then(({ update }) => {
-        if (update) notify(`Mise à jour disponible : ${update.version} — ${updater.external ? "Réglages" : "Paramètres › Application"}.`);
+        if (update) notify(t("Mise à jour disponible : {0} — {1}.", update.version, updater.external ? t("Réglages") : t("Paramètres › Application")));
       }).catch(() => {});
     }, 8000);
-    return () => clearTimeout(t);
+    return () => clearTimeout(timer);
   }, [notify]);
 
   // Android : l'écran se cache aux captures tant qu'un coffre est ouvert.
@@ -127,7 +131,7 @@ export default function App({ Welcome = LoginScreen }: { Welcome?: ComponentType
       if (sessionRef.current) {
         clearWebSession();
         setSession(null);
-        error("Session expirée ou révoquée : reconnectez-vous.");
+        error(t("Session expirée ou révoquée : reconnectez-vous."));
       }
     });
     return () => setSessionLostHandler(null);
@@ -139,7 +143,7 @@ export default function App({ Welcome = LoginScreen }: { Welcome?: ComponentType
     const r = restored.current;
     restored.current = null;
     if (r === "expired") {
-      error("Verrouillé après inactivité : reconnectez-vous.");
+      error(t("Verrouillé après inactivité : reconnectez-vous."));
       return;
     }
     if (!r) return;
@@ -169,7 +173,7 @@ export default function App({ Welcome = LoginScreen }: { Welcome?: ComponentType
   }, [error, notify]);
   // « Verrouiller » (barre latérale, Ctrl+L dans l'application) : les clés
   // s'effacent, la session du serveur reste ; on rouvre avec le mot de passe.
-  const lockByHand = useCallback(() => lockNow("Verrouillé.", "notify"), [lockNow]);
+  const lockByHand = useCallback(() => lockNow(t("Verrouillé."), "notify"), [lockNow]);
 
   useEffect(() => {
     if (!session) return;
@@ -186,7 +190,7 @@ export default function App({ Welcome = LoginScreen }: { Welcome?: ComponentType
           const ms = await sys.idleMs();
           if (ms !== null) idle = ms > minutes * 60_000;
         }
-        if (idle && sessionRef.current) lockNow("Verrouillé après inactivité : reconnectez-vous.");
+        if (idle && sessionRef.current) lockNow(t("Verrouillé après inactivité : reconnectez-vous."));
       })();
     }, 15_000);
     return () => {
@@ -228,7 +232,7 @@ export default function App({ Welcome = LoginScreen }: { Welcome?: ComponentType
         void reload().finally(() => setVaultTicks((t) => ({ ...t, [ev.vault_id]: (t[ev.vault_id] ?? 0) + 1 })));
       } else {
         void reload();
-        if (ev.type === "invitation_received") notify("Nouvelle invitation reçue.");
+        if (ev.type === "invitation_received") notify(t("Nouvelle invitation reçue."));
       }
     });
     return () => sub.stop();
@@ -311,7 +315,7 @@ export default function App({ Welcome = LoginScreen }: { Welcome?: ComponentType
 
   if (!ctx) {
     return (
-      <div className="app-root h-full overflow-y-auto bg-[var(--c-bg)] text-[var(--c-text)]">
+      <div key={lang} className="app-root h-full overflow-y-auto bg-[var(--c-bg)] text-[var(--c-text)]">
         <Welcome onSession={(s) => { const t = currentTokens(); if (t) saveWebSession(s, t); setSession(s); navigate({ page: "home" }); if (!s.offline) void refreshOfflineCopy(s).catch(() => {}); }} />
         <Toasts toasts={toasts} onDismiss={dismiss} />
       </div>
@@ -322,7 +326,7 @@ export default function App({ Welcome = LoginScreen }: { Welcome?: ComponentType
 
   const renderPage = (r: Route) => {
     if (booting) {
-      return <p className="p-6 text-[12.5px] text-[var(--c-text-muted)]">Reprise de la session…</p>;
+      return <p className="p-6 text-[12.5px] text-[var(--c-text-muted)]">{t("Reprise de la session…")}</p>;
     }
     switch (r.page) {
       case "home":
@@ -352,12 +356,12 @@ export default function App({ Welcome = LoginScreen }: { Welcome?: ComponentType
       case "admin":
         return <AdminPage ctx={ctx} />;
       default:
-        return <p className="p-6 text-[12.5px] text-[var(--c-text-muted)]">Aucun vault.</p>;
+        return <p className="p-6 text-[12.5px] text-[var(--c-text-muted)]">{t("Aucun vault.")}</p>;
     }
   };
 
   return (
-    <RepromptProvider session={ctx.session}>
+    <RepromptProvider key={lang} session={ctx.session}>
     <div className={`app-root flex h-full w-full overflow-hidden bg-[var(--c-bg)] text-[var(--c-text)] ${narrow ? "flex-col" : ""}`}>
       {!narrow && <Sidebar ctx={ctx} route={effective} onLogout={onLogout} onLock={lockByHand} onSearch={openSearch} width={sidebar.value} />}
       {!narrow && <PaneHandle onMouseDown={sidebar.onMouseDown} />}
@@ -366,17 +370,17 @@ export default function App({ Welcome = LoginScreen }: { Welcome?: ComponentType
           <div role="status" className="shrink-0 px-4 pt-3">
             <div className="callout callout-warn flex flex-wrap items-center gap-3 text-[12.5px]">
               <p className="min-w-0 flex-1">
-                <span className="font-medium">Hors ligne</span> — la copie de cet appareil, mise à jour le {new Date(ctx.session.offline.savedAt).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}. Lecture seule : ce qui a changé depuis sur le serveur n'y est pas.
+                <span className="font-medium">{t("Hors ligne")}</span> {t("— la copie de cet appareil, mise à jour le")} {new Date(ctx.session.offline.savedAt).toLocaleString(locale(), { dateStyle: "short", timeStyle: "short" })}{t(". Lecture seule : ce qui a changé depuis sur le serveur n'y est pas.")}
               </p>
-              <button onClick={() => void onLogout()} className="btn btn-secondary btn-sm">Se reconnecter</button>
+              <button onClick={() => void onLogout()} className="btn btn-secondary btn-sm">{t("Se reconnecter")}</button>
             </div>
           </div>
         )}
         {ctx.session.travelMode && (
           <div role="status" className="shrink-0 px-4 pt-3">
             <div className="callout callout-warn flex flex-wrap items-center gap-3 text-[12.5px]">
-              <p className="min-w-0 flex-1"><span className="font-medium">Mode voyage</span> — seuls les vaults sûrs en voyage sont sur vos appareils.</p>
-              <button onClick={() => navigate({ page: "settings", section: "securite" })} className="btn btn-secondary btn-sm">Réglages</button>
+              <p className="min-w-0 flex-1"><span className="font-medium">{t("Mode voyage")}</span> {t("— seuls les vaults sûrs en voyage sont sur vos appareils.")}</p>
+              <button onClick={() => navigate({ page: "settings", section: "securite" })} className="btn btn-secondary btn-sm">{t("Réglages")}</button>
             </div>
           </div>
         )}

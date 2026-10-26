@@ -9,6 +9,7 @@ import { EntityRow, EntityMono, EntityTags, GroupRow } from "./EntityRow";
 import { InfoTip, SettingRow } from "./ui";
 import { tileHue } from "../lib/tiles";
 import { IconCheck, IconFolder, IconMonitor, IconMoon, IconSun } from "./ui-icons";
+import { loadLanguageSetting, setLanguageSetting, t, type LanguageSetting } from "../lib/i18n";
 
 /** Synchroniser ou non les réglages de cet appareil avec le compte — un
  * choix propre à l'appareil. */
@@ -17,14 +18,14 @@ export function SettingsSyncToggle() {
   return (
     <div className="card">
       <SettingRow
-        title={<>Synchroniser entre mes appareils <InfoTip label="Ce qui est synchronisé" items={[
-          { text: "Apparence, générateur, couleurs des vaults, remplissage de l'extension." },
-          { text: "Chiffrés avec votre compte.", tone: "ok" },
-          { text: "Le délai de verrouillage reste propre à chaque appareil." },
+        title={<>{t("Synchroniser entre mes appareils")} <InfoTip label={t("Ce qui est synchronisé")} items={[
+          { text: t("Apparence, générateur, couleurs des vaults, remplissage de l'extension.") },
+          { text: t("Chiffrés avec votre compte."), tone: "ok" },
+          { text: t("Le délai de verrouillage reste propre à chaque appareil.") },
         ]} /></>}
-        desc="Ces réglages vous suivent sur chaque appareil."
+        desc={t("Ces réglages vous suivent sur chaque appareil.")}
       >
-        <button type="button" role="switch" aria-checked={on} aria-label="Synchroniser entre mes appareils" onClick={() => { setOn(!on); setSettingsSyncEnabled(!on); }} className="switch" />
+        <button type="button" role="switch" aria-checked={on} aria-label={t("Synchroniser entre mes appareils")} onClick={() => { setOn(!on); setSettingsSyncEnabled(!on); }} className="switch" />
       </SettingRow>
     </div>
   );
@@ -46,12 +47,13 @@ export function AppearanceSettings({ compact = false }: { compact?: boolean }) {
   // Changés depuis un autre appareil pendant qu'on regarde.
   useEffect(() => onSettingsApplied(() => setPrefs(loadPreferences())), []);
   const mode = resolvedMode(prefs.colorMode);
-  const modes: [ColorModeChoice, string, typeof IconMoon][] = [["dark", "Sombre", IconMoon], ["light", "Clair", IconSun], ["system", "Système", IconMonitor]];
+  const modes: [ColorModeChoice, string, typeof IconMoon][] = [["dark", t("Sombre"), IconMoon], ["light", t("Clair"), IconSun], ["system", t("Système"), IconMonitor]];
 
   return (
     <div className={compact ? "space-y-4" : "space-y-6"}>
+      <LanguageSetting compact={compact} />
       <section className="space-y-2">
-        <p className="eyebrow">Mode d'affichage</p>
+        <p className="eyebrow">{t("Mode d'affichage")}</p>
         <div className="segmented">
           {modes.map(([m, label, Icon]) => (
             <button
@@ -68,7 +70,7 @@ export function AppearanceSettings({ compact = false }: { compact?: boolean }) {
       </section>
 
       <section className="space-y-2">
-        <p className="eyebrow">Fond de l'interface</p>
+        <p className="eyebrow">{t("Fond de l'interface")}</p>
         {/* Un échantillon par fond : les trois tons de surface tels qu'ils se
             superposent, pas une pilule colorée. Les fonds clairs ont leur
             teinte et leur nom propres — ce ne sont pas les fonds sombres
@@ -101,7 +103,7 @@ export function AppearanceSettings({ compact = false }: { compact?: boolean }) {
       </section>
 
       <section className="space-y-2">
-        <p className="eyebrow">Couleur d'accent</p>
+        <p className="eyebrow">{t("Couleur d'accent")}</p>
         <div className="flex flex-wrap items-center gap-2">
           {(Object.entries(ACCENT_COLORS) as [UiAccent, typeof ACCENT_COLORS[UiAccent]][]).map(([key, color]) => {
             const active = prefs.uiAccent === key;
@@ -124,7 +126,7 @@ export function AppearanceSettings({ compact = false }: { compact?: boolean }) {
               pastille qui montre la couleur choisie. Choisir dans le
               sélecteur active la couleur libre. */}
           <label
-            title="Couleur personnalisée"
+            title={t("Couleur personnalisée")}
             className={`relative flex h-7 w-7 cursor-pointer items-center justify-center rounded-full text-white transition-transform hover:scale-110 ${prefs.uiAccent === "custom" ? "ring-2 ring-[var(--c-text)] ring-offset-2 ring-offset-[var(--c-bg2)]" : ""}`}
             style={{ background: prefs.uiAccent === "custom" ? prefs.uiAccentCustom : "conic-gradient(#ef4444, #f59e0b, #22c55e, #06b6d4, #2563eb, #a855f7, #ef4444)" }}
           >
@@ -132,55 +134,55 @@ export function AppearanceSettings({ compact = false }: { compact?: boolean }) {
               type="color"
               value={prefs.uiAccentCustom}
               onChange={(e) => update({ ...prefs, uiAccent: "custom", uiAccentCustom: e.target.value })}
-              aria-label="Couleur personnalisée"
+              aria-label={t("Couleur personnalisée")}
               className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
             />
             {prefs.uiAccent === "custom" && <IconCheck size={13} />}
           </label>
           <span className="ml-1 flex items-center gap-2 text-[12px] text-[var(--c-text-secondary)]">
             {prefs.uiAccent === "custom"
-              ? <><span>Personnalisée</span><span className="kbd">{prefs.uiAccentCustom.toUpperCase()}</span></>
+              ? <><span>{t("Personnalisée")}</span><span className="kbd">{prefs.uiAccentCustom.toUpperCase()}</span></>
               : ACCENT_COLORS[prefs.uiAccent].label}
           </span>
         </div>
       </section>
 
       <section className="space-y-2">
-        <p className="eyebrow">Police de l'interface</p>
+        <p className="eyebrow">{t("Police de l'interface")}</p>
         <select
           value={prefs.uiFontFamily}
           onChange={(e) => update({ ...prefs, uiFontFamily: e.target.value })}
-          aria-label="Police de l'interface"
+          aria-label={t("Police de l'interface")}
           className="input w-full max-w-xs"
         >
           {UI_FONT_FAMILIES.map((f) => (
             <option key={f.value} value={f.value}>{f.label}</option>
           ))}
         </select>
-        {!compact && <p className="help-text">Les valeurs (adresses, mots de passe, clés) restent en chasse fixe.</p>}
+        {!compact && <p className="help-text">{t("Les valeurs (adresses, mots de passe, clés) restent en chasse fixe.")}</p>}
       </section>
 
       <section className="space-y-3">
-        <p className="eyebrow">Lignes de la liste</p>
+        <p className="eyebrow">{t("Lignes de la liste")}</p>
         <div className={`grid gap-4 ${compact ? "grid-cols-2" : "max-w-md grid-cols-2"}`}>
           <Slider
-            label="Texte"
+            label={t("Texte")}
             value={prefs.hostRowSize}
             shown={hostRowMetrics(prefs.hostRowSize, prefs.hostRowIconSize).font}
             min={HOST_ROW_SIZE_MIN}
             max={HOST_ROW_SIZE_MAX}
             step={0.5}
-            aria="Taille du texte des lignes"
+            aria={t("Taille du texte des lignes")}
             onChange={(v) => update({ ...prefs, hostRowSize: v })}
           />
           <Slider
-            label="Icône"
+            label={t("Icône")}
             value={prefs.hostRowIconSize}
             shown={hostRowMetrics(prefs.hostRowSize, prefs.hostRowIconSize).icon}
             min={HOST_ROW_ICON_MIN}
             max={HOST_ROW_ICON_MAX}
             step={1}
-            aria="Taille de l'icône des lignes"
+            aria={t("Taille de l'icône des lignes")}
             onChange={(v) => update({ ...prefs, hostRowIconSize: v })}
           />
         </div>
@@ -190,37 +192,37 @@ export function AppearanceSettings({ compact = false }: { compact?: boolean }) {
                 dans les listes, pas une imitation. */}
             <div className="card max-w-md px-2 py-1.5">
               <EntityRow
-                tile={<span className="tile" style={{ "--tile-size": "var(--entity-icon)", "--tile-h": tileHue("GitHub") } as React.CSSProperties}>G</span>}
+                tile={<span className="tile" style={{ "--tile-size": "var(--entity-icon)", "--tile-h": tileHue("GitHub") } as React.CSSProperties}>{t("G")}</span>}
                 title="GitHub"
-                secondary={<><EntityMono>alice@github.com</EntityMono><EntityTags tags={["travail"]} /></>}
+                secondary={<><EntityMono>{t("alice@github.com")}</EntityMono><EntityTags tags={["travail"]} /></>}
               />
             </div>
-            <p className="help-text">Pour toutes les lignes d'éléments.</p>
+            <p className="help-text">{t("Pour toutes les lignes d'éléments.")}</p>
           </>
         )}
       </section>
 
       <section className="space-y-3">
-        <p className="eyebrow">Dossiers de la liste</p>
+        <p className="eyebrow">{t("Dossiers de la liste")}</p>
         <div className={`grid gap-4 ${compact ? "grid-cols-2" : "max-w-md grid-cols-2"}`}>
           <Slider
-            label="Texte"
+            label={t("Texte")}
             value={prefs.hostGroupSize}
             shown={hostGroupMetrics(prefs.hostGroupSize, prefs.hostGroupIconSize).font}
             min={HOST_GROUP_SIZE_MIN}
             max={HOST_GROUP_SIZE_MAX}
             step={0.5}
-            aria="Taille du texte des dossiers"
+            aria={t("Taille du texte des dossiers")}
             onChange={(v) => update({ ...prefs, hostGroupSize: v })}
           />
           <Slider
-            label="Icône"
+            label={t("Icône")}
             value={prefs.hostGroupIconSize}
             shown={hostGroupMetrics(prefs.hostGroupSize, prefs.hostGroupIconSize).icon}
             min={HOST_GROUP_ICON_MIN}
             max={HOST_GROUP_ICON_MAX}
             step={1}
-            aria="Taille de l'icône des dossiers"
+            aria={t("Taille de l'icône des dossiers")}
             onChange={(v) => update({ ...prefs, hostGroupIconSize: v })}
           />
         </div>
@@ -245,8 +247,39 @@ function Slider({ label, value, shown, min, max, step, aria, onChange }: {
       </span>
       <input type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(Number(e.target.value))} aria-label={aria} className="w-full" />
       <span className="flex justify-between text-[11px] text-[var(--c-text-faint)]">
-        <span>{min} px</span><span>{max} px</span>
+        <span>{min} {t("px")}</span><span>{max} {t("px")}</span>
       </span>
     </label>
+  );
+}
+
+/** La langue de l'interface, sur cet appareil : celle du système, ou une
+ * des deux. Les noms des langues restent dans leur langue. */
+function LanguageSetting({ compact }: { compact: boolean }) {
+  const [setting, setSetting] = useState<LanguageSetting>(loadLanguageSetting);
+  const choices: [LanguageSetting, string][] = [["system", t("Système")], ["fr", "Français"], ["en", "English"]];
+  return (
+    <section className="space-y-2">
+      <p className="eyebrow">{t("Langue")}</p>
+      <div className="segmented" role="radiogroup" aria-label={t("Langue")}>
+        {choices.map(([value, label]) => (
+          <button
+            key={value}
+            type="button"
+            role="radio"
+            aria-checked={setting === value}
+            lang={value === "system" ? undefined : value}
+            onClick={() => {
+              setSetting(value);
+              setLanguageSetting(value);
+            }}
+            data-active={setting === value ? "true" : undefined}
+            className={compact ? "min-w-[4.5rem]" : "min-w-[6rem]"}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+    </section>
   );
 }

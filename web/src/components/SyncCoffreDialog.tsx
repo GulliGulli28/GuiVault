@@ -8,15 +8,16 @@ import { syncWithCopy, type SyncReport } from "../lib/coffreSync";
 import { coffreName } from "../lib/localHost";
 import { coffreBridge } from "../lib/platform";
 import { Modal, PasswordInput } from "./ui";
+import { t, plural } from "../lib/i18n";
 
 function summary(r: SyncReport): string {
   if (r.error) return r.error;
-  if (r.copied === "here") return "Copié ici depuis la copie";
-  if (r.copied === "there") return "Copié dans la copie";
-  if (r.here === 0 && r.there === 0) return "Déjà identiques";
+  if (r.copied === "here") return t("Copié ici depuis la copie");
+  if (r.copied === "there") return t("Copié dans la copie");
+  if (r.here === 0 && r.there === 0) return t("Déjà identiques");
   const parts = [];
-  if (r.here > 0) parts.push(`${r.here} reçu${r.here > 1 ? "s" : ""} ici`);
-  if (r.there > 0) parts.push(`${r.there} envoyé${r.there > 1 ? "s" : ""} à la copie`);
+  if (r.here > 0) parts.push(plural(r.here, "{0} reçu ici", "{0} reçus ici"));
+  if (r.there > 0) parts.push(plural(r.there, "{0} envoyé à la copie", "{0} envoyés à la copie"));
   return parts.join(", ");
 }
 
@@ -55,7 +56,7 @@ export function SyncCoffreDialog({ ctx, onClose }: { ctx: PageContext; onClose: 
   if (reports) {
     const conflicts = reports.reduce((n, r) => n + r.conflicts, 0);
     return (
-      <Modal title="Synchronisation terminée" onClose={close}>
+      <Modal title={t("Synchronisation terminée")} onClose={close}>
         <div className="flex flex-col gap-3">
           <ul className="flex flex-col gap-1.5">
             {reports.map((r) => (
@@ -67,11 +68,11 @@ export function SyncCoffreDialog({ ctx, onClose }: { ctx: PageContext; onClose: 
           </ul>
           {conflicts > 0 && (
             <p className="callout callout-warn">
-              {conflicts} élément{conflicts > 1 ? "s" : ""} modifié{conflicts > 1 ? "s" : ""} des deux côtés : la version la plus récente l'emporte, l'autre reste dans l'historique de l'élément.
+              {plural(conflicts, "{0} élément modifié des deux côtés : la version la plus récente l'emporte, l'autre reste dans l'historique de l'élément.", "{0} éléments modifiés des deux côtés : la version la plus récente l'emporte, l'autre reste dans l'historique de l'élément.")}
             </p>
           )}
           <div className="flex justify-end">
-            <button type="button" onClick={onClose} className="btn btn-primary">Fermer</button>
+            <button type="button" onClick={onClose} className="btn btn-primary">{t("Fermer")}</button>
           </div>
         </div>
       </Modal>
@@ -79,23 +80,23 @@ export function SyncCoffreDialog({ ctx, onClose }: { ctx: PageContext; onClose: 
   }
 
   return (
-    <Modal title="Synchroniser avec une copie" onClose={close}>
+    <Modal title={t("Synchroniser avec une copie")} onClose={close}>
       <form onSubmit={submit} className="flex flex-col gap-4">
         <div className="flex min-w-0 items-center gap-2">
-          <button type="button" onClick={() => void pick()} className="btn btn-secondary shrink-0">Choisir la copie…</button>
-          <span className="min-w-0 truncate text-[13px] text-[var(--c-text-muted)]" title={path ?? undefined}>{path ? coffreName(path) : "Aucune copie choisie"}</span>
+          <button type="button" onClick={() => void pick()} className="btn btn-secondary shrink-0">{t("Choisir la copie…")}</button>
+          <span className="min-w-0 truncate text-[13px] text-[var(--c-text-muted)]" title={path ?? undefined}>{path ? coffreName(path) : t("Aucune copie choisie")}</span>
         </div>
         <div>
           <label className="block">
-            <span className="field-label">Mot de passe maître de la copie</span>
+            <span className="field-label">{t("Mot de passe maître de la copie")}</span>
             <PasswordInput value={password} onChange={setPassword} autoComplete="current-password" />
           </label>
-          <p className="help-text">Le même, s'il n'a pas changé depuis la copie.</p>
+          <p className="help-text">{t("Le même, s'il n'a pas changé depuis la copie.")}</p>
         </div>
         {error && <p className="callout callout-danger">{error}</p>}
         <div className="flex justify-end gap-2">
-          <button type="button" onClick={close} disabled={busy} className="btn btn-ghost">Annuler</button>
-          <button type="submit" disabled={!path || !password || busy} className="btn btn-primary">{busy ? "Synchronisation…" : "Synchroniser"}</button>
+          <button type="button" onClick={close} disabled={busy} className="btn btn-ghost">{t("Annuler")}</button>
+          <button type="submit" disabled={!path || !password || busy} className="btn btn-primary">{busy ? t("Synchronisation…") : t("Synchroniser")}</button>
         </div>
       </form>
     </Modal>

@@ -10,6 +10,7 @@ import { check, type Update } from "@tauri-apps/plugin-updater";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { setUpdaterBridge } from "../../src/lib/platform";
 import { latestAppRelease, newer, type GithubRelease } from "../../src/lib/version";
+import { t } from "../../src/lib/i18n";
 
 // Un mandataire peut garder un `latest.json` en cache : on le lui interdit.
 const noCache = { headers: { "Cache-Control": "no-cache", Pragma: "no-cache" } };
@@ -30,7 +31,7 @@ export function installUpdater() {
       return { update: null, advertised };
     },
     async install(onProgress) {
-      if (!pending) throw new Error("Aucune mise à jour à installer : vérifiez d'abord.");
+      if (!pending) throw new Error(t("Aucune mise à jour à installer : vérifiez d'abord."));
       let total: number | null = null;
       let done = 0;
       await pending.downloadAndInstall((e) => {
@@ -59,7 +60,7 @@ export function installUpdateNotice() {
     external: true,
     async check() {
       const res = await fetch(RELEASES, { headers: { Accept: "application/vnd.github+json" }, cache: "no-store" });
-      if (!res.ok) throw new Error(`GitHub répond ${res.status}`);
+      if (!res.ok) throw new Error(t("GitHub répond {0}", res.status));
       const releases = (await res.json()) as GithubRelease[];
       const latest = latestAppRelease(releases);
       if (!latest) return { update: null, advertised: null };
@@ -70,7 +71,7 @@ export function installUpdateNotice() {
       return { update: { version, notes: latest.body, date: latest.published_at }, advertised: version };
     },
     async install() {
-      if (!page) throw new Error("Aucune version à télécharger : vérifiez d'abord.");
+      if (!page) throw new Error(t("Aucune version à télécharger : vérifiez d'abord."));
       await openUrl(page);
     },
   });

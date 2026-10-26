@@ -10,6 +10,7 @@ import { EntityMono, EntityRow, EntityTags, GroupRow } from "./EntityRow";
 import { HostIcon, hasIcon } from "./icons";
 import { IconApiKey, IconCard, IconIdentity, IconLogin, IconNote, IconStar } from "./secret-icons";
 import { IconCloud, IconDatabase, IconFolder, IconFolderFilled, IconHosts, IconKeychain, IconPalette, IconRunbook, IconSnippets } from "./ui-icons";
+import { t } from "../lib/i18n";
 
 export const KIND_ICONS: Record<GuiVaultEntityKind, (p: { size?: number; className?: string }) => ReactNode> = {
   host: IconHosts,
@@ -109,8 +110,8 @@ function FolderNameInput({ depth, initial, onSubmit, onCancel }: { depth: number
           if (e.key === "Escape") { e.preventDefault(); done(false); }
         }}
         onBlur={() => done(true)}
-        placeholder="Nom du dossier"
-        aria-label="Nom du dossier"
+        placeholder={t("Nom du dossier")}
+        aria-label={t("Nom du dossier")}
         className="input h-7 min-w-0 flex-1"
       />
     </div>
@@ -126,7 +127,7 @@ function FolderNameInput({ depth, initial, onSubmit, onCancel }: { depth: number
  * élément, sous-dossier, renommer), dossier nommé sur place, et
  * glisser-déposer d'un élément ou d'un dossier dans un autre — ou sur la
  * bande « racine » qui apparaît pendant le glisser. */
-export function ItemTree({ entities, customIcons = [], query, selected, onSelect, emptyMessage = "Rien ici pour l'instant.", rowActions, folderActions, naming, onName, onNameCancel, onMove, sort = "name", keyboard = false, alerts }: {
+export function ItemTree({ entities, customIcons = [], query, selected, onSelect, emptyMessage = t("Rien ici pour l'instant."), rowActions, folderActions, naming, onName, onNameCancel, onMove, sort = "name", keyboard = false, alerts }: {
   entities: GuiVaultEntity[];
   /** Éléments signalés (id → raison), par exemple par le manifeste du vault :
    * une étiquette rouge sur leur ligne. */
@@ -255,7 +256,7 @@ export function ItemTree({ entities, customIcons = [], query, selected, onSelect
     return (
       <div>
         {naming?.mode === "create" && nameInput(0)}
-        <p className="px-2 py-6 text-center text-[12px] text-[var(--c-text-muted)]">{query ? "Rien ne correspond." : emptyMessage}</p>
+        <p className="px-2 py-6 text-center text-[12px] text-[var(--c-text-muted)]">{query ? t("Rien ne correspond.") : emptyMessage}</p>
       </div>
     );
   }
@@ -264,7 +265,7 @@ export function ItemTree({ entities, customIcons = [], query, selected, onSelect
     <div>
       {dragId && (
         <div {...dropProps(null)} className={`mb-1 flex items-center justify-center rounded-md border border-dashed border-[var(--c-border-strong)] px-2 py-1.5 text-[11px] text-[var(--c-text-muted)] ${dropClass(null)}`}>
-          Déposer ici pour ranger à la racine
+          {t("Déposer ici pour ranger à la racine")}
         </div>
       )}
       {naming?.mode === "create" && naming.parentId === null && nameInput(0)}
@@ -285,7 +286,7 @@ export function ItemTree({ entities, customIcons = [], query, selected, onSelect
                 count={row.keys.length - 1}
                 badge={alerts?.has(row.entity.id) ? <AlertTag reason={alerts.get(row.entity.id)!} /> : undefined}
                 actions={folderActions ? folderActions(row.entity) : (
-                  <button onClick={() => onSelect(row.entity.id)} className={`btn btn-ghost btn-sm ${selected === row.entity.id ? "btn-toggled" : ""}`} title="Ouvrir le dossier">ouvrir</button>
+                  <button onClick={() => onSelect(row.entity.id)} className={`btn btn-ghost btn-sm ${selected === row.entity.id ? "btn-toggled" : ""}`} title={t("Ouvrir le dossier")}>{t("ouvrir")}</button>
                 )}
               />
               {naming?.mode === "create" && naming.parentId === row.entity.id && !collapsed.has(row.id) && nameInput(row.depth + 1)}
@@ -336,5 +337,5 @@ export function ItemTree({ entities, customIcons = [], query, selected, onSelect
 /** L'étiquette d'un élément signalé (`alerts`) ; la raison au survol et pour
  * les lecteurs d'écran. */
 function AlertTag({ reason }: { reason: string }) {
-  return <span className="tag" style={{ color: "var(--c-danger)" }} title={reason}>écart<span className="sr-only"> : {reason}</span></span>;
+  return <span className="tag" style={{ color: "var(--c-danger)" }} title={reason}>{t("écart")}<span className="sr-only"> : {reason}</span></span>;
 }

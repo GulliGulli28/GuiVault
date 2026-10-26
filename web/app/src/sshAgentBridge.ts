@@ -5,6 +5,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { setSshAgentBridge, type SshAgentRequest } from "../../src/lib/platform";
+import { t } from "../../src/lib/i18n";
 
 type Question = { id: number; request: Omit<SshAgentRequest, "id"> };
 
@@ -25,7 +26,7 @@ export async function installSshAgent(): Promise<void> {
   setSshAgentBridge({
     status: () => invoke("ssh_agent_status"),
     start: () => invoke<{ running: boolean; endpoint: string }>("ssh_agent_start").catch((e) => {
-      throw Object.assign(new Error(e === "agent_busy" ? "Le tube de l'agent OpenSSH est déjà pris : arrêtez le service « OpenSSH Authentication Agent » de Windows." : String(e)), { code: e === "agent_busy" ? "agent_busy" : undefined });
+      throw Object.assign(new Error(e === "agent_busy" ? t("Le tube de l'agent OpenSSH est déjà pris : arrêtez le service « OpenSSH Authentication Agent » de Windows.") : String(e)), { code: e === "agent_busy" ? "agent_busy" : undefined });
     }),
     stop: () => invoke<void>("ssh_agent_stop"),
     setKeys: (keys) => invoke("ssh_agent_set_keys", { keys }),

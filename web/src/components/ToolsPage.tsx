@@ -13,6 +13,7 @@ import { canWrite, KIND_LABELS_PLURAL, type ItemKind } from "../lib/types";
 import { PasswordStrength } from "./PasswordStrength";
 import { GroupSelect } from "./forms/common";
 import { Field, FileButton, InfoTip, PasswordInput } from "./ui";
+import { plural, t } from "../lib/i18n";
 
 /** Import et export d'un vault. L'import lit le fichier dans le navigateur,
  * montre ce qu'il contient, puis chiffre et envoie item par item ; l'export
@@ -20,7 +21,7 @@ import { Field, FileButton, InfoTip, PasswordInput } from "./ui";
  * ou protégé par un mot de passe. */
 export function ToolsPage({ ctx, vaultId }: { ctx: PageContext; vaultId: string }) {
   const vault = findVault(ctx.session, vaultId);
-  if (!vault) return <p className="p-6 text-[12.5px] text-[var(--c-text-muted)]">Ce vault n'existe pas (ou plus).</p>;
+  if (!vault) return <p className="p-6 text-[12.5px] text-[var(--c-text-muted)]">{t("Ce vault n'existe pas (ou plus).")}</p>;
   return <Body key={vault.id} ctx={ctx} vault={vault} />;
 }
 
@@ -34,11 +35,11 @@ function Body({ ctx, vault }: { ctx: PageContext; vault: VaultView }) {
   const writable = canWrite(vault.role);
 
   return (
-    <Page title={writable ? "Importer ou exporter" : "Exporter"} sub={vault.name} back={{ label: vault.name, route: { page: "vault", id: vault.id } }} width="max-w-[760px]">
+    <Page title={writable ? t("Importer ou exporter") : t("Exporter")} sub={vault.name} back={{ label: vault.name, route: { page: "vault", id: vault.id } }} width="max-w-[760px]">
       {writable ? (
         <ImportSection ctx={ctx} vault={vault} groups={index.groups} onDone={reload} />
       ) : (
-        <p className="callout">{vault.emergency ? `Confié par ${vault.emergency.grantor} : lecture seule, l'export reste possible.` : "Lecteur de ce vault : l'export reste possible."}</p>
+        <p className="callout">{vault.emergency ? t("Confié par {0} : lecture seule, l'export reste possible.", vault.emergency.grantor) : t("Lecteur de ce vault : l'export reste possible.")}</p>
       )}
       <ExportSection ctx={ctx} vault={vault} items={items} />
     </Page>
@@ -138,61 +139,61 @@ function ImportSection({ ctx, vault, groups, onDone }: { ctx: PageContext; vault
     setProgress(null);
     setResult(null);
     setContent(null);
-    if (filesSkipped.length) ctx.error(`${filesSkipped.length} pièce(s) jointe(s) non importée(s) — ${limit ? "trop grosse(s) pour ce serveur" : "désactivées ici"} : ${filesSkipped.slice(0, 5).join(", ")}${filesSkipped.length > 5 ? "…" : ""}`);
-    ctx.notify(`${payloads.length} élément(s) importé(s)${created.length ? ` (${created.length} dossier(s) créé(s))` : ""}${filesDone ? `, ${filesDone} pièce(s) jointe(s)` : ""}${failed ? `, ${failed} écriture(s) en échec` : ""}.`);
+    if (filesSkipped.length) ctx.error(t("{0} pièce(s) jointe(s) non importée(s) — {1} : {2}{3}", filesSkipped.length, limit ? t("trop grosse(s) pour ce serveur") : t("désactivées ici"), filesSkipped.slice(0, 5).join(", "), filesSkipped.length > 5 ? "…" : ""));
+    ctx.notify(t("{0} élément(s) importé(s){1}{2}{3}.", payloads.length, created.length ? t(" ({0} dossier(s) créé(s))", created.length) : "", filesDone ? t(", {0} pièce(s) jointe(s)", filesDone) : "", failed ? t(", {0} écriture(s) en échec", failed) : ""));
     await onDone();
   };
 
   return (
     <section className="flex flex-col gap-3">
-      <h2 className="section-title">Importer</h2>
+      <h2 className="section-title">{t("Importer")}</h2>
       <div className="card flex flex-col items-center gap-2 border-dashed px-5 py-7 text-center">
-        <FileButton label="Choisir un fichier" accept=".kdbx,.json,.csv,.txt,application/json,text/csv" small={false} onFile={(f) => void onFile(f)} />
+        <FileButton label={t("Choisir un fichier")} accept=".kdbx,.json,.csv,.txt,application/json,text/csv" small={false} onFile={(f) => void onFile(f)} />
         <p className="flex flex-wrap items-center justify-center gap-1.5 text-[12.5px] text-[var(--c-text-muted)]">
-          KeePass, Bitwarden, Chrome, Firefox, LastPass, GuiVault · lu ici, rien ne part en clair
-          <InfoTip label="Formats reconnus" items={[
-            { text: "KeePass et KeePassXC : base .kdbx, pièces jointes et historique compris." },
-            { text: "Bitwarden : JSON (en clair ou protégé) et CSV." },
-            { text: "Chrome, Firefox, LastPass, KeePassXC : CSV. Et les exports GuiVault." },
+          {t("KeePass, Bitwarden, Chrome, Firefox, LastPass, GuiVault · lu ici, rien ne part en clair")}
+          <InfoTip label={t("Formats reconnus")} items={[
+            { text: t("KeePass et KeePassXC : base .kdbx, pièces jointes et historique compris.") },
+            { text: t("Bitwarden : JSON (en clair ou protégé) et CSV.") },
+            { text: t("Chrome, Firefox, LastPass, KeePassXC : CSV. Et les exports GuiVault.") },
           ]} />
         </p>
       </div>
       {needsPassword && content !== null && (
         <form onSubmit={(e) => { e.preventDefault(); void parse(content, password, keyFile?.data); }} className="callout space-y-2">
-          <p>{keePass ? `« ${filename} » est une base KeePass : son mot de passe maître, et son fichier clé si elle en a un.` : `« ${filename} » est protégé par un mot de passe.`}</p>
+          <p>{keePass ? t("« {0} » est une base KeePass : son mot de passe maître, et son fichier clé si elle en a un.", filename) : t("« {0} » est protégé par un mot de passe.", filename)}</p>
           <div className="flex gap-2">
             <PasswordInput value={password} onChange={setPassword} autoFocus autoComplete="off" className="flex-1" />
-            <button type="submit" disabled={(!password && !keyFile) || busy} className="btn btn-primary btn-sm">{busy ? "Déchiffrement…" : "Déchiffrer"}</button>
+            <button type="submit" disabled={(!password && !keyFile) || busy} className="btn btn-primary btn-sm">{busy ? t("Déchiffrement…") : t("Déchiffrer")}</button>
           </div>
           {keePass && (
             <div className="flex flex-wrap items-center gap-2">
-              <FileButton label={keyFile ? `Fichier clé : ${keyFile.name}` : "Ajouter un fichier clé…"} accept=".keyx,.key,*" onFile={(f) => { if (f) void f.arrayBuffer().then((b) => setKeyFile({ name: f.name, data: new Uint8Array(b) })); }} />
-              {keyFile && <button type="button" onClick={() => setKeyFile(null)} className="btn btn-ghost btn-sm">Retirer</button>}
+              <FileButton label={keyFile ? t("Fichier clé : {0}", keyFile.name) : t("Ajouter un fichier clé…")} accept=".keyx,.key,*" onFile={(f) => { if (f) void f.arrayBuffer().then((b) => setKeyFile({ name: f.name, data: new Uint8Array(b) })); }} />
+              {keyFile && <button type="button" onClick={() => setKeyFile(null)} className="btn btn-ghost btn-sm">{t("Retirer")}</button>}
             </div>
           )}
-          {keePass && <p className="help-text">Quelques secondes de dérivation (Argon2 ou AES-KDF).</p>}
+          {keePass && <p className="help-text">{t("Quelques secondes de dérivation (Argon2 ou AES-KDF).")}</p>}
         </form>
       )}
       {error && <p className="callout callout-danger">{error}</p>}
       {result && (
         <div className="card space-y-3 p-3">
           <p className="text-[12.5px] text-[var(--c-text)]">
-            <span className="font-medium">{filename}</span> — {result.format} : {result.items.length} élément(s)
+            <span className="font-medium">{filename}</span> — {result.format} : {result.items.length} {t("élément(s)")}
             {counts.size > 0 && <span className="text-[var(--c-text-muted)]"> ({Array.from(counts).map(([k, n]) => `${n} ${KIND_LABELS_PLURAL[k].toLowerCase()}`).join(", ")})</span>}
           </p>
           {result.warnings.length > 0 && (
             <ul className="callout callout-warn list-inside list-disc space-y-0.5">
               {result.warnings.slice(0, 10).map((w, i) => <li key={i}>{w}</li>)}
-              {result.warnings.length > 10 && <li>… et {result.warnings.length - 10} autre(s)</li>}
+              {result.warnings.length > 10 && <li>{t("… et")} {result.warnings.length - 10} {t("autre(s)")}</li>}
             </ul>
           )}
-          <Field label="Sous le dossier" hint="Les dossiers du fichier sont recréés en dessous, ou réutilisés s'ils existent déjà.">
+          <Field label={t("Sous le dossier")} hint={t("Les dossiers du fichier sont recréés en dessous, ou réutilisés s'ils existent déjà.")}>
             <GroupSelect groups={groups} value={rootId} onChange={setRootId} />
           </Field>
           <div className="flex items-center justify-end gap-2">
             {progress && <span className="text-[11.5px] text-[var(--c-text-muted)]">{progress.done} / {progress.total}</span>}
-            <button onClick={() => { setResult(null); setContent(null); }} disabled={progress !== null} className="btn btn-ghost btn-sm">Annuler</button>
-            <button onClick={() => void run()} disabled={progress !== null || result.items.length === 0} className="btn btn-primary btn-sm">{progress ? "Import…" : "Importer"}</button>
+            <button onClick={() => { setResult(null); setContent(null); }} disabled={progress !== null} className="btn btn-ghost btn-sm">{t("Annuler")}</button>
+            <button onClick={() => void run()} disabled={progress !== null || result.items.length === 0} className="btn btn-primary btn-sm">{progress ? t("Import…") : t("Importer")}</button>
           </div>
         </div>
       )}
@@ -217,7 +218,7 @@ function ExportSection({ ctx, vault, items }: { ctx: PageContext; vault: VaultVi
       if (format === "json") download(`${base}.json`, exportJson(vault, payloads));
       else if (format === "encrypted") download(`${base}.encrypted.json`, await exportEncrypted(vault, payloads, password));
       else download(`${base}.csv`, exportCsv(payloads).csv, "text/csv");
-      ctx.notify("Export téléchargé.");
+      ctx.notify(t("Export téléchargé."));
     } catch (e) {
       ctx.error(errorMessage(e));
     } finally {
@@ -230,29 +231,29 @@ function ExportSection({ ctx, vault, items }: { ctx: PageContext; vault: VaultVi
   return (
     <section className="flex flex-col gap-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="section-title">Exporter</h2>
-        <span className="text-[12.5px] text-[var(--c-text-muted)]">{items ? `${payloads.length} éléments` : "Chargement…"}{unreadable ? ` · ${unreadable} illisibles laissés de côté` : ""} · sans les pièces jointes</span>
+        <h2 className="section-title">{t("Exporter")}</h2>
+        <span className="text-[12.5px] text-[var(--c-text-muted)]">{items ? plural(payloads.length, "{0} élément", "{0} éléments") : t("Chargement…")}{unreadable ? t(" · {0} illisibles laissés de côté", unreadable) : ""} {t("· sans les pièces jointes")}</span>
       </div>
       <div className="card flex flex-col gap-4 p-5">
       <div className="segmented self-start">
-        <button type="button" data-active={format === "encrypted"} onClick={() => setFormat("encrypted")}>JSON chiffré</button>
-        <button type="button" data-active={format === "json"} onClick={() => setFormat("json")}>JSON en clair</button>
-        <button type="button" data-active={format === "csv"} onClick={() => setFormat("csv")}>CSV</button>
+        <button type="button" data-active={format === "encrypted"} onClick={() => setFormat("encrypted")}>{t("JSON chiffré")}</button>
+        <button type="button" data-active={format === "json"} onClick={() => setFormat("json")}>{t("JSON en clair")}</button>
+        <button type="button" data-active={format === "csv"} onClick={() => setFormat("csv")}>{t("CSV")}</button>
       </div>
       {format === "encrypted" && (
         <div className="space-y-2">
-          <p className="help-text">Réimportable ici avec ce mot de passe, distinct du mot de passe maître et irrécupérable.</p>
+          <p className="help-text">{t("Réimportable ici avec ce mot de passe, distinct du mot de passe maître et irrécupérable.")}</p>
           <div className="grid grid-cols-2 gap-3 max-sm:grid-cols-1">
-            <Field label="Mot de passe du fichier"><PasswordInput value={password} onChange={setPassword} autoComplete="new-password" /></Field>
-            <Field label="Confirmer"><PasswordInput value={confirm} onChange={setConfirm} autoComplete="new-password" /></Field>
+            <Field label={t("Mot de passe du fichier")}><PasswordInput value={password} onChange={setPassword} autoComplete="new-password" /></Field>
+            <Field label={t("Confirmer")}><PasswordInput value={confirm} onChange={setConfirm} autoComplete="new-password" /></Field>
           </div>
           <PasswordStrength password={password} />
         </div>
       )}
-      {format === "json" && <p className="callout callout-warn">En clair : tous les secrets y sont lisibles.</p>}
-      {format === "csv" && <p className="callout callout-warn">En clair, format Bitwarden : identifiants et notes seulement{csvSkipped ? ` (${csvSkipped} autres éléments ignorés)` : ""}.</p>}
+      {format === "json" && <p className="callout callout-warn">{t("En clair : tous les secrets y sont lisibles.")}</p>}
+      {format === "csv" && <p className="callout callout-warn">{t("En clair, format Bitwarden : identifiants et notes seulement")}{csvSkipped ? t(" ({0} autres éléments ignorés)", csvSkipped) : ""}.</p>}
       <div className="flex justify-end">
-        <button onClick={() => void run()} disabled={!ready || busy} className="btn btn-primary">{busy ? "Préparation…" : "Télécharger"}</button>
+        <button onClick={() => void run()} disabled={!ready || busy} className="btn btn-primary">{busy ? t("Préparation…") : t("Télécharger")}</button>
       </div>
       </div>
     </section>
