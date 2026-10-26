@@ -265,6 +265,50 @@ taper sur ce système — sous Linux et Android, rien n'en est montré. Les
 garde-fous (modificateurs relâchés, focus vérifié avant chaque caractère,
 texte effacé) sont dans `docs/SECURITY.md`. Linux (X11) : à faire.
 
+## Agent SSH
+
+Comme KeeAgent ou l'agent de 1Password, et repris de celui de Guiterm
+(`core/src/ssh_agent/` là-bas, `app-tauri/src/ssh_agent/` ici :
+`protocol.rs` et `purpose.rs` copiés tels quels) : `ssh`, `git`, `scp`,
+`ssh-keygen -Y sign` lancés sur le poste signent avec les clés SSH du coffre
+ouvert. Paramètres › Agent SSH (bureau seulement) : la marche, puis les clés
+à confier, une à une.
+
+- **Où il écoute** : le tube `\\.\pipe\openssh-ssh-agent` sous Windows, celui que
+  `ssh.exe` trouve sans réglage ; Git pour Windows embarque son propre
+  OpenSSH : lui donner celui de Windows (`git config --global
+  core.sshCommand C:/Windows/System32/OpenSSH/ssh.exe`, et
+  `gpg.ssh.program …/ssh-keygen.exe` pour signer ses commits). Le service « OpenSSH Authentication Agent »
+  de Windows l'occupe s'il tourne : il faut l'arrêter et le désactiver
+  (`services.msc`, ou `Stop-Service ssh-agent; Set-Service ssh-agent
+  -StartupType Disabled` en administrateur) — l'interface le dit
+  (`agent_busy`). Ailleurs (développement, tests) : une socket Unix
+  `$XDG_RUNTIME_DIR/guivault-ssh-agent.sock`.
+- **Les clés** : l'interface (`web/src/components/SshAgent.tsx`,
+  `SshAgentFeeder`) les confie au déverrouillage — texte OpenSSH et phrase
+  de passe, déchiffrés ici, gardés en mémoire seulement — et les retire au
+  verrouillage, à l'arrêt ou quand on les décoche. Format OpenSSH seulement
+  (`-----BEGIN OPENSSH PRIVATE KEY-----`, chiffrée ou non) ; un PEM ancien
+  est signalé avec la commande pour le convertir. Les **éléments protégés**
+  ne sont pas confiés (l'agent signerait sans redemander le mot de passe
+  maître), ni les vaults d'un accès d'urgence.
+- **Chaque signature est confirmée** (`SshAgentPrompt`) : ce qui est signé
+  (connexion SSH et sous quel utilisateur, avec l'empreinte du serveur
+  quand le client l'annonce et la prouve — `session-bind@openssh.com` ;
+  commit Git ; autre `SSHSIG`), quelle clé, quel programme (Windows : le
+  processus au bout du tube). « Ne plus demander pendant 10 minutes » par
+  clé, jamais pour un agent transféré. Sans réponse en 60 s : refusé.
+- **Ce qu'il refuse** : ajouter, retirer, verrouiller des clés par le
+  protocole ; l'ancien `ssh-rsa` (SHA-1). Toutes les clés confiées sont
+  présentées (l'application ne connaît pas les clés d'hôte : au-delà de
+  cinq clés, un serveur peut couper avant la bonne — n'en confier que
+  celles qui servent).
+
+Tests : unitaires dans `ssh_agent/` (dont `openssh_lists_and_signs_through_the_agent`
+: le vrai `ssh-add` et `ssh-keygen -Y sign`/`verify` contre l'agent), et le
+scénario « agent SSH » de l'E2E (clé collée dans le coffre, cochée, listée,
+signature confirmée puis vérifiée, refus, clé décochée).
+
 ## Le poste : presse-papiers, verrouillage, sauvegardes, zone de notification
 
 Ce que seule l'application sait faire passe par des ponts que l'interface

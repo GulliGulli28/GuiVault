@@ -2,10 +2,14 @@
 # workflow « Security »). Tout avis nouveau fait échouer le contrôle.
 [advisories]
 ignore = [
-    # rsa 0.9 (« Marvin Attack », fuite de temps au *déchiffrement* RSA avec
-    # une clé privée) — pas de correctif publié. Le serveur n'en fait que la
+    # rsa 0.9 (« Marvin Attack », fuite de temps des opérations à clé
+    # privée) — pas de correctif publié. Le serveur n'en fait que la
     # vérification de signatures WebAuthn RS256 (`src/webauthn.rs`), avec des
-    # clés publiques : aucun secret, rien à faire fuir. À revoir quand `rsa`
+    # clés publiques : aucun secret, rien à faire fuir. L'application
+    # (`app-tauri/src/ssh_agent/`) signe avec des clés RSA du coffre, sur le
+    # poste : toujours avec un aléa (aveuglement de `rsa`), et chaque
+    # signature est confirmée par l'utilisateur — on n'en obtient pas les
+    # milliers qu'une mesure de temps demanderait. À revoir quand `rsa`
     # publie un correctif. https://rustsec.org/advisories/RUSTSEC-2023-0071
     "RUSTSEC-2023-0071",
 

@@ -101,3 +101,35 @@ export function saveSecureScreen(on: boolean) {
     // stockage indisponible : le réglage vaut pour cette fois
   }
 }
+
+/** L'agent SSH (Paramètres › Agent SSH) : en marche ou non, et les clés
+ * (ids d'éléments) qu'on lui confie quand le coffre est ouvert. */
+export interface SshAgentSettings {
+  enabled: boolean;
+  keys: string[];
+}
+
+const SSH_AGENT_KEY = "guivault.app.sshAgent";
+/** Émis sur `window` quand le réglage change (les composants se relisent). */
+export const SSH_AGENT_CHANGED = "guivault-ssh-agent-settings";
+
+export function loadSshAgent(): SshAgentSettings {
+  try {
+    const raw = JSON.parse(localStorage.getItem(SSH_AGENT_KEY) ?? "null") as Partial<SshAgentSettings> | null;
+    return {
+      enabled: raw?.enabled === true,
+      keys: Array.isArray(raw?.keys) ? raw.keys.filter((k): k is string => typeof k === "string") : [],
+    };
+  } catch {
+    return { enabled: false, keys: [] };
+  }
+}
+
+export function saveSshAgent(s: SshAgentSettings) {
+  try {
+    localStorage.setItem(SSH_AGENT_KEY, JSON.stringify(s));
+  } catch {
+    // stockage indisponible : le réglage vaut pour cette fenêtre
+  }
+  window.dispatchEvent(new Event(SSH_AGENT_CHANGED));
+}

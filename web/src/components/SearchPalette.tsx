@@ -10,7 +10,7 @@ import { useReprompt } from "./Reprompt";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { PageContext } from "../App";
 import { errorMessage, supports } from "../lib/api";
-import { autoTypeBridge } from "../lib/platform";
+import { autoTypeBridge, sshAgentBridge } from "../lib/platform";
 import { copyText } from "../lib/clipboard";
 import { indexItems, matchesQuery, toEntities } from "../lib/entities";
 import { primarySecret, primaryUser, withArticle } from "../lib/items";
@@ -44,10 +44,11 @@ function pages(vaults: VaultView[]): Entry[] {
     { kind: "page", key: "settings-compte", label: "Paramètres — Compte", keywords: "empreinte e-mail", route: { page: "settings", section: "compte" } },
     { kind: "page", key: "settings-securite", label: "Paramètres — Sécurité", keywords: "mot de passe maître totp verrouiller presse-papiers", route: { page: "settings", section: "securite" } },
     { kind: "page", key: "settings-saisie", label: "Paramètres — Saisie automatique", keywords: "autotype keepass raccourci séquence", route: { page: "settings", section: "saisie" } },
+    { kind: "page", key: "settings-agent-ssh", label: "Paramètres — Agent SSH", keywords: "ssh agent clé git signature openssh", route: { page: "settings", section: "agent-ssh" } },
     { kind: "page", key: "settings-sessions", label: "Paramètres — Appareils connectés", keywords: "sessions journal", route: { page: "settings", section: "sessions" } },
   ];
   // Ce que ce transport (un coffre local) ou cette plateforme (le web) n'a pas.
-  const out = all.filter((p) => (p.key !== "invitations" || supports("myInvitations")) && (p.key !== "settings-sessions" || supports("sessions")) && (p.key !== "settings-saisie" || !!autoTypeBridge()));
+  const out = all.filter((p) => (p.key !== "invitations" || supports("myInvitations")) && (p.key !== "settings-sessions" || supports("sessions")) && (p.key !== "settings-saisie" || !!autoTypeBridge()) && (p.key !== "settings-agent-ssh" || !!sshAgentBridge()));
   for (const v of vaults) {
     out.push(
       { kind: "page", key: `vault-${v.id}`, label: `Ouvrir « ${v.name} »`, keywords: "vault", route: { page: "vault", id: v.id } },

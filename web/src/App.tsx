@@ -32,9 +32,10 @@ import { MobileNav, mobileTabs, rememberVault, tabOf } from "./components/Mobile
 import { NARROW, useMediaQuery } from "./hooks/useMediaQuery";
 import { clearAllItems } from "./lib/allItems";
 import { AutoTypeHost } from "./components/AutoType";
-import { autofillBridge, autoTypeBridge, bubbleBridge, screenBridge, systemBridge, updaterBridge } from "./lib/platform";
+import { autofillBridge, autoTypeBridge, bubbleBridge, screenBridge, sshAgentBridge, systemBridge, updaterBridge } from "./lib/platform";
 import { loadSecureScreen } from "./lib/appSettings";
 import { AutofillFeeder } from "./components/AutofillSetting";
+import { SshAgentFeeder, SshAgentPrompt } from "./components/SshAgent";
 import { Toasts, useToasts } from "./components/ui";
 import { PaneHandle, usePersistedPane } from "./hooks/usePersistedPane";
 
@@ -394,6 +395,8 @@ export default function App({ Welcome = LoginScreen }: { Welcome?: ComponentType
       {search && <SearchPalette ctx={ctx} onClose={closeSearch} />}
       {autoTypeBridge() && <AutoTypeHost ctx={ctx} />}
       {autofillBridge() && <AutofillFeeder ctx={ctx} />}
+      {sshAgentBridge() && <SshAgentFeeder ctx={ctx} />}
+      {sshAgentBridge() && <SshAgentPrompt />}
       <Toasts toasts={toasts} onDismiss={dismiss} />
     </div>
     </RepromptProvider>

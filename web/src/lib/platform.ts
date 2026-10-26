@@ -324,3 +324,67 @@ export function setAutofillBridge(b: AutofillBridge | null) {
 export function autofillBridge(): AutofillBridge | null {
   return autofill;
 }
+
+/** Une clé du coffre confiée à l'agent SSH : le texte OpenSSH de la clé
+ * privée et sa phrase de passe (`app-tauri/src/ssh_agent/`). */
+export interface SshAgentKey {
+  id: string;
+  name: string;
+  content: string;
+  passphrase: string | null;
+}
+
+/** Ce que l'agent a fait d'une clé confiée : son empreinte, ou pourquoi il
+ * n'a pas pu la lire. */
+export interface SshAgentKeyStatus {
+  id: string;
+  fingerprint: string | null;
+  error: string | null;
+}
+
+/** Ce qu'un programme demande de signer. */
+export type SshAgentPurpose =
+  | { kind: "sshLogin"; user: string; fingerprint: string | null }
+  | { kind: "gitSignature" }
+  | { kind: "sshsig"; namespace: string }
+  | { kind: "unknown" };
+
+/** La question posée avant chaque signature (ou une fois pour 10 minutes). */
+export interface SshAgentRequest {
+  id: number;
+  keyId: string;
+  keyName: string;
+  keyFingerprint: string;
+  purpose: SshAgentPurpose;
+  client: { pid: number | null; program: string | null };
+  /** Par un agent transféré sur un hôte distant : toujours redemandé. */
+  forwarded: boolean;
+}
+
+/** L'agent SSH de l'application (bureau) : `ssh`, `git`… signent avec les
+ * clés du coffre ouvert, après confirmation. */
+export interface SshAgentBridge {
+  /** Où l'agent écoute (Windows : le tube d'OpenSSH). */
+  status(): Promise<{ running: boolean; endpoint: string }>;
+  /** Rejette avec le code `agent_busy` si le tube est déjà pris (le service
+   * « OpenSSH Authentication Agent » de Windows). */
+  start(): Promise<{ running: boolean; endpoint: string }>;
+  stop(): Promise<void>;
+  /** Les clés du coffre ouvert ; `[]` au verrouillage. */
+  setKeys(keys: SshAgentKey[]): Promise<SshAgentKeyStatus[]>;
+  /** Appelé à chaque demande de signature ; rend de quoi se désabonner. */
+  onRequest(handler: (r: SshAgentRequest) => void): () => void;
+  /** Une demande restée sans réponse (délai écoulé) : la retirer. */
+  onCancel(handler: (id: number) => void): () => void;
+  answer(id: number, allow: boolean, remember: boolean): Promise<void>;
+}
+
+let sshAgent: SshAgentBridge | null = null;
+
+export function setSshAgentBridge(b: SshAgentBridge | null) {
+  sshAgent = b;
+}
+
+export function sshAgentBridge(): SshAgentBridge | null {
+  return sshAgent;
+}

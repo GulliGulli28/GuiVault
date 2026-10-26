@@ -27,6 +27,8 @@ mod clipboard;
 #[cfg(target_os = "android")]
 mod coffre_file;
 mod native_host;
+#[cfg(desktop)]
+mod ssh_agent;
 mod system;
 mod tray;
 
@@ -537,6 +539,8 @@ pub fn run() {
         .manage(Hotkey::default())
         .manage(tray::CloseToTray::default());
     #[cfg(desktop)]
+    let builder = builder.manage(ssh_agent::SshAgent::default());
+    #[cfg(desktop)]
     let builder = builder.invoke_handler(tauri::generate_handler![
         app_mobile,
         local_dir,
@@ -562,7 +566,12 @@ pub fn run() {
         app_autostart,
         app_browser_integration,
         app_update_advertised,
-        app_installer
+        app_installer,
+        ssh_agent::ssh_agent_start,
+        ssh_agent::ssh_agent_stop,
+        ssh_agent::ssh_agent_status,
+        ssh_agent::ssh_agent_set_keys,
+        ssh_agent::ssh_agent_answer
     ]);
     // Mobile : le coffre local ; le reste répond « indisponible » (l'interface
     // ne le propose pas).

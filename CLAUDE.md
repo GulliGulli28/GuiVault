@@ -81,6 +81,9 @@ il ne déchiffre rien : la user key reste sous la clé que seule la PRF donne).
 - `app-tauri/` — l'application (Windows d'abord, `docs/APP.md`) : Tauri 2,
   **workspace Cargo à part** (`cargo test` à la racine ne le construit pas),
   quatre commandes qui passent le coffre local à `guivault_local::rpc`.
+  L'agent SSH (`src/ssh_agent/`, `docs/APP.md` « Agent SSH ») est la seule
+  crypto de l'app : `protocol.rs`/`purpose.rs` copiés de Guiterm (à garder
+  identiques), les clés confiées par `components/SshAgent.tsx`.
   Son interface est `web/app/` (`AppWelcome` : serveur ou coffre local,
   puis `App` tel quel), construite dans `web/dist-app` par `npm run build:app`.
   Après un changement de comportement de l'app, passer `npm run test:app`

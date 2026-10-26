@@ -25,11 +25,12 @@ import { AutoTypeSettings } from "./AutoType";
 import { AppSettings } from "./AppSettings";
 import { LocalBackups } from "./LocalBackups";
 import { CoffreExport } from "./CoffreExport";
-import { autoTypeBridge, backupBridge, coffreBridge, coffreFileBridge, systemBridge } from "../lib/platform";
+import { autoTypeBridge, backupBridge, coffreBridge, coffreFileBridge, sshAgentBridge, systemBridge } from "../lib/platform";
 import { TransferDialog } from "./TransferDialog";
 import { RecoveryKit } from "./RecoveryKit";
 import { TravelSettings } from "./TravelSettings";
-import { IconChevronRight, IconKeyboard, IconMonitor, IconPalette, IconSettings, IconShield } from "./ui-icons";
+import { SshAgentSettings } from "./SshAgent";
+import { IconChevronRight, IconKeyboard, IconKeychain, IconMonitor, IconPalette, IconSettings, IconShield } from "./ui-icons";
 import { CopyButton, Fingerprint, formatAgo, formatWhen, InfoTip, Modal, PasswordInput, SettingRow } from "./ui";
 
 /** Les catégories, avec leur nom — la colonne de gauche du panneau
@@ -39,6 +40,7 @@ const CATEGORIES: { key: SettingsSection; label: string; Icon: ComponentType<{ s
   { key: "compte", label: "Compte", Icon: IconIdentity },
   { key: "securite", label: "Sécurité", Icon: IconShield },
   { key: "saisie", label: "Saisie automatique", Icon: IconKeyboard },
+  { key: "agent-ssh", label: "Agent SSH", Icon: IconKeychain },
   { key: "application", label: "Application", Icon: IconSettings },
   { key: "urgence", label: "Accès d'urgence", Icon: IconLifebuoy },
   { key: "sessions", label: "Appareils et sessions", Icon: IconMonitor },
@@ -50,6 +52,7 @@ const SUBTITLES: Record<SettingsSection, string> = {
   compte: "Votre identité et ce qui touche au compte entier.",
   securite: "Comment vous vous connectez, et quand GuiVault se verrouille.",
   saisie: "Taper un identifiant dans une autre application.",
+  "agent-ssh": "Les clés SSH du coffre pour ssh et git, sur ce poste.",
   application: "Ce que l'application fait sur ce poste.",
   urgence: "Qui peut demander l'accès à vos vaults, et après quel délai.",
   sessions: "Les appareils connectés à ce compte.",
@@ -60,7 +63,7 @@ const SUBTITLES: Record<SettingsSection, string> = {
  * sessions et le journal. */
 /** Les catégories que ce transport et cette plateforme proposent. */
 export function settingsCategories() {
-  return CATEGORIES.filter((c) => (c.key !== "urgence" || supports("emergency")) && (c.key !== "sessions" || supports("sessions")) && (c.key !== "saisie" || !!autoTypeBridge()) && (c.key !== "application" || !!systemBridge()));
+  return CATEGORIES.filter((c) => (c.key !== "urgence" || supports("emergency")) && (c.key !== "sessions" || supports("sessions")) && (c.key !== "saisie" || !!autoTypeBridge()) && (c.key !== "agent-ssh" || !!sshAgentBridge()) && (c.key !== "application" || !!systemBridge()));
 }
 
 export function SettingsPage({ ctx, section }: { ctx: PageContext; section: SettingsSection }) {
@@ -235,6 +238,8 @@ export function SettingsPage({ ctx, section }: { ctx: PageContext; section: Sett
           )}
 
           {current.key === "saisie" && <AutoTypeSettings notify={ctx.notify} />}
+
+          {current.key === "agent-ssh" && <SshAgentSettings ctx={ctx} />}
 
           {current.key === "application" && <AppSettings error={ctx.error} />}
 

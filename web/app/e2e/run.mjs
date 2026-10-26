@@ -488,6 +488,95 @@ scenario("saisie automatique : fiche, réglages, frappe réelle (Windows)", asyn
  * « é » relu côté node n'en est plus un. Sortie forcée en UTF-8, et le texte
  * à poser passé en base64 — sinon le presse-papiers de la personne qui lance
  * les tests, remis en fin de scénario, revenait abîmé. */
+/** Lance un programme OpenSSH contre l'agent ; rend sa sortie quand il
+ * termine (il peut attendre la confirmation dans la fenêtre). */
+function openssh(cmd, args, sock, input) {
+  return new Promise((resolve) => {
+    const child = spawn(cmd, args, { env: { ...process.env, SSH_AUTH_SOCK: sock }, stdio: [input ? "pipe" : "ignore", "pipe", "pipe"] });
+    let out = "";
+    let err = "";
+    child.stdout.on("data", (d) => (out += d));
+    child.stderr.on("data", (d) => (err += d));
+    if (input) child.stdin.end(input);
+    child.on("error", (e) => resolve({ code: -1, out, err: String(e) }));
+    child.on("close", (code) => resolve({ code, out, err }));
+  });
+}
+
+scenario("agent SSH : une clé du coffre, ssh-add la voit, ssh-keygen signe après confirmation", async (b) => {
+  if (!(await invoke(b, "ssh_agent_status")).ok) return "ignoré : pas d'agent SSH sur ce système";
+  if (spawnSync("ssh-keygen", ["-?"]).error) return "ignoré : OpenSSH absent du poste";
+  // Une vraie clé chiffrée, faite par ssh-keygen, rangée dans le coffre.
+  const keyFile = path.join(scratch, "id_e2e");
+  const made = spawnSync("ssh-keygen", ["-q", "-t", "ed25519", "-N", "phrase-e2e", "-C", "e2e", "-f", keyFile]);
+  assert(made.status === 0, `ssh-keygen : ${made.stderr}`);
+  await openNewMenu(b);
+  await (await b.$("//button[@role='menuitem'][normalize-space()='Clé']")).click();
+  await fillField(b, "Nom", "Clé de déploiement");
+  // Collée, comme on le ferait : taper une clé touche par touche par
+  // WebDriver la déforme.
+  const pem = readFileSync(keyFile, "utf8");
+  const area = await b.$("//label[span[normalize-space()='Contenu de la clé privée']]//textarea");
+  await b.execute((el, v) => {
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set.call(el, v);
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+  }, area, pem);
+  assert((await area.getValue()) === pem, "la clé collée n'est pas dans le champ telle quelle");
+  await fillField(b, "Passphrase (optionnelle)", "phrase-e2e");
+  await click(b, "Enregistrer");
+  await waitText(b, "Clé de déploiement");
+
+  await openSettings(b, "Agent SSH");
+  const agentSwitch = await b.$('button[role="switch"][aria-label="Agent SSH"]');
+  await agentSwitch.waitForExist({ timeout: 10_000, timeoutMsg: "Paramètres › Agent SSH absent" });
+  // Le réglage vit dans le stockage de la WebView : il peut rester d'une
+  // exécution précédente.
+  if ((await agentSwitch.getAttribute("aria-checked")) !== "true") await b.execute((el) => el.click(), agentSwitch);
+  const status = await b.waitUntil(async () => {
+    const t = await bodyText(b);
+    return t.includes("Écoute sur") || t.includes("déjà pris") ? t : false;
+  }, { timeout: 15_000, timeoutMsg: "l'agent n'a ni démarré ni dit pourquoi" });
+  if (status.includes("déjà pris")) return "ignoré : le service OpenSSH Authentication Agent de Windows occupe le tube";
+  const keySwitch = await b.$('button[role="switch"][aria-label="Confier « Clé de déploiement » à l\'agent"]');
+  await b.execute((el) => el.click(), keySwitch);
+  const pub = readFileSync(`${keyFile}.pub`, "utf8").trim().split(" ").slice(0, 2).join(" ");
+  const fingerprint = spawnSync("ssh-keygen", ["-l", "-E", "sha256", "-f", `${keyFile}.pub`]).stdout.toString().split(" ")[1];
+  await waitText(b, fingerprint);
+  const sock = (await invoke(b, "ssh_agent_status")).value.endpoint;
+
+  const listed = await openssh("ssh-add", ["-L"], sock);
+  assert(listed.out.includes(pub), `ssh-add -L ne voit pas la clé : ${listed.out}${listed.err}`);
+
+  // Signer comme git le fait : la question arrive dans la fenêtre.
+  const message = path.join(scratch, "commit.txt");
+  await writeFile(message, "un commit signé");
+  await writeFile(`${keyFile}.only.pub`, `${pub}\n`);
+  const signing = openssh("ssh-keygen", ["-Y", "sign", "-n", "git", "-f", `${keyFile}.only.pub`, message], sock);
+  await waitText(b, "Agent SSH : autoriser ?");
+  await waitText(b, "Signer un commit ou une étiquette Git");
+  await shot(b, "agent-ssh-question");
+  await click(b, "Autoriser");
+  const signed = await signing;
+  assert(signed.code === 0, `ssh-keygen -Y sign a échoué : ${signed.err}`);
+  const allowed = path.join(scratch, "allowed_signers");
+  await writeFile(allowed, `e2e ${pub}\n`);
+  const verify = await openssh("ssh-keygen", ["-Y", "verify", "-n", "git", "-I", "e2e", "-f", allowed, "-s", `${message}.sig`], sock, readFileSync(message));
+  assert(verify.code === 0, `la signature ne se vérifie pas : ${verify.err}`);
+
+  // Refuser : rien n'est signé.
+  await rm(`${message}.sig`, { force: true });
+  const refused = openssh("ssh-keygen", ["-Y", "sign", "-n", "git", "-f", `${keyFile}.only.pub`, message], sock);
+  await waitText(b, "Agent SSH : autoriser ?");
+  await click(b, "Refuser");
+  assert((await refused).code !== 0 && !existsSync(`${message}.sig`), "une signature refusée a quand même été faite");
+
+  // Décocher la clé : l'agent l'oublie ; puis l'arrêter.
+  await b.execute((el) => el.click(), keySwitch);
+  await b.waitUntil(async () => !(await openssh("ssh-add", ["-L"], sock)).out.includes(pub), { timeout: 10_000, timeoutMsg: "la clé décochée est restée dans l'agent" });
+  await b.execute((el) => el.click(), agentSwitch);
+  await (await b.$("//a[.//span[normalize-space()='Personnel']]")).click();
+});
+
 function ps(command) {
   return (powershell(`[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; ${command}`).stdout ?? "").replace(/\r?\n$/, "");
 }

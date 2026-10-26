@@ -252,6 +252,19 @@ correspondent, et la possibilité de désactiver la saisie automatique par
 identifiant. Pas encore d'« obfuscation à deux canaux » (KeePass : une
 partie par le presse-papiers).
 
+**Agent SSH** (`docs/APP.md`, « Agent SSH ») : les clés SSH cochées sont
+déchiffrées dans le processus de l'application tant que le coffre est ouvert
+(jamais écrites sur le disque), retirées au verrouillage. N'importe quel
+processus de la session peut s'adresser à l'agent (tube nommé : l'utilisateur
+et les administrateurs ; socket en `0600` ailleurs) : chaque signature est
+donc **confirmée** dans la fenêtre, avec ce qui est signé et le programme
+qui le demande ; l'accord « 10 minutes » par clé n'existe pas pour un agent
+transféré sur un serveur distant. L'agent refuse d'ajouter ou de retirer des
+clés, et le SHA-1 de `ssh-rsa`. Les éléments protégés n'y sont pas confiés.
+Un logiciel malveillant qui tourne sous la session peut demander une
+signature au mauvais moment et compter sur un clic distrait : la question
+dit quel programme demande.
+
 **Presse-papiers de l'application** (Windows) : exclu de l'historique et
 du presse-papiers cloud de Windows, effacé par l'application au délai réglé
 s'il n'a pas changé. Ce qu'une autre application lit pendant ce délai, elle

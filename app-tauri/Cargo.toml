@@ -56,6 +56,12 @@ tauri-plugin-autostart = "2"
 # contre la clé publique de `tauri.conf.json` ; relancer après installation.
 tauri-plugin-updater = { version = "2", default-features = false, features = ["rustls-tls"] }
 tauri-plugin-process = "2"
+# L'agent SSH (`src/ssh_agent/`) : lire les clés OpenSSH du coffre ouvert
+# (chiffrées ou non), signer ; le tube nommé d'OpenSSH (Windows).
+ssh-key = { version = "0.6", features = ["ed25519", "rsa", "p256", "p384", "encryption", "std"] }
+rsa = { version = "0.9", default-features = false, features = ["std", "sha2"] }
+signature = "2"
+tokio = { version = "1", features = ["net", "io-util", "sync", "time", "rt", "macros"] }
 
 # Taper dans une autre fenêtre (`SendInput`), savoir laquelle est au premier
 # plan : l'API Win32, déjà dans l'arbre de Tauri.
@@ -71,6 +77,8 @@ windows-sys = { version = "0.61", features = [
     "Win32_System_SystemInformation",
     "Win32_UI_Shell",
     "Win32_System_Registry",
+    "Win32_System_Pipes",
+    "Win32_System_Threading",
 ] }
 
 [profile.release]

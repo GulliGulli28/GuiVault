@@ -32,8 +32,7 @@ c'est ce qui sépare un projet solide d'un outil qu'on recommande.
 1. **Android, la suite du remplissage** (essayé sur un vrai téléphone le
    26 octobre) : enregistrer après une connexion, passkeys par le
    Credential Manager (§6, [`REMPLISSAGE.md`](REMPLISSAGE.md)).
-2. **Windows** (§6) : signature de code (SmartScreen), Windows Hello,
-   agent SSH.
+2. **Windows** (§6) : signature de code (SmartScreen), Windows Hello.
 3. **Le reste des cases vides**, au choix : passkey dans l'extension (§2), écrans propres à
    l'application qui n'ont eu que des textes raccourcis dans la refonte
    (`DESIGN.md`, « État »), `gv` et Guiterm sur un coffre local
@@ -338,9 +337,10 @@ L gros.
   dans Chromium (`e2e/native.spec.ts`).
 - [ ] **Déverrouillage rapide Windows Hello** (M, KeePassXC, Bitwarden) : la
   user key enveloppée sous une clé liée au TPM ; conception crypto à part.
-- [ ] **Agent SSH Windows** (M, KeePassXC, KeeAgent) : les clés du coffre
-  dans l'agent OpenSSH tant que le coffre est ouvert — l'agent de Guiterm
-  est réutilisable.
+- [x] **Agent SSH** (M, KeePassXC, KeeAgent) : les clés cochées du coffre
+  ouvert, sur le tube d'OpenSSH pour Windows, chaque signature confirmée
+  (ce qui est signé, par quel programme) — repris de l'agent de Guiterm
+  ([`APP.md`](APP.md), « Agent SSH »).
 - [x] **Copier un coffre local vers un serveur**, et l'inverse (M) : compte
   neuf ou existant, coffre neuf ou existant ; historique, corbeille et
   pièces jointes compris, reprise après coupure (`POST /vaults/{id}/import`)
