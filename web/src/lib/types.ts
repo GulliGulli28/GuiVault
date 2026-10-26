@@ -223,6 +223,8 @@ export interface Vault {
   revision: number;
   created_at: string;
   updated_at: string;
+  /** Marqué « sûr en voyage » par ce compte (`PUT /vaults/{id}/travel`). */
+  travel_safe?: boolean;
 }
 
 export interface VaultMember {
@@ -330,6 +332,8 @@ export interface SyncResponse {
   vaults: Vault[];
   invitations: Invitation[];
   server_time: string;
+  /** Mode voyage : `vaults` n'a que ceux sûrs en voyage. */
+  travel_mode?: boolean;
 }
 
 export interface AuditEntry {

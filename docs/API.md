@@ -73,6 +73,8 @@ Partout : `403 ip_not_allowed` si l'adresse du client n'est pas dans
 | `GET /events` | flux SSE de `ServerEvent` (`vault_changed`, `invitation_received`, `membership_changed`, `settings_changed`, `emergency_changed`) — dit *que* quelque chose a changé, le client resynchronise |
 | `GET /users/me` | `UserProfile` (`is_admin` : administrateur du serveur, absent sinon) |
 | `DELETE /users/me` | `{ auth_key, totp_code? }` → `204`. Supprime le compte, ses vaults (personnel et partagés dont il est le seul membre), sessions, réglages, second facteur, liens de partage, accès d'urgence (dans les deux sens) et les invitations qu'il a envoyées ; révoque celles adressées à son e-mail. Le journal d'audit garde ses lignes, sans IP. `401 invalid_credentials` (mot de passe), `400 totp_required` / `401 invalid_code` si le second facteur est actif, `409 owns_shared_vaults` `{ vaults: [id] }` tant qu'il possède un vault partagé avec d'autres membres (transférer la propriété ou le supprimer d'abord) |
+| `GET /users/me/travel` | `{ enabled }` : le mode voyage (`docs/ARCHITECTURE.md`, « Mode voyage ») |
+| `PUT /users/me/travel` | `{ enabled, auth_key? }` → `{ enabled }`. L'activer : rien d'autre ; le couper : `auth_key` exigée (`400 invalid_request` sans, `401 invalid_credentials` fausse), e-mail de sécurité. En voyage, `/sync` porte `travel_mode: true` et n'a que les vaults marqués sûrs ; les autres répondent 404 partout |
 | `GET /users/me/settings` | `UserSettings` (`{ blob, revision, updated_at }`) ou `null` si aucun appareil n'en a envoyé |
 | `PUT /users/me/settings` | `{ blob, base_revision }` → `UserSettings`, ou `409` `{ code: "revision_mismatch", current }` si `base_revision` n'est pas la dernière (`null` = « je n'en ai lu aucune »). `blob` = `seal_user_settings(user_key, json)`, 64 Kio max. Prévient les autres sessions (`settings_changed`) |
 | `GET /users/me/audit?limit=&before=` | mes actions |
@@ -93,7 +95,8 @@ Partout : `403 ip_not_allowed` si l'adresse du client n'est pas dans
 
 | | Rôle | |
 |---|---|---|
-| `GET /vaults` | membre | `[Vault]` |
+| `GET /vaults` | membre | `[Vault]` (chacun avec `travel_safe` : marqué sûr en voyage par ce compte) |
+| `PUT /vaults/{id}/travel` | membre | `{ safe }` → `Vault` : marquer le vault « sûr en voyage » pour soi. En voyage, un vault non marqué répond 404 : on ne le ré-expose qu'au retour |
 | `POST /vaults` | — | `{ id, name_enc, wrapped_vault_key }` → `201` `Vault` (créateur = owner) |
 | `GET /vaults/{id}` | membre | `Vault` |
 | `PATCH /vaults/{id}` | admin | `{ name_enc }` |

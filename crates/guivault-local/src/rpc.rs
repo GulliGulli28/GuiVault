@@ -112,6 +112,8 @@ pub fn call(vault: &LocalVault, op: &str, args: &Value) -> Result<Value> {
             vaults: vault.vaults()?,
             invitations: Vec::new(),
             server_time: chrono::Utc::now(),
+            // Un coffre local ne voyage pas : il est sur l'appareil.
+            travel_mode: false,
         }),
         "settings" => json(vault.settings()?),
         "putSettings" => json(vault.put_settings(arg::<PutUserSettingsRequest>(args, "req")?)?),

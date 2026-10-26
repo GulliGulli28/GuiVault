@@ -29,6 +29,7 @@ pub mod passkeys;
 pub mod sends;
 pub mod sync;
 pub mod totp;
+pub mod travel;
 pub mod users;
 pub mod vaults;
 pub mod well_known;
@@ -80,6 +81,8 @@ pub fn router(state: AppState) -> Router {
         .route("/events", get(events::events))
         .route("/users/me", get(users::me).delete(users::delete_me))
         .route("/users/me/settings", get(users::get_settings).put(users::put_settings))
+        .route("/users/me/travel", get(travel::status).put(travel::set))
+        .route("/vaults/{id}/travel", put(travel::set_vault))
         .route("/users/me/audit", get(audit::for_me))
         .route("/users/lookup", get(users::lookup))
         .route("/sync", get(sync::sync))

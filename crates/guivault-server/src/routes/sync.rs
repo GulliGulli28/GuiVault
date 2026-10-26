@@ -22,5 +22,6 @@ pub async fn sync(State(state): State<AppState>, user: AuthUser) -> ApiResult<Js
         vaults: vaults.into_iter().map(db::VaultRow::into_proto).collect(),
         invitations: invitations.into_iter().map(Into::into).collect(),
         server_time: Utc::now(),
+        travel_mode: super::travel::is_enabled(&state.db, user.id).await?,
     }))
 }

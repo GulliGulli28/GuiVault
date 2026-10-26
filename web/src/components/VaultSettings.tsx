@@ -101,6 +101,26 @@ function Body({ ctx, vault }: { ctx: PageContext; vault: VaultView }) {
           </div>
         </section>
 
+        {supports("setVaultTravel") && !vault.emergency && (
+          <section className="flex flex-col gap-2.5">
+            <Eyebrow>Voyage</Eyebrow>
+            <div className="card flex items-center gap-3 px-4 py-3">
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span className="text-[13.5px]">Sûr en voyage</span>
+                <span className="text-[12.5px] text-[var(--c-text-muted)]">Reste sur vos appareils en mode voyage (Paramètres › Sécurité).</span>
+              </span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={!!vault.travelSafe}
+                aria-label="Sûr en voyage"
+                onClick={() => void act("travel", () => api.setVaultTravel(vault.id, !vault.travelSafe), () => void ctx.reload())}
+                className="switch"
+              />
+            </div>
+          </section>
+        )}
+
         <section className="flex flex-col gap-2.5">
           <Eyebrow>Nom</Eyebrow>
           {renaming === null ? (

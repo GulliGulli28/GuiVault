@@ -28,6 +28,7 @@ import { CoffreExport } from "./CoffreExport";
 import { autoTypeBridge, backupBridge, coffreBridge, coffreFileBridge, systemBridge } from "../lib/platform";
 import { TransferDialog } from "./TransferDialog";
 import { RecoveryKit } from "./RecoveryKit";
+import { TravelSettings } from "./TravelSettings";
 import { IconChevronRight, IconKeyboard, IconMonitor, IconPalette, IconSettings, IconShield } from "./ui-icons";
 import { CopyButton, Fingerprint, formatAgo, formatWhen, InfoTip, Modal, PasswordInput, SettingRow } from "./ui";
 
@@ -208,6 +209,7 @@ export function SettingsPage({ ctx, section }: { ctx: PageContext; section: Sett
                 </div>
               </section>
               {supports("passkeys") && <PasskeySettings ctx={ctx} totp={totp === true} />}
+              {supports("travelStatus") && !session.offline && <TravelSettings ctx={ctx} />}
               <section className="flex flex-col gap-2.5">
                 <h2 className="eyebrow">Verrouillage</h2>
                 <div className="card">

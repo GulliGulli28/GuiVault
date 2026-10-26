@@ -31,6 +31,8 @@ export interface VaultView {
   keyFrom: KeyFrom;
   revision: number;
   updatedAt: string;
+  /** Marqué « sûr en voyage » : il reste sur les appareils en mode voyage. */
+  travelSafe?: boolean;
   /** Vault remis par un accès d'urgence (lecture seule) : la désignation, et
    * qui l'a confié. Absent pour un vault dont on est membre. */
   emergency?: { grantId: string; grantor: string };
@@ -62,6 +64,8 @@ export interface SessionState {
   /** Session ouverte sur un coffre local de l'app (`localHost.ts`) : pas de
    * serveur, `api` parle au dossier. */
   local?: { path: string };
+  /** Mode voyage : le serveur ne sert que les vaults sûrs en voyage. */
+  travelMode?: boolean;
 }
 
 /** `prelogin` + `LoginResponse`, en base64 comme l'API. */
@@ -410,7 +414,7 @@ function decodeVault(state: SessionState, v: Vault): VaultView {
   } catch {
     name = v.kind === "personal" ? "Personnel" : "(nom illisible)";
   }
-  return { id: v.id, kind: v.kind, role: v.role, name, key, keyFrom: keyFromSender(state, sender), revision: v.revision, updatedAt: v.updated_at };
+  return { id: v.id, kind: v.kind, role: v.role, name, key, keyFrom: keyFromSender(state, sender), revision: v.revision, updatedAt: v.updated_at, travelSafe: !!v.travel_safe };
 }
 
 /** Recharge vaults et invitations depuis `/sync`. Un vault dont la clé ne
@@ -422,6 +426,7 @@ export async function refresh(state: SessionState): Promise<string[]> {
   state.user = res.user;
   state.vaults = vaults;
   state.invitations = res.invitations.filter((i) => i.status === "pending");
+  state.travelMode = !!res.travel_mode;
   state.rollbacks = observeRevisions(res.user.id, vaults);
   warnings.push(...(await refreshEmergency(state)));
   return warnings;

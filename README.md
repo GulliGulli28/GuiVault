@@ -127,6 +127,9 @@ le TypeScript (et réciproquement) le vérifient à chaque build.
   transmis à quelqu'un sans compte, la clé dans le fragment du lien
   (jamais vue par le serveur), avec expiration, nombre d'ouvertures et mot
   de passe facultatif.
+- **Mode voyage** : avant une frontière, seuls les vaults marqués « sûrs en
+  voyage » restent sur vos appareils ; les autres reviennent au retour (mot
+  de passe maître redemandé).
 - **Accès d'urgence** : un proche pourra lire certains de vos vaults si
   vous ne refusez pas sa demande avant la fin d'un délai choisi ; les clés
   lui sont enveloppées côté client, le serveur ne sait que les garder.

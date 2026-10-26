@@ -5488,3 +5488,91 @@ async fn security_keys_as_second_factor() {
     assert!(listed.is_empty(), "la clé de sécurité part avec le TOTP");
     server.stop().await;
 }
+
+#[tokio::test]
+async fn travel_mode_keeps_only_the_vaults_marked_safe() {
+    let Some(server) = TestServer::start(RegistrationMode::Open).await else {
+        return;
+    };
+    let alice = User::register(&server, "alice-travel@t.io", "pw-alice").await;
+    let personal = alice.sync().await.vaults[0].clone();
+    let (work, work_key) = alice.create_vault("Travail").await;
+    let item = Uuid::new_v4();
+    status!(
+        alice.put_item(work.id, &work_key, item, "note", "{}", None).await,
+        StatusCode::CREATED
+    );
+    let travel: TravelStatus = alice.get("/users/me/travel").await;
+    assert!(!travel.enabled);
+
+    // Le vault personnel part en voyage, pas celui du travail.
+    let marked: Vault = serde_json::from_str(&status!(
+        alice
+            .req(reqwest::Method::PUT, &format!("/vaults/{}/travel", personal.id))
+            .json(&VaultTravelRequest { safe: true })
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::OK
+    ))
+    .unwrap();
+    assert!(marked.travel_safe);
+    let set = |enabled: bool, auth_key: Option<Vec<u8>>| {
+        alice
+            .req(reqwest::Method::PUT, "/users/me/travel")
+            .json(&TravelRequest { enabled, auth_key })
+            .send()
+    };
+    status!(set(true, None).await.unwrap(), StatusCode::OK);
+
+    // En voyage : le vault du travail n'existe plus pour ce compte.
+    let sync = alice.sync().await;
+    assert!(sync.travel_mode);
+    assert_eq!(sync.vaults.iter().map(|v| v.id).collect::<Vec<_>>(), [personal.id]);
+    for path in [
+        format!("/vaults/{}", work.id),
+        format!("/vaults/{}/items", work.id),
+        format!("/vaults/{}/items/{item}", work.id),
+    ] {
+        status!(
+            alice.req(reqwest::Method::GET, &path).send().await.unwrap(),
+            StatusCode::NOT_FOUND
+        );
+    }
+    // Ni écrire dedans, ni le ré-exposer avant d'être rentré.
+    status!(
+        alice
+            .put_item(work.id, &work_key, Uuid::new_v4(), "note", "{}", None)
+            .await,
+        StatusCode::NOT_FOUND
+    );
+    status!(
+        alice
+            .req(reqwest::Method::PUT, &format!("/vaults/{}/travel", work.id))
+            .json(&VaultTravelRequest { safe: true })
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::NOT_FOUND
+    );
+
+    // Le couper redemande le mot de passe maître.
+    status!(set(false, None).await.unwrap(), StatusCode::BAD_REQUEST);
+    let wrong = auth_key_of(&alice, "pas le bon").await;
+    status!(set(false, Some(wrong)).await.unwrap(), StatusCode::UNAUTHORIZED);
+    assert!(alice.sync().await.travel_mode);
+    let good = auth_key_of(&alice, "pw-alice").await;
+    status!(set(false, Some(good)).await.unwrap(), StatusCode::OK);
+    let sync = alice.sync().await;
+    assert!(!sync.travel_mode);
+    assert_eq!(sync.vaults.len(), 2, "tout revient");
+    status!(
+        alice
+            .req(reqwest::Method::GET, &format!("/vaults/{}/items/{item}", work.id))
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::OK
+    );
+    server.stop().await;
+}

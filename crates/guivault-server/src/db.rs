@@ -249,6 +249,7 @@ pub struct VaultRow {
     pub revision: i64,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    pub travel_safe: bool,
 }
 
 impl VaultRow {
@@ -270,13 +271,20 @@ impl VaultRow {
             revision: self.revision,
             created_at: self.created_at,
             updated_at: self.updated_at,
+            travel_safe: self.travel_safe,
         }
     }
 }
 
+/// Les vaults d'un utilisateur — en **mode voyage**, seulement ceux qu'il a
+/// marqués sûrs : les autres n'existent plus pour lui (404 partout, absents
+/// de `/sync`), comme un vault dont il ne serait pas membre. Toutes les
+/// routes d'un vault passent par ici (`vault_for_user`, `vault_with_role`).
 const VAULT_SELECT: &str =
-    "SELECT v.id, v.kind, v.name_enc, m.role, m.wrapped_vault_key, v.revision, v.created_at, v.updated_at
-     FROM vaults v JOIN vault_members m ON m.vault_id = v.id AND m.user_id = $1";
+    "SELECT v.id, v.kind, v.name_enc, m.role, m.wrapped_vault_key, v.revision, v.created_at, v.updated_at,
+            m.travel_safe
+     FROM vaults v JOIN vault_members m ON m.vault_id = v.id AND m.user_id = $1
+     JOIN users traveller ON traveller.id = m.user_id AND (NOT traveller.travel_mode OR m.travel_safe)";
 
 pub async fn vaults_for_user<'e>(db: impl PgExecutor<'e>, user_id: Uuid) -> sqlx::Result<Vec<VaultRow>> {
     sqlx::query_as(&format!("{VAULT_SELECT} ORDER BY v.kind, v.created_at"))

@@ -549,6 +549,10 @@ pub struct Vault {
     pub revision: i64,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    /// Marqué « sûr en voyage » par l'utilisateur qui fait la requête : il
+    /// reste sur ses appareils en mode voyage (`PUT /vaults/{id}/travel`).
+    #[serde(default)]
+    pub travel_safe: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1251,6 +1255,32 @@ pub struct SyncResponse {
     pub vaults: Vec<Vault>,
     pub invitations: Vec<Invitation>,
     pub server_time: DateTime<Utc>,
+    /// Le compte est en mode voyage : `vaults` n'a que ceux sûrs en voyage,
+    /// les autres doivent quitter cet appareil.
+    #[serde(default)]
+    pub travel_mode: bool,
+}
+
+/// `GET /users/me/travel`, et la réponse de `PUT`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TravelStatus {
+    pub enabled: bool,
+}
+
+/// `PUT /users/me/travel` : l'activer d'un geste ; le désactiver redemande
+/// le mot de passe maître (`auth_key`) — sinon qui tient l'appareil
+/// déverrouillé n'aurait qu'à le couper.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TravelRequest {
+    pub enabled: bool,
+    #[serde(default, with = "b64::option", skip_serializing_if = "Option::is_none")]
+    pub auth_key: Option<Vec<u8>>,
+}
+
+/// `PUT /vaults/{id}/travel`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VaultTravelRequest {
+    pub safe: bool,
 }
 
 #[cfg(test)]

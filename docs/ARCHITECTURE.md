@@ -237,6 +237,33 @@ ré-enveloppe pour ses contacts ; faite par un autre (admin, Guiterm), elle
 marque les enveloppes à renouveler, ce que la page « Accès d'urgence » du
 propriétaire refait d'elle-même.
 
+## Mode voyage
+
+Avant de passer une frontière (ou de prêter un appareil), le compte ne garde
+sur ses appareils que les vaults qu'il a marqués **sûrs en voyage**
+(réglages du vault, par membre : chacun choisit pour lui). Le serveur
+l'applique à la source : `db::VAULT_SELECT`, par lequel passe toute route
+d'un vault, joint `users.travel_mode` et `vault_members.travel_safe` — un
+vault non marqué n'existe plus pour ce compte (absent de `/sync`, 404
+partout, comme un vault dont il ne serait pas membre). Chaque client le
+retire à sa synchronisation suivante : la page et ses caches, la copie hors
+ligne et le cache de l'extension (reconstruits à partir des vaults servis),
+le cache de `gv` (remplacé à chaque `sync`).
+
+- **L'activer** est immédiat (Paramètres › Sécurité › Mode voyage) ; le
+  **couper** redemande le mot de passe maître (`auth_key` vérifiée) — sinon
+  qui tient l'appareil déverrouillé n'aurait qu'à le couper — et prévient
+  par e-mail.
+- En voyage, un vault non marqué est introuvable : on ne peut pas le
+  **ré-exposer** avant d'être rentré.
+- C'est une protection de l'**appareil**, pas du serveur : les vaults restent
+  sur le serveur, chiffrés comme toujours. Un appareil qui ne s'est pas
+  synchronisé depuis l'activation les a encore (l'ouvrir en ligne suffit).
+- Routes : `GET`/`PUT /users/me/travel`, `PUT /vaults/{id}/travel` ;
+  migration `0015` ; test `travel_mode_keeps_only_the_vaults_marked_safe`.
+  Web : `TravelSettings.tsx`, réglage « Sûr en voyage » de `VaultSettings`,
+  bandeau tant qu'il est actif. Coffre local : sans objet.
+
 ## Ce que le serveur sait
 
 Métadonnées visibles côté serveur, assumées : adresses e-mail, qui est

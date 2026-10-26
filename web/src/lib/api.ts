@@ -225,6 +225,9 @@ function httpTransport(conn: Connection) {
       return { kind: "ok", login: await parse<LoginResponse>(res) };
     },
     totpVerify: (totp_token: string, code: string) => raw<LoginResponse>("POST", "/auth/totp/verify", { totp_token, code }, false),
+    travelStatus: () => authed<{ enabled: boolean }>("GET", "/users/me/travel"),
+    setTravel: (enabled: boolean, auth_key?: string) => authed<{ enabled: boolean }>("PUT", "/users/me/travel", { enabled, auth_key }),
+    setVaultTravel: (vault: string, safe: boolean) => authed<Vault>("PUT", `/vaults/${vault}/travel`, { safe }),
     secondFactorStart: (totp_token: string) => raw<SecondFactorOptions>("POST", "/auth/2fa/webauthn/start", { totp_token }, false),
     secondFactorWebauthn: (req: { totp_token: string; challenge_id: string; credential_id: string; client_data_json: string; authenticator_data: string; signature: string }) =>
       raw<LoginResponse>("POST", "/auth/2fa/webauthn", req, false),

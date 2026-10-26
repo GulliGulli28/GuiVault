@@ -316,6 +316,7 @@ pub fn from_local(dir: &Path, password: &str) -> Result<Recovered> {
             revision: v.revision,
             created_at: v.created_at,
             updated_at: v.updated_at,
+            travel_safe: false,
         });
     }
     Ok(decrypt(&account, &cache, |vault, att, i| {
@@ -539,6 +540,7 @@ pub fn from_backup(file: &Path, email: &str, password: &str) -> Result<Recovered
             revision,
             created_at: time_of(row, "created_at"),
             updated_at: time_of(row, "updated_at"),
+            travel_safe: false,
         });
     }
     Ok(decrypt(&account, &cache, |vault, att, i| {

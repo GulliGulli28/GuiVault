@@ -207,8 +207,13 @@ paramètres ou formats anciens.
   (`gv set`), les codes TOTP à la volée pour un `ssh`, la complétion.
 - [ ] Runbooks et snippets qui **référencent des secrets**, résolus au
   moment de l'exécution.
-- [ ] **Mode voyage** : le serveur exclut certains vaults de `/sync` pour
-  les sessions marquées « en voyage » (payant chez 1Password).
+- [x] **Mode voyage** (payant chez 1Password) : en voyage, le compte ne
+  garde sur ses appareils que les vaults marqués « sûrs en voyage » ; le
+  serveur ne sert plus les autres (404, absents de `/sync`), le couper
+  redemande le mot de passe maître ([`ARCHITECTURE.md`](ARCHITECTURE.md),
+  « Mode voyage »). Reste : vérifier que Guiterm efface un vault qui
+  disparaît de `/sync` (le web, l'extension, la copie hors ligne et `gv`
+  le font).
 
 ## 4. Interface et ergonomie
 

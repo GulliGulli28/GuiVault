@@ -371,6 +371,14 @@ export default function App({ Welcome = LoginScreen }: { Welcome?: ComponentType
             </div>
           </div>
         )}
+        {ctx.session.travelMode && (
+          <div role="status" className="shrink-0 px-4 pt-3">
+            <div className="callout callout-warn flex flex-wrap items-center gap-3 text-[12.5px]">
+              <p className="min-w-0 flex-1"><span className="font-medium">Mode voyage</span> — seuls les vaults sûrs en voyage sont sur vos appareils.</p>
+              <button onClick={() => navigate({ page: "settings", section: "securite" })} className="btn btn-secondary btn-sm">Réglages</button>
+            </div>
+          </div>
+        )}
         <RollbackBanner rollbacks={ctx.session.rollbacks} onAccept={(id) => { acceptRollback(ctx.session, id); setSession({ ...ctx.session }); }} />
         {route.page !== "settings" && <EmergencyBanner grants={ctx.session.emergency?.granted_by_me ?? []} onOpen={() => navigate({ page: "settings", section: "urgence" })} />}
         {/* Mobile : les pages glissent comme dans une application native
