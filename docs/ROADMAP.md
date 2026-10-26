@@ -433,6 +433,12 @@ Le README le dit en tête ; chaque case cochée y retire une ligne.
   Images de base épinglées par empreinte, avancées par Dependabot
   (`.github/dependabot.yml`, mensuel, avec les actions des workflows).
   Reste : publier un SBOM.
+- [x] **Audit des dépendances** : `.github/workflows/security.yml` (chaque
+  push, chaque PR et chaque lundi) — `cargo audit` sur le workspace et sur
+  `app-tauri`, `npm audit` du web (production bloquant à `high`). Les avis
+  écartés le sont dans `.cargo/audit.toml`, chacun avec sa raison
+  (`rsa` et `crypto-bigint` : le serveur n'y vérifie que des signatures
+  WebAuthn, avec des clés publiques).
 - [ ] **Extension dans les stores** (Chrome Web Store, Firefox Add-ons,
   Edge) — l'identifiant change : l'ajouter aux origines de l'hôte natif
   (`EXTENSION.md`).

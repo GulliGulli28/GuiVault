@@ -348,7 +348,10 @@ pub fn from_archive(file: &Path, password: &str) -> Result<Recovered> {
         for i in 0..zip.len() {
             let mut entry = zip.by_index(i)?;
             let Some(name) = entry.enclosed_name() else {
-                bail!("archive refusée : « {} » sort de son dossier", entry.name());
+                bail!(
+                    "archive refusée : « {} » sort de son dossier",
+                    entry.name().unwrap_or_default()
+                );
             };
             let target = tmp.join(name);
             if entry.is_dir() {

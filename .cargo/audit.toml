@@ -1,0 +1,18 @@
+# Les avis de sécurité examinés et acceptés, avec la raison (`cargo audit`,
+# workflow « Security »). Tout avis nouveau fait échouer le contrôle.
+[advisories]
+ignore = [
+    # rsa 0.9 (« Marvin Attack », fuite de temps au *déchiffrement* RSA avec
+    # une clé privée) — pas de correctif publié. Le serveur n'en fait que la
+    # vérification de signatures WebAuthn RS256 (`src/webauthn.rs`), avec des
+    # clés publiques : aucun secret, rien à faire fuir. À revoir quand `rsa`
+    # publie un correctif. https://rustsec.org/advisories/RUSTSEC-2023-0071
+    "RUSTSEC-2023-0071",
+
+    # crypto-bigint 0.5.5, tiré par p256 0.13 (vérification WebAuthn ES256) :
+    # des opérations censées être à temps constant ne le sont pas toutes. Le
+    # correctif est dans la 0.7, qui demande p256 0.14 (pas encore publiée en
+    # stable). Même raison que ci-dessus : le serveur ne vérifie que des
+    # signatures avec des clés publiques. https://rustsec.org/advisories/RUSTSEC-2026-0387
+    "RUSTSEC-2026-0387",
+]

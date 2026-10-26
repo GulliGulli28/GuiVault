@@ -1,0 +1,58 @@
+name: Security
+
+# L'audit des dépendances (Rust et npm), à part de ci.yml pour tourner aussi
+# chaque semaine : un avis peut paraître contre un Cargo.lock ou un
+# package-lock.json qui n'a pas bougé. Les avis examinés et acceptés sont dans
+# .cargo/audit.toml, avec la raison ; tout avis nouveau fait échouer le job.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  cargo-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit
+      # Le serveur, gv, les crates partagées…
+      - name: cargo audit (serveur, crates)
+        run: cargo audit
+      # … et l'application, workspace à part (son propre Cargo.lock). Ses
+      # avertissements (dépendances GTK de Linux non maintenues) ne bloquent
+      # pas ; une vulnérabilité, si.
+      - name: cargo audit (application)
+        working-directory: app-tauri
+        run: cargo audit --file Cargo.lock
+
+  npm-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci --no-audit --no-fund
+        working-directory: web
+      # Bloquant : ce qui part dans l'interface, l'extension et l'application.
+      - name: npm audit (dépendances de production)
+        working-directory: web
+        run: npm audit --omit=dev --audit-level=high
+      # Pour information : les outils de développement (vite, vitest…).
+      - name: npm audit (développement, non bloquant)
+        working-directory: web
+        run: npm audit --audit-level=high || true
