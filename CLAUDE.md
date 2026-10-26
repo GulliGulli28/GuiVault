@@ -169,6 +169,10 @@ il ne déchiffre rien : la user key reste sous la clé que seule la PRF donne).
     local vers un serveur et l'inverse (`docs/TRANSFERT.md`,
     `TransferDialog`, pont `coffreBridge` de l'app), par `POST
     /vaults/{id}/import` (miroir `LocalVault::import_items`).
+    `lib/coffreSync.ts` : synchroniser avec une copie du même coffre
+    (`SyncCoffreDialog`), ouverte dans le « pair » de l'app
+    (`coffreBridge.peer`, commandes `peer_*`) ; fausse extrémité partagée
+    des tests : `lib/memoryEnd.testing.ts`.
     `lib/session.ts` (compte déverrouillé, vaults, items, partage),
     `lib/types.ts` (protocole en snake_case + entités Guiterm en camelCase,
     **même JSON que `termius_core::guivault::entity::Payload`** : un item

@@ -689,6 +689,35 @@ scenario("sauvegardes : prises avant d'écrire, une copie s'ouvre à part", asyn
   await (await b.$("//a[.//span[normalize-space()='Personnel']]")).click();
 });
 
+scenario("synchroniser avec une copie : la copie reçoit ce qui lui manque, puis rien", async (b) => {
+  // La copie faite à partir d'une sauvegarde (scénario précédent) : même
+  // coffre, plus ancien.
+  const copy = path.join(scratch, "Copie.guivault");
+  const liveIds = (dir) => coffreOnDisk(dir).json.vaults.flatMap((v) => v.items.filter((i) => !i.deleted_at).map((i) => i.id)).sort();
+  assert(liveIds(copy).length < liveIds(coffre).length, "la copie a déjà tout : rien à synchroniser");
+  await openSettings(b);
+  await (await button(b, "Synchroniser…")).click();
+  await b.execute((p) => { window.__GUIVAULT_E2E_PATH__ = p; }, copy);
+  await click(b, "Choisir la copie…");
+  await waitText(b, "Copie");
+  await fillPasswords(b, PASSWORD);
+  await click(b, "Synchroniser");
+  await waitText(b, "Synchronisation terminée", 60_000);
+  assert((await bodyText(b)).includes("envoyé"), "la copie n'a rien reçu");
+  await shot(b, "sync-1");
+  assert(JSON.stringify(liveIds(copy)) === JSON.stringify(liveIds(coffre)), "la copie et le coffre n'ont pas les mêmes éléments");
+  await click(b, "Fermer");
+  // Une seconde fois : déjà identiques.
+  await (await button(b, "Synchroniser…")).click();
+  await b.execute((p) => { window.__GUIVAULT_E2E_PATH__ = p; }, copy);
+  await click(b, "Choisir la copie…");
+  await fillPasswords(b, PASSWORD);
+  await click(b, "Synchroniser");
+  await waitText(b, "Déjà identiques", 60_000);
+  await click(b, "Fermer");
+  await (await b.$("//a[.//span[normalize-space()='Personnel']]")).click();
+});
+
 scenario("import KeePass : une vraie base .kdbx, pièce jointe comprise", async (b) => {
   // Écrite par KeePass 2.61 (`src/lib/fixtures/kdbx/make.ps1`) : le chemin
   // navigateur de kdbxweb (WebCrypto) ne se prouve qu'ici, les tests unitaires

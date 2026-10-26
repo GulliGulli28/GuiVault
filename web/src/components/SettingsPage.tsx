@@ -29,6 +29,7 @@ import { autoTypeBridge, backupBridge, coffreBridge, coffreFileBridge, sshAgentB
 import { TransferDialog } from "./TransferDialog";
 import { RecoveryKit } from "./RecoveryKit";
 import { TravelSettings } from "./TravelSettings";
+import { SyncCoffreDialog } from "./SyncCoffreDialog";
 import { SshAgentSettings } from "./SshAgent";
 import { IconChevronRight, IconKeyboard, IconKeychain, IconMonitor, IconPalette, IconSettings, IconShield } from "./ui-icons";
 import { CopyButton, Fingerprint, formatAgo, formatWhen, InfoTip, Modal, PasswordInput, SettingRow } from "./ui";
@@ -71,7 +72,7 @@ export function SettingsPage({ ctx, section }: { ctx: PageContext; section: Sett
   const [sessions, setSessions] = useState<Session[]>([]);
   const [totp, setTotp] = useState<boolean | null>(null);
   const [audit, setAudit] = useState<AuditEntry[] | null>(null);
-  const [dialog, setDialog] = useState<null | "password" | "totp-setup" | "totp-disable" | "delete-account" | "transfer" | "kit">(null);
+  const [dialog, setDialog] = useState<null | "password" | "totp-setup" | "totp-disable" | "delete-account" | "transfer" | "sync" | "kit">(null);
   const [revoke, setRevoke] = useState<Session | null>(null);
   const closeDialog = useCallback(() => setDialog(null), []);
   const [lockMinutes, setLockMinutes] = useState(loadLockMinutes);
@@ -179,6 +180,18 @@ export function SettingsPage({ ctx, section }: { ctx: PageContext; section: Sett
                     >
                       <button onClick={() => setDialog("transfer")} className="btn btn-secondary">Copier…</button>
                     </SettingRow>
+                    {coffreBridge()?.peer && (
+                      <SettingRow
+                        title={<>Synchroniser avec une copie <InfoTip label="Ce que fait la synchronisation" items={[
+                          { text: "Une copie de ce coffre (Nextcloud, Syncthing, clé USB) et celui-ci redeviennent un.", tone: "ok" },
+                          { text: "Modifié des deux côtés : la version la plus récente l'emporte, l'autre reste dans l'historique." },
+                          { text: "Seulement avec une copie de ce coffre, pas avec un autre." },
+                        ]} /></>}
+                        desc="Fusionner les changements faits ailleurs, dans les deux sens."
+                      >
+                        <button onClick={() => setDialog("sync")} className="btn btn-secondary">Synchroniser…</button>
+                      </SettingRow>
+                    )}
                   </div>
                 </section>
               )}
@@ -278,6 +291,7 @@ export function SettingsPage({ ctx, section }: { ctx: PageContext; section: Sett
 
       {dialog === "password" && <PasswordDialog ctx={ctx} onClose={() => setDialog(null)} />}
       {dialog === "transfer" && <TransferDialog ctx={ctx} onClose={closeDialog} />}
+      {dialog === "sync" && <SyncCoffreDialog ctx={ctx} onClose={closeDialog} />}
       {dialog === "kit" && <RecoveryKit session={session} onClose={closeDialog} />}
       {dialog === "delete-account" && <DeleteAccountDialog ctx={ctx} totp={totp === true} onClose={() => setDialog(null)} />}
       {dialog === "totp-setup" && <TotpSetupDialog ctx={ctx} onClose={() => { setDialog(null); reload(); }} />}

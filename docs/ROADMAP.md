@@ -345,8 +345,12 @@ L gros.
   neuf ou existant, coffre neuf ou existant ; historique, corbeille et
   pièces jointes compris, reprise après coupure (`POST /vaults/{id}/import`)
   — [`TRANSFERT.md`](TRANSFERT.md) ; E2E contre un vrai serveur.
-- [ ] **Synchroniser deux coffres locaux** (L, « Synchroniser » de KeePass) :
-  un dossier sur Nextcloud ou Syncthing, fusion par révisions et manifeste.
+- [x] **Synchroniser deux coffres locaux** (L, « Synchroniser » de KeePass) :
+  une copie sur Nextcloud, Syncthing ou une clé USB et le coffre ouvert
+  redeviennent un ; conflit = le plus récent gagne, l'autre reste dans
+  l'historique ([`TRANSFERT.md`](TRANSFERT.md), « Synchroniser deux
+  copies »). Reste : la lancer d'elle-même quand le fichier de la copie
+  change.
 - [ ] **Fichier clé** (M, KeePass) : un coffre local qui s'ouvre avec le mot
   de passe **et** un fichier — nouvelle enveloppe, nouveau `format`.
 - [ ] **Saisie automatique, suite** (M) : obfuscation à deux canaux,

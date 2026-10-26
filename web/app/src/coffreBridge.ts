@@ -4,11 +4,12 @@
 import { setCoffreBridge } from "../../src/lib/platform";
 import { pickCoffre, pickNewCoffre } from "./dialogs";
 import { lastServer, rememberCoffre } from "./recents";
-import { tauriHost } from "./tauriHost";
+import { tauriHost, tauriPeerHost } from "./tauriHost";
 
 export function installCoffres() {
   setCoffreBridge({
     host: tauriHost,
+    peer: tauriPeerHost,
     pickNew: pickNewCoffre,
     pickExisting: pickCoffre,
     remember: rememberCoffre,

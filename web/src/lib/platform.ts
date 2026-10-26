@@ -151,6 +151,9 @@ export function coffreFileBridge(): CoffreFileBridge | null {
 export interface CoffreBridge {
   /** L'hôte des coffres, libre tant que la session n'est pas un coffre local. */
   host: LocalHost;
+  /** Un second coffre ouvert à côté de la session, quelle qu'elle soit : la
+   * copie avec laquelle on la synchronise (`coffreSync.ts`). */
+  peer?: LocalHost;
   pickNew(): Promise<string | null>;
   pickExisting(): Promise<string | null>;
   /** Le coffre rejoint les coffres récents de l'accueil. */

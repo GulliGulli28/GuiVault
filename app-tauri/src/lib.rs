@@ -120,6 +120,46 @@ async fn local_call(state: State<'_, Coffre>, op: String, args: Value) -> Result
     blocking(move || guivault_local::rpc::call(&vault, &op, &args).map_err(error)).await
 }
 
+// ─── Le pair : un second coffre, ouvert à côté ───────────────────────────────
+
+/// Un second coffre ouvert en même temps que celui de la session — la copie
+/// avec laquelle on le synchronise (`web/src/lib/coffreSync.ts`). Jamais le
+/// même dossier : le pair est refusé s'il est le coffre ouvert.
+#[derive(Default)]
+struct Peer(Coffre);
+
+#[tauri::command]
+async fn peer_open(state: State<'_, Peer>, open: State<'_, Coffre>, path: String) -> Result<(), Value> {
+    let current = open.get().ok().map(|v| v.dir().to_path_buf());
+    let vault = blocking(move || {
+        let same = |a: &std::path::Path| {
+            let b = std::path::Path::new(&path);
+            a == b || matches!((a.canonicalize(), b.canonicalize()), (Ok(x), Ok(y)) if x == y)
+        };
+        if current.as_deref().is_some_and(same) {
+            return Err(error(guivault_local::Error::bad_request(
+                "local_same_coffre",
+                "c'est le coffre ouvert : choisissez sa copie",
+            )));
+        }
+        LocalVault::open(path).map_err(error)
+    })
+    .await?;
+    state.0.set(Some(vault));
+    Ok(())
+}
+
+#[tauri::command]
+fn peer_close(state: State<'_, Peer>) {
+    state.0.set(None);
+}
+
+#[tauri::command]
+async fn peer_call(state: State<'_, Peer>, op: String, args: Value) -> Result<Value, Value> {
+    let vault = state.0.get()?;
+    blocking(move || guivault_local::rpc::call(&vault, &op, &args).map_err(error)).await
+}
+
 // ─── Mobile ──────────────────────────────────────────────────────────────────
 
 /// L'interface demande où elle tourne : sur mobile, pas de boîte de
@@ -536,6 +576,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .manage(Coffre::default())
+        .manage(Peer::default())
         .manage(Hotkey::default())
         .manage(tray::CloseToTray::default());
     #[cfg(desktop)]
@@ -549,6 +590,9 @@ pub fn run() {
         local_open,
         local_close,
         local_call,
+        peer_open,
+        peer_close,
+        peer_call,
         local_backups,
         local_restore_backup,
         local_export_snapshot,
@@ -584,6 +628,9 @@ pub fn run() {
         local_open,
         local_close,
         local_call,
+        peer_open,
+        peer_close,
+        peer_call,
         local_backups,
         local_restore_backup,
         local_export_snapshot,

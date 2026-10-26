@@ -82,6 +82,43 @@ est pris par quelqu'un d'autre (`409` à la création) est signalé sans
 arrêter les autres. Après un « nouveau compte » coupé, relancer en
 « compte existant » avec le même mot de passe.
 
+## Synchroniser deux copies
+
+Le « Synchroniser » de KeePass : un coffre copié sur Nextcloud, Syncthing ou
+une clé USB, modifié des deux côtés, redevient un. Paramètres › Compte ›
+« Synchroniser avec une copie » (l'application), `web/src/lib/coffreSync.ts`,
+`SyncCoffreDialog`. La copie s'ouvre à côté de la session dans le **pair**
+de l'app (`peer_open` / `peer_call` / `peer_close`, `app-tauri/src/lib.rs` :
+un second emplacement, jamais le coffre ouvert), avec son mot de passe
+maître.
+
+- **Seulement une copie du même coffre** : même vault personnel (même id),
+  donc mêmes vaults et mêmes clés ; sinon refus, et « Copier » reste le
+  chemin. La session peut aussi être un compte de serveur dont le coffre est
+  une copie (« Copier dans un coffre local »).
+- **Par élément** (chiffrés comparés, rien n'est déchiffré) : identiques,
+  rien ; l'un est un état que l'autre a dépassé (dans son historique), le
+  plus avancé gagne ; sinon **conflit** : le plus récent (`updated_at`)
+  gagne et l'autre version reste dans l'historique de son côté (l'écriture
+  l'y range), le dialogue les compte. Une suppression est un état comme un
+  autre : elle passe si elle porte sur la version que l'autre côté a encore,
+  et une modification plus récente qu'elle fait revenir l'élément. D'un seul
+  côté : copié de l'autre (une pierre tombale seule, non).
+- **Par vault** : d'un seul côté, copié en entier (`copyVaults`). Un vault
+  supprimé d'un côté revient donc de l'autre — pas de pierre tombale de
+  vault.
+- **Manifeste** : chaque côté doit passer sa vérification d'abord ; chaque
+  écriture porte le manifeste de son côté, tenu au fil des écritures.
+- **Pièces jointes** : celles des éléments vivants passent dans les deux
+  sens (`copyAttachments`).
+
+Tests : `coffreSync.test.ts` (le plan de fusion ; deux coffres en mémoire
+qui ont divergé — avance, conflit, suppression, ajouts, vault nouveau —
+puis une seconde passe sans rien à faire ; un coffre qui n'est pas une
+copie, refusé) et le scénario « synchroniser avec une copie » de l'E2E de
+l'app (la copie restaurée d'une sauvegarde reçoit ce qui lui manque, puis
+« Déjà identiques »).
+
 ## Tests
 
 - `tests/api.rs`, `vault_import_keeps_history_trash_and_dates` : la route

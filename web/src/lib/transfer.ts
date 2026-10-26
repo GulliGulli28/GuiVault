@@ -31,7 +31,7 @@ export const BATCH_BYTES = 4 * 1024 * 1024;
  * serveur, ou le transport d'un coffre local. */
 export type End = Partial<Transport>;
 
-function method<K extends keyof Transport>(end: End, name: K): Transport[K] {
+export function method<K extends keyof Transport>(end: End, name: K): Transport[K] {
   const f = end[name];
   if (!f) throw new ApiError(501, "local_unsupported", `« ${String(name)} » manque à l'une des deux extrémités.`);
   return f;
@@ -188,36 +188,45 @@ async function copyVault(source: End, dest: Destination, v: TransferVault, repor
 
   // Les pièces jointes : leur clé voyage dans l'item, les morceaux tels quels.
   const live = new Set(page.items.filter((i) => !i.deleted).map((i) => i.id));
-  const files = (await method(source, "attachments")(v.id)).filter((a) => a.complete);
-  const existing = new Map((await method(to, "attachments")(v.id)).map((a) => [a.id, a]));
+  const files = await copyAttachments(source, to, v.id, live, (done, total) => onProgress?.({ vault: report.name, step: "attachments", done, total }));
+  report.attachments += files.copied;
+  report.skippedAttachments += files.skipped;
+}
+
+/** Copie les pièces jointes complètes de `source` qui manquent à `to` (ou
+ * n'y sont pas complètes), seulement pour les items vivants de `live` : un
+ * fichier d'un item supprimé est compté à part, pas copié. */
+export async function copyAttachments(source: End, to: End, vaultId: string, live: Set<string>, onProgress?: (done: number, total: number) => void): Promise<{ copied: number; skipped: number }> {
+  let skipped = 0;
+  const files = (await method(source, "attachments")(vaultId)).filter((a) => a.complete);
+  const existing = new Map((await method(to, "attachments")(vaultId)).map((a) => [a.id, a]));
   const todo = files.filter((a) => {
     if (!live.has(a.item_id)) {
-      report.skippedAttachments++;
+      skipped++;
       return false;
     }
     return !existing.get(a.id)?.complete;
   });
   for (const [n, a] of todo.entries()) {
-    onProgress?.({ vault: report.name, step: "attachments", done: n, total: todo.length });
-    if (existing.has(a.id)) await method(to, "deleteAttachment")(v.id, a.id);
-    await method(to, "createAttachment")(v.id, { id: a.id, item_id: a.item_id, size: a.size, chunks: a.chunks });
+    onProgress?.(n, todo.length);
+    if (existing.has(a.id)) await method(to, "deleteAttachment")(vaultId, a.id);
+    await method(to, "createAttachment")(vaultId, { id: a.id, item_id: a.item_id, size: a.size, chunks: a.chunks });
     for (let k = 0; k < a.chunks; k++) {
-      await method(to, "putAttachmentChunk")(v.id, a.id, k, await method(source, "attachmentChunk")(v.id, a.id, k));
+      await method(to, "putAttachmentChunk")(vaultId, a.id, k, await method(source, "attachmentChunk")(vaultId, a.id, k));
     }
-    await method(to, "completeAttachment")(v.id, a.id);
-    report.attachments++;
+    await method(to, "completeAttachment")(vaultId, a.id);
   }
-  if (todo.length > 0) onProgress?.({ vault: report.name, step: "attachments", done: todo.length, total: todo.length });
+  if (todo.length > 0) onProgress?.(todo.length, todo.length);
+  return { copied: todo.length, skipped };
 }
 
-/** Les vaults de la session, prêts à partir. */
 export function transferVaults(state: SessionState, ids: string[]): TransferVault[] {
   return state.vaults.filter((v) => ids.includes(v.id)).map((v) => ({ id: v.id, kind: v.kind, name: v.name, key: v.key }));
 }
 
 /** Le mot de passe maître ouvre-t-il ces enveloppes ? Rend le compte, et la
  * clé d'auth (pour une inscription). */
-async function unlockWith(password: string, blobs: AccountBlobs): Promise<{ account: UnlockedAccount; authKey: Uint8Array }> {
+export async function unlockWith(password: string, blobs: AccountBlobs): Promise<{ account: UnlockedAccount; authKey: Uint8Array }> {
   const master = await c.deriveMasterKey(password, unb64(blobs.kdf_salt), blobs.kdf);
   try {
     return { account: c.unlockAccount(master.stretchedKey, unb64(blobs.protected_user_key), unb64(blobs.protected_private_key)), authKey: master.authKey };
