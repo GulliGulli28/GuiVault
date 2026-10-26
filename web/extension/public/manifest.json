@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "GuiVault",
   "description": "Vos identifiants GuiVault dans le navigateur : copier, remplir, codes TOTP, générateur. Chiffrement de bout en bout.",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAmDmJ/pTERoGUGt4usR1SwtDUG41dDkJSMACFx9srLIavv4f2J5Vd+vJhPo3jLYwMfVqpH0VwY6bDyZ0RMhBj+ws8U1CPk2WCe4LTnTGzr0Lk9+ywigiUnhCvGWV0qMfxI0uO/UgO8hlG2CixSA0sDQsZGM1+6uBlOjht4RZCdV64Knywm5jFu21VIeUNIRrSJsGFBui72BsyXpho1pZdAaE/4rW9jt9REMABYRPYCD+h5sCBXu0ivCPpDemfzjzyEWqzI/GxFQl9iPp1hVQuZY+yxot5gLShMMnLLsr4kh7DCpB1HmvpYCJLNrMsAHjXUTYocwiUE10kohEVO5TaHwIDAQAB",
   "icons": {
     "16": "icons/icon16.png",

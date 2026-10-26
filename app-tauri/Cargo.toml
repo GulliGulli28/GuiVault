@@ -9,7 +9,7 @@
 [package]
 name = "guivault-app"
 description = "GuiVault : se connecter à un serveur GuiVault, ou ouvrir un coffre local."
-version = "0.4.0"
+version = "0.5.0"
 edition = "2024"
 license = "MIT"
 repository = "https://github.com/GulliGulli28/GuiVault"
