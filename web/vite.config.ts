@@ -16,6 +16,7 @@ export default defineConfig({
   },
   test: {
     environment: "node",
+    setupFiles: ["src/test-setup.ts"],
     // Le corpus de l'extension tourne sous Playwright (`npm run test:ext`).
     exclude: ["**/node_modules/**", "**/dist*/**", "extension/e2e/**"],
   },
