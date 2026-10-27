@@ -9,7 +9,7 @@ l'auto-hébergement sans fonctions « premium »).
 Chaque piste respecte la règle n°1 (`CLAUDE.md`) : le serveur ne garde que
 des blobs qu'il ne sait pas lire. Cocher au fur et à mesure.
 
-## État (26 octobre 2026)
+## État (27 octobre 2026)
 
 **Fait** : tout le §0 (plancher et paramètres Argon2id épinglés, retour en
 arrière détecté, enveloppes authentifiées, empreinte de l'inviteur,
@@ -20,8 +20,12 @@ effacé, historique et corbeille, copie hors ligne, recherche globale
 **liens de partage**, **rapport de santé** (web), **pièces jointes** et
 **connexion par passkey** ; dans le §6 : l'**application Windows** (0.1 puis
 0.2, mises à jour signées) et l'**application Android** (APK signé par le
-CI à chaque release, bulle flottante). L'interface entière est **refaite**
-(`DESIGN.md`, octobre 2026 : web, extension, mobile). Chaque point est
+CI à chaque release, bulle flottante, remplissage des autres applications
+avec « Enregistrer dans GuiVault ? » et la copie du code 2FA) ; l'**agent
+SSH** et la **synchronisation de deux copies** d'un coffre local dans
+l'application. L'interface entière est **refaite** (`DESIGN.md`, octobre
+2026 : web, extension, mobile) et existe **en français et en anglais**
+(e-mails du serveur compris). Chaque point est
 coché ci-dessous avec où il vit dans le code.
 
 **Ce qui reste, par ordre de priorité** (chaque ligne renvoie au détail).

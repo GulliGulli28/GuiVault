@@ -1809,7 +1809,7 @@ dependencies = [
 
 [[package]]
 name = "guivault-app"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "guivault-local",
  "rsa",
