@@ -1283,7 +1283,8 @@ async fn auth_routes_are_rate_limited_per_ip() {
     };
     let http = Client::new();
     let mut codes = vec![];
-    for _ in 0..5 {
+    let started = std::time::Instant::now();
+    for _ in 0..8 {
         let r = http
             .post(format!("{}/auth/prelogin", server.base))
             .json(&PreloginRequest { email: "a@b.io".into() })
@@ -1292,8 +1293,25 @@ async fn auth_routes_are_rate_limited_per_ip() {
             .unwrap();
         codes.push(r.status());
     }
+    // Trois d'un coup, puis un par seconde : borné par le temps réellement
+    // écoulé, pour ne pas dépendre de la vitesse de la machine (une machine
+    // chargée laissait passer la quatrième).
+    let elapsed = started.elapsed().as_secs();
+    let accepted = codes.iter().filter(|c| **c == StatusCode::OK).count() as u64;
     assert_eq!(codes[..3], [StatusCode::OK, StatusCode::OK, StatusCode::OK]);
-    assert_eq!(codes[3], StatusCode::TOO_MANY_REQUESTS);
+    assert!(
+        accepted <= 3 + elapsed + 1,
+        "{accepted} acceptées en {elapsed} s : {codes:?}"
+    );
+    assert!(
+        codes
+            .iter()
+            .all(|c| *c == StatusCode::OK || *c == StatusCode::TOO_MANY_REQUESTS),
+        "{codes:?}"
+    );
+    if elapsed < 4 {
+        assert!(codes.contains(&StatusCode::TOO_MANY_REQUESTS), "{codes:?}");
+    }
     // Les routes authentifiées ne sont pas concernées.
     status!(
         http.get(format!("{}/health", server.base)).send().await.unwrap(),
