@@ -1,5 +1,7 @@
 # Politique de sécurité
 
+*[English version below](#security-policy)*
+
 GuiVault garde des secrets : une faille compte plus qu'un bogue. Merci de
 prendre le temps de la signaler.
 
@@ -61,8 +63,8 @@ en particulier :
   liens de partage ;
 - l'extension qui remplirait un identifiant sur le mauvais site ou dans un
   cadre tiers ;
-- l'application (coffre local, hôte natif, saisie automatique, remplissage
-  Android).
+- l'application (coffre local, hôte natif, saisie automatique, agent SSH,
+  remplissage Android).
 
 **Hors périmètre** :
 
@@ -80,3 +82,84 @@ Testez sur votre propre instance (`docker compose up`, voir le README), pas
 sur celle d'un autre. N'accédez pas aux données d'autrui, ne les modifiez
 pas, ne dégradez pas un service. Une recherche menée de bonne foi dans ces
 limites ne fera l'objet d'aucune poursuite de notre part.
+
+---
+
+# Security policy
+
+GuiVault keeps secrets: a vulnerability matters more than a bug. Thank you
+for taking the time to report it.
+
+## Reporting a vulnerability
+
+- **Through a [private security advisory](https://github.com/GulliGulli28/GuiVault/security/advisories/new)**
+  on GitHub — not a public issue, a discussion or a pull request.
+- In French or English.
+- Useful: the version (server commit, app or extension version), steps to
+  reproduce, what an attacker gains, and the assumed attacker model
+  (network, compromised server, compromised device… — see
+  [`docs/SECURITY.md`](docs/SECURITY.md), in French).
+
+Every GuiVault server also serves `/.well-known/security.txt` (RFC 9116):
+its operator's contact if they declared one, then the project's.
+
+## What to expect
+
+GuiVault is maintained by **a single person**: these response times are
+best-effort commitments.
+
+| Step | Target time |
+|---|---|
+| Acknowledgement | 3 days |
+| First assessment (reproduced or not, severity) | 7 days |
+| Fix released — critical or high severity | 14 days |
+| Fix released — medium or low severity | 60 days |
+| Advisory published | with the fix, or after 90 days at the latest, by mutual agreement |
+
+You are kept informed at every step, and credited in the advisory if you
+wish. There is **no bug bounty yet**: it will come after an external audit
+(`docs/ROADMAP.md`, §7).
+
+## Maintained versions
+
+| Component | Maintained version |
+|---|---|
+| Server (`guivault-server`), web interface, `gv` | the `main` branch |
+| Windows and Android app | the latest [`app-v*` release](https://github.com/GulliGulli28/GuiVault/releases) |
+| Browser extension | the `main` branch |
+| Encrypted formats (`guivault-crypto`) | every published format stays readable |
+
+A security fix isn't backported to older versions of the app: it updates
+itself (Windows) or is installed over the current one (Android).
+
+## Scope
+
+**In scope** — anything that contradicts [`docs/SECURITY.md`](docs/SECURITY.md),
+in particular:
+
+- a server, a database or a backup that would allow reading a secret,
+  impersonating a user or modifying encrypted data without the clients
+  noticing;
+- the cryptography (`crates/guivault-crypto`, `web/src/lib/crypto.ts`) and
+  the interoperability between the two;
+- authentication, sessions, sharing, emergency access, share links;
+- the extension filling a login on the wrong site or in a third-party
+  frame;
+- the app (local vault, native host, auto-type, SSH agent, Android
+  autofill).
+
+**Out of scope**:
+
+- an instance you don't operate: report to its operator first (its
+  `security.txt`);
+- limits already documented in [`docs/SECURITY.md`](docs/SECURITY.md),
+  “Limites connues” — unless you show they go further than written;
+- volumetric denial of service, social engineering, an already compromised
+  device (keylogger, malware running with the user's rights).
+
+## Good-faith rules
+
+Test on your own instance (`docker compose up`, see the README), not on
+someone else's. Don't access or modify other people's data, don't degrade
+a service. Research carried out in good faith within these limits will not
+be pursued by us.

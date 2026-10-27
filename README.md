@@ -1,5 +1,7 @@
 # GuiVault
 
+*[English version](README.en.md)*
+
 **Un coffre zero-knowledge pour les mots de passe *et* les secrets
 d'infrastructure — sur votre serveur, ou sans serveur du tout.**
 
@@ -29,12 +31,13 @@ même auteur.
 >   `@noble`) et non sur du fait maison — mais rien ne remplace un regard
 >   indépendant. Gardez une autre copie de ce que vous ne pouvez pas vous
 >   permettre de perdre.
-> - **Interface en français uniquement.**
+> - **Deux langues** : l'interface existe en français et en anglais
+>   (Paramètres › Apparence › Langue), pas encore dans d'autres.
 > - **Distribution encore artisanale** : l'image Docker est publiée et
 >   signée, mais l'extension est à charger « non empaquetée » (pas encore
 >   dans les stores), installeurs Windows sans signature Authenticode (SmartScreen
->   avertit), APK Android à installer à la main et vérifié seulement sur
->   émulateur. Ni iOS, ni macOS, ni application Linux.
+>   avertit), APK Android à installer à la main, essayé sur un seul vrai
+>   téléphone. Ni iOS, ni macOS, ni application Linux.
 
 ## Pourquoi GuiVault
 
@@ -58,8 +61,9 @@ même auteur.
    pas de mode sans serveur.
 3. **Les secrets d'infrastructure en première classe.** Hôtes, clés SSH
    (générées au format OpenSSH), accès AWS, clés d'API qui expirent,
-   synchronisés avec Guiterm, dont l'agent SSH lit le coffre (confirmation
-   à chaque signature, signature des commits). `gv` lit un secret par
+   synchronisés avec Guiterm ; l'agent SSH de Guiterm et celui de
+   l'application lisent le coffre (confirmation à chaque signature,
+   signature des commits). `gv` lit un secret par
    référence (`gv://vault/élément/champ`), lance une commande avec ses
    secrets en variables (`gv run`), sert de `credential_process` AWS et de
    credential helper Git. Ce que 1Password vend aux développeurs, en
@@ -84,8 +88,8 @@ même auteur.
 |---|---|---|
 | **Interface web** | Tout, depuis n'importe quel navigateur, avec la même cryptographie que les autres clients ; utilisable au téléphone, installable (PWA), copie hors ligne en lecture seule | Servie par le serveur à `/` |
 | **Extension** ([`EXTENSION.md`](docs/EXTENSION.md)) | Remplissage en un clic ou depuis le champ — composants web (shadow DOM) et cadres compris, sans jamais remettre le mot de passe d'un site à un cadre tiers —, codes TOTP, passkeys, générateur ; face à un serveur ou au coffre local de l'application | Chrome, Edge, Firefox ≥ 115 ; à charger non empaquetée |
-| **Application Windows** ([`APP.md`](docs/APP.md)) | Coffre local ou serveur ; saisie automatique à la KeePass, presse-papiers hors de l'historique Windows, verrouillage avec la session, zone de notification, sauvegardes du coffre local, import KeePass (KDBX), mises à jour signées | MSI et NSIS dans les [releases `app-v*`](https://github.com/GulliGulli28/GuiVault/releases) |
-| **Application Android** ([`ANDROID.md`](docs/ANDROID.md)) | Coffre local ou serveur ; déverrouillage biométrique, remplissage des autres applications et de Chrome ([`REMPLISSAGE.md`](docs/REMPLISSAGE.md)), bulle flottante | APK signé et attesté, joint aux mêmes releases ; vu sur émulateur seulement |
+| **Application Windows** ([`APP.md`](docs/APP.md)) | Coffre local ou serveur ; saisie automatique à la KeePass, agent SSH, presse-papiers hors de l'historique Windows, verrouillage avec la session, zone de notification, sauvegardes du coffre local et synchronisation avec une copie, import KeePass (KDBX), mises à jour signées | MSI et NSIS dans les [releases `app-v*`](https://github.com/GulliGulli28/GuiVault/releases) |
+| **Application Android** ([`ANDROID.md`](docs/ANDROID.md)) | Coffre local ou serveur ; déverrouillage biométrique, remplissage des autres applications et de Chrome ([`REMPLISSAGE.md`](docs/REMPLISSAGE.md)), bulle flottante | APK signé et attesté, joint aux mêmes releases ; essayé sur un vrai téléphone |
 | **`gv`** ([`CLI.md`](docs/CLI.md)) | Secrets par référence, `gv run`, AWS, Git, pièces jointes ; cache chiffré lisible sans le serveur ; `gv recover` : tout ressortir d'une sauvegarde, d'un coffre local ou d'un export, sans serveur | À compiler (`cargo build --release -p guivault-cli`) |
 | **Guiterm** | Client SSH : hôtes, clés, snippets et connexions synchronisés, agent SSH adossé au coffre | Dépôt à part |
 
@@ -136,7 +140,8 @@ le TypeScript (et réciproquement) le vérifient à chaque build.
 ### Le compte et la sécurité
 
 - Connexion par **mot de passe maître** (Argon2id 64 Mio, 3 passes, côté
-  client) avec second facteur **TOTP** et codes de récupération, ou par
+  client) avec second facteur **TOTP** et codes de récupération, ou **clé
+  de sécurité** (WebAuthn) ; ou par
   **passkey** (PRF de WebAuthn, [`docs/PASSKEYS.md`](docs/PASSKEYS.md)).
 - **Sessions** : jetons opaques hachés, rotation des jetons de
   rafraîchissement avec détection de rejeu, révocation à distance, alerte
@@ -194,16 +199,17 @@ de clés en détail dans [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 - **Pas de « Secret Key » à la 1Password** : qui vole la base peut attaquer
   hors ligne un mot de passe maître faible. Argon2id le rend coûteux, pas
   impossible — choisissez une phrase de passe longue.
-- **Second facteur TOTP seulement** : pas encore de clé de sécurité en
-  second facteur ; la connexion par passkey existe dans l'interface web,
-  pas encore dans l'extension.
+- **Clé de sécurité et passkeys depuis l'interface web seulement** : en
+  second facteur, la clé de sécurité ne s'utilise que dans le navigateur
+  (l'application et l'extension ont le TOTP) ; la connexion par passkey
+  n'est pas encore dans l'extension.
 - **Pas de fonctions d'entreprise** : ni SSO, ni SCIM, ni groupes, ni
   politiques imposées aux membres.
 - **Import 1Password et Proton Pass par leur CSV seulement** (identifiants
   et notes ; pas encore leurs exports complets `.1pux` et JSON), pas
   d'alias d'e-mail.
 - **Android** : un coffre local vit dans le dossier privé de l'application,
-  que la désinstallation efface (pas encore d'export de fichier) — copiez-le
+  que la désinstallation efface — exportez-le (archive `.zip`) ou copiez-le
   vers un serveur pour le mettre à l'abri.
 - **Métadonnées** : le serveur sait combien d'éléments de chaque type
   vous avez, et avec qui vous partagez.
@@ -225,7 +231,7 @@ vérifier chez eux).
 | Plateformes | Web, Chrome/Edge/Firefox, Windows, Android, CLI | Toutes, iOS et macOS compris | Windows, macOS, Linux ; mobiles par des applications tierces | Toutes | Toutes |
 | Secrets d'infrastructure | Hôtes et clés SSH, AWS, clés d'API ; agent SSH (Guiterm), CLI à références | Agent SSH, CLI, Secrets Manager (produit à part) | Agent SSH, CLI | Le plus complet : agent SSH, CLI à références, intégrations | CLI et agent SSH, récents |
 | Protection d'une base volée | Argon2id sur le mot de passe | Argon2id ou PBKDF2 sur le mot de passe | Argon2 sur le fichier | Mot de passe **+ Secret Key** de 128 bits | Mot de passe |
-| Langues | Français | Des dizaines | Des dizaines | Des dizaines | Des dizaines |
+| Langues | Français, anglais | Des dizaines | Des dizaines | Des dizaines | Des dizaines |
 | Ancienneté | Quelques semaines, un développeur | Depuis 2016, une entreprise | Depuis 2016, une communauté | Depuis 2006, une entreprise | Depuis 2023, Proton |
 
 **Choisissez plutôt…**
@@ -237,7 +243,7 @@ vérifier chez eux).
 - **KeePassXC** si vous êtes seul, ne voulez rien héberger et vous
   satisfaites d'un fichier synchronisé par vos soins.
 - **1Password** pour une famille ou une entreprise qui veut le plus
-  abouti, un support, la Secret Key et le mode voyage, et accepte le cloud
+  abouti, un support et la Secret Key, et accepte le cloud
   et le code fermé.
 - **Proton Pass** si vous vivez déjà dans l'écosystème Proton (Mail,
   Drive, VPN), voulez des alias d'e-mail et ne voulez rien héberger.
@@ -365,7 +371,8 @@ compte à chaque connexion depuis une adresse IP jamais vue (90 jours), à
 chaque changement de mot de passe maître ou de second facteur, et les deux
 parties d'un accès d'urgence à chaque étape — surtout le donneur quand son
 contact **demande** l'accès, avec la date à laquelle il sera ouvert sans
-refus, puis les deux quand il s'ouvre. **Rien n'en dépend** : sans SMTP, avec un SMTP mal réglé ou en
+refus, puis les deux quand il s'ouvre. Chaque message part dans la langue
+du compte de son destinataire (les deux si elle est inconnue). **Rien n'en dépend** : sans SMTP, avec un SMTP mal réglé ou en
 panne, chaque action réussit quand même (l'envoi part après, en
 arrière-plan ; un échec est journalisé) et tout reste visible dans les
 clients. Un message ne contient ni secret, ni nom de vault, ni autre lien
@@ -486,7 +493,8 @@ Structure :
   est le port de `guivault-crypto` ; des vecteurs générés par le crate Rust
   (et réciproquement) garantissent que les deux lisent les mêmes blobs.
   `web/extension/` : l'extension, sur le même code ; `web/app/` : l'interface
-  de l'application.
+  de l'application. Les textes de l'interface s'écrivent en français dans le
+  code (`t("…")`) et se traduisent dans `web/src/i18n/en.json`.
 - `app-tauri/` — l'application Windows et Android (Tauri 2, workspace Cargo
   à part ; le Kotlin d'Android dans `gen/android`).
 
