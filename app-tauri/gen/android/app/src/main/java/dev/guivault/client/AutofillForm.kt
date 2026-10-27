@@ -123,6 +123,23 @@ class AutofillForm private constructor(
         // ─── Ce qu'Android affiche ──────────────────────────────────────────
 
         /** La ligne sous le champ (liste déroulante). */
+        /** Le texte saisi dans le premier de ces champs qui en a un (ce
+         * qu'Android remet à l'enregistrement). */
+        fun textOf(structure: AssistStructure, ids: List<AutofillId>): String? {
+            var found: String? = null
+            fun visit(node: AssistStructure.ViewNode) {
+                if (found != null) return
+                val id = node.autofillId
+                if (id != null && id in ids) {
+                    val v = node.autofillValue
+                    if (v != null && v.isText) v.textValue.toString().takeIf { it.isNotEmpty() }?.let { found = it }
+                }
+                for (i in 0 until node.childCount) visit(node.getChildAt(i))
+            }
+            for (i in 0 until structure.windowNodeCount) visit(structure.getWindowNodeAt(i).rootViewNode)
+            return found
+        }
+
         fun presentation(context: Context, title: String, subtitle: String): RemoteViews =
             RemoteViews(context.packageName, R.layout.autofill_item).apply {
                 setTextViewText(R.id.autofill_title, title)

@@ -302,7 +302,7 @@ export interface AutofillBridge {
   /** `enabled` : GuiVault est le service de remplissage choisi ;
    * `biometric` : l'index se garde chiffré, l'application fermée remplit
    * encore après une empreinte. */
-  status(): Promise<{ supported: boolean; enabled: boolean; biometric: boolean }>;
+  status(): Promise<{ supported: boolean; enabled: boolean; biometric: boolean; offerSave?: boolean }>;
   /** L'écran d'Android qui propose de choisir GuiVault. */
   request(): Promise<void>;
   /** Ne plus être le service choisi ; l'index s'efface. */
@@ -315,6 +315,22 @@ export interface AutofillBridge {
   forget(): Promise<void>;
   /** Le mot de passe maître vient d'ouvrir un coffre (le délai repart). */
   passwordUsed(): Promise<void>;
+  /** La connexion qu'Android a proposé d'enregistrer (« Enregistrer dans
+   * GuiVault ? »), retirée ; `null` s'il n'y en a pas. */
+  takeSave(): Promise<CapturedLogin | null>;
+  /** Proposer d'enregistrer, ou non. */
+  setOfferSave(enabled: boolean): Promise<void>;
+}
+
+/** Une connexion tapée à la main dans une autre application ou un site. */
+export interface CapturedLogin {
+  username: string;
+  password: string;
+  /** Le site, annoncé par un navigateur connu ; sinon `null`. */
+  domain: string | null;
+  /** L'application Android. */
+  pkg: string;
+  label: string;
 }
 
 let autofill: AutofillBridge | null = null;

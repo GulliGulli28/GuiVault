@@ -38,10 +38,11 @@ import { copyText, Dropdown, formatAgo, formatWhen, Loading, Modal, useDelayed }
 import { PaneHandle, usePersistedPane } from "../hooks/usePersistedPane";
 import { NARROW, TOUCH, useMediaQuery } from "../hooks/useMediaQuery";
 import { plural, t } from "../lib/i18n";
+import { takeDraft, usePendingDraft } from "../lib/pendingDraft";
 
 /** `groupId` : le dossier où créer (bouton « + » d'un dossier) ; absent, le
  * dossier de l'élément sélectionné. */
-type Mode = { kind: "view" } | { kind: "edit" } | { kind: "new"; itemKind: ItemKind; groupId?: string | null; draft?: Payload };
+type Mode = { kind: "view" } | { kind: "edit"; draft?: Payload } | { kind: "new"; itemKind: ItemKind; groupId?: string | null; draft?: Payload };
 
 /** Les entrées du menu « Nouveau » : les secrets d'abord, puis les entités
  * Guiterm, un trait entre les deux. */
@@ -442,6 +443,26 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
   };
   /** `fn` après le mot de passe maître si l'élément ouvert est protégé. */
   const guard = (fn: () => void) => void ask(current?.ok ? current.payload : null).then((go) => go && fn());
+  // Un formulaire pré-rempli demandé d'ailleurs (« Enregistrer dans
+  // GuiVault ? » d'Android) : un nouvel élément, ou la modification d'un
+  // existant — protégé, après le mot de passe maître.
+  const requested = usePendingDraft();
+  useEffect(() => {
+    if (!items || !requested || requested.vaultId !== vault.id || !canWrite(vault.role)) return;
+    // Une modification attend que la route soit sur l'élément : le
+    // changement de route remettrait sinon la page en lecture.
+    if (requested.itemId && requested.itemId !== itemId) return;
+    const p = takeDraft(vault.id);
+    if (!p) return;
+    if (!p.itemId) {
+      setMode({ kind: "new", itemKind: p.draft.kind as ItemKind, draft: p.draft });
+      return;
+    }
+    const target = items.find((i) => i.id === p.itemId);
+    if (!target?.ok) return;
+    setSelected(target.id);
+    void ask(target.payload).then((go) => go && setMode({ kind: "edit", draft: p.draft }));
+  }, [items, requested, vault.id, vault.role, itemId]); // eslint-disable-line react-hooks/exhaustive-deps
   const locked = !!current?.ok && needsReprompt(current.payload);
   const copyTotp = (secret: string) => {
     const params = parseTotp(secret);
@@ -669,7 +690,7 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
             <ItemForm key={`${mode.itemKind}-${mode.groupId ?? ""}-${mode.draft ? payloadEntity(mode.draft).id : ""}`} kind={mode.itemKind} draft={mode.draft} index={index} defaultGroupId={mode.groupId !== undefined ? mode.groupId : selectedGroupId} onSave={(p) => save(p)} onCancel={() => setMode({ kind: "view" })} onAddIcon={addIcon} />
           )}
           {mode.kind === "edit" && current?.ok && (
-            <ItemForm kind={current.payload.kind} initial={current.payload} index={index} onSave={(p) => save(p, current.revision)} onCancel={() => setMode({ kind: "view" })} onAddIcon={addIcon} />
+            <ItemForm kind={current.payload.kind} initial={current.payload} draft={mode.draft} index={index} onSave={(p) => save(p, current.revision)} onCancel={() => setMode({ kind: "view" })} onAddIcon={addIcon} />
           )}
           {mode.kind === "view" && !current && (
             <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center max-md:hidden">

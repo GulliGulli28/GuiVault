@@ -30,8 +30,9 @@ stores, politique de sécurité, survivre au projet) puis l'**offre** (§8) :
 c'est ce qui sépare un projet solide d'un outil qu'on recommande.
 
 1. **Android, la suite du remplissage** (essayé sur un vrai téléphone le
-   26 octobre) : enregistrer après une connexion, passkeys par le
-   Credential Manager (§6, [`REMPLISSAGE.md`](REMPLISSAGE.md)).
+   26 octobre ; « Enregistrer dans GuiVault ? » fait le 27) : passkeys par
+   le Credential Manager, copier le code 2FA après remplissage (§6,
+   [`REMPLISSAGE.md`](REMPLISSAGE.md)).
 2. **Windows** (§6) : signature de code (SmartScreen), Windows Hello.
 3. **Le reste des cases vides**, au choix : passkey dans l'extension (§2), écrans propres à
    l'application qui n'ont eu que des textes raccourcis dans la refonte

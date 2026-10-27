@@ -26,6 +26,8 @@
     "autofill:allow-clear",
     "autofill:allow-forget",
     "autofill:allow-password",
+    "autofill:allow-pending",
+    "autofill:allow-offer",
     "biometric:allow-status",
     "biometric:allow-state",
     "biometric:allow-enable",

@@ -38,6 +38,8 @@ export interface AutofillStatus {
   supported: boolean;
   enabled: boolean;
   biometric: boolean;
+  /** Proposer « Enregistrer dans GuiVault ? » (vrai par défaut). */
+  offerSave?: boolean;
 }
 
 /** L'état du réglage, relu au retour dans l'application (on vient peut-être

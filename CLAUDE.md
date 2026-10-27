@@ -117,7 +117,9 @@ il ne déchiffre rien : la user key reste sous la clé que seule la PRF donne).
   `CoffreFilePlugin.kt`, `guivault_local::export_coffre`/`import_coffre`,
   `CoffreExport`),
   `autofillBridge.ts` (→ `src/lib/autofill.ts`, `AutofillSetting` dont
-  `AutofillFeeder`, qui confie l'index du coffre ouvert).
+  `AutofillFeeder`, qui confie l'index du coffre ouvert, et
+  `AutofillSaveHost` : « Enregistrer dans GuiVault ? », `PendingSave.kt` →
+  `lib/autofillSave.ts` → formulaire pré-rempli par `lib/pendingDraft.ts`).
 - `web/` — l'interface web, Vite + React 19 + TypeScript + Tailwind 3.
   **Refonte (2026-10-21) : on se sépare de la charte de Guiterm.** Faite
   pour le web, l'extension et le mobile (le web sous 768 px : barre

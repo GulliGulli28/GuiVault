@@ -3,7 +3,7 @@
  * `AutofillPlugin.kt`). Ailleurs, ou sur un téléphone qui ne le permet pas :
  * pas de pont. */
 import { invoke } from "@tauri-apps/api/core";
-import { setAutofillBridge } from "../../src/lib/platform";
+import { setAutofillBridge, type CapturedLogin } from "../../src/lib/platform";
 
 export async function installAutofill(): Promise<void> {
   const status = await invoke<{ supported: boolean; enabled: boolean; biometric: boolean }>("plugin:autofill|status").catch(() => null);
@@ -16,5 +16,7 @@ export async function installAutofill(): Promise<void> {
     clear: () => invoke<void>("plugin:autofill|clear"),
     forget: () => invoke<void>("plugin:autofill|forget"),
     passwordUsed: () => invoke<void>("plugin:autofill|password"),
+    takeSave: () => invoke<{ login: CapturedLogin | null }>("plugin:autofill|pending").then((r) => r.login ?? null),
+    setOfferSave: (enabled) => invoke<void>("plugin:autofill|offer", { enabled }),
   });
 }

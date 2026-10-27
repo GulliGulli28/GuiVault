@@ -62,6 +62,32 @@ Une autre application, un champ ──▶ GuiVaultAutofillService.onFillRequest
 - **La règle n°1 tient** : rien ne part au serveur, tout se passe sur le
   téléphone.
 
+## Enregistrer une connexion
+
+Un mot de passe tapé à la main (pas rempli par GuiVault) : Android propose
+« Enregistrer dans GuiVault ? » quand le formulaire part — ou, page web,
+quand ses champs disparaissent (`SaveInfo`, `FLAG_SAVE_ON_ALL_VIEWS_INVISIBLE`).
+
+1. `onSaveRequest` lit l'utilisateur et le mot de passe saisis
+   (`AutofillForm.textOf`) et les garde **en mémoire** dans le processus
+   (`PendingSave.kt`, dix minutes au plus) — l'intent qui ouvre GuiVault ne
+   porte rien, rien n'est écrit sur le disque.
+2. GuiVault s'ouvre ; une fois un coffre ouvert, l'interface prend la
+   connexion (`autofillBridge.takeSave`, commande `pending`, à l'ouverture
+   et à chaque retour au premier plan : `AutofillSaveHost`).
+3. `lib/autofillSave.ts` décide : déjà là avec ce mot de passe → rien ; le
+   même compte (même site — ou `androidapp://` —, même utilisateur) dans un
+   vault où l'on peut écrire → sa **modification** s'ouvre avec le nouveau
+   mot de passe (l'ancien passe dans l'historique ; protégé : le mot de
+   passe maître d'abord) ; sinon un **nouvel identifiant** dans le vault
+   personnel. Le formulaire s'ouvre pré-rempli (`lib/pendingDraft.ts`) :
+   rien n'est écrit sans « Enregistrer ».
+
+Réglage : Réglages › Remplissage › « Proposer d'enregistrer les
+connexions » (préférence du service, `PendingSave.offer`). Vérifié sur
+l'émulateur (Chrome 133) : proposition, création pré-remplie, puis le même
+compte avec un autre mot de passe → modification de l'existant.
+
 ## Qui reçoit quoi
 
 - **Un site** (navigateur connu, `AutofillForm.BROWSERS`) : les
@@ -99,9 +125,8 @@ Une autre application, un champ ──▶ GuiVaultAutofillService.onFillRequest
 
 ## Ce qui reste
 
-- [ ] « Enregistrer dans GuiVault ? » après une connexion (`SaveInfo`,
-  `onSaveRequest`) : il faudra écrire dans le coffre, donc passer par
-  l'interface (ou ouvrir l'application sur un brouillon).
+- [x] « Enregistrer dans GuiVault ? » après une connexion : voir
+  « Enregistrer une connexion ».
 - [ ] Copier le code 2FA après avoir rempli (comme Bitwarden).
 - [ ] Passkeys et mots de passe par le **Credential Manager** d'Android 14+
   (`CredentialProviderService`) : la feuille unifiée des applications qui

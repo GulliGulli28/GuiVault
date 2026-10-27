@@ -20,6 +20,11 @@ class AutofillUpdateArgs {
     lateinit var index: String
 }
 
+@InvokeArg
+class AutofillOfferArgs {
+    var enabled: Boolean = true
+}
+
 /**
  * Le remplissage automatique vu de l'interface (`docs/REMPLISSAGE.md`) :
  * savoir si GuiVault est le service choisi, le faire choisir, lui confier
@@ -42,7 +47,8 @@ class AutofillPlugin(private val activity: Activity) : Plugin(activity) {
             JSObject()
                 .put("supported", supported)
                 .put("enabled", supported && m?.hasEnabledAutofillServices() == true)
-                .put("biometric", BiometricManager.from(activity).canAuthenticate(BIOMETRIC_STRONG) == BiometricManager.BIOMETRIC_SUCCESS),
+                .put("biometric", BiometricManager.from(activity).canAuthenticate(BIOMETRIC_STRONG) == BiometricManager.BIOMETRIC_SUCCESS)
+                .put("offerSave", PendingSave.offer(activity)),
         )
     }
 
@@ -84,6 +90,32 @@ class AutofillPlugin(private val activity: Activity) : Plugin(activity) {
     @Command
     fun forget(invoke: Invoke) {
         AutofillIndex.forget(activity)
+        invoke.resolve()
+    }
+
+    /** La connexion qu'Android a proposé d'enregistrer ([PendingSave]),
+     * retirée : l'interface ouvre le formulaire pré-rempli. */
+    @Command
+    fun pending(invoke: Invoke) {
+        val login = PendingSave.take() ?: return invoke.resolve(JSObject().put("login", null as Any?))
+        invoke.resolve(
+            JSObject().put(
+                "login",
+                JSObject()
+                    .put("username", login.username)
+                    .put("password", login.password)
+                    .put("domain", login.domain)
+                    .put("pkg", login.pkg)
+                    .put("label", login.label),
+            ),
+        )
+    }
+
+    /** Proposer « Enregistrer dans GuiVault ? » ou non. */
+    @Command
+    fun offer(invoke: Invoke) {
+        val args = invoke.parseArgs(AutofillOfferArgs::class.java)
+        PendingSave.setOffer(activity, args.enabled)
         invoke.resolve()
     }
 

@@ -9,6 +9,7 @@ import android.service.autofill.FillCallback
 import android.service.autofill.FillRequest
 import android.service.autofill.FillResponse
 import android.service.autofill.SaveCallback
+import android.service.autofill.SaveInfo
 import android.service.autofill.SaveRequest
 import android.widget.inline.InlinePresentationSpec
 
@@ -22,6 +23,12 @@ import android.widget.inline.InlinePresentationSpec
  * - Sinon, l'index chiffré du disque : « Déverrouiller GuiVault » → une
  *   empreinte, puis on remplit.
  * - Sinon : « Ouvrir GuiVault », pour déverrouiller dans l'application.
+ *
+ * Un mot de passe tapé à la main (pas rempli par GuiVault) : Android
+ * propose « Enregistrer dans GuiVault ? » ([onSaveRequest]). Le service ne
+ * sait pas écrire dans le coffre (pas de clé) : il garde la saisie en
+ * mémoire ([PendingSave]) et ouvre GuiVault, dont l'interface la reprend
+ * (`autofillBridge.takeSave`, commande `pending`) et ouvre le formulaire pré-rempli.
  */
 class GuiVaultAutofillService : AutofillService() {
 
@@ -56,13 +63,41 @@ class GuiVaultAutofillService : AutofillService() {
                     response.addDataset(form.gate(this, "GuiVault", "Ouvrir pour déverrouiller", sender(AutofillActivity.MODE_OPEN), spec()))
             }
         }
+        // Un mot de passe saisi à la main : Android proposera de
+        // l'enregistrer quand le formulaire part (ou disparaît, page web).
+        if (form.password.isNotEmpty() && PendingSave.offer(this)) {
+            val types = SaveInfo.SAVE_DATA_TYPE_PASSWORD or (if (form.username.isNotEmpty()) SaveInfo.SAVE_DATA_TYPE_USERNAME else 0)
+            val save = SaveInfo.Builder(types, form.password.toTypedArray())
+            if (form.username.isNotEmpty()) save.setOptionalIds(form.username.toTypedArray())
+            save.setFlags(SaveInfo.FLAG_SAVE_ON_ALL_VIEWS_INVISIBLE)
+            response.setSaveInfo(save.build())
+        }
         callback.onSuccess(response.build())
     }
 
-    /** « Enregistrer dans GuiVault ? » n'est pas encore là : rien n'est
-     * demandé (pas de `SaveInfo`), rien n'arrive ici. */
+    /** « Enregistrer dans GuiVault » accepté : la saisie attend l'interface
+     * en mémoire, l'intent qui ouvre GuiVault ne porte rien. */
     override fun onSaveRequest(request: SaveRequest, callback: SaveCallback) {
-        callback.onSuccess()
+        val structure = request.fillContexts.lastOrNull()?.structure ?: return callback.onSuccess()
+        val form = AutofillForm.parse(structure)
+        val password = AutofillForm.textOf(structure, form.password)
+        if (password == null || form.pkg == packageName) return callback.onSuccess()
+        PendingSave.put(
+            PendingSave.Login(
+                username = AutofillForm.textOf(structure, form.username).orEmpty(),
+                password = password,
+                domain = form.domain,
+                pkg = form.pkg,
+                label = form.domain ?: AutofillIndex.appLabel(this, form.pkg),
+            ),
+        )
+        val open = Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            callback.onSuccess(PendingIntent.getActivity(this, 1, open, PendingIntent.FLAG_CANCEL_CURRENT or PendingIntent.FLAG_IMMUTABLE).intentSender)
+        } else {
+            callback.onSuccess()
+            startActivity(open)
+        }
     }
 
     /** L'écran de GuiVault qui rend un jeu de valeurs. Mutable : Android y
