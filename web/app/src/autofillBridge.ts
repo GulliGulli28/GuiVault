@@ -18,5 +18,6 @@ export async function installAutofill(): Promise<void> {
     passwordUsed: () => invoke<void>("plugin:autofill|password"),
     takeSave: () => invoke<{ login: CapturedLogin | null }>("plugin:autofill|pending").then((r) => r.login ?? null),
     setOfferSave: (enabled) => invoke<void>("plugin:autofill|offer", { enabled }),
+    setCopyTotp: (enabled) => invoke<void>("plugin:autofill|totp", { enabled }),
   });
 }

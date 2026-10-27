@@ -51,7 +51,17 @@ class GuiVaultAutofillService : AutofillService() {
         val open = AutofillIndex.open()
         if (open != null) {
             val found = AutofillIndex.matches(this, open, form.asker).take(4)
-            for (entry in found) response.addDataset(form.dataset(this, entry, spec()))
+            val copyTotp = Totp.copyEnabled(this)
+            for (entry in found) {
+                // Avec un TOTP : un passage invisible par GuiVault, qui copie
+                // le code puis rend les valeurs ([AutofillActivity.MODE_TOTP]).
+                val ds = if (copyTotp && entry.totp != null) {
+                    form.dataset(this, entry, spec(), sender(AutofillActivity.MODE_TOTP, entry.id))
+                } else {
+                    form.dataset(this, entry, spec())
+                }
+                response.addDataset(ds)
+            }
             response.addDataset(form.gate(this, "Chercher dans GuiVault", where, sender(AutofillActivity.MODE_PICK), spec()))
         } else {
             when (AutofillIndex.stored(this)) {
@@ -102,10 +112,10 @@ class GuiVaultAutofillService : AutofillService() {
 
     /** L'écran de GuiVault qui rend un jeu de valeurs. Mutable : Android y
      * ajoute la structure du formulaire. */
-    private fun sender(mode: String) = PendingIntent.getActivity(
+    private fun sender(mode: String, entry: String? = null) = PendingIntent.getActivity(
         this,
-        mode.hashCode(),
-        Intent(this, AutofillActivity::class.java).putExtra(AutofillActivity.EXTRA_MODE, mode),
+        (mode + (entry ?: "")).hashCode(),
+        Intent(this, AutofillActivity::class.java).putExtra(AutofillActivity.EXTRA_MODE, mode).putExtra(AutofillActivity.EXTRA_ENTRY, entry),
         PendingIntent.FLAG_CANCEL_CURRENT or (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE else 0),
     ).intentSender
 }

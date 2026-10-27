@@ -48,6 +48,10 @@ class AutofillActivity : AppCompatActivity() {
         const val MODE_PICK = "pick"
         const val MODE_UNLOCK = "unlock"
         const val MODE_OPEN = "open"
+        /** Un identifiant avec TOTP, coffre ouvert : rien à montrer — copier
+         * le code, rendre les valeurs. */
+        const val MODE_TOTP = "totp"
+        const val EXTRA_ENTRY = "entry"
     }
 
     private lateinit var form: AutofillForm
@@ -64,8 +68,12 @@ class AutofillActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
-        window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
-        window.setDimAmount(0.45f)
+        val mode = intent.getStringExtra(EXTRA_MODE)
+        // Le passage du TOTP ne montre rien : pas d'assombrissement.
+        if (mode != MODE_TOTP) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+            window.setDimAmount(0.45f)
+        }
         val structure: AssistStructure? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             intent.getParcelableExtra(AutofillManager.EXTRA_ASSIST_STRUCTURE, AssistStructure::class.java)
         } else {
@@ -75,7 +83,11 @@ class AutofillActivity : AppCompatActivity() {
         if (structure == null) return cancel()
         form = AutofillForm.parse(structure)
         where = form.domain ?: AutofillIndex.appLabel(this, form.pkg)
-        when (intent.getStringExtra(EXTRA_MODE)) {
+        when (mode) {
+            MODE_TOTP -> {
+                val id = intent.getStringExtra(EXTRA_ENTRY)
+                AutofillIndex.open()?.find { it.id == id }?.let { fill(it, remember = false) } ?: unlockOrOpen()
+            }
             MODE_PICK -> AutofillIndex.open()?.let { showList(it) } ?: unlockOrOpen()
             MODE_UNLOCK -> unlockOrOpen()
             else -> showOpen(null)
@@ -124,6 +136,11 @@ class AutofillActivity : AppCompatActivity() {
         if (remember && form.domain == null) AutofillIndex.associate(this, form.pkg, entry.id)
         val data = Intent().putExtra(AutofillManager.EXTRA_AUTHENTICATION_RESULT, form.dataset(this, entry))
         setResult(RESULT_OK, data)
+        // Le site demandera le code à l'écran suivant : il est déjà copié.
+        entry.totp?.takeIf { Totp.copyEnabled(this) }?.let {
+            Totp.copy(this, it.code())
+            android.widget.Toast.makeText(this, "Code 2FA copié", android.widget.Toast.LENGTH_SHORT).show()
+        }
         finish()
     }
 

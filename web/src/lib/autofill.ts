@@ -5,11 +5,20 @@
 import { useCallback, useEffect, useState } from "react";
 import { coffreName } from "./localHost";
 import type { VaultItem } from "./allItems";
-import { autofillBridge, type AutofillIndex } from "./platform";
+import { autofillBridge, type AutofillIndex, type AutofillTotp } from "./platform";
+import { base32Encode, parseTotp } from "./totp";
 import type { SessionState } from "./session";
 import { t } from "./i18n";
 
 export { autofillBridge };
+
+/** Le TOTP d'un identifiant pour le service : secret en base32 et réglages
+ * (`Totp.kt` le calcule et le copie après avoir rempli). Illisible : rien. */
+export function autofillTotp(totp: string | null | undefined): AutofillTotp | undefined {
+  const p = totp?.trim() ? parseTotp(totp) : null;
+  if (!p) return undefined;
+  return { secret: base32Encode(p.secret), algorithm: p.algorithm.replace("-", "") as AutofillTotp["algorithm"], digits: p.digits, period: p.period };
+}
 
 /** Les identifiants (pas les autres secrets) de tous les vaults lisibles ;
  * les adresses « jamais » n'en sortent pas. */
@@ -29,6 +38,7 @@ export function buildAutofillIndex(session: SessionState, items: VaultItem[]): A
       username: l.username,
       password: l.password,
       uris: l.uris.filter((u) => u.uri.trim() && u.match !== "never").map((u) => ({ uri: u.uri.trim(), match: u.match ?? null })),
+      totp: autofillTotp(l.totp),
     });
   }
   return { v: 1, label: session.local ? coffreName(session.local.path) : session.user.email, entries };
@@ -40,6 +50,8 @@ export interface AutofillStatus {
   biometric: boolean;
   /** Proposer « Enregistrer dans GuiVault ? » (vrai par défaut). */
   offerSave?: boolean;
+  /** Copier le code 2FA après avoir rempli (vrai par défaut). */
+  copyTotp?: boolean;
 }
 
 /** L'état du réglage, relu au retour dans l'application (on vient peut-être

@@ -20,7 +20,7 @@ fn main() {
             .plugin(
                 "autofill",
                 tauri_build::InlinedPlugin::new().commands(&[
-                    "status", "request", "disable", "update", "clear", "forget", "password", "pending", "offer",
+                    "status", "request", "disable", "update", "clear", "forget", "password", "pending", "offer", "totp",
                 ]),
             )
             .plugin(

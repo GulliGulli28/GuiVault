@@ -98,6 +98,12 @@ export function AutofillSetting({ ctx, mobile }: { ctx: Pick<PageContext, "error
   };
   const offerControl = <button type="button" role="switch" aria-checked={offer} aria-label={t("Proposer d'enregistrer les connexions")} onClick={toggleOffer} className="switch" />;
   const offerDesc = t("Un mot de passe tapé ailleurs : « Enregistrer dans GuiVault ? »");
+  const copyTotp = status.copyTotp !== false;
+  const toggleTotp = () => {
+    void autofillBridge()?.setCopyTotp(!copyTotp).then(refresh, () => ctx.error(t("Réglage non enregistré.")));
+  };
+  const totpControl = <button type="button" role="switch" aria-checked={copyTotp} aria-label={t("Copier le code 2FA après avoir rempli")} onClick={toggleTotp} className="switch" />;
+  const totpDesc = t("Le site le demande à l'écran suivant : il est déjà copié");
   if (mobile) {
     return (
       <>
@@ -119,6 +125,16 @@ export function AutofillSetting({ ctx, mobile }: { ctx: Pick<PageContext, "error
             {offerControl}
           </div>
         )}
+        {status.enabled && (
+          <div className="m-set">
+            <span className="w-[18px] shrink-0" />
+            <span className="flex min-w-0 flex-1 flex-col">
+              <span>{t("Copier le code 2FA après avoir rempli")}</span>
+              <span className="text-[13px] text-[var(--c-text-muted)]">{totpDesc}</span>
+            </span>
+            {totpControl}
+          </div>
+        )}
       </>
     );
   }
@@ -126,6 +142,7 @@ export function AutofillSetting({ ctx, mobile }: { ctx: Pick<PageContext, "error
     <>
       <SettingRow title={t("Remplir les autres applications")} desc={desc}>{control}</SettingRow>
       {status.enabled && <SettingRow title={t("Proposer d'enregistrer les connexions")} desc={offerDesc}>{offerControl}</SettingRow>}
+      {status.enabled && <SettingRow title={t("Copier le code 2FA après avoir rempli")} desc={totpDesc}>{totpControl}</SettingRow>}
     </>
   );
 }

@@ -293,7 +293,17 @@ export interface AutofillIndex {
   v: 1;
   /** Le coffre ou le compte (ce que la feuille de remplissage nomme). */
   label: string;
-  entries: { id: string; name: string; vault: string; username: string; password: string; uris: { uri: string; match: string | null }[] }[];
+  entries: { id: string; name: string; vault: string; username: string; password: string; uris: { uri: string; match: string | null }[]; totp?: AutofillTotp }[];
+}
+
+/** Le TOTP d'un identifiant, normalisé pour le service de remplissage
+ * (`Totp.kt`) : copié juste après avoir rempli. */
+export interface AutofillTotp {
+  /** Base32, sans remplissage. */
+  secret: string;
+  algorithm: "SHA1" | "SHA256" | "SHA512";
+  digits: number;
+  period: number;
 }
 
 /** Le remplissage automatique de l'application Android (`AutofillPlugin.kt`,
@@ -302,7 +312,7 @@ export interface AutofillBridge {
   /** `enabled` : GuiVault est le service de remplissage choisi ;
    * `biometric` : l'index se garde chiffré, l'application fermée remplit
    * encore après une empreinte. */
-  status(): Promise<{ supported: boolean; enabled: boolean; biometric: boolean; offerSave?: boolean }>;
+  status(): Promise<{ supported: boolean; enabled: boolean; biometric: boolean; offerSave?: boolean; copyTotp?: boolean }>;
   /** L'écran d'Android qui propose de choisir GuiVault. */
   request(): Promise<void>;
   /** Ne plus être le service choisi ; l'index s'efface. */
@@ -320,6 +330,8 @@ export interface AutofillBridge {
   takeSave(): Promise<CapturedLogin | null>;
   /** Proposer d'enregistrer, ou non. */
   setOfferSave(enabled: boolean): Promise<void>;
+  /** Copier le code 2FA juste après avoir rempli, ou non. */
+  setCopyTotp(enabled: boolean): Promise<void>;
 }
 
 /** Une connexion tapée à la main dans une autre application ou un site. */

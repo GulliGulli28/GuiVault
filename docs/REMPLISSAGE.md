@@ -88,6 +88,18 @@ connexions » (préférence du service, `PendingSave.offer`). Vérifié sur
 l'émulateur (Chrome 133) : proposition, création pré-remplie, puis le même
 compte avec un autre mot de passe → modification de l'existant.
 
+## Copier le code 2FA
+
+Un identifiant qui a un TOTP : en le remplissant, GuiVault copie aussi son
+code — le site le demande à l'écran suivant, il n'y a qu'à coller. L'index
+emporte le TOTP normalisé (`autofillTotp` : secret base32, algorithme,
+chiffres, période ; chiffré au repos comme le mot de passe), et un tel
+identifiant passe par un écran de GuiVault **invisible** (jeu de valeurs
+authentifié, `AutofillActivity` en mode `totp`) qui calcule le code
+(`Totp.kt`), le copie marqué sensible, l'efface au bout d'une minute s'il
+est encore là, et rend les valeurs. Réglage : « Copier le code 2FA après
+avoir rempli » (vrai par défaut).
+
 ## Qui reçoit quoi
 
 - **Un site** (navigateur connu, `AutofillForm.BROWSERS`) : les
@@ -127,7 +139,11 @@ compte avec un autre mot de passe → modification de l'existant.
 
 - [x] « Enregistrer dans GuiVault ? » après une connexion : voir
   « Enregistrer une connexion ».
-- [ ] Copier le code 2FA après avoir rempli (comme Bitwarden).
+- [x] Copier le code 2FA après avoir rempli (comme Bitwarden) : voir
+  « Copier le code 2FA ».
+- [ ] Les textes du service et de sa feuille (Kotlin : « Déverrouiller
+  GuiVault », « Chercher dans GuiVault »…) sont en français seulement :
+  à passer en ressources Android (`values/`, `values-en/`).
 - [ ] Passkeys et mots de passe par le **Credential Manager** d'Android 14+
   (`CredentialProviderService`) : la feuille unifiée des applications qui
   l'utilisent.

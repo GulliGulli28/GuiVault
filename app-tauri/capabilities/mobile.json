@@ -28,6 +28,7 @@
     "autofill:allow-password",
     "autofill:allow-pending",
     "autofill:allow-offer",
+    "autofill:allow-totp",
     "biometric:allow-status",
     "biometric:allow-state",
     "biometric:allow-enable",

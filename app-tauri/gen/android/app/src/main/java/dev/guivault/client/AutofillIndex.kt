@@ -35,6 +35,8 @@ data class FillEntry(
     val password: String,
     /** Adresses avec leur règle (`domain`, `host`…) ; `androidapp://<paquet>` pour une application. */
     val uris: List<Pair<String, String?>>,
+    /** Le TOTP, copié juste après avoir rempli ([Totp]). */
+    val totp: Totp? = null,
 )
 
 /** Qui demande : une application (paquet), ou un site dans un navigateur de
@@ -338,6 +340,7 @@ object AutofillIndex {
                     val u = uris.getJSONObject(j)
                     u.getString("uri") to (if (u.isNull("match")) null else u.optString("match"))
                 },
+                totp = e.optJSONObject("totp")?.let(Totp::fromJson),
             )
         }
         o.optString("label") to list

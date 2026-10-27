@@ -48,7 +48,8 @@ class AutofillPlugin(private val activity: Activity) : Plugin(activity) {
                 .put("supported", supported)
                 .put("enabled", supported && m?.hasEnabledAutofillServices() == true)
                 .put("biometric", BiometricManager.from(activity).canAuthenticate(BIOMETRIC_STRONG) == BiometricManager.BIOMETRIC_SUCCESS)
-                .put("offerSave", PendingSave.offer(activity)),
+                .put("offerSave", PendingSave.offer(activity))
+                .put("copyTotp", Totp.copyEnabled(activity)),
         )
     }
 
@@ -116,6 +117,14 @@ class AutofillPlugin(private val activity: Activity) : Plugin(activity) {
     fun offer(invoke: Invoke) {
         val args = invoke.parseArgs(AutofillOfferArgs::class.java)
         PendingSave.setOffer(activity, args.enabled)
+        invoke.resolve()
+    }
+
+    /** Copier le code 2FA après avoir rempli, ou non. */
+    @Command
+    fun totp(invoke: Invoke) {
+        val args = invoke.parseArgs(AutofillOfferArgs::class.java)
+        Totp.setCopyEnabled(activity, args.enabled)
         invoke.resolve()
     }
 

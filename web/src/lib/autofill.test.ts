@@ -39,4 +39,17 @@ describe("buildAutofillIndex", () => {
     const local = { user: { email: "local" }, local: { path: "/data/coffres/Mon coffre.guivault" } } as unknown as SessionState;
     expect(buildAutofillIndex(local, []).label).toBe("Mon coffre");
   });
+
+  it("confie le TOTP normalisé, pour le copier après avoir rempli", () => {
+    const index = buildAutofillIndex(session, [
+      login("a", { username: "moi", password: "p", totp: "otpauth://totp/X:moi?secret=jbswy3dpehpk3pxp&algorithm=SHA256&digits=8&period=60" }),
+      login("b", { username: "moi", password: "p", totp: "JBSW Y3DP EHPK 3PXP" }),
+      login("c", { username: "moi", password: "p", totp: "0189" }),
+    ]);
+    expect(index.entries.map((e) => e.totp)).toEqual([
+      { secret: "JBSWY3DPEHPK3PXP", algorithm: "SHA256", digits: 8, period: 60 },
+      { secret: "JBSWY3DPEHPK3PXP", algorithm: "SHA1", digits: 6, period: 30 },
+      undefined,
+    ]);
+  });
 });

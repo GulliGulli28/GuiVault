@@ -169,7 +169,9 @@ class AutofillForm private constructor(
     /** Un jeu de valeurs : l'identifiant et le mot de passe de `entry` dans
      * les champs du formulaire. */
     @Suppress("DEPRECATION")
-    fun dataset(context: Context, entry: FillEntry, spec: InlinePresentationSpec? = null): Dataset {
+    /** Le jeu de valeurs d'un identifiant ; `auth` : passer d'abord par
+     * GuiVault (copie du code TOTP), qui rend ce même jeu. */
+    fun dataset(context: Context, entry: FillEntry, spec: InlinePresentationSpec? = null, auth: android.content.IntentSender? = null): Dataset {
         val subtitle = entry.username.ifEmpty { entry.vault }
         val pres = presentation(context, entry.name, subtitle)
         val inl = inline(context, spec, entry.name, subtitle)
@@ -183,6 +185,7 @@ class AutofillForm private constructor(
         // Un formulaire sans champ rempli par cet identifiant : au moins une
         // valeur, sans quoi Android refuse le jeu.
         if (entry.username.isEmpty() && password.isEmpty()) username.forEach { put(it, "") }
+        if (auth != null) b.setAuthentication(auth)
         return b.build()
     }
 
