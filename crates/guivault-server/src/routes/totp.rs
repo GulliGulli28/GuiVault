@@ -214,9 +214,16 @@ pub async fn enable(
     crate::mail::security(
         &state,
         &user.email,
-        "Second facteur activé sur votre compte GuiVault",
-        "Le second facteur (codes TOTP) vient d'être activé sur votre compte GuiVault ; vos autres sessions ont été déconnectées. \
-         Gardez vos codes de récupération en lieu sûr.",
+        crate::mail::text(
+            "Second facteur activé sur votre compte GuiVault",
+            "Second factor turned on for your GuiVault account",
+        ),
+        crate::mail::text(
+            "Le second facteur (codes TOTP) vient d'être activé sur votre compte GuiVault ; vos autres sessions ont été déconnectées. \
+             Gardez vos codes de récupération en lieu sûr.",
+            "The second factor (TOTP codes) was just turned on for your GuiVault account; your other sessions were signed out. \
+             Keep your recovery codes somewhere safe.",
+        ),
     );
     Ok(Json(TotpEnableResponse { recovery_codes: codes }))
 }
@@ -264,9 +271,16 @@ pub async fn disable(
     crate::mail::security(
         &state,
         &user.email,
-        "Second facteur désactivé sur votre compte GuiVault",
-        "Le second facteur (codes TOTP) vient d'être désactivé sur votre compte GuiVault : votre mot de passe maître suffit \
-         désormais à s'y connecter.",
+        crate::mail::text(
+            "Second facteur désactivé sur votre compte GuiVault",
+            "Second factor turned off for your GuiVault account",
+        ),
+        crate::mail::text(
+            "Le second facteur (codes TOTP) vient d'être désactivé sur votre compte GuiVault : votre mot de passe maître suffit \
+             désormais à s'y connecter.",
+            "The second factor (TOTP codes) was just turned off for your GuiVault account: your master password alone \
+             now signs in to it.",
+        ),
     );
     Ok(StatusCode::NO_CONTENT)
 }

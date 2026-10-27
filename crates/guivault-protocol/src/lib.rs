@@ -1267,6 +1267,13 @@ pub struct TravelStatus {
     pub enabled: bool,
 }
 
+/// `PUT /users/me/language` : la langue de l'interface du compte, celle des
+/// e-mails que le serveur lui envoie (`fr` ou `en`).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LanguageRequest {
+    pub language: String,
+}
+
 /// `PUT /users/me/travel` : l'activer d'un geste ; le désactiver redemande
 /// le mot de passe maître (`auth_key`) — sinon qui tient l'appareil
 /// déverrouillé n'aurait qu'à le couper.

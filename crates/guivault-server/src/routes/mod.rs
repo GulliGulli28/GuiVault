@@ -82,6 +82,7 @@ pub fn router(state: AppState) -> Router {
         .route("/users/me", get(users::me).delete(users::delete_me))
         .route("/users/me/settings", get(users::get_settings).put(users::put_settings))
         .route("/users/me/travel", get(travel::status).put(travel::set))
+        .route("/users/me/language", put(users::set_language))
         .route("/vaults/{id}/travel", put(travel::set_vault))
         .route("/users/me/audit", get(audit::for_me))
         .route("/users/lookup", get(users::lookup))

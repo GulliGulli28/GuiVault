@@ -9,7 +9,8 @@ use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use chrono::{DateTime, Utc};
 use guivault_protocol::{
-    DeleteAccountRequest, PutUserSettingsRequest, ServerEvent, UserLookupResponse, UserProfile, UserSettings,
+    DeleteAccountRequest, LanguageRequest, PutUserSettingsRequest, ServerEvent, UserLookupResponse, UserProfile,
+    UserSettings,
 };
 use serde::Deserialize;
 use uuid::Uuid;
@@ -116,6 +117,24 @@ pub async fn put_settings(
         .events
         .publish(vec![user.id], ServerEvent::SettingsChanged { revision: row.revision });
     Ok(Json(row.into()))
+}
+
+/// La langue de l'interface du compte : celle de ses e-mails (`mail.rs`).
+/// Pas d'audit : une préférence, sans effet sur la sécurité.
+pub async fn set_language(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Json(req): Json<LanguageRequest>,
+) -> ApiResult<StatusCode> {
+    if !matches!(req.language.as_str(), "fr" | "en") {
+        return Err(AppError::bad_request("invalid_language", "langue inconnue (fr ou en)"));
+    }
+    sqlx::query("UPDATE users SET language = $2 WHERE id = $1")
+        .bind(user.id)
+        .bind(&req.language)
+        .execute(&state.db)
+        .await?;
+    Ok(StatusCode::NO_CONTENT)
 }
 
 /// Supprime le compte et tout ce qui n'appartient qu'à lui : ses vaults (le
@@ -300,12 +319,20 @@ pub(crate) async fn delete_account(
     crate::mail::notice(
         state,
         email,
-        "Votre compte GuiVault a été supprimé",
-        &if by_admin.is_some() {
-            "Un administrateur du serveur a supprimé votre compte GuiVault et ce qui n'appartenait qu'à lui."
-                .to_string()
+        crate::mail::text(
+            "Votre compte GuiVault a été supprimé",
+            "Your GuiVault account was deleted",
+        ),
+        if by_admin.is_some() {
+            crate::mail::text(
+                "Un administrateur du serveur a supprimé votre compte GuiVault et ce qui n'appartenait qu'à lui.",
+                "A server administrator deleted your GuiVault account and what belonged only to it.",
+            )
         } else {
-            "Votre compte GuiVault a été supprimé, avec ce qui n'appartenait qu'à lui.".to_string()
+            crate::mail::text(
+                "Votre compte GuiVault a été supprimé, avec ce qui n'appartenait qu'à lui.",
+                "Your GuiVault account was deleted, along with what belonged only to it.",
+            )
         },
     );
     Ok(owned)

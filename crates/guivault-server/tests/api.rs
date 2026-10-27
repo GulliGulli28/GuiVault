@@ -3633,6 +3633,17 @@ async fn mail_goes_out_when_configured_and_never_blocks() {
     let alice = User::register(&server, "alice@t.io", "pw-alice").await;
     let bob = User::register(&server, "bob@t.io", "pw-bob").await;
     assert!(smtp.wait(1).await.is_empty(), "l'inscription n'envoie rien");
+    // Les interfaces disent leur langue : les e-mails la suivent.
+    for u in [&alice, &bob] {
+        status!(
+            u.req(reqwest::Method::PUT, "/users/me/language")
+                .json(&LanguageRequest { language: "fr".into() })
+                .send()
+                .await
+                .unwrap(),
+            StatusCode::NO_CONTENT
+        );
+    }
 
     // Une invitation vers quelqu'un qui n'a pas de compte.
     let (team, _) = alice.create_vault("Équipe").await;
@@ -3652,9 +3663,16 @@ async fn mail_goes_out_when_configured_and_never_blocks() {
     let mails = smtp.wait(1).await;
     let m = &mails[0];
     assert_eq!(m.to, "carol@t.io");
-    assert_eq!(m.subject, "alice@t.io vous invite dans un vault GuiVault");
+    // Carol n'a pas de compte : sa langue est inconnue, elle reçoit les deux.
+    assert_eq!(
+        m.subject,
+        "alice@t.io vous invite dans un vault GuiVault · alice@t.io invites you to a GuiVault vault"
+    );
     assert!(
-        m.body.contains("rôle « éditeur »") && m.body.contains("créez-le avec cette adresse"),
+        m.body.contains("rôle « éditeur »")
+            && m.body.contains("créez-le avec cette adresse")
+            && m.body.contains("“editor” role")
+            && m.body.find("rôle « éditeur »") < m.body.find("“editor” role"),
         "{}",
         m.body
     );
@@ -3821,6 +3839,30 @@ async fn mail_goes_out_when_configured_and_never_blocks() {
     );
     let mails = smtp.wait(10).await;
     assert_eq!(mails[9].subject, "Essai d'envoi GuiVault");
+
+    // L'interface d'Alice passe en anglais : ses e-mails aussi, en anglais
+    // seulement.
+    status!(
+        alice
+            .req(reqwest::Method::PUT, "/users/me/language")
+            .json(&LanguageRequest { language: "en".into() })
+            .send()
+            .await
+            .unwrap(),
+        StatusCode::NO_CONTENT
+    );
+    assert_eq!(
+        login_from(&server, "alice@t.io", "pw-alice", "198.51.100.9").await,
+        StatusCode::OK
+    );
+    let mails = smtp.wait(11).await;
+    let m = &mails[10];
+    assert_eq!(m.subject, "New sign-in to your GuiVault account");
+    assert!(
+        m.body.contains("198.51.100.9") && m.body.contains("Sent by") && !m.body.contains("Quelqu'un"),
+        "{}",
+        m.body
+    );
     server.stop().await;
 
     // SMTP qui accepte la connexion et ne répond jamais : un envoi attendu
@@ -5486,6 +5528,38 @@ async fn security_keys_as_second_factor() {
     );
     let listed: Vec<PasskeyInfo> = alice.get("/auth/passkeys").await;
     assert!(listed.is_empty(), "la clé de sécurité part avec le TOTP");
+    server.stop().await;
+}
+
+#[tokio::test]
+async fn the_account_language_is_kept_for_its_emails() {
+    let Some(server) = TestServer::start(RegistrationMode::Open).await else {
+        return;
+    };
+    let alice = User::register(&server, "alice-lang@t.io", "pw-alice").await;
+    let set = |language: &str| {
+        alice
+            .req(reqwest::Method::PUT, "/users/me/language")
+            .json(&LanguageRequest {
+                language: language.into(),
+            })
+            .send()
+    };
+    let db = server.db().await;
+    let stored = || async {
+        sqlx::query_scalar::<_, Option<String>>("SELECT language FROM users WHERE email = 'alice-lang@t.io'")
+            .fetch_one(&db)
+            .await
+            .unwrap()
+    };
+    assert_eq!(stored().await, None, "inconnue tant que l'interface ne l'a pas dite");
+    status!(set("en").await.unwrap(), StatusCode::NO_CONTENT);
+    assert_eq!(stored().await.as_deref(), Some("en"));
+    status!(set("fr").await.unwrap(), StatusCode::NO_CONTENT);
+    assert_eq!(stored().await.as_deref(), Some("fr"));
+    let refused = status!(set("de").await.unwrap(), StatusCode::BAD_REQUEST);
+    assert!(refused.contains("invalid_language"), "{refused}");
+    assert_eq!(stored().await.as_deref(), Some("fr"));
     server.stop().await;
 }
 

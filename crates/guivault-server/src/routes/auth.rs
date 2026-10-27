@@ -467,8 +467,14 @@ pub async fn change_password(
     crate::mail::security(
         &state,
         &user.email,
-        "Votre mot de passe maître GuiVault a changé",
-        "Le mot de passe maître de votre compte GuiVault vient d'être changé ; vos autres sessions ont été déconnectées.",
+        crate::mail::text(
+            "Votre mot de passe maître GuiVault a changé",
+            "Your GuiVault master password changed",
+        ),
+        crate::mail::text(
+            "Le mot de passe maître de votre compte GuiVault vient d'être changé ; vos autres sessions ont été déconnectées.",
+            "The master password of your GuiVault account was just changed; your other sessions were signed out.",
+        ),
     );
     Ok(StatusCode::NO_CONTENT)
 }

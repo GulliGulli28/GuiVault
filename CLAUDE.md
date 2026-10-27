@@ -71,7 +71,10 @@ il ne déchiffre rien : la user key reste sous la clé que seule la PRF donne).
   `mail.rs` (e-mails facultatifs : envoyés après la transaction, en
   arrière-plan — **rien ne doit en dépendre**, une route n'attend jamais
   un envoi ; ni secret, ni nom de vault, ni autre lien que
-  `GUIVAULT_PUBLIC_URL` dans un message),
+  `GUIVAULT_PUBLIC_URL` dans un message ; chaque message s'écrit en
+  français **et** en anglais, `text(fr, en)`, le destinataire reçoit la
+  langue de son compte — `users.language`, `PUT /users/me/language` —, les
+  deux sinon),
   `backup.rs` (sauvegardes vérifiées, `guivault backup` ; **une migration
   qui crée une table l'ajoute à `backup::TABLES`**, dans l'ordre des clés
   étrangères — sinon les sauvegardes échouent, c'est voulu),

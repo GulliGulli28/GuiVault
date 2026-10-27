@@ -458,8 +458,9 @@ Le README le dit en tête ; chaque case cochée y retire une ligne.
   Apparence › Langue (Système, Français, English), par appareil ; erreurs
   du serveur traduites par code. `lib/i18n.ts`, catalogue
   `src/i18n/en.json` (≈ 2 200 textes), complétude vérifiée par
-  `i18n.test.ts`. Reste : le README et `SECURITY.md` en anglais, et les
-  e-mails du serveur.
+  `i18n.test.ts`. E-mails du serveur dans la langue du compte
+  (`users.language`, posée par l'interface ; les deux langues si elle est
+  inconnue). Reste : le README et `SECURITY.md` en anglais.
 - [x] **Politique de sécurité** : [`SECURITY.md`](../SECURITY.md) à la
   racine (canal, délais visés, versions maintenues, périmètre, bonne foi) ;
   `/.well-known/security.txt` (RFC 9116) servi par chaque serveur, contact

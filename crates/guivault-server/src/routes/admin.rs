@@ -250,9 +250,16 @@ pub async fn disable(
         crate::mail::notice(
             &state,
             &info.email,
-            "Votre compte GuiVault a été désactivé",
-            "Un administrateur du serveur a désactivé votre compte GuiVault : vos sessions sont fermées et vous ne pouvez \
-             plus vous connecter. Rien n'est effacé ; adressez-vous à lui.",
+            crate::mail::text(
+                "Votre compte GuiVault a été désactivé",
+                "Your GuiVault account was disabled",
+            ),
+            crate::mail::text(
+                "Un administrateur du serveur a désactivé votre compte GuiVault : vos sessions sont fermées et vous ne pouvez \
+                 plus vous connecter. Rien n'est effacé ; adressez-vous à lui.",
+                "A server administrator disabled your GuiVault account: your sessions are closed and you can no longer \
+                 sign in. Nothing is erased; contact them.",
+            ),
         );
     }
     Ok(Json(user_info(&state, id).await?))
@@ -525,13 +532,17 @@ pub async fn mail_test(State(state): State<AppState>, admin: Admin) -> ApiResult
     }
     let sent = state
         .mail
-        .send_now(crate::mail::Mail {
-            to: admin.user.email.clone(),
-            subject: "Essai d'envoi GuiVault".into(),
-            body:
-                "Les e-mails de ce serveur GuiVault fonctionnent : invitations, alertes de connexion, accès d'urgence."
-                    .into(),
-        })
+        .send_now(
+            &state.db,
+            crate::mail::Mail {
+                to: admin.user.email.clone(),
+                subject: crate::mail::text("Essai d'envoi GuiVault", "GuiVault test e-mail"),
+                body: crate::mail::text(
+                    "Les e-mails de ce serveur GuiVault fonctionnent : invitations, alertes de connexion, accès d'urgence.",
+                    "This GuiVault server's e-mails work: invitations, sign-in alerts, emergency access.",
+                ),
+            },
+        )
         .await;
     Audit::new("admin.mail_test")
         .actor(admin.user.id)

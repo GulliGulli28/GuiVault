@@ -81,9 +81,16 @@ pub async fn set(
         crate::mail::security(
             &state,
             &user.email,
-            "Mode voyage désactivé sur votre compte GuiVault",
-            "Le mode voyage vient d'être désactivé sur votre compte GuiVault : tous vos vaults reviennent sur vos \
-             appareils à leur prochaine synchronisation.",
+            crate::mail::text(
+                "Mode voyage désactivé sur votre compte GuiVault",
+                "Travel mode turned off on your GuiVault account",
+            ),
+            crate::mail::text(
+                "Le mode voyage vient d'être désactivé sur votre compte GuiVault : tous vos vaults reviennent sur vos \
+                 appareils à leur prochaine synchronisation.",
+                "Travel mode was just turned off on your GuiVault account: all your vaults come back to your devices \
+                 at their next sync.",
+            ),
         );
     }
     Ok(Json(TravelStatus { enabled: req.enabled }))

@@ -117,7 +117,7 @@ pub async fn create(
         &state,
         (user.id, &user.email),
         &email,
-        crate::mail::role_label(req.role),
+        req.role,
         invitee.is_some(),
         row.expires_at,
     );

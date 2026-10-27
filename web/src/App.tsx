@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType } from "react";
 import { RepromptProvider } from "./components/Reprompt";
-import { currentTokens, setSessionLostHandler, setTokens, setTokensChangedHandler, subscribeEvents } from "./lib/api";
+import { api, currentTokens, setSessionLostHandler, setTokens, setTokensChangedHandler, subscribeEvents, supports } from "./lib/api";
 import { pullSettings, startSettingsSync, stopSettingsSync } from "./lib/syncedSettings";
 import "./lib/settingsSections";
 import { clearWebSession, loadLockMinutes, loadWebSession, saveWebSession, saveWebTokens, touchWebSession, webSessionIdle } from "./lib/persist";
@@ -298,6 +298,14 @@ export default function App({ Welcome = LoginScreen }: { Welcome?: ComponentType
   const narrow = useMediaQuery(NARROW);
   const vaultRoute = route.page === "vault" ? route.id : null;
   useEffect(() => { if (vaultRoute) rememberVault(vaultRoute); }, [vaultRoute]);
+
+  // Le serveur écrit ses e-mails dans la langue de l'interface : il la
+  // reçoit à l'ouverture de la session et à chaque changement (pas un coffre
+  // local, qui n'en envoie pas ; un serveur plus ancien l'ignore).
+  const userId = session && !session.offline ? session.user.id : null;
+  useEffect(() => {
+    if (userId && supports("setLanguage")) api.setLanguage(lang).catch(() => {});
+  }, [userId, lang]);
 
   const ctx = useMemo<PageContext | null>(() => (session ? { session, reload, notify, error, vaultTicks, search: openSearch, lock: lockByHand } : null), [session, reload, notify, error, vaultTicks, openSearch, lockByHand]);
   // Mobile : les onglets, dans l'ordre de la barre, pour glisser de l'un à
