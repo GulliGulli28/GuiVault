@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type DragEvent, type ReactNode } from "react";
-import { rangeBetween } from "../lib/bulk";
+import { rangeBetween, subtreeIds } from "../lib/bulk";
 import { FOLDERABLE_KINDS, sortedFlat, type SortMode } from "../lib/entities";
 import { plainShortcut } from "../lib/keyboard";
 import { hostKindMeta } from "../lib/hostKinds";
@@ -9,7 +9,7 @@ import { tileHue, tileInitial } from "../lib/tiles";
 import { KIND_LABELS, type CustomIcon, type GuiVaultEntity, type GuiVaultEntityKind } from "../lib/types";
 import { EntityMono, EntityRow, EntityTags, GroupRow } from "./EntityRow";
 import { HostIcon, hasIcon } from "./icons";
-import { IconApiKey, IconCard, IconIdentity, IconLogin, IconNote, IconStar } from "./secret-icons";
+import { IconAccount, IconApiKey, IconCard, IconIdentity, IconLogin, IconNote, IconStar } from "./secret-icons";
 import { IconCloud, IconDatabase, IconFolder, IconFolderFilled, IconHosts, IconKeychain, IconPalette, IconRunbook, IconSnippets } from "./ui-icons";
 import { t } from "../lib/i18n";
 
@@ -26,6 +26,7 @@ export const KIND_ICONS: Record<GuiVaultEntityKind, (p: { size?: number; classNa
   identity: IconIdentity,
   aws: IconCloud,
   "api-key": IconApiKey,
+  account: IconAccount,
   runbook: IconRunbook,
 };
 
@@ -165,7 +166,7 @@ export function ItemTree({ entities, customIcons = [], query, selected, onSelect
   /** Mode sélection : les cases restent visibles, un clic coche. */
   picking?: boolean;
   /** Cocher ou décocher (`toggle`), ou cocher une plage (`add`). */
-  onPick?: (ids: string[], mode: "toggle" | "add") => void;
+  onPick?: (ids: string[], mode: "toggle" | "add" | "remove") => void;
   /** Les éléments cochables à l'écran (filtre, dossiers dépliés), pour
    * « tout cocher ». */
   onPickable?: (ids: string[]) => void;
@@ -200,19 +201,46 @@ export function ItemTree({ entities, customIcons = [], query, selected, onSelect
     [entities, query, sort],
   );
   const visible = useMemo(() => visibleRows(tree.rows, collapsed), [tree, collapsed]);
-  const pickableIds = useMemo(() => visible.flatMap((r) => (r.kind === "entity" && r.entity.kind !== "group" ? [r.id] : [])), [visible]);
+  const pickableIds = useMemo(() => visible.flatMap((r) => (r.kind === "entity" || r.kind === "folder" ? [r.entity.id] : [])), [visible]);
   useEffect(() => { onPickable?.(pickableIds); }, [pickableIds, onPickable]);
+  const isFolder = useMemo(() => new Set(entities.filter((e) => e.kind === "group").map((e) => e.id)), [entities]);
+  /** Un dossier coché coche tout ce qu'il contient. */
+  const withContents = (ids: string[]) => [...new Set(ids.flatMap((id) => (isFolder.has(id) ? subtreeIds(entities, id) : [id])))];
+  /** Cocher ou décocher une ligne (Maj : la plage depuis la dernière). */
+  const pick = (id: string, shift: boolean) => {
+    if (!onPick) return;
+    if (shift) onPick(withContents(rangeBetween(pickableIds, anchor, id)), "add");
+    else if (isFolder.has(id)) onPick(withContents([id]), picked?.has(id) ? "remove" : "add");
+    else onPick([id], "toggle");
+    setAnchor(id);
+  };
   /** Un clic sur un élément : coche (mode sélection, Ctrl/⌘, Maj) ou ouvre. */
   const click = (e: React.MouseEvent, id: string) => {
     if (onPick && (picking || e.ctrlKey || e.metaKey || e.shiftKey)) {
       e.preventDefault();
-      if (e.shiftKey) onPick(rangeBetween(pickableIds, anchor, id), "add");
-      else onPick([id], "toggle");
-      setAnchor(id);
+      pick(id, e.shiftKey);
       return;
     }
     onSelect(id);
   };
+  /** Un dossier : Ctrl/⌘/Maj+clic le coche, un clic le replie. */
+  const folderClick = (e: React.MouseEvent | undefined, folderId: string, rowId: string) => {
+    if (onPick && e && (e.ctrlKey || e.metaKey || e.shiftKey)) {
+      e.preventDefault();
+      pick(folderId, e.shiftKey);
+      return;
+    }
+    toggle(rowId);
+  };
+  const checkbox = (id: string, name: string) => onPick && (picking || !!picked?.size) ? (
+    <input
+      type="checkbox"
+      checked={!!picked?.has(id)}
+      onChange={() => undefined}
+      onClick={(e) => { e.stopPropagation(); pick(id, e.shiftKey); }}
+      aria-label={t("Sélectionner {0}", name)}
+    />
+  ) : undefined;
 
   // ─── Clavier ───────────────────────────────────────────────────────────
   useEffect(() => {
@@ -308,7 +336,8 @@ export function ItemTree({ entities, customIcons = [], query, selected, onSelect
               <GroupRow
                 depth={row.depth}
                 expanded={!collapsed.has(row.id)}
-                onToggle={() => toggle(row.id)}
+                onToggle={(e) => folderClick(e, row.entity.id, row.id)}
+                leading={checkbox(row.entity.id, row.entity.name)}
                 icon={hasIcon(row.entity.icon, customIcons)
                   ? <HostIcon iconId={row.entity.icon} customIcons={customIcons} size={15} />
                   : <EntityIcon entity={row.entity} customIcons={customIcons} size={14} />}
@@ -343,7 +372,6 @@ export function ItemTree({ entities, customIcons = [], query, selected, onSelect
           </>
         ) : undefined;
         const draggable = dragProps(entity);
-        const pickable = !!onPick && entity.kind !== "group";
         const isPicked = !!picked?.has(entity.id);
         return (
           <div key={row.id} {...draggable} data-entity-id={entity.id} className={dragId === entity.id ? "opacity-50" : undefined}>
@@ -351,15 +379,7 @@ export function ItemTree({ entities, customIcons = [], query, selected, onSelect
             depth={row.depth}
             active={selected === entity.id || isPicked}
             className="cursor-pointer"
-            leading={pickable && (picking || isPicked) ? (
-              <input
-                type="checkbox"
-                checked={isPicked}
-                onChange={() => undefined}
-                onClick={(e) => { e.stopPropagation(); if (e.shiftKey) onPick!(rangeBetween(pickableIds, anchor, entity.id), "add"); else onPick!([entity.id], "toggle"); setAnchor(entity.id); }}
-                aria-label={t("Sélectionner {0}", entity.name)}
-              />
-            ) : undefined}
+            leading={checkbox(entity.id, entity.name)}
             tile={<ItemTile entity={entity} customIcons={customIcons} size="var(--entity-icon)" />}
             title={entity.name}
             badges={alert || entity.favorite || entity.badge ? badges : undefined}

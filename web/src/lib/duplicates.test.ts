@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { duplicateOf, findDuplicates, mergeLogins } from "./duplicates";
+import { copiesFor, duplicateOf, findDuplicates, mergeLogins } from "./duplicates";
 import type { HealthEntry } from "./health";
 import { emptyCard, emptyLogin } from "./items";
 import type { Login, Payload } from "./types";
@@ -56,5 +56,18 @@ describe("doublons", () => {
     expect(copy.login.passwordHistory).toEqual([]);
     // L'original n'est pas touché.
     expect((p as { kind: "login"; login: Login }).login.attachments).toHaveLength(1);
+  });
+
+  it("copier vers un autre vault : ids neufs, liens internes suivis, liens externes coupés", () => {
+    const folder: Payload = { kind: "group", group: { id: "f", name: "Prod", parentId: "ailleurs" } };
+    const account: Payload = { kind: "account", account: { id: "a", name: "LDAP", groupId: "f", tags: [], username: "u", password: "p", passwordHistory: [] } };
+    const linked: Payload = { kind: "login", login: { ...emptyLogin("f"), id: "l", name: "Wiki", username: "u", password: "p", accountId: "a" } };
+    const outside: Payload = { kind: "login", login: { ...emptyLogin("x"), id: "o", name: "Jira", username: "u", password: "p", accountId: "z" } };
+    const [g, a, l, o] = copiesFor([account, linked, folder, outside]);
+    expect(g.kind === "group" && [g.group.id !== "f", g.group.parentId, g.group.name]).toEqual([true, null, "Prod"]);
+    const gid = g.kind === "group" ? g.group.id : "";
+    expect(a.kind === "account" && [a.account.id !== "a", a.account.groupId === gid, a.account.name]).toEqual([true, true, "LDAP"]);
+    expect(l.kind === "login" && a.kind === "account" && [l.login.accountId === a.account.id, l.login.groupId === gid, l.login.name]).toEqual([true, true, "Wiki"]);
+    expect(o.kind === "login" && ["accountId" in o.login, o.login.groupId, o.login.password]).toEqual([false, null, "p"]);
   });
 });

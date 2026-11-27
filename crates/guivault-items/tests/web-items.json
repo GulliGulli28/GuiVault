@@ -61,7 +61,8 @@
             "sequence": "{PASSWORD}{ENTER}"
           }
         ]
-      }
+      },
+      "accountId": "88888888-8888-4888-8888-888888888888"
     }
   },
   {
@@ -163,6 +164,23 @@
       "secret": "ghp_x",
       "scopes": "repo",
       "expiresAt": "2027-01-01"
+    }
+  },
+  {
+    "kind": "account",
+    "account": {
+      "id": "88888888-8888-4888-8888-888888888888",
+      "name": "LDAP",
+      "groupId": null,
+      "tags": [],
+      "username": "alice",
+      "password": "pw",
+      "passwordHistory": [
+        {
+          "password": "old",
+          "changedAt": "2025-01-01T00:00:00Z"
+        }
+      ]
     }
   }
 ]

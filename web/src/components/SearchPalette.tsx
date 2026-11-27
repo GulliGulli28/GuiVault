@@ -218,7 +218,7 @@ export function SearchPalette({ ctx, onClose }: { ctx: PageContext; onClose: () 
 }
 
 /** L'ordre des groupes : les identifiants et les hôtes d'abord. */
-const KIND_ORDER: GuiVaultEntity["kind"][] = ["login", "host", "card", "note", "identity", "api-key", "aws", "sql-connection", "key", "snippet", "runbook"];
+const KIND_ORDER: GuiVaultEntity["kind"][] = ["login", "account", "host", "card", "note", "identity", "api-key", "aws", "sql-connection", "key", "snippet", "runbook"];
 function kindRank(k: GuiVaultEntity["kind"]): number {
   const i = KIND_ORDER.indexOf(k);
   return i < 0 ? KIND_ORDER.length : i;

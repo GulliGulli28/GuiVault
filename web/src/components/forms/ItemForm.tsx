@@ -15,6 +15,7 @@ import { IdentityForm } from "./IdentityForm";
 import { AwsForm } from "./AwsForm";
 import { ApiKeyForm } from "./ApiKeyForm";
 import { RunbookForm } from "./RunbookForm";
+import { AccountForm } from "./AccountForm";
 import { DraftContext, type DraftContextValue } from "./common";
 
 /** Le formulaire qui va avec un type d'item — partagé par l'interface web
@@ -95,6 +96,8 @@ function form(kind: ItemKind, initial: Payload | undefined, index: VaultIndex, d
       return <AwsForm initial={initial?.kind === "aws" ? initial.aws : undefined} index={index} defaultGroupId={defaultGroupId} onSave={onSave} onCancel={onCancel} />;
     case "api-key":
       return <ApiKeyForm initial={initial?.kind === "api-key" ? initial.apiKey : undefined} index={index} defaultGroupId={defaultGroupId} onSave={onSave} onCancel={onCancel} />;
+    case "account":
+      return <AccountForm initial={initial?.kind === "account" ? initial.account : undefined} index={index} defaultGroupId={defaultGroupId} onSave={onSave} onCancel={onCancel} />;
     case "runbook":
       return <RunbookForm initial={initial?.kind === "runbook" ? initial.runbook : undefined} index={index} onSave={onSave} onCancel={onCancel} />;
   }

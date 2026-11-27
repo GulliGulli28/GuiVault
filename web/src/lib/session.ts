@@ -565,6 +565,7 @@ export function payloadId(p: Payload): string {
     case "aws": return p.aws.id;
     case "api-key": return p.apiKey.id;
     case "runbook": return p.runbook.id;
+    case "account": return p.account.id;
   }
 }
 
@@ -583,6 +584,7 @@ export function payloadName(p: Payload): string {
     case "aws": return p.aws.name;
     case "api-key": return p.apiKey.name;
     case "runbook": return p.runbook.name;
+    case "account": return p.account.name;
   }
 }
 
@@ -603,6 +605,7 @@ export function payloadEntity(p: Payload): Record<string, unknown> & { id: strin
     case "aws": return p.aws;
     case "api-key": return p.apiKey;
     case "runbook": return p.runbook;
+    case "account": return p.account;
   }
 }
 

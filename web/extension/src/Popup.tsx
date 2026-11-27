@@ -39,9 +39,9 @@ import { t, translated } from "../../src/lib/i18n";
 
 /** Les entrées du menu « Nouveau » : les secrets d'abord, puis les entités
  * Guiterm — le même menu que l'interface web. */
-const NEW_KINDS: (ItemKind | "sep")[] = ["login", "note", "card", "identity", "api-key", "aws", "sep", "host", "group", "sql-connection", "key", "snippet", "runbook", "icon"];
+const NEW_KINDS: (ItemKind | "sep")[] = ["login", "account", "note", "card", "identity", "api-key", "aws", "sep", "host", "group", "sql-connection", "key", "snippet", "runbook", "icon"];
 type Filter = "all" | ItemKind;
-const FILTERS: Filter[] = ["all", "login", "note", "card", "identity", "api-key", "aws", "host", "sql-connection", "key", "snippet", "runbook", "group", "icon"];
+const FILTERS: Filter[] = ["all", "login", "account", "note", "card", "identity", "api-key", "aws", "host", "sql-connection", "key", "snippet", "runbook", "group", "icon"];
 
 setDeviceLabel("Extension GuiVault");
 

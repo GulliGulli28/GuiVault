@@ -7,7 +7,7 @@ use serde_json::Value;
 fn web_items_parse_and_roundtrip() {
     let raw = include_str!("web-items.json");
     let values: Vec<Value> = serde_json::from_str(raw).unwrap();
-    assert_eq!(values.len(), 6);
+    assert_eq!(values.len(), 7);
     // Le champ de l'entité : le `kind`, en camelCase (`api-key` → `apiKey`).
     let field = |kind: &str| match kind {
         "api-key" => "apiKey".to_string(),
@@ -43,6 +43,10 @@ fn web_items_parse_and_roundtrip() {
     );
     assert_eq!(auto_type.windows.as_ref().unwrap()[0].title, "*GitHub*Firefox");
     assert_eq!(auto_type.enabled, None);
+    assert_eq!(
+        login.account_id.map(|id| id.to_string()).as_deref(),
+        Some("88888888-8888-4888-8888-888888888888")
+    );
     let SecretItem::Note { note } = SecretItem::from_json(values[1].to_string().as_bytes()).unwrap() else {
         panic!()
     };
@@ -58,4 +62,9 @@ fn web_items_parse_and_roundtrip() {
         panic!()
     };
     assert_eq!(api_key.secret, "ghp_x");
+    let SecretItem::Account { account } = SecretItem::from_json(values[6].to_string().as_bytes()).unwrap() else {
+        panic!()
+    };
+    assert_eq!((account.username.as_str(), account.password.as_str()), ("alice", "pw"));
+    assert_eq!(account.password_history[0].password, "old");
 }

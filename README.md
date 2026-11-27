@@ -100,17 +100,21 @@ le TypeScript (et réciproquement) le vérifient à chaque build.
 
 - **Types d'éléments** : identifiants (plusieurs sites, TOTP, passkeys,
   historique du mot de passe), notes sécurisées, cartes, identités, accès
-  AWS, clés d'API, hôtes, clés SSH, snippets ; champs personnalisés,
-  favoris, dossiers colorés, icônes. Formats dans
+  AWS, clés d'API, comptes, hôtes, clés SSH, snippets ; champs
+  personnalisés, favoris, dossiers colorés, icônes. Formats dans
   [`docs/ITEMS.md`](docs/ITEMS.md).
+- **Comptes enregistrés** (un compte LDAP, un compte de service) : un
+  identifiant ou un hôte du même vault reprend son utilisateur et son mot
+  de passe ; changer le compte met à jour tout ce qui le reprend.
 - **Pièces jointes chiffrées**, une clé par fichier, morceaux liés à leur
   place ([`docs/PIECES-JOINTES.md`](docs/PIECES-JOINTES.md)).
 - **Historique** de chaque élément et **corbeille** (30 jours par défaut).
 - **Conflits** : deux modifications concurrentes se fusionnent champ par
   champ au lieu qu'une écrase l'autre.
-- **Multisélection** (Ctrl/Maj+clic ou « Sélectionner ») : supprimer,
-  déplacer (dossier ou autre vault), épingler, étiqueter ou exporter
-  plusieurs éléments d'un coup.
+- **Multisélection** (Ctrl/Maj+clic ou « Sélectionner », un dossier avec
+  son contenu) : supprimer, déplacer (dossier ou autre vault), copier vers
+  un autre vault, épingler, étiqueter ou exporter plusieurs éléments d'un
+  coup.
 - **Recherche** dans tous les vaults (Ctrl+K), raccourcis clavier (`?`),
   presse-papiers effacé après le délai réglé, verrouillage après
   inactivité, réglages qui suivent le compte (chiffrés).

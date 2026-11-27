@@ -18,7 +18,7 @@
 //! implémentations ensemble.
 //!
 //! Intégration Guiterm (voir `docs/ITEMS.md`) : ajouter à son `Payload` les
-//! variantes `Login`, `Note`, `Card`, `Identity` en déléguant à ces types,
+//! variantes `Login`, `Note`, `Card`, `Identity`, … en déléguant à ces types,
 //! ou déserialiser d'abord ici pour tout `kind` qu'il ne connaît pas.
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -31,6 +31,7 @@ pub const TYPE_CARD: &str = "card";
 pub const TYPE_IDENTITY: &str = "identity";
 pub const TYPE_AWS: &str = "aws";
 pub const TYPE_API_KEY: &str = "api-key";
+pub const TYPE_ACCOUNT: &str = "account";
 
 /// Une pièce jointe telle que l'item la décrit (`guivault_crypto::attachment`
 /// pour le fichier lui-même).
@@ -182,6 +183,11 @@ pub struct Login {
     /// La saisie automatique de l'application (`web/src/lib/autotype.ts`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub auto_type: Option<AutoType>,
+    /// Le compte enregistré ([`Account`], même vault) dont `username` et
+    /// `password` sont la copie. La copie fait foi pour remplir : un client
+    /// qui ignore les comptes lit l'identifiant comme avant.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub account_id: Option<Uuid>,
 }
 
 /// Comment l'application tape un identifiant dans une autre fenêtre, à la
@@ -363,6 +369,23 @@ pub struct ApiKey {
     pub expires_at: String,
 }
 
+/// Un compte enregistré (LDAP, compte de service) : un utilisateur et un mot
+/// de passe que des identifiants ([`Login::account_id`]) et des hôtes
+/// (`accountId` de l'hôte Guiterm) du même vault reprennent en copie ;
+/// l'interface web réécrit les copies quand il change.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Account {
+    #[serde(flatten)]
+    pub base: SecretBase,
+    #[serde(default)]
+    pub username: String,
+    #[serde(default)]
+    pub password: String,
+    #[serde(default)]
+    pub password_history: Vec<PasswordHistoryEntry>,
+}
+
 /// L'enveloppe d'un item secret : `kind` est l'`item_type` du serveur.
 // `large_enum_variant` : une identité pèse plus qu'une note, et alors ?
 // Ces valeurs vivent le temps d'un chiffrement, jamais en tableau.
@@ -389,6 +412,9 @@ pub enum SecretItem {
         #[serde(rename = "apiKey")]
         api_key: ApiKey,
     },
+    Account {
+        account: Account,
+    },
 }
 
 impl SecretItem {
@@ -400,13 +426,14 @@ impl SecretItem {
             SecretItem::Identity { .. } => TYPE_IDENTITY,
             SecretItem::Aws { .. } => TYPE_AWS,
             SecretItem::ApiKey { .. } => TYPE_API_KEY,
+            SecretItem::Account { .. } => TYPE_ACCOUNT,
         }
     }
 
     pub fn is_secret_type(item_type: &str) -> bool {
         matches!(
             item_type,
-            TYPE_LOGIN | TYPE_NOTE | TYPE_CARD | TYPE_IDENTITY | TYPE_AWS | TYPE_API_KEY
+            TYPE_LOGIN | TYPE_NOTE | TYPE_CARD | TYPE_IDENTITY | TYPE_AWS | TYPE_API_KEY | TYPE_ACCOUNT
         )
     }
 
@@ -418,6 +445,7 @@ impl SecretItem {
             SecretItem::Identity { identity } => &identity.base,
             SecretItem::Aws { aws } => &aws.base,
             SecretItem::ApiKey { api_key } => &api_key.base,
+            SecretItem::Account { account } => &account.base,
         }
     }
 

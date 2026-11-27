@@ -230,12 +230,34 @@ paramètres ou formats anciens.
 - [x] **Multisélection** dans un vault (`BulkBar.tsx`, `lib/bulk.ts`) :
   Ctrl/⌘+clic coche, Maj+clic une plage, bouton « Sélectionner » (ou menu
   du vault, au tactile) pour un mode où chaque ligne a sa case ; Échap
-  quitte. Supprimer (corbeille), déplacer vers un dossier ou un autre vault
-  (pièces jointes comprises, dossiers exclus), épingler ou non,
+  quitte. Un dossier coché coche tout ce qu'il contient. Supprimer
+  (corbeille), déplacer vers un dossier (le haut de la sélection, le reste
+  suit son dossier) ou un autre vault (mêmes ids : arborescence et liens
+  aux comptes gardés, pièces jointes comprises), copier vers un autre vault
+  (`copiesFor` : ids neufs, liens internes remappés), épingler ou non,
   ajouter/retirer des étiquettes, exporter la sélection (mot de passe
   maître d'abord si un élément est protégé). Une écriture par élément,
   l'une après l'autre (chacune porte le manifeste) ; un échec n'arrête pas
   les suivantes.
+- [x] **Comptes enregistrés** (type `account`, `lib/accounts.ts`) : un
+  identifiant ou un hôte SSH/RDP du même vault choisit un compte au lieu
+  de saisir utilisateur et mot de passe, et en garde une copie que
+  l'enregistrement du compte réécrit ; une copie en retard se signale sur
+  la fiche (« Mettre à jour »). L'extension met à jour le compte quand un
+  site change le mot de passe d'un identifiant relié. Santé : un compte et
+  ses copies comptent pour un seul mot de passe.
+- [x] **Copier un élément vers un autre vault** (menu ⋯ de la fiche, ou la
+  multisélection) : id neuf, sans pièces jointes ni passkeys ; un
+  identifiant copié seul est détaché de son compte.
+- [ ] **Droits par élément** dans un vault partagé : qu'un compte ou un
+  secret ne soit lisible que de certains membres. Aujourd'hui un vault est
+  l'unité de partage (une clé par vault) : il faudrait une clé par élément
+  restreint, enveloppée pour les seuls membres autorisés, et le dire au
+  manifeste — à concevoir côté client (règle n°1).
+- [ ] **Comptes dans Guiterm** : passer `guivault-items` à une révision
+  qui connaît `account` (sinon un avertissement par compte à chaque
+  synchro), conserver `accountId` d'un hôte qu'il réécrit, proposer le
+  compte dans son formulaire d'hôte.
 - [x] **Mobile** — relevé à 390 px, écran par écran : aucune page ne
   déborde (panneau unique, tiroir). Corrigé : `src/touch.css` (pointeur
   tactile : champs en 16 px, sans quoi Safari iOS zoome au focus ; boutons

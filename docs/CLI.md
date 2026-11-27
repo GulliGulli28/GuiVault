@@ -41,7 +41,7 @@ personnel répond aussi à `personal` / `perso`. Deux éléments de même nom :
 `gv` les liste avec leur id.
 
 Champ par défaut : le secret de l'élément — mot de passe (identifiant,
-hôte, connexion SQL), `secret` (clé d'API), `secret-access-key` (AWS),
+compte, hôte, connexion SQL), `secret` (clé d'API), `secret-access-key` (AWS),
 contenu (note), numéro (carte), clé privée (clé SSH), commande (snippet).
 Sinon : `password`, `username`, `totp` (le code du moment), `uri`, `notes`,
 n'importe quel champ de l'élément en kebab-case (`access-key-id`,

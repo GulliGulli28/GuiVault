@@ -8,7 +8,7 @@ import { parseCsv, toCsv } from "./csv";
 import { exportCsv, exportEncrypted, exportJson } from "./exporters";
 import { estimateStrength, generatePassphrase, generatePassword, randomInt } from "./generator";
 import { importFile, NeedsPassword, resolveFolders } from "./importers";
-import { awsConfigText, emptyApiKey, emptyAws, emptyCard, emptyIdentity, emptyLogin, emptyNote } from "./items";
+import { awsConfigText, emptyAccount, emptyApiKey, emptyAws, emptyCard, emptyIdentity, emptyLogin, emptyNote } from "./items";
 import { base32Decode, base32Encode, parseTotp, totpCode } from "./totp";
 import type { Payload } from "./types";
 import { EFF_LARGE_WORDLIST } from "./wordlist";
@@ -183,13 +183,14 @@ function samples(): Payload[] {
   const login = { ...emptyLogin(), id: "11111111-1111-4111-8111-111111111111", name: "GitHub", username: "alice", password: "pw", uris: [{ uri: "https://github.com", match: null }], totp: "JBSWY3DPEHPK3PXP", favorite: true, reprompt: true, notes: "n", fields: [{ name: "PIN", value: "1", type: "hidden" as const }, { name: "ok", value: "true", type: "boolean" as const }],
     passkeys: [{ credentialId: "c", keyType: "public-key", keyAlgorithm: "ECDSA", keyCurve: "P-256", keyValue: "k", rpId: "github.com", rpName: "GitHub", userHandle: "u", userName: "alice", userDisplayName: null, counter: 1, discoverable: true, createdAt: "2026-01-01T00:00:00Z" }],
     passwordHistory: [{ password: "old", changedAt: "2025-01-01T00:00:00Z" }],
-    autoType: { sequence: "{USERNAME}{TAB}{PASSWORD}{TAB}{TOTP}{ENTER}", windows: [{ title: "*GitHub*Firefox", sequence: "{PASSWORD}{ENTER}" }] } };
+    autoType: { sequence: "{USERNAME}{TAB}{PASSWORD}{TAB}{TOTP}{ENTER}", windows: [{ title: "*GitHub*Firefox", sequence: "{PASSWORD}{ENTER}" }] }, accountId: "88888888-8888-4888-8888-888888888888" };
   const note = { ...emptyNote(), id: "22222222-2222-4222-8222-222222222222", name: "Codes", content: "a\nb", attachments: [{ id: "77777777-7777-4777-8777-777777777777", name: "scan.pdf", size: 12345, mime: "application/pdf", key: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=" }], groupId: "gggggggg-gggg-4ggg-8ggg-gggggggggggg".replace(/g/g, "a") };
   const card = { ...emptyCard(), id: "33333333-3333-4333-8333-333333333333", name: "CB", cardholderName: "A", brand: "Visa", number: "4111111111111111", expMonth: "12", expYear: "2030", code: "123" };
   const identity = { ...emptyIdentity(), id: "44444444-4444-4444-8444-444444444444", name: "Moi", firstName: "Alice", lastName: "L", email: "a@b" };
   const aws = { ...emptyAws(), id: "55555555-5555-4555-8555-555555555555", name: "Org", ssoSessionName: "org", ssoStartUrl: "https://org.awsapps.com/start", ssoRegion: "eu-west-1", region: "eu-west-3", profiles: [{ name: "prod", accountId: "123456789012", roleName: "Admin", region: "" }] };
   const apiKey = { ...emptyApiKey(), id: "66666666-6666-4666-8666-666666666666", name: "CI", service: "GitHub", keyId: "", secret: "ghp_x", scopes: "repo", expiresAt: "2027-01-01" };
-  return [{ kind: "login", login }, { kind: "note", note }, { kind: "card", card }, { kind: "identity", identity }, { kind: "aws", aws }, { kind: "api-key", apiKey }];
+  const account = { ...emptyAccount(), id: "88888888-8888-4888-8888-888888888888", name: "LDAP", username: "alice", password: "pw", passwordHistory: [{ password: "old", changedAt: "2025-01-01T00:00:00Z" }] };
+  return [{ kind: "login", login }, { kind: "note", note }, { kind: "card", card }, { kind: "identity", identity }, { kind: "aws", aws }, { kind: "api-key", apiKey }, { kind: "account", account }];
 }
 
 describe("export", () => {
@@ -200,7 +201,7 @@ describe("export", () => {
     const json = exportJson(vault, [group, ...samples()]);
     const r = await importFile(json);
     expect(r.format).toBe("GuiVault (JSON)");
-    expect(r.items).toHaveLength(6);
+    expect(r.items).toHaveLength(7);
     expect(r.items[1].folderPath).toEqual(["Dossier"]);
     expect(r.items[0].payload).toEqual(samples()[0]);
   });
@@ -211,16 +212,17 @@ describe("export", () => {
     await expect(importFile(enc)).rejects.toThrow(NeedsPassword);
     await expect(importFile(enc, "nope")).rejects.toThrow(/incorrect/);
     const r = await importFile(enc, "export-pw");
-    expect(r.items.map((i) => i.payload.kind)).toEqual(["login", "note", "card", "identity", "aws", "api-key"]);
+    expect(r.items.map((i) => i.payload.kind)).toEqual(["login", "note", "card", "identity", "aws", "api-key", "account"]);
   }, 30_000);
 
-  it("CSV Bitwarden : identifiants et notes, le reste compté", async () => {
+  it("CSV Bitwarden : identifiants (comptes compris) et notes, le reste compté", async () => {
     const { csv, skipped } = exportCsv([group, ...samples()]);
     expect(skipped).toBe(4);
     const r = await importFile(csv);
     expect(r.format).toBe("Bitwarden (CSV)");
     expect(r.items[0].payload).toMatchObject({ kind: "login", login: { name: "GitHub", username: "alice", totp: "JBSWY3DPEHPK3PXP", reprompt: true } });
     expect(r.items[1]).toMatchObject({ folderPath: ["Dossier"], payload: { kind: "note", note: { content: "a\nb" } } });
+    expect(r.items[2].payload).toMatchObject({ kind: "login", login: { name: "LDAP", username: "alice", password: "pw", uris: [] } });
   });
 
   it("écrit les fixtures du crate guivault-items (GUIVAULT_WRITE_VECTORS)", () => {

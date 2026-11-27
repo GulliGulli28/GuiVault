@@ -3,7 +3,7 @@ import type { VaultIndex } from "../lib/entities";
 import { groupPath } from "../lib/entities";
 import { estimateStrength } from "../lib/generator";
 import { STRENGTH_LABELS } from "./PasswordStrength";
-import { passwordSince, secretsOf } from "../lib/health";
+import { passwordSince, secretOwner, secretsOf } from "../lib/health";
 import type { DecodedItem, VaultView } from "../lib/session";
 import { payloadEntity } from "../lib/session";
 import type { VaultItem } from "../lib/allItems";
@@ -32,18 +32,18 @@ export function ItemAside({ vault, item, index, all, onHistory }: {
   for (const s of secretsOf({ vault, item })) {
     const strength = estimateStrength(s.value);
     checks.push({ ok: strength.score >= 3 ? true : strength.score <= 1 ? false : null, text: `${capitalize(s.label)} ${STRENGTH_LABELS[strength.score]}` });
-    const elsewhere = all.filter((o) => o.item.id !== item.id && secretsOf(o).some((x) => x.value === s.value));
+    // Ce qui reprend le même compte enregistré n'est pas une réutilisation.
+    const owner = secretOwner({ vault, item });
+    const elsewhere = all.filter((o) => o.item.id !== item.id && secretOwner(o) !== owner && secretsOf(o).some((x) => x.value === s.value));
     checks.push(elsewhere.length
       ? { ok: false, text: <>{t("Aussi utilisé par «")} {nameOf(elsewhere[0])} »{elsewhere.length > 1 ? t(" et {0} autre{1}", elsewhere.length - 1, elsewhere.length > 2 ? "s" : "") : ""}</> }
       : { ok: true, text: t("Utilisé nulle part ailleurs") });
   }
-  if (p.kind === "login" && p.login.password) {
-    checks.push(p.login.totp ? { ok: true, text: t("2FA enregistrée") } : { ok: null, text: t("Pas de code 2FA") });
-    const since = passwordSince({ vault, item });
-    if (since) {
-      const old = Date.now() - since.getTime() > 365 * 86_400_000;
-      checks.push({ ok: old ? false : null, text: t("Mot de passe changé {0}", formatAgo(since.toISOString())) });
-    }
+  if (p.kind === "login" && p.login.password) checks.push(p.login.totp ? { ok: true, text: t("2FA enregistrée") } : { ok: null, text: t("Pas de code 2FA") });
+  const since = passwordSince({ vault, item });
+  if (since) {
+    const old = Date.now() - since.getTime() > 365 * 86_400_000;
+    checks.push({ ok: old ? false : null, text: t("Mot de passe changé {0}", formatAgo(since.toISOString())) });
   }
 
   return (

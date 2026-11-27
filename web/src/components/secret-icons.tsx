@@ -52,6 +52,18 @@ export function IconApiKey({ size = 16, className }: P) {
   );
 }
 
+/** Un compte enregistré : une personne et sa clé. */
+export function IconAccount({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className}>
+      <circle cx="6" cy="5" r="2.5" stroke="currentColor" strokeWidth="1.25" />
+      <path d="M1.75 13.5c.5-2.5 2.1-4 4.25-4 .9 0 1.7.25 2.35.7" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" />
+      <circle cx="11.5" cy="9.75" r="1.75" stroke="currentColor" strokeWidth="1.25" />
+      <path d="M11.5 11.5v3M11.5 13.25h1.5" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function IconStar({ size = 16, className, filled }: P & { filled?: boolean }) {
   return (
     <svg width={size} height={size} viewBox="0 0 16 16" fill={filled ? "currentColor" : "none"} className={className}>

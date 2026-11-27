@@ -37,7 +37,7 @@ export interface MergePlan {
 
 /** Fusionnés par union plutôt que choisis : l'historique des mots de passe
  * (les deux côtés y ajoutent l'ancien mot de passe en le changeant). */
-const UNION = new Set(["login.passwordHistory"]);
+const UNION = new Set(["login.passwordHistory", "account.passwordHistory"]);
 
 const LABELS: Record<string, string> = translated({
   name: "Nom",
@@ -73,6 +73,7 @@ const LABELS: Record<string, string> = translated({
   expMonth: "Mois d'expiration",
   expYear: "Année d'expiration",
   expiresAt: "Expiration",
+  accountId: "Compte",
 });
 
 /** Libellés propres à un type (`kind:clé`). */
@@ -151,20 +152,23 @@ export function buildMerge(mine: Payload, theirs: Payload, plan: MergePlan, choi
   const out = JSON.parse(JSON.stringify(theirs)) as Payload & Record<string, unknown>;
   for (const f of plan.fromMine) setPath(out, f.path, f.mine);
   for (const f of plan.conflicts) if ((choices[f.path] ?? "mine") === "mine") setPath(out, f.path, f.mine);
-  if (out.kind === "login" && mine.kind === "login" && theirs.kind === "login") {
+  const sameKind = (k: "login" | "account") => out.kind === k && mine.kind === k && theirs.kind === k;
+  if (sameKind("login") || sameKind("account")) {
+    const key = out.kind as "login" | "account";
+    const at = (p: Payload) => (p as unknown as Record<string, { password: string; passwordHistory?: PasswordHistoryEntry[] }>)[key];
     // Les deux historiques ; et le mot de passe écarté par la fusion y entre :
     // il était en vigueur d'un côté, on ne le perd pas.
     const history = new Map<string, PasswordHistoryEntry>();
-    for (const h of [...(mine.login.passwordHistory ?? []), ...(theirs.login.passwordHistory ?? [])]) {
+    for (const h of [...(at(mine).passwordHistory ?? []), ...(at(theirs).passwordHistory ?? [])]) {
       const known = history.get(h.password);
       if (!known || known.changedAt < h.changedAt) history.set(h.password, h);
     }
-    const kept = out.login.password;
-    for (const dropped of [mine.login.password, theirs.login.password]) {
+    const kept = at(out).password;
+    for (const dropped of [at(mine).password, at(theirs).password]) {
       if (dropped && dropped !== kept && !history.has(dropped)) history.set(dropped, { password: dropped, changedAt: now.toISOString() });
     }
     history.delete(kept);
-    out.login.passwordHistory = [...history.values()].sort((a, b) => b.changedAt.localeCompare(a.changedAt)).slice(0, PASSWORD_HISTORY_MAX);
+    at(out).passwordHistory = [...history.values()].sort((a, b) => b.changedAt.localeCompare(a.changedAt)).slice(0, PASSWORD_HISTORY_MAX);
   }
   return out;
 }

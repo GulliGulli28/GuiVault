@@ -496,6 +496,10 @@ export interface Host {
   keepaliveIntervalSecs?: number | null;
   agentForward?: boolean;
   persistentShell?: PersistentShellMode;
+  /** Le compte enregistré (`Account`, même vault) dont l'hôte garde une
+   * copie de l'utilisateur et du mot de passe (`lib/accounts.ts`). Guiterm
+   * l'ignore : il lit la copie. */
+  accountId?: string | null;
   /** Champs que ce client ne modifie pas mais doit conserver (`source`,
    * `lastFacts`…) : un item réécrit ne perd rien de ce que Guiterm y a mis. */
   [extra: string]: unknown;
@@ -699,6 +703,19 @@ export interface Login extends SecretBase {
   /** La saisie automatique de l'application (`lib/autotype.ts`), à la
    * KeePass. Absente : réglages par défaut. */
   autoType?: AutoType;
+  /** Le compte enregistré (`Account`, même vault) dont `username` et
+   * `password` sont la copie, tenue à jour par `lib/accounts.ts`. */
+  accountId?: string | null;
+}
+
+/** Un compte enregistré (un compte LDAP, un compte de service) : un
+ * utilisateur et un mot de passe que des identifiants et des hôtes du même
+ * vault reprennent (`accountId`). Changer son mot de passe met leurs
+ * copies à jour. */
+export interface Account extends SecretBase {
+  username: string;
+  password: string;
+  passwordHistory: PasswordHistoryEntry[];
 }
 
 /** Comment l'application tape cet identifiant dans une autre fenêtre. */
@@ -801,8 +818,8 @@ export interface Identity extends SecretBase {
 
 /** Le contenu en clair d'un item : `kind` en kebab-case, c'est aussi
  * l'`item_type` du serveur. Les six premiers sont le miroir de
- * `termius_core::guivault::entity::Payload`, les quatre suivants sont ceux
- * de `crates/guivault-items`. */
+ * `termius_core::guivault::entity::Payload`, les suivants (sauf `runbook`,
+ * de Guiterm aussi) sont ceux de `crates/guivault-items`. */
 export type Payload =
   | { kind: "host"; host: Host; secrets?: HostSecrets }
   | { kind: "group"; group: Group }
@@ -816,11 +833,12 @@ export type Payload =
   | { kind: "identity"; identity: Identity }
   | { kind: "aws"; aws: AwsAccess }
   | { kind: "api-key"; apiKey: ApiKey }
-  | { kind: "runbook"; runbook: Runbook };
+  | { kind: "runbook"; runbook: Runbook }
+  | { kind: "account"; account: Account };
 
 export type ItemKind = Payload["kind"];
-export type SecretKind = "login" | "note" | "card" | "identity" | "aws" | "api-key";
-export const SECRET_KINDS: SecretKind[] = ["login", "note", "card", "identity", "aws", "api-key"];
+export type SecretKind = "login" | "note" | "card" | "identity" | "aws" | "api-key" | "account";
+export const SECRET_KINDS: SecretKind[] = ["login", "note", "card", "identity", "aws", "api-key", "account"];
 
 export const KIND_LABELS: Record<ItemKind, string> = translated({
   host: "hôte",
@@ -836,6 +854,7 @@ export const KIND_LABELS: Record<ItemKind, string> = translated({
   aws: "accès AWS",
   "api-key": "clé d'API",
   runbook: "runbook",
+  account: "compte",
 });
 
 export const KIND_LABELS_PLURAL: Record<ItemKind, string> = translated({
@@ -852,6 +871,7 @@ export const KIND_LABELS_PLURAL: Record<ItemKind, string> = translated({
   aws: "AWS",
   "api-key": "Clés d'API",
   runbook: "Runbooks",
+  account: "Comptes",
 });
 
 export const SQL_ENGINE_LABELS: Record<SqlEngine, string> = {

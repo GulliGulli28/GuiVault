@@ -94,7 +94,7 @@ nom       = seal(vault_key, nom UTF-8, "guivault/v1/item\0" ‖ vault_id ‖ "\0
 
 Le JSON d'un item : `{ "kind": <item_type>, <entité>: { "id": <item_id>, … } }`,
 où l'entité porte le nom du type (`login`, `note`, `card`, `identity`,
-`aws`, `host`, `group`, `snippet`, `key`, `icon`, `runbook`), sauf `apiKey`
+`aws`, `account`, `host`, `group`, `snippet`, `key`, `icon`, `runbook`), sauf `apiKey`
 pour `api-key` et `connection` pour `sql-connection`. Champs de chaque type :
 [`ITEMS.md`](ITEMS.md) ; un lecteur doit conserver ce qu'il ne connaît pas.
 Un item dont `kind` ou `id` ne correspond pas à sa ligne est à rejeter.

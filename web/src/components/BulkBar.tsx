@@ -1,10 +1,12 @@
 import { useCallback, useMemo, useState } from "react";
 import type { PageContext } from "../App";
 import { parseTags, runBulk, withFavorite, withTags, type BulkResult } from "../lib/bulk";
-import { groupPath, withParent, type VaultIndex } from "../lib/entities";
+import { groupPath, payloadParent, withParent, type VaultIndex } from "../lib/entities";
+import { copiesFor } from "../lib/duplicates";
+import { subtreeIds } from "../lib/bulk";
 import { plural, t } from "../lib/i18n";
 import { isProtected, markUnlocked, needsReprompt } from "../lib/reprompt";
-import { changeItem, deleteItem, moveItem, payloadEntity, payloadName, type DecodedItem, type VaultView } from "../lib/session";
+import { changeItem, deleteItem, moveItem, payloadEntity, payloadName, putPayload, type DecodedItem, type VaultView } from "../lib/session";
 import type { Payload } from "../lib/types";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { useReprompt } from "./Reprompt";
@@ -17,8 +19,9 @@ type Dialog = "delete" | "move" | "tags" | "export" | null;
 
 /** La barre de la multisélection, au-dessus de la liste d'un vault : combien
  * d'éléments sont cochés, et ce qu'on peut leur faire d'un coup — supprimer
- * (vers la corbeille), déplacer (dossier ou autre vault), épingler,
- * étiquettes, exporter. Une écriture par élément, l'une après l'autre
+ * (vers la corbeille), déplacer (dossier ou autre vault), copier vers un
+ * autre vault, épingler, étiquettes, exporter. Un dossier coché l'est avec
+ * son contenu (`ItemTree`) : il part avec lui. Une écriture par élément, l'une après l'autre
  * (`runBulk`) ; un vault en lecture seule n'offre que l'export. */
 export function BulkBar({ ctx, vault, index, picked, visibleCount, writable, otherVaults, onAll, onClear, onChanged }: {
   ctx: PageContext;
@@ -41,6 +44,7 @@ export function BulkBar({ ctx, vault, index, picked, visibleCount, writable, oth
   const [progress, setProgress] = useState<{ label: string; n: number; of: number } | null>(null);
   const readable = useMemo(() => picked.filter((i): i is DecodedItem & { ok: true } => i.ok), [picked]);
   const n = picked.length;
+  const pickedIds = useMemo(() => new Set(picked.map((i) => i.id)), [picked]);
 
   /** Une action sur toute la sélection, puis le compte rendu. */
   const run = async <T,>(label: string, targets: T[], name: (t: T) => string, op: (t: T) => Promise<boolean>, said: (r: BulkResult) => string) => {
@@ -104,7 +108,7 @@ export function BulkBar({ ctx, vault, index, picked, visibleCount, writable, oth
         <span className="min-w-0 flex-1 truncate pl-1 text-[13px] font-medium" aria-live="polite">{n ? plural(n, "{0} sélectionné", "{0} sélectionnés") : t("Cochez des éléments")}</span>
         {writable && (
           <>
-            <button onClick={() => setDialog("move")} disabled={!n} className="btn btn-ghost btn-sm" title={t("Déplacer vers un dossier ou un autre vault")}><IconFolder size={13} /> <span className="max-sm:hidden">{t("Déplacer")}</span></button>
+            <button onClick={() => setDialog("move")} disabled={!n} className="btn btn-ghost btn-sm" title={t("Déplacer vers un dossier ou un autre vault, ou y copier")}><IconFolder size={13} /> <span className="max-sm:hidden">{t("Déplacer")}</span></button>
             <button onClick={() => setDialog("delete")} disabled={!n} className="btn btn-ghost btn-sm text-[var(--c-danger-text)]" title={t("Supprimer (vers la corbeille)")}><IconTrash size={13} /> <span className="max-sm:hidden">{t("Supprimer")}</span></button>
           </>
         )}
@@ -135,19 +139,27 @@ export function BulkBar({ ctx, vault, index, picked, visibleCount, writable, oth
           onCancel={close}
         />
       )}
-      {dialog === "move" && <MoveDialog vault={vault} index={index} count={readable.length} otherVaults={otherVaults} onClose={close} onMove={(dest) => {
+      {dialog === "move" && <MoveDialog vault={vault} index={index} count={readable.length} picked={pickedIds} otherVaults={otherVaults} onClose={close} onMove={(dest, copy) => {
         if (dest.kind === "folder") {
           const label = dest.folderId ? groupPath(new Map(index.groups.map((g) => [g.id, g])), dest.folderId) : t("la racine");
-          void run(t("Rangement…"), readable, (i) => payloadName(i.payload), async (i) => {
+          // Le haut de la sélection seulement : le reste suit son dossier.
+          const top = readable.filter((i) => { const parent = payloadParent(i.payload); return !parent || !pickedIds.has(parent); });
+          void run(t("Rangement…"), top, (i) => payloadName(i.payload), async (i) => {
             const next = withParent(i.payload, dest.folderId);
-            if (!next || (payloadEntity(i.payload).groupId ?? null) === dest.folderId) return false;
+            if (!next || payloadParent(i.payload) === dest.folderId) return false;
             return !!(await changeItem(vault, i, (p) => withParent(p, dest.folderId)));
           }, (r) => plural(r.done, "{0} élément rangé dans « {1} ».", "{0} éléments rangés dans « {1} ».", label));
+        } else if (copy) {
+          const to = dest.vault;
+          void run(t("Copie…"), copiesFor(readable.map((i) => i.payload)), (p) => payloadName(p), async (p) => {
+            await putPayload(to, p);
+            return true;
+          }, (r) => plural(r.done, "{0} élément copié vers « {1} ».", "{0} éléments copiés vers « {1} ».", to.name));
         } else {
           const to = dest.vault;
+          // Mêmes ids : dossiers et comptes déplacés avec ce qui les
+          // reprend gardent leurs liens.
           void run(t("Déplacement…"), readable, (i) => payloadName(i.payload), async (i) => {
-            // Un dossier ne quitte pas son vault d'ici : son contenu resterait.
-            if (i.payload.kind === "group") return false;
             await moveItem(vault, to, i);
             return true;
           }, (r) => plural(r.done, "{0} élément déplacé vers « {1} ».", "{0} éléments déplacés vers « {1} ».", to.name));
@@ -168,19 +180,22 @@ export function BulkBar({ ctx, vault, index, picked, visibleCount, writable, oth
 
 type MoveDest = { kind: "folder"; folderId: string | null } | { kind: "vault"; vault: VaultView };
 
-/** Où déplacer la sélection : un dossier de ce vault (ou sa racine), ou un
- * autre vault où l'on peut écrire — re-chiffré sous sa clé. */
-function MoveDialog({ vault, index, count, otherVaults, onClose, onMove }: { vault: VaultView; index: VaultIndex; count: number; otherVaults: VaultView[]; onClose: () => void; onMove: (d: MoveDest) => void }) {
+/** Où déplacer la sélection : un dossier de ce vault (ou sa racine) — pas
+ * un dossier coché ni ce qu'il contient —, ou un autre vault où l'on peut
+ * écrire, re-chiffré sous sa clé : déplacé, ou copié. */
+function MoveDialog({ vault, index, count, picked, otherVaults, onClose, onMove }: { vault: VaultView; index: VaultIndex; count: number; picked: ReadonlySet<string>; otherVaults: VaultView[]; onClose: () => void; onMove: (d: MoveDest, copy: boolean) => void }) {
   const folders = useMemo(() => {
     const byId = new Map(index.groups.map((g) => [g.id, g]));
-    return index.groups.map((g) => ({ id: g.id, path: groupPath(byId, g.id) })).sort((a, b) => a.path.localeCompare(b.path));
-  }, [index.groups]);
+    const tree = index.groups.map((g) => ({ id: g.id, parentId: g.parentId ?? null }));
+    const inside = new Set([...picked].filter((id) => byId.has(id)).flatMap((id) => subtreeIds(tree, id)));
+    return index.groups.filter((g) => !inside.has(g.id)).map((g) => ({ id: g.id, path: groupPath(byId, g.id) })).sort((a, b) => a.path.localeCompare(b.path));
+  }, [index.groups, picked]);
   const [choice, setChoice] = useState("folder:");
   const dest: MoveDest = choice.startsWith("vault:")
     ? { kind: "vault", vault: otherVaults.find((v) => `vault:${v.id}` === choice)! }
     : { kind: "folder", folderId: choice.slice("folder:".length) || null };
   return (
-    <Modal title={plural(count, "Déplacer {0} élément", "Déplacer {0} éléments")} onClose={onClose}>
+    <Modal title={plural(count, "Déplacer ou copier {0} élément", "Déplacer ou copier {0} éléments")} onClose={onClose}>
       <div className="flex flex-col gap-4">
         <Field label={t("Destination")}>
           <select value={choice} onChange={(e) => setChoice(e.target.value)} className="input">
@@ -197,13 +212,14 @@ function MoveDialog({ vault, index, count, otherVaults, onClose, onMove }: { vau
         </Field>
         {dest.kind === "vault" && (
           <p className="callout callout-warn">
-            {t("Re-chiffrés sous la clé de {0} et retirés d'ici, pièces jointes comprises. Ce qu'ils référencent (dossier, clé du trousseau, relais) ne suit pas ; les dossiers restent ici.", dest.vault.name)}
+            {t("Re-chiffrés sous la clé de {0}. Déplacer les retire d'ici, pièces jointes comprises ; copier en fait de nouveaux éléments, sans pièces jointes. Les dossiers cochés emmènent leur contenu ; ce qui renvoie hors de la sélection (dossier, compte, clé du trousseau, relais) ne suit pas.", dest.vault.name)}
             {dest.vault.kind === "shared" ? " " + t("Tous les membres de ce vault pourront les lire, secrets compris.") : ""}
           </p>
         )}
         <div className="flex justify-end gap-2">
           <button onClick={onClose} className="btn btn-ghost">{t("Annuler")}</button>
-          <button onClick={() => onMove(dest)} className="btn btn-primary">{t("Déplacer")}</button>
+          {dest.kind === "vault" && <button onClick={() => onMove(dest, true)} className="btn btn-secondary">{t("Copier")}</button>}
+          <button onClick={() => onMove(dest, false)} className="btn btn-primary">{t("Déplacer")}</button>
         </div>
       </div>
     </Modal>

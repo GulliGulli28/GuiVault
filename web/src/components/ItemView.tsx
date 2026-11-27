@@ -12,6 +12,8 @@ import { IconPasskey } from "./secret-icons";
 import { CopyButton, Eyebrow, formatWhen, Row, SecretValue } from "./ui";
 import { ACTION_LABELS, APPROVAL_LABELS, ON_FAILURE_LABELS } from "./forms/RunbookForm";
 import { t, translated } from "../lib/i18n";
+import { linkedAccountId } from "../lib/accounts";
+import { payloadName } from "../lib/session";
 
 /** La fiche d'une entité, en lecture : ce que Guiterm montre dans ses
  * panneaux, secrets masqués et copiables. `shared` : reçue par un lien de
@@ -21,6 +23,12 @@ export function ItemView({ payload, index, shared, withoutOrganisation }: { payl
   // montre à côté (`ItemAside`).
   const organisation = !shared && !withoutOrganisation;
   const groups = new Map(index.groups.map((g) => [g.id, g]));
+  // Le compte repris (`lib/accounts.ts`) : son nom, ou de quoi dire qu'il
+  // n'est plus dans ce vault. Rien sur une fiche partagée par lien.
+  const accountId = shared ? null : linkedAccountId(payload);
+  const accountRow = accountId && (
+    <Row label={t("Compte")}>{index.accounts.find((a) => a.id === accountId)?.name ?? <Muted>{t("introuvable dans ce vault — dernière copie gardée")}</Muted>}</Row>
+  );
   const hostLabel = (id: string | null | undefined) => (id ? index.hosts.find((h) => h.id === id)?.label ?? t("hôte inconnu ({0})", id.slice(0, 8)) : null);
 
   switch (payload.kind) {
@@ -33,6 +41,7 @@ export function ItemView({ payload, index, shared, withoutOrganisation }: { payl
           <Section title={t("Connexion")}>
             <Row label={t("Type")}>{HOST_KIND_LABELS[kind]}</Row>
             {kind === "dockerExec" && h.dockerViaHostId ? <Row label={t("Via l'hôte")}>{hostLabel(h.dockerViaHostId)}</Row> : <Row label={kind === "k8sExec" ? t("Contexte") : t("Adresse")} mono>{h.address}{kind === "ssh" || kind === "rdp" ? `:${h.port}` : ""}</Row>}
+            {accountRow}
             <Row label={kind === "k8sExec" ? t("Namespace") : t("Utilisateur")} mono>{h.username || <Muted>—</Muted>}</Row>
             {kind !== "dockerExec" && kind !== "k8sExec" && <Row label={t("Authentification")}>{describeAuth(h.auth, index)}</Row>}
             {s.password !== undefined && <Row label={t("Mot de passe")}><SecretValue value={s.password} /></Row>}
@@ -142,6 +151,7 @@ export function ItemView({ payload, index, shared, withoutOrganisation }: { payl
       return (
         <div className="space-y-6">
           <Section title={t("Identifiant")}>
+            {accountRow}
             <Row label={t("Utilisateur")}><Copyable value={l.username} mono /></Row>
             <Row label={t("Mot de passe")}>
               {l.password ? (
@@ -297,6 +307,32 @@ export function ItemView({ payload, index, shared, withoutOrganisation }: { payl
             <Row label={t("Expiration")}>{k.expiresAt ? <span className={expired ? "text-[var(--c-danger)]" : ""}>{k.expiresAt}{expired ? t(" — expirée") : ""}</span> : <Muted>{t("aucune")}</Muted>}</Row>
           </Section>
           <SecretCommon base={k} groups={groups} organisation={organisation} />
+        </div>
+      );
+    }
+    case "account": {
+      const a = payload.account;
+      const users = shared ? [] : [...index.byId.values()].filter((i) => linkedAccountId(i.payload) === a.id);
+      return (
+        <div className="space-y-6">
+          <Section title={t("Compte")}>
+            <Row label={t("Utilisateur")}><Copyable value={a.username} mono /></Row>
+            <Row label={t("Mot de passe")}>
+              {a.password ? (
+                <span className="flex flex-col gap-1">
+                  <SecretValue value={a.password} />
+                  <PasswordStrength password={a.password} />
+                </span>
+              ) : <Muted>—</Muted>}
+            </Row>
+            {!shared && (
+              <Row label={t("Repris par")}>
+                {users.length ? users.map((i) => payloadName(i.payload)).sort((x, y) => x.localeCompare(y)).join(", ") : <Muted>{t("aucun élément")}</Muted>}
+              </Row>
+            )}
+          </Section>
+          <SecretCommon base={a} groups={groups} organisation={organisation} />
+          {a.passwordHistory.length > 0 && <PasswordHistory entries={a.passwordHistory} />}
         </div>
       );
     }

@@ -3,8 +3,9 @@
  * jour pour que la liste, le badge et les boutons dans les pages suivent
  * sans re-télécharger. */
 import { applyBackend } from "./backend";
+import { syncLinked } from "../../src/lib/accounts";
 import { deleteItem as deleteVaultItem, IntegrityError, loadItems, payloadEntity, putPayload, RevisionConflict, type DecodedItem, type SessionState, type VaultView } from "../../src/lib/session";
-import type { Login, Payload } from "../../src/lib/types";
+import type { Account, Login, Payload } from "../../src/lib/types";
 import { loadItemsCache, loadSession, loadSettings, saveItemsCache } from "./store";
 import { t } from "../../src/lib/i18n";
 
@@ -23,6 +24,12 @@ export async function findLogin(id: string): Promise<{ vaultId: string; login: L
     if (it?.ok && it.payload.kind === "login") return { vaultId, login: it.payload.login, revision: it.revision };
   }
   return null;
+}
+
+/** Le compte enregistré `id` du vault, d'après le cache. */
+export async function findAccount(vaultId: string, id: string): Promise<{ account: Account; revision: number } | null> {
+  const it = (await loadItemsCache())[vaultId]?.items.find((i) => i.id === id);
+  return it?.ok && it.payload.kind === "account" ? { account: it.payload.account, revision: it.revision } : null;
 }
 
 /** Un vault en écart avec son manifeste (vu par le popup, gardé dans le
@@ -49,6 +56,11 @@ export async function savePayload(vaultId: string, payload: Payload, revision?: 
     entry.items = [...entry.items.filter((i) => i.id !== id), decoded];
     cache[vaultId] = entry;
     await saveItemsCache(cache);
+    // Un compte enregistré : ce qui le reprend suit (`lib/accounts.ts`).
+    if (payload.kind === "account") {
+      const r = await syncLinked(vault, payload.account, entry.items);
+      if (r.done) await refreshVault(vaultId);
+    }
     return decoded;
   } catch (e) {
     if (e instanceof RevisionConflict) await refreshVault(vaultId);

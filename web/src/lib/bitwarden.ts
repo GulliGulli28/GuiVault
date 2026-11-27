@@ -251,8 +251,8 @@ async function decryptEncString(enc: string, encKey: Uint8Array, macKey: Uint8Ar
 
 export const BITWARDEN_CSV_HEADER = ["folder", "favorite", "type", "name", "notes", "fields", "reprompt", "login_uri", "login_username", "login_password", "login_totp"];
 
-/** Les lignes CSV Bitwarden d'une liste de secrets — identifiants et notes
- * seulement, le format n'a pas de colonnes pour le reste. */
+/** Les lignes CSV Bitwarden d'une liste de secrets — identifiants (comptes
+ * compris) et notes seulement, le format n'a pas de colonnes pour le reste. */
 export function toBitwardenCsvRows(items: { payload: Payload; folderPath: string[] }[]): { rows: (string | number)[][]; skipped: number } {
   const rows: (string | number)[][] = [];
   let skipped = 0;
@@ -261,6 +261,10 @@ export function toBitwardenCsvRows(items: { payload: Payload; folderPath: string
     if (p.kind === "login") {
       const l = p.login;
       rows.push([folder, l.favorite ? 1 : 0, "login", l.name, l.notes ?? "", fieldsToCsv(l.fields), l.reprompt ? 1 : 0, l.uris.map((u) => u.uri).join(","), l.username, l.password, l.totp ?? ""]);
+    } else if (p.kind === "account") {
+      // Bitwarden n'a pas de compte : un identifiant sans site.
+      const a = p.account;
+      rows.push([folder, a.favorite ? 1 : 0, "login", a.name, a.notes ?? "", fieldsToCsv(a.fields), a.reprompt ? 1 : 0, "", a.username, a.password, ""]);
     } else if (p.kind === "note") {
       const n = p.note;
       rows.push([folder, n.favorite ? 1 : 0, "note", n.name, n.content, fieldsToCsv(n.fields), n.reprompt ? 1 : 0, "", "", "", ""]);

@@ -3,7 +3,7 @@ import type { VaultIndex } from "../../lib/entities";
 import { emptyLogin, PASSWORD_HISTORY_MAX } from "../../lib/items";
 import { decodeQrImage } from "../../lib/qr";
 import { parseTotp } from "../../lib/totp";
-import type { Login, LoginUri, Payload, UriMatch } from "../../lib/types";
+import type { Account, Login, LoginUri, Payload, UriMatch } from "../../lib/types";
 import { GeneratorPanel } from "../GeneratorPanel";
 import { PasswordStrength } from "../PasswordStrength";
 import { TotpCode } from "../TotpCode";
@@ -14,6 +14,8 @@ import { Field, FormShell, useSeed } from "./common";
 import { AutoTypeFields } from "../AutoType";
 import { autoTypeBridge } from "../../lib/platform";
 import { SecretFooter, SecretHeader } from "./SecretBits";
+import { AccountSelect, LinkedCredentials } from "./AccountLink";
+import { withAccount, withoutAccount } from "../../lib/accounts";
 import { t, translated } from "../../lib/i18n";
 
 const MATCH_LABELS: Record<UriMatch, string> = translated({ domain: "domaine", host: "hôte", startsWith: "commence par", exact: "exact", regex: "expression régulière", never: "jamais" });
@@ -29,6 +31,12 @@ export function LoginForm({ initial, index, defaultGroupId, onSave, onCancel }: 
   const [showGenerator, setShowGenerator] = useState(false);
   const [qrError, setQrError] = useState<string | null>(null);
   const totp = login.totp ? parseTotp(login.totp) : null;
+  const account = login.accountId ? index.accounts.find((a) => a.id === login.accountId) : undefined;
+  const linkTo = (a: Account | null) => {
+    const p: Payload = { kind: "login", login };
+    const next = a ? withAccount(p, a) ?? p : withoutAccount(p);
+    if (next.kind === "login") setLogin(next.login);
+  };
 
   const readQr = async (file: Blob | undefined) => {
     if (!file) return;
@@ -43,7 +51,10 @@ export function LoginForm({ initial, index, defaultGroupId, onSave, onCancel }: 
   };
 
   const save = async () => {
-    const out: Login = { ...login, name: login.name.trim(), username: login.username.trim(), uris: login.uris.filter((u) => u.uri.trim()).map((u) => ({ ...u, uri: u.uri.trim() })), totp: login.totp?.trim() || null };
+    // Relié : la copie du compte tel qu'il est maintenant.
+    const linked = account ? withAccount({ kind: "login", login }, account) : null;
+    const base = linked?.kind === "login" ? linked.login : login;
+    const out: Login = { ...base, name: login.name.trim(), username: base.username.trim(), uris: login.uris.filter((u) => u.uri.trim()).map((u) => ({ ...u, uri: u.uri.trim() })), totp: login.totp?.trim() || null };
     // Une fenêtre associée sans titre ne correspondrait à rien.
     if (out.autoType?.windows) {
       const windows = out.autoType.windows.filter((w) => w.title.trim()).map((w) => ({ ...w, title: w.title.trim() }));
@@ -52,7 +63,8 @@ export function LoginForm({ initial, index, defaultGroupId, onSave, onCancel }: 
     }
     // Un mot de passe remplacé passe dans l'historique, borné aux dix
     // derniers — le format de Bitwarden, qu'on relit et réexporte.
-    if (initial && initial.password && initial.password !== out.password) {
+    // Relié avant : l'historique est celui du compte, pas de l'identifiant.
+    if (initial && initial.password && initial.password !== out.password && !initial.accountId) {
       out.passwordHistory = [{ password: initial.password, changedAt: new Date().toISOString() }, ...login.passwordHistory].slice(0, PASSWORD_HISTORY_MAX);
     }
     await onSave({ kind: "login", login: out });
@@ -63,23 +75,28 @@ export function LoginForm({ initial, index, defaultGroupId, onSave, onCancel }: 
   return (
     <FormShell title={initial ? t("Modifier « {0} »", initial.name) : t("Nouvel identifiant")} onSave={save} onCancel={onCancel} validate={() => (login.name.trim() ? login.totp && !totp ? t("Le secret TOTP ne se lit pas (URI otpauth:// ou base32 attendu).") : null : t("Le nom est obligatoire."))}>
       <SecretHeader value={login} onChange={setLogin} placeholder={t("GitHub, banque, Wi-Fi…")} />
-      <Field label={t("Utilisateur")}>
-        <input value={login.username} onChange={(e) => setLogin({ ...login, username: e.target.value })} autoComplete="off" className="input input-mono" />
-      </Field>
-      <div>
-        <div className="flex items-end gap-1.5">
-          <Field label={t("Mot de passe")} className="min-w-0 flex-1">
-            <PasswordInput value={login.password} onChange={(password) => setLogin({ ...login, password })} autoComplete="new-password" />
+      <AccountSelect accounts={index.accounts} value={login.accountId ?? null} onChange={linkTo} />
+      {login.accountId ? <LinkedCredentials username={login.username} withPassword /> : (
+        <>
+          <Field label={t("Utilisateur")}>
+            <input value={login.username} onChange={(e) => setLogin({ ...login, username: e.target.value })} autoComplete="off" className="input input-mono" />
           </Field>
-          <button type="button" onClick={() => setShowGenerator((g) => !g)} aria-pressed={showGenerator} className={`btn btn-icon ${showGenerator ? "btn-toggled" : "btn-secondary"}`} title={t("Générer un mot de passe")} aria-label={t("Générer un mot de passe")}><IconDice size={14} /></button>
-        </div>
-        <PasswordStrength password={login.password} className="mt-1" />
-        {showGenerator && (
-          <div className="card mt-2 p-3">
-            <GeneratorPanel compact onUse={(v) => { setLogin({ ...login, password: v }); setShowGenerator(false); }} />
+          <div>
+            <div className="flex items-end gap-1.5">
+              <Field label={t("Mot de passe")} className="min-w-0 flex-1">
+                <PasswordInput value={login.password} onChange={(password) => setLogin({ ...login, password })} autoComplete="new-password" />
+              </Field>
+              <button type="button" onClick={() => setShowGenerator((g) => !g)} aria-pressed={showGenerator} className={`btn btn-icon ${showGenerator ? "btn-toggled" : "btn-secondary"}`} title={t("Générer un mot de passe")} aria-label={t("Générer un mot de passe")}><IconDice size={14} /></button>
+            </div>
+            <PasswordStrength password={login.password} className="mt-1" />
+            {showGenerator && (
+              <div className="card mt-2 p-3">
+                <GeneratorPanel compact onUse={(v) => { setLogin({ ...login, password: v }); setShowGenerator(false); }} />
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        </>
+      )}
 
       <Field group label={t("Sites (URI)")} hint={t("Le premier s'affiche dans la liste ; la correspondance guide le remplissage.")}>
         <div className="space-y-1">

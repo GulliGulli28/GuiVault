@@ -239,7 +239,7 @@ impl Opened {
 /// Le champ lu quand on n'en demande pas : le secret de l'élément.
 pub fn default_field(kind: &str) -> Option<&'static str> {
     Some(match kind {
-        "login" | "host" | "sql-connection" => "password",
+        "login" | "account" | "host" | "sql-connection" => "password",
         "api-key" => "secret",
         "aws" => "secret-access-key",
         "note" => "content",
@@ -270,8 +270,8 @@ pub fn field(e: &Entry, name: &str) -> Result<String> {
     let special: Option<Option<String>> = match (e.kind.as_str(), f.as_str()) {
         (_, "id") => Some(Some(e.id.to_string())),
         (_, "name") => Some(Some(e.name.clone())),
-        ("login", "user" | "login") => Some(text(&ent["username"])),
-        ("login", "pass") => Some(text(&ent["password"])),
+        ("login" | "account", "user" | "login") => Some(text(&ent["username"])),
+        ("login" | "account", "pass") => Some(text(&ent["password"])),
         ("login", "uri" | "url") => Some(ent["uris"].get(0).and_then(|u| text(&u["uri"]))),
         ("login", "totp" | "code" | "otp") => Some(match text(&ent["totp"]) {
             Some(secret) => Some(totp_now(&secret)?),
@@ -382,6 +382,9 @@ mod tests {
         let api = entry(json!({ "kind": "api-key", "apiKey": { "keyId": "pk", "secret": "sk" } }));
         assert_eq!(field(&api, "key-id").unwrap(), "pk");
         assert_eq!(field(&api, default_field("api-key").unwrap()).unwrap(), "sk");
+        let account = entry(json!({ "kind": "account", "account": { "username": "jdupont", "password": "ldap" } }));
+        assert_eq!(field(&account, "user").unwrap(), "jdupont");
+        assert_eq!(field(&account, default_field("account").unwrap()).unwrap(), "ldap");
     }
 
     #[test]

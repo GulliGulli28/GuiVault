@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseTags, rangeBetween, runBulk, withFavorite, withTags } from "./bulk";
+import { parseTags, rangeBetween, runBulk, subtreeIds, topOfSelection, withFavorite, withTags } from "./bulk";
 import type { Payload } from "./types";
 
 const login = (extra: Record<string, unknown> = {}): Payload =>
@@ -38,6 +38,18 @@ describe("actions de masse", () => {
     expect(rangeBetween(ids, "d", "b")).toEqual(["b", "c", "d"]);
     expect(rangeBetween(ids, null, "c")).toEqual(["c"]);
     expect(rangeBetween(ids, "zz", "c")).toEqual(["c"]);
+  });
+
+  it("un dossier coché : tout son contenu, sous-dossiers compris ; ranger ne touche que le haut", () => {
+    const e = [
+      { id: "prod", parentId: null }, { id: "db", parentId: "prod" }, { id: "pg", parentId: "db" },
+      { id: "web", parentId: "prod" }, { id: "perso", parentId: null },
+      { id: "boucle", parentId: "boucle" },
+    ];
+    expect(subtreeIds(e, "prod")).toEqual(["prod", "db", "pg", "web"]);
+    expect(subtreeIds(e, "boucle")).toEqual(["boucle"]);
+    const picked = new Set(["prod", "db", "pg", "perso"]);
+    expect(topOfSelection(e.filter((x) => picked.has(x.id)), picked).map((x) => x.id)).toEqual(["prod", "perso"]);
   });
 
   it("une erreur n'arrête pas les suivantes", async () => {

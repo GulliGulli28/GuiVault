@@ -19,6 +19,7 @@ const ENTITY_KEY: Record<ItemKind, string> = {
   aws: "aws",
   "api-key": "apiKey",
   runbook: "runbook",
+  account: "account",
 };
 
 /** Le payload avec son entité passée par `fn` ; le reste (secrets d'un
@@ -64,6 +65,29 @@ export function rangeBetween(ids: string[], anchor: string | null, id: string): 
   if (b < 0) return [];
   if (a < 0) return [id];
   return ids.slice(Math.min(a, b), Math.max(a, b) + 1);
+}
+
+/** Un dossier et tout ce qu'il contient, sous-dossiers compris (d'après
+ * le `parentId` des entités), borné contre un cycle. */
+export function subtreeIds(entities: readonly { id: string; parentId: string | null }[], folderId: string): string[] {
+  const children = new Map<string, string[]>();
+  for (const e of entities) if (e.parentId) children.set(e.parentId, [...(children.get(e.parentId) ?? []), e.id]);
+  const out: string[] = [];
+  const seen = new Set<string>();
+  const walk = (id: string) => {
+    if (seen.has(id)) return;
+    seen.add(id);
+    out.push(id);
+    for (const c of children.get(id) ?? []) walk(c);
+  };
+  walk(folderId);
+  return out;
+}
+
+/** Le haut de la sélection : ce dont le dossier n'est pas coché lui aussi
+ * (ranger ailleurs ne touche qu'eux, le reste suit son dossier). */
+export function topOfSelection<T extends { id: string; parentId: string | null }>(items: readonly T[], picked: ReadonlySet<string>): T[] {
+  return items.filter((i) => !i.parentId || !picked.has(i.parentId));
 }
 
 export interface BulkResult {

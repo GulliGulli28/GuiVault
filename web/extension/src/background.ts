@@ -19,7 +19,7 @@ import { hostOf, parentUrl, pickFrame, senderUrl, shortcutFrame, type FrameCandi
 import { clearClipboardIfUnchanged } from "./clipboardDom";
 import * as passkeys from "./passkeys";
 import { CLIPBOARD_ALARM, LOCK_ALARM, loadItemsCache, loadSession, loadSettings, lock, noteRecentFill, parseOtpPatterns, recentFill, saveTokens, scheduleClipboardClear, takeClipboardClear } from "./store";
-import { findLogin, saveLogin } from "./vaultops";
+import { findAccount, findLogin, saveLogin, savePayload } from "./vaultops";
 import { applyLanguageSetting, asLanguageSetting, t } from "../../src/lib/i18n";
 
 // Une écriture depuis ici (enregistrer une passkey) peut rafraîchir les
@@ -184,7 +184,15 @@ async function classify(tabId: number, urls: string[], username: string, passwor
   if (lists.some((l) => l === null)) return null;
   const m = [...new Map(lists.flatMap((l) => l ?? []).map((l) => [l.id, l])).values()];
   const candidates = m.map((l) => ({ id: l.id, name: l.name, username: l.username, password: l.password, score: Math.max(...urls.map((u) => loginScore(l, u))) }));
-  return classifyCapture(candidates, username, password, await recentFill(tabId));
+  const out = classifyCapture(candidates, username, password, await recentFill(tabId));
+  // Un identifiant qui reprend un compte : c'est le compte qui change, et
+  // la bannière le dit.
+  if (out?.mode === "update") {
+    const found = await findLogin(out.loginId);
+    const account = found?.login.accountId ? await findAccount(found.vaultId, found.login.accountId) : null;
+    if (account) return { ...out, loginName: t("{0} (compte)", account.account.name) };
+  }
+  return out;
 }
 
 async function saveCaptured(tabId: number, vaultId: string): Promise<{ ok: true; name: string } | { ok: false; error: string }> {
@@ -195,6 +203,15 @@ async function saveCaptured(tabId: number, vaultId: string): Promise<{ ok: true;
       const found = await findLogin(c.loginId);
       if (!found) return { ok: false, error: t("identifiant introuvable") };
       const { login, revision } = found;
+      const linked = login.accountId ? await findAccount(found.vaultId, login.accountId) : null;
+      if (linked) {
+        const a = linked.account;
+        const history = a.password ? [{ password: a.password, changedAt: new Date().toISOString() }, ...a.passwordHistory].slice(0, 10) : a.passwordHistory;
+        // `savePayload` met à jour ce qui reprend le compte, cet identifiant compris.
+        await savePayload(found.vaultId, { kind: "account", account: { ...a, password: c.password, passwordHistory: history } }, linked.revision);
+        await setPending(tabId, null);
+        return { ok: true, name: a.name };
+      }
       const history = login.password ? [{ password: login.password, changedAt: new Date().toISOString() }, ...login.passwordHistory].slice(0, 10) : login.passwordHistory;
       await saveLogin(found.vaultId, { ...login, password: c.password, passwordHistory: history }, revision);
       await setPending(tabId, null);

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { duplicateOf } from "../lib/duplicates";
+import { copiesFor, duplicateOf } from "../lib/duplicates";
 import type { PageContext } from "../App";
 import { errorMessage, supports } from "../lib/api";
 import { autoTypeBridge } from "../lib/platform";
@@ -8,6 +8,7 @@ import { filterEntities, indexItems, SORT_LABELS, toEntities, withParent, type S
 import { plainShortcut } from "../lib/keyboard";
 import { uuid } from "../lib/bytes";
 import { isSecret, primarySecret, primaryUser, uriHost, withArticle } from "../lib/items";
+import { withEntity } from "../lib/bulk";
 import { parseTotp, totpCode } from "../lib/totp";
 import { ACCENT_COLORS } from "../lib/preferences";
 import { setVaultColor, useVaultColors, VAULT_COLORS, vaultColor, vaultColorName } from "../lib/vaultColors";
@@ -28,6 +29,8 @@ import { ItemHistory } from "./ItemHistory";
 import { AttachmentsPanel } from "./AttachmentsPanel";
 import { IntegrityBanner } from "./IntegrityBanner";
 import { useMerge } from "./MergeDialog";
+import { linkedItems, syncLinked } from "../lib/accounts";
+import { AccountCallout } from "./AccountCallout";
 import { ShortcutsHelp } from "./ShortcutsHelp";
 import { ItemAside } from "./ItemAside";
 import { NewVaultDialog } from "./NewVault";
@@ -47,11 +50,11 @@ type Mode = { kind: "view" } | { kind: "edit"; draft?: Payload } | { kind: "new"
 
 /** Les entrées du menu « Nouveau » : les secrets d'abord, puis les entités
  * Guiterm, un trait entre les deux. */
-export const NEW_KINDS: (ItemKind | "sep")[] = ["login", "note", "card", "identity", "api-key", "aws", "sep", "host", "group", "sql-connection", "key", "snippet", "runbook", "icon"];
+export const NEW_KINDS: (ItemKind | "sep")[] = ["login", "account", "note", "card", "identity", "api-key", "aws", "sep", "host", "group", "sql-connection", "key", "snippet", "runbook", "icon"];
 
 type Filter = "all" | "favorites" | ItemKind;
 /** Les filtres proposés, dans l'ordre ; ceux sans élément sont masqués. */
-const FILTERS: Filter[] = ["all", "favorites", "login", "note", "card", "identity", "api-key", "aws", "host", "sql-connection", "key", "snippet", "runbook", "group", "icon"];
+const FILTERS: Filter[] = ["all", "favorites", "login", "account", "note", "card", "identity", "api-key", "aws", "host", "sql-connection", "key", "snippet", "runbook", "group", "icon"];
 
 /** Un vault : son contenu à gauche, la fiche ou le formulaire à droite. */
 export function VaultPage({ ctx, vaultId, itemId, create }: { ctx: PageContext; vaultId: string; itemId?: string; create?: string }) {
@@ -125,6 +128,7 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
    * ni réglages (ce compte n'en est pas membre). */
   const emergency = vault.emergency;
   const [moveTo, setMoveTo] = useState<VaultView | null>(null);
+  const [copyTo, setCopyTo] = useState<VaultView | null>(null);
   const [newMenu, setNewMenu] = useState(false);
   const closeNewMenu = useCallback(() => setNewMenu(false), []);
   const [newVault, setNewVault] = useState(false);
@@ -158,12 +162,12 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
   const [picking, setPicking] = useState(false);
   const [pickable, setPickable] = useState<string[]>([]);
   const selecting = picking || picked.size > 0;
-  const onPick = useCallback((ids: string[], how: "toggle" | "add") => {
+  const onPick = useCallback((ids: string[], how: "toggle" | "add" | "remove") => {
     setPicked((prev) => {
       const next = new Set(prev);
       for (const id of ids) {
-        if (how === "add" || !next.has(id)) next.add(id);
-        else next.delete(id);
+        if (how === "remove" || (how === "toggle" && next.has(id))) next.delete(id);
+        else next.add(id);
       }
       return next;
     });
@@ -251,6 +255,12 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
   };
 
   const leaveEdit = async (payload: Payload, message: string) => {
+    // Un compte enregistré : ce qui le reprend suit (`lib/accounts.ts`).
+    if (payload.kind === "account" && items) {
+      const r = await syncLinked(vault, payload.account, items);
+      if (r.done) message += " " + plural(r.done, "{0} élément relié mis à jour.", "{0} éléments reliés mis à jour.");
+      if (r.failed.length) ctx.error(plural(r.failed.length, "{0} élément relié n'a pas pu être mis à jour : {1}", "{0} éléments reliés n'ont pas pu être mis à jour : {1}", r.failed.map((f) => f.name).join(", ")));
+    }
     ctx.notify(message);
     setMode({ kind: "view" });
     setStale(false);
@@ -314,24 +324,27 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
     }
   };
 
+  /** Une copie dans un autre vault (id neuf, sans pièces jointes ; un
+   * identifiant y est détaché de son compte, qui reste ici). */
+  const doCopy = async () => {
+    if (!current?.ok || !copyTo) return;
+    const dest = copyTo;
+    setCopyTo(null);
+    try {
+      await putPayload(dest, copiesFor([current.payload])[0]);
+      ctx.notify(t("« {0} » copié vers « {1} ».", payloadName(current.payload), dest.name));
+    } catch (e) {
+      ctx.error(errorMessage(e));
+    }
+  };
+
   const toggleFavorite = async () => {
     if (!current?.ok) return;
     // La valeur voulue, d'après ce qu'on voyait : rejouée telle quelle si
     // l'élément a changé entre-temps (`changeItem`), jamais un « inverser »
     // qui déferait une épingle posée ailleurs.
     const favorite = payloadEntity(current.payload).favorite ? undefined : true;
-    const set = <T extends { favorite?: boolean }>(e: T): T => ({ ...e, favorite });
-    const edit = (p: Payload): Payload | null => {
-      switch (p.kind) {
-        case "login": return { ...p, login: set(p.login) };
-        case "note": return { ...p, note: set(p.note) };
-        case "card": return { ...p, card: set(p.card) };
-        case "identity": return { ...p, identity: set(p.identity) };
-        case "aws": return { ...p, aws: set(p.aws) };
-        case "api-key": return { ...p, apiKey: set(p.apiKey) };
-        default: return null;
-      }
-    };
+    const edit = (p: Payload): Payload | null => (isSecret(p) ? withEntity(p, (e) => ({ ...e, favorite })) : null);
     try {
       await changeItem(vault, current, edit);
     } catch (e) {
@@ -777,6 +790,12 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
                           <span className="min-w-0 flex-1 truncate">{t("Déplacer vers")} {v.name}</span>
                         </button>
                       ))}
+                      {current.ok && current.payload.kind !== "group" && otherWritable.map((v) => (
+                        <button key={`copy-${v.id}`} role="menuitem" className="menu-item" onClick={() => { close(); setCopyTo(v); }}>
+                          <IconCopy size={14} />
+                          <span className="min-w-0 flex-1 truncate">{t("Copier vers")} {v.name}</span>
+                        </button>
+                      ))}
                       {writable && <><div className="menu-sep" /><button role="menuitem" className="menu-item text-[var(--c-danger-text)]" onClick={() => { close(); setConfirmDelete(true); }}><IconTrash size={14} /> {t("Supprimer")}<span className="flex-1" />{!touch && <span className="kbd">{t("Suppr")}</span>}</button></>}
                     </>
                   )}
@@ -785,6 +804,7 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
               <div className="sidebar-scroll min-h-0 flex-1 overflow-y-auto px-8 pb-10 pt-7 max-md:px-4 max-md:pt-5">
                 <div className="flex max-w-[1180px] flex-col gap-6">
                   {alerts.has(current.id) && <p className="callout callout-danger">{capitalize(alerts.get(current.id)!)} {t(": ne vous y fiez pas avant de l'avoir vérifié.")}</p>}
+                  {current.ok && items && <AccountCallout vault={vault} item={current} items={items} accounts={index.accounts} writable={writable && !emergency && !ctx.session.offline} notify={ctx.notify} error={ctx.error} onChanged={() => void load()} />}
                   {current.ok ? (
                     <>
                       {/* Mobile (maquette `MFiche`) : centré, la tuile en grand. */}
@@ -876,7 +896,7 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
       {confirmDelete && current && (
         <ConfirmDialog
           title={t("Supprimer « {0} » ?", current.ok ? payloadName(current.payload) : current.id.slice(0, 8))}
-          message={(current.ok && current.payload.kind === "group" ? t("Le dossier est supprimé ; ce qu'il contient remonte à la racine lors de la prochaine synchronisation de chaque appareil.") : t("Chaque appareil synchronisé le retire à son tour.")) + t(" Il reste dans la corbeille du vault, d'où il peut être restauré.")}
+          message={(current.ok && current.payload.kind === "group" ? t("Le dossier est supprimé ; ce qu'il contient remonte à la racine lors de la prochaine synchronisation de chaque appareil.") : t("Chaque appareil synchronisé le retire à son tour.")) + t(" Il reste dans la corbeille du vault, d'où il peut être restauré.") + (current.ok && current.payload.kind === "account" && items ? linkedNote(linkedItems(items, current.id).length) : "")}
           confirmLabel={t("Supprimer")}
           danger
           onConfirm={remove}
@@ -905,14 +925,26 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
           onCancel={() => setMoveTo(null)}
         >
           {current.payload.kind === "group" && <p className="callout callout-warn">{t("Seul le dossier lui-même est déplacé, pas son contenu.")}</p>}
+          {current.payload.kind === "account" && items && linkedItems(items, current.id).length > 0 && (
+            <p className="callout callout-warn">{plural(linkedItems(items, current.id).length, "{0} élément de ce vault le reprend : il garde sa dernière copie, le lien ne suit pas. Déplacez-les ensemble (multisélection) pour le garder.", "{0} éléments de ce vault le reprennent : ils gardent leur dernière copie, le lien ne suit pas. Déplacez-les ensemble (multisélection) pour le garder.")}</p>
+          )}
         </ConfirmDialog>
+      )}
+      {copyTo && current?.ok && (
+        <ConfirmDialog
+          title={t("Copier vers « {0} » ?", copyTo.name)}
+          message={t("Une copie de « {0} » est créée dans {1}, re-chiffrée sous sa clé, sans pièces jointes ; l'original reste ici. {2}", payloadName(current.payload), copyTo.name, copyTo.kind === "shared" ? t("Tous les membres de ce vault pourront le lire, secrets compris.") : "")}
+          confirmLabel={t("Copier")}
+          onConfirm={doCopy}
+          onCancel={() => setCopyTo(null)}
+        />
       )}
     </div>
   );
 }
 
 /** Ce qui peut naître dans un dossier. */
-const FOLDER_KINDS = new Set<ItemKind>(["login", "note", "card", "identity", "api-key", "aws", "host", "sql-connection"]);
+const FOLDER_KINDS = new Set<ItemKind>(["login", "account", "note", "card", "identity", "api-key", "aws", "host", "sql-connection"]);
 
 function payloadIdOf(p: Payload): string {
   return payloadEntity(p).id;
@@ -920,4 +952,9 @@ function payloadIdOf(p: Payload): string {
 
 function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+/** Supprimer un compte enregistré : ce qui le reprend garde sa copie. */
+function linkedNote(n: number): string {
+  return n ? " " + plural(n, "{0} élément le reprend et garde sa dernière copie.", "{0} éléments le reprennent et gardent leur dernière copie.") : "";
 }

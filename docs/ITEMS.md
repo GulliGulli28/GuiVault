@@ -35,7 +35,7 @@ est relu par `termius-core` (voir `CLAUDE.md`, section vérification).
 
 ## Secrets (gestionnaire de mots de passe)
 
-`login`, `note`, `card`, `identity` : définis dans
+`login`, `note`, `card`, `identity`, `aws`, `api-key`, `account` : définis dans
 [`crates/guivault-items`](../crates/guivault-items/src/lib.rs) (Rust) et
 `web/src/lib/types.ts` (TypeScript). Modelés sur les types de Bitwarden pour
 que l'import et l'export soient sans perte. Les fixtures
@@ -51,12 +51,13 @@ text|hidden|boolean }`).
 
 | `kind` | Champs propres |
 |---|---|
-| `login` | `username`, `password`, `uris[] { uri, match? }`, `totp` (URI `otpauth://` ou secret base32), `passkeys[]`, `passwordHistory[] { password, changedAt }`, `autoType? { enabled?, sequence?, windows?[] { title, sequence? } }` (saisie automatique de l'application, `lib/autotype.ts`) |
+| `login` | `username`, `password`, `uris[] { uri, match? }`, `totp` (URI `otpauth://` ou secret base32), `passkeys[]`, `passwordHistory[] { password, changedAt }`, `autoType? { enabled?, sequence?, windows?[] { title, sequence? } }` (saisie automatique de l'application, `lib/autotype.ts`), `accountId?` (le compte repris, voir plus bas) |
 | `note` | `content` |
 | `card` | `cardholderName`, `brand`, `number`, `expMonth`, `expYear`, `code` |
 | `identity` | `title`, `firstName`, `middleName`, `lastName`, `username`, `company`, `ssn`, `passportNumber`, `licenseNumber`, `email`, `phone`, `address1..3`, `city`, `state`, `postalCode`, `country` |
 | `aws` | `authType` (`sso` \| `keys`), `ssoSessionName`, `ssoStartUrl`, `ssoRegion` (le `AwsSsoSession` de Guiterm), `accessKeyId`, `secretAccessKey` (le secret), `mfaSerial`, `region` (défaut), `profiles[] { name, accountId, roleName, region }` (le `AwsProfile` de Guiterm) |
 | `api-key` | enveloppe `{ "kind": "api-key", "apiKey": { … } }` : `service`, `url`, `keyId` (partie publique), `secret`, `scopes`, `expiresAt` (`AAAA-MM-JJ` ou vide) |
+| `account` | `username`, `password`, `passwordHistory[]` |
 
 Un accès `aws` est de quoi réécrire `~/.aws/config` (et
 `~/.aws/credentials` pour des clés) sur un autre poste : la fiche web le
@@ -64,6 +65,23 @@ montre prêt à copier (`awsConfigText` dans `web/src/lib/items.ts`). Guiterm
 fait les deux sens depuis son panneau Identités AWS (`guivault/aws.rs`) :
 enregistrer une session SSO locale et ses profils dans le coffre, et écrire
 un accès du coffre dans `~/.aws/config` — puis `aws sso login`.
+
+Un **compte** (`account`) est un utilisateur et un mot de passe partagés :
+un identifiant (`login.accountId`) ou un hôte SSH ou RDP (`host.accountId`,
+un champ que Guiterm ne connaît pas) **du même vault** le reprend. L'élément
+garde une **copie** de l'utilisateur et du mot de passe (`secrets.password`
+pour un hôte qui s'authentifie par mot de passe), et c'est la copie qui
+fait foi pour remplir ou se connecter : un client qui ignore les comptes
+(Guiterm, une ancienne extension, `gv`) lit l'élément comme avant.
+L'interface web réécrit les copies quand elle enregistre le compte
+(`syncLinked` dans `web/src/lib/accounts.ts`), et un compte protégé
+(`reprompt`) protège ce qui le reprend. Compte supprimé ou déplacé : les
+éléments gardent leur dernière copie.
+
+Guiterm à la révision `dde4cf2` de `guivault-items` ne connaît pas
+`account` : il ignore ces items avec un avertissement à chaque synchro, et
+perd `accountId` d'un hôte qu'il réécrit (l'hôte garde sa copie, le lien
+disparaît).
 
 Une **passkey** est le `fido2Credentials` de Bitwarden : `credentialId`,
 `keyType`, `keyAlgorithm`, `keyCurve`, `keyValue` (clé privée PKCS#8 en
@@ -82,8 +100,8 @@ C'est le rôle d'un client natif (Guiterm) ou d'une extension.
   `kdf_salt` (base64), `blob` (base64) = `seal(key, json, "guivault/v1/export")`
   avec `key = HKDF(Argon2id(mot de passe, sel), "guivault/v1/export")`.
   Réimportable ici ; lisible par tout client qui a `guivault-crypto`.
-- **CSV Bitwarden** : identifiants et notes seulement (le format n'a pas de
-  colonnes pour le reste).
+- **CSV Bitwarden** : identifiants, comptes (en identifiants sans site) et
+  notes seulement (le format n'a pas de colonnes pour le reste).
 
 Imports reconnus : les deux formats ci-dessus, Bitwarden JSON (en clair ou
 protégé par mot de passe — PBKDF2 ou Argon2id, `EncString` type 2) et CSV,

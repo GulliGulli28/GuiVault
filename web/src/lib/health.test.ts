@@ -29,6 +29,22 @@ describe("rapport de santé", () => {
     expect(reused[0].map((s) => s.entry.item.id)).toEqual(["b", "c", "h"]);
   });
 
+  it("un compte enregistré et ses copies : un seul secret", () => {
+    const pw = "correct-horse-battery-staple-9!";
+    const ldap = { kind: "account", account: { id: "ldap", name: "LDAP", groupId: null, tags: [], username: "moi", password: pw, passwordHistory: [] } } as unknown as Payload;
+    const entries = [entry(ldap), entry(login("wiki", pw, { accountId: "ldap" })), entry(login("jira", pw, { accountId: "ldap" }))];
+    const secrets = allSecrets(entries);
+    expect(secrets.map((s) => s.entry.item.id)).toEqual(["ldap"]);
+    expect(findReused(secrets)).toEqual([]);
+    // Le même mot de passe ailleurs, hors du compte : réutilisé.
+    const more = allSecrets([...entries, entry(login("perso", pw))]);
+    expect(findReused(more)[0].map((s) => s.entry.item.id)).toEqual(["ldap", "perso"]);
+    // Compte disparu : les copies restent un seul secret.
+    expect(findReused(allSecrets(entries.slice(1)))).toEqual([]);
+    // L'âge est celui du compte, pas des copies.
+    expect(findOld(entries, new Date("2030-01-01T00:00:00Z")).map((o) => o.entry.item.id)).toEqual(["ldap"]);
+  });
+
   it("date un mot de passe par son dernier changement, sinon la création", () => {
     const now = new Date("2026-09-28T00:00:00Z");
     const entries = [

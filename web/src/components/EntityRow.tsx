@@ -170,7 +170,8 @@ export function GroupRow({
 }: {
   depth: number;
   expanded: boolean;
-  onToggle: () => void;
+  /** Le clic sur le chevron ou le nom (avec ses touches : Ctrl+clic coche). */
+  onToggle: (e?: React.MouseEvent) => void;
   icon: ReactNode;
   name: string;
   count?: number;

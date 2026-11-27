@@ -1,7 +1,7 @@
 /** Ce qu'on sait faire d'un secret sans le serveur : le créer vide, le
  * décrire pour la liste, le fouiller. */
 import { uuid } from "./bytes";
-import type { ApiKey, AwsAccess, Card, Identity, Login, Note, Payload, SecretKind } from "./types";
+import { SECRET_KINDS, type Account, type ApiKey, type AwsAccess, type Card, type Identity, type Login, type Note, type Payload, type SecretKind } from "./types";
 import { language, plural, t } from "./i18n";
 
 /** Les anciens mots de passe gardés sur un identifiant. */
@@ -35,6 +35,10 @@ export function emptyApiKey(groupId: string | null = null): ApiKey {
   return { id: uuid(), name: "", groupId, tags: [], service: "", url: "", keyId: "", secret: "", scopes: "", expiresAt: "" };
 }
 
+export function emptyAccount(groupId: string | null = null): Account {
+  return { id: uuid(), name: "", groupId, tags: [], username: "", password: "", passwordHistory: [] };
+}
+
 export function emptyPayload(kind: SecretKind, groupId: string | null = null): Payload {
   switch (kind) {
     case "login": return { kind, login: emptyLogin(groupId) };
@@ -43,11 +47,12 @@ export function emptyPayload(kind: SecretKind, groupId: string | null = null): P
     case "identity": return { kind, identity: emptyIdentity(groupId) };
     case "aws": return { kind, aws: emptyAws(groupId) };
     case "api-key": return { kind, apiKey: emptyApiKey(groupId) };
+    case "account": return { kind, account: emptyAccount(groupId) };
   }
 }
 
 export function isSecret(p: Payload): p is Extract<Payload, { kind: SecretKind }> {
-  return p.kind === "login" || p.kind === "note" || p.kind === "card" || p.kind === "identity" || p.kind === "aws" || p.kind === "api-key";
+  return (SECRET_KINDS as string[]).includes(p.kind);
 }
 
 /** `~/.aws/config` (et `~/.aws/credentials` pour des clés) tels qu'un
@@ -133,6 +138,8 @@ export function describeSecret(p: Payload): { subtitle: string; search: string }
       const steps = p.runbook.steps.map((s) => [s.title, s.action.kind === "command" ? s.action.command : s.action.kind === "playbook" ? s.action.playbook : ""].join(" "));
       return { subtitle: "", search: [p.runbook.description, ...steps].join(" ") };
     }
+    case "account":
+      return { subtitle: p.account.username, search: [p.account.username, p.account.notes ?? ""].join(" ") };
     case "api-key": {
       const k = p.apiKey;
       const expired = k.expiresAt && k.expiresAt < new Date().toISOString().slice(0, 10);
@@ -151,6 +158,7 @@ export function primarySecret(p: Payload): { label: string; value: string } | nu
   const pick = (label: string, value: string | null | undefined) => (value ? { label, value } : null);
   switch (p.kind) {
     case "login": return pick(t("Mot de passe"), p.login.password);
+    case "account": return pick(t("Mot de passe"), p.account.password);
     case "card": return pick(t("Numéro de carte"), p.card.number);
     case "api-key": return pick(t("Secret"), p.apiKey.secret);
     case "aws": return pick(t("Clé secrète"), p.aws.secretAccessKey);
@@ -177,6 +185,7 @@ export function primaryUser(p: Payload): { label: string; value: string } | null
   const pick = (label: string, value: string | null | undefined) => (value ? { label, value } : null);
   switch (p.kind) {
     case "login": return pick(t("Utilisateur"), p.login.username);
+    case "account": return pick(t("Utilisateur"), p.account.username);
     case "identity": return pick(t("E-mail"), p.identity.email) ?? pick(t("Utilisateur"), p.identity.username);
     case "api-key": return pick(t("Identifiant de clé"), p.apiKey.keyId);
     case "aws": return pick(t("Access key id"), p.aws.accessKeyId);

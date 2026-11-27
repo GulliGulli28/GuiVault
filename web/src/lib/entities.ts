@@ -2,9 +2,9 @@
  * formulaires ont besoin de connaître du reste du vault (dossiers, hôtes pour
  * les relais, clés, snippets). */
 import type { DecodedItem } from "./session";
-import { payloadName } from "./session";
-import { describeSecret } from "./items";
-import { KIND_LABELS, SQL_ENGINE_LABELS, type CustomIcon, type Group, type GuiVaultEntity, type Host, type Payload, type PrivateKey, type Snippet, type SqlConnection } from "./types";
+import { payloadEntity, payloadName } from "./session";
+import { describeSecret, isSecret } from "./items";
+import { KIND_LABELS, SQL_ENGINE_LABELS, type Account, type CustomIcon, type Group, type GuiVaultEntity, type Host, type Payload, type PrivateKey, type Snippet, type SqlConnection } from "./types";
 import { t, translated } from "./i18n";
 
 export interface VaultIndex {
@@ -16,11 +16,14 @@ export interface VaultIndex {
   /** Les icônes du vault, celles que `HostIcon` sait dessiner en plus de
    * la banque de Guiterm. */
   icons: CustomIcon[];
+  /** Les comptes enregistrés du vault, pour relier un identifiant ou un
+   * hôte (`lib/accounts.ts`). */
+  accounts: Account[];
   byId: Map<string, DecodedItem & { ok: true }>;
 }
 
 export function indexItems(items: DecodedItem[]): VaultIndex {
-  const idx: VaultIndex = { groups: [], hosts: [], keys: [], snippets: [], connections: [], icons: [], byId: new Map() };
+  const idx: VaultIndex = { groups: [], hosts: [], keys: [], snippets: [], connections: [], icons: [], accounts: [], byId: new Map() };
   for (const it of items) {
     if (!it.ok) continue;
     idx.byId.set(it.id, it);
@@ -32,6 +35,7 @@ export function indexItems(items: DecodedItem[]): VaultIndex {
       case "snippet": idx.snippets.push(p.snippet); break;
       case "sql-connection": idx.connections.push(p.connection); break;
       case "icon": idx.icons.push(p.icon); break;
+      case "account": idx.accounts.push(p.account); break;
       default: break;
     }
   }
@@ -41,10 +45,12 @@ export function indexItems(items: DecodedItem[]): VaultIndex {
   idx.keys.sort(byName);
   idx.snippets.sort(byName);
   idx.connections.sort(byName);
+  idx.accounts.sort(byName);
   return idx;
 }
 
-function parentOf(p: Payload): string | null {
+/** Le dossier qui contient l'élément (le parent, pour un dossier). */
+export function payloadParent(p: Payload): string | null {
   switch (p.kind) {
     case "host": return p.host.groupId ?? null;
     case "group": return p.group.parentId ?? null;
@@ -55,6 +61,7 @@ function parentOf(p: Payload): string | null {
     case "identity": return p.identity.groupId ?? null;
     case "aws": return p.aws.groupId ?? null;
     case "api-key": return p.apiKey.groupId ?? null;
+    case "account": return p.account.groupId ?? null;
     default: return null;
   }
 }
@@ -72,12 +79,13 @@ export function withParent(p: Payload, folderId: string | null): Payload | null 
     case "identity": return { ...p, identity: { ...p.identity, groupId: folderId } };
     case "aws": return { ...p, aws: { ...p.aws, groupId: folderId } };
     case "api-key": return { ...p, apiKey: { ...p.apiKey, groupId: folderId } };
+    case "account": return { ...p, account: { ...p.account, groupId: folderId } };
     default: return null;
   }
 }
 
 /** Les types qui se rangent dans un dossier. */
-export const FOLDERABLE_KINDS = new Set<string>(["host", "group", "sql-connection", "login", "note", "card", "identity", "aws", "api-key"]);
+export const FOLDERABLE_KINDS = new Set<string>(["host", "group", "sql-connection", "login", "note", "card", "identity", "aws", "api-key", "account"]);
 
 /** Chemin « Prod / Bases » d'un dossier, borné contre un cycle de `parentId`. */
 export function groupPath(groups: Map<string, Group>, groupId: string | null): string {
@@ -95,13 +103,7 @@ export function groupPath(groups: Map<string, Group>, groupId: string | null): s
 }
 
 function payloadEntityFavorite(p: Payload): boolean {
-  switch (p.kind) {
-    case "login": return !!p.login.favorite;
-    case "note": return !!p.note.favorite;
-    case "card": return !!p.card.favorite;
-    case "identity": return !!p.identity.favorite;
-    default: return false;
-  }
+  return isSecret(p) && payloadEntity(p).favorite === true;
 }
 
 export function toEntities(items: DecodedItem[]): GuiVaultEntity[] {
@@ -113,7 +115,7 @@ export function toEntities(items: DecodedItem[]): GuiVaultEntity[] {
       out.push({ id: it.id, kind: (it.itemType as GuiVaultEntity["kind"]) ?? "host", name: `(illisible) ${it.id.slice(0, 8)}`, path: "", parentId: null });
       continue;
     }
-    const parentId = parentOf(it.payload);
+    const parentId = payloadParent(it.payload);
     const { subtitle, search } = describeSecret(it.payload);
     const favorite = payloadEntityFavorite(it.payload) || undefined;
     out.push({ id: it.id, kind: it.payload.kind, name: payloadName(it.payload) || t("(sans nom)"), path: groupPath(groups, parentId), parentId, subtitle: subtitle || undefined, search: search || undefined, favorite, updatedAt: it.updatedAt, createdAt: it.createdAt, ...describeEntity(it.payload) });

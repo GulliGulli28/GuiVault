@@ -1,13 +1,15 @@
 import { useState } from "react";
 import type { VaultIndex } from "../../lib/entities";
 import { uuid } from "../../lib/bytes";
-import type { AuthMethod, CustomIcon, EnvVar, Host, HostKind, HostSecrets, Payload, PersistentShellMode } from "../../lib/types";
+import type { Account, AuthMethod, CustomIcon, EnvVar, Host, HostKind, HostSecrets, Payload, PersistentShellMode } from "../../lib/types";
 import { HOST_KIND_LABELS } from "../ItemView";
 import { IconField } from "../IconPicker";
 import { IconClose, IconDocker, IconHosts, IconKubernetes, IconMonitor } from "../ui-icons";
 import { PasswordInput } from "../ui";
 import { Checkbox, Field, FormShell, GroupSelect, HostSelect, TagsInput, parsePort, useSeed } from "./common";
 import { t } from "../../lib/i18n";
+import { withAccount } from "../../lib/accounts";
+import { AccountSelect, LinkedCredentials } from "./AccountLink";
 
 type AuthKind = "password" | "agent" | "keyboardInteractive" | "privateKey";
 
@@ -62,6 +64,15 @@ export function HostForm({ initial, index, defaultGroupId, onSave, onCancel, onA
   const [keepalive, setKeepalive] = useState(String(h?.keepaliveIntervalSecs ?? 0));
   const [agentForward, setAgentForward] = useState(h?.agentForward ?? false);
   const [persistentShell, setPersistentShell] = useState<PersistentShellMode>(h?.persistentShell ?? "off");
+  const [accountId, setAccountId] = useState<string | null>(typeof h?.accountId === "string" ? h.accountId : null);
+  const account = accountId ? index.accounts.find((a) => a.id === accountId) : undefined;
+  const linkTo = (a: Account | null) => {
+    setAccountId(a?.id ?? null);
+    if (a) {
+      setUsername(a.username);
+      setPassword(a.password);
+    }
+  };
 
   const showPort = kind === "ssh" || kind === "rdp";
   const showAuth = kind === "ssh" || kind === "rdp";
@@ -77,8 +88,9 @@ export function HostForm({ initial, index, defaultGroupId, onSave, onCancel, onA
 
   const save = async () => {
     const id = h?.id ?? uuid();
+    const { accountId: _, ...rest } = h ?? {};
     const host: Host = {
-      ...h,
+      ...(rest as Partial<Host>),
       id,
       label: label.trim(),
       kind,
@@ -99,13 +111,16 @@ export function HostForm({ initial, index, defaultGroupId, onSave, onCancel, onA
       persistentShell,
     };
     if (host.icon === undefined) delete host.icon;
+    if (showAuth && accountId) host.accountId = accountId;
     const secrets: HostSecrets = {};
     if (showAuth && authKind === "password" && password) secrets.password = password;
     if (showAuth && authKind === "privateKey" && !keyId && passphrase) secrets.passphrase = passphrase;
     const env: Record<string, string> = {};
     for (const v of envVars) if (v.secret && v.key.trim()) env[v.key.trim()] = v.secretValue;
     if (Object.keys(env).length) secrets.env = env;
-    await onSave({ kind: "host", host, secrets });
+    // Relié : la copie du compte tel qu'il est maintenant.
+    const p: Payload = { kind: "host", host, secrets };
+    await onSave(showAuth && account ? withAccount(p, account) ?? p : p);
   };
 
   const validate = () => {
@@ -177,9 +192,12 @@ export function HostForm({ initial, index, defaultGroupId, onSave, onCancel, onA
       )}
       {kind === "k8sExec" && <p className="help-text -mt-1.5">{t("Authentifié par kubeconfig ; le pod se choisit à la connexion.")}</p>}
 
-      <Field label={usernameLabel}>
-        <input value={username} onChange={(e) => setUsername(e.target.value)} className="input" />
-      </Field>
+      {showAuth && <AccountSelect accounts={index.accounts} value={accountId} onChange={linkTo} />}
+      {showAuth && accountId ? <LinkedCredentials username={username} usernameLabel={usernameLabel} withPassword={false} /> : (
+        <Field label={usernameLabel}>
+          <input value={username} onChange={(e) => setUsername(e.target.value)} className="input" />
+        </Field>
+      )}
 
       {showAuth && (
         <Field label={t("Authentification")}>
@@ -212,7 +230,7 @@ export function HostForm({ initial, index, defaultGroupId, onSave, onCancel, onA
           </Field>
         </>
       )}
-      {showAuth && (authKind === "password" || (authKind === "privateKey" && !keyId)) && (
+      {showAuth && (authKind === "password" ? !accountId : authKind === "privateKey" && !keyId) && (
         <Field label={authKind === "password" ? t("Mot de passe") : t("Passphrase (optionnelle)")}>
           <PasswordInput value={authKind === "password" ? password : passphrase} onChange={authKind === "password" ? setPassword : setPassphrase} autoComplete="off" />
         </Field>

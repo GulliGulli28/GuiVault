@@ -11,6 +11,7 @@ import { uuid } from "./bytes";
 import type { HealthEntry } from "./health";
 import { uriHost } from "./items";
 import { payloadEntity } from "./session";
+import { linkedAccountId, withoutAccount } from "./accounts";
 import type { Login, Payload } from "./types";
 import { registrableDomain } from "./urimatch";
 
@@ -70,6 +71,37 @@ export function duplicateOf(p: Payload): Payload {
     copy.login.passwordHistory = [];
   }
   return copy;
+}
+
+/** Des copies à écrire dans un autre vault : chacune un id neuf (un id ne
+ * vit que dans un vault), sous son nom. Ce qui renvoie à un autre élément de
+ * la liste suit sa copie (un dossier, son sous-dossier, le compte d'un
+ * identifiant) ; ce qui renvoie au-dehors est coupé — racine, identifiant
+ * détaché de son compte avec sa dernière copie. Sans pièces jointes ni
+ * passkeys, comme « Dupliquer ». Les dossiers en premier. */
+export function copiesFor(payloads: readonly Payload[]): Payload[] {
+  const ids = new Map(payloads.map((p) => [payloadEntity(p).id, uuid()]));
+  const remap = (id: unknown): string | null => (typeof id === "string" ? ids.get(id) ?? null : null);
+  const out = payloads.map((p) => {
+    let copy = JSON.parse(JSON.stringify(p)) as Payload;
+    const e = payloadEntity(copy);
+    e.id = ids.get(e.id)!;
+    delete e.attachments;
+    if (copy.kind === "group") copy.group.parentId = remap(copy.group.parentId);
+    else if ("groupId" in e) e.groupId = remap(e.groupId);
+    if (copy.kind === "login") copy.login.passkeys = [];
+    const account = remap(linkedAccountId(copy));
+    if (linkedAccountId(copy)) copy = account ? withAccountId(copy, account) : withoutAccount(copy);
+    return copy;
+  });
+  return [...out.filter((p) => p.kind === "group"), ...out.filter((p) => p.kind !== "group")];
+}
+
+/** Le même élément relié à un autre id de compte. */
+function withAccountId(p: Payload, accountId: string): Payload {
+  if (p.kind === "login") return { ...p, login: { ...p.login, accountId } };
+  if (p.kind === "host") return { ...p, host: { ...p.host, accountId } };
+  return p;
 }
 
 const uniqueBy = <T,>(list: T[], key: (x: T) => string): T[] => {

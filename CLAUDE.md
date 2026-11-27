@@ -37,7 +37,7 @@ il ne déchiffre rien : la user key reste sous la clé que seule la PRF donne).
   (`db::next_manifest` / `store_manifest` côté serveur, `withManifest` côté
   web), sinon elle casse sur tout vault existant.
 - `crates/guivault-items` — formats en clair des secrets (`login`, `note`,
-  `card`, `identity`, `aws`, `api-key`), miroir Rust de `web/src/lib/types.ts`, à consommer
+  `card`, `identity`, `aws`, `api-key`, `account`), miroir Rust de `web/src/lib/types.ts`, à consommer
   par Guiterm le jour de l'intégration (plan dans `docs/ITEMS.md`). Champs
   inconnus conservés (`flatten extra`), tout absent = défaut. Fixtures
   `tests/web-items.json` écrites par `GUIVAULT_WRITE_VECTORS=1 npx vitest
@@ -233,6 +233,11 @@ il ne déchiffre rien : la user key reste sous la clé que seule la PRF donne).
     vaults dont on est membre, lecture seule ; `findVault` pour les deux),
     `components/EmergencySettings.tsx` (Paramètres › Accès d'urgence, et le
     bandeau du donneur).
+  - `lib/accounts.ts` — les comptes enregistrés (`account`) : un
+    identifiant ou un hôte du même vault en garde une copie (`accountId`),
+    réécrite par `syncLinked` **à chaque écriture d'un compte** (page du
+    vault, `vaultops.savePayload` de l'extension) ; `AccountCallout` montre
+    une copie en retard.
   - `lib/duplicates.ts` — les doublons (onglet « Doublons » de la santé,
     fusion par `MergeDuplicates`) et « Dupliquer » (copie sans pièces
     jointes ni passkeys).

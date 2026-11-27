@@ -412,6 +412,51 @@ scenario("multisélection : cocher deux éléments, les étiqueter, les supprime
   await shot(b, "3d-multiselection");
 });
 
+scenario("compte enregistré : un identifiant le reprend et suit son mot de passe", async (b) => {
+  const openRow = async (name) => {
+    const back = await b.$('button[aria-label="Retour à la liste"]');
+    if (await back.isDisplayed().catch(() => false)) await back.click();
+    const row = await b.$(`//button[.//*[normalize-space()=${JSON.stringify(name)}]]`);
+    await row.waitForClickable({ timeout: 10_000, timeoutMsg: `ligne « ${name} » introuvable` });
+    await row.click();
+  };
+  await openNewMenu(b);
+  await (await b.$("//button[@role='menuitem'][normalize-space()='Compte']")).click();
+  await waitText(b, "Nouveau compte");
+  await fillField(b, "Nom", "LDAP e2e");
+  await fillField(b, "Utilisateur", "jdupont-e2e");
+  await fillField(b, "Mot de passe", "ldap-v1-Secret!");
+  await click(b, "Enregistrer");
+  await waitText(b, "« LDAP e2e » enregistré.");
+
+  await openNewMenu(b);
+  await (await b.$("//button[@role='menuitem'][normalize-space()='Identifiant']")).click();
+  await waitText(b, "Nouvel identifiant");
+  await fillField(b, "Nom", "Wiki e2e");
+  const pick = await b.$("//label[span[normalize-space()='Compte']]//select");
+  await pick.waitForDisplayed({ timeout: 10_000, timeoutMsg: "choix du compte absent du formulaire d'identifiant" });
+  await pick.selectByVisibleText("LDAP e2e — jdupont-e2e");
+  await click(b, "Enregistrer");
+  await waitText(b, "« Wiki e2e » enregistré.");
+  await waitText(b, "jdupont-e2e");
+
+  // Le mot de passe du compte change : l'identifiant suit.
+  await openRow("LDAP e2e");
+  await waitText(b, "Wiki e2e");
+  await click(b, "Modifier");
+  await fillField(b, "Mot de passe", "ldap-v2-Secret!");
+  await click(b, "Enregistrer");
+  await waitText(b, "1 élément relié mis à jour.");
+  await openRow("Wiki e2e");
+  const reveal = await b.$('button[aria-label="Révéler"]');
+  await reveal.waitForClickable({ timeout: 10_000, timeoutMsg: "bouton « Révéler » du mot de passe introuvable" });
+  await reveal.click();
+  await waitText(b, "ldap-v2-Secret!");
+  assert(!(await bodyText(b)).includes("n'est plus celui du compte"), "l'identifiant se dit en retard sur son compte");
+  assert(!coffreOnDisk(coffre).raw.includes("jdupont-e2e"), "un compte est en clair dans coffre.json");
+  await shot(b, "3e-compte");
+});
+
 scenario("fuites : un coffre local interroge Have I Been Pwned lui-même", async (b) => {
   await openNewMenu(b);
   await (await b.$("//button[@role='menuitem'][normalize-space()='Identifiant']")).click();

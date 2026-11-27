@@ -35,7 +35,7 @@ export async function exportEncrypted(vault: { id: string; name: string }, paylo
 export function exportCsv(payloads: Payload[]): { csv: string; skipped: number } {
   const groups = new Map(payloads.flatMap((p) => (p.kind === "group" ? [[p.group.id, p.group] as [string, Group]] : [])));
   const items = payloads.filter((p) => p.kind !== "group").map((payload) => {
-    const groupId = payload.kind === "login" ? payload.login.groupId : payload.kind === "note" ? payload.note.groupId : null;
+    const groupId = payload.kind === "login" ? payload.login.groupId : payload.kind === "note" ? payload.note.groupId : payload.kind === "account" ? payload.account.groupId : null;
     return { payload, folderPath: groupId ? groupPath(groups, groupId).split(" / ") : [] };
   });
   const { rows, skipped } = toBitwardenCsvRows(items);

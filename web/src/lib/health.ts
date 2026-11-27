@@ -13,6 +13,7 @@ import type { DecodedItem, VaultView } from "./session";
 import type { TwoFactorSite } from "./types";
 import { registrableDomain } from "./urimatch";
 import { t } from "./i18n";
+import { linkedAccountId } from "./accounts";
 
 /** Un item lisible et le vault où il vit. */
 export interface HealthEntry {
@@ -37,6 +38,7 @@ export function secretsOf(entry: HealthEntry): SecretRef[] {
   };
   switch (p.kind) {
     case "login": add(t("mot de passe"), p.login.password); break;
+    case "account": add(t("mot de passe"), p.account.password); break;
     case "host": add(t("mot de passe"), p.secrets?.password); add("passphrase", p.secrets?.passphrase); break;
     case "sql-connection": add(t("mot de passe"), p.password); break;
     case "key": add("passphrase", p.passphrase); break;
@@ -44,8 +46,25 @@ export function secretsOf(entry: HealthEntry): SecretRef[] {
   return out;
 }
 
+/** À qui est un secret : le compte enregistré pour ce qui le reprend
+ * (`lib/accounts.ts`), l'élément lui-même sinon. Deux copies d'un même
+ * compte ne sont pas une réutilisation. */
+export function secretOwner(entry: HealthEntry): string {
+  const p = entry.item.payload;
+  return linkedAccountId(p) ?? entry.item.id;
+}
+
+/** Tous les secrets à juger. Le mot de passe repris d'un compte présent
+ * se juge une fois, sur le compte. */
 export function allSecrets(entries: HealthEntry[]): SecretRef[] {
-  return entries.flatMap(secretsOf);
+  const accounts = new Set(entries.filter((e) => e.item.payload.kind === "account").map((e) => `${e.vault.id}/${e.item.id}`));
+  return entries.flatMap((e) => {
+    const id = linkedAccountId(e.item.payload);
+    const own = secretsOf(e);
+    if (!id || !accounts.has(`${e.vault.id}/${id}`)) return own;
+    const copied = e.item.payload.kind === "login" ? e.item.payload.login.password : e.item.payload.kind === "host" ? e.item.payload.secrets?.password : undefined;
+    return own.filter((s) => s.value !== copied || s.label !== t("mot de passe"));
+  });
 }
 
 /** Faibles : « très faible » ou « faible » selon `estimateStrength`. */
@@ -58,15 +77,17 @@ export function findWeak(secrets: SecretRef[]): SecretRef[] {
 export function findReused(secrets: SecretRef[]): SecretRef[][] {
   const by = new Map<string, SecretRef[]>();
   for (const s of secrets) by.set(s.value, [...(by.get(s.value) ?? []), s]);
-  return [...by.values()].filter((g) => g.length > 1).sort((a, b) => b.length - a.length);
+  return [...by.values()].filter((g) => new Set(g.map((s) => secretOwner(s.entry))).size > 1).sort((a, b) => b.length - a.length);
 }
 
-/** Depuis quand le mot de passe d'un identifiant est le même : son dernier
+/** Depuis quand le mot de passe d'un identifiant (ou d'un compte) est le même : son dernier
  * changement (l'historique), sinon la création de l'item. */
 export function passwordSince(entry: HealthEntry): Date | null {
   const p = entry.item.payload;
-  if (p.kind !== "login" || !p.login.password) return null;
-  const changed = p.login.passwordHistory?.map((h) => Date.parse(h.changedAt)).filter((t) => !Number.isNaN(t)) ?? [];
+  // Repris d'un compte : son âge est celui du compte.
+  const secret = p.kind === "login" && !p.login.accountId ? p.login : p.kind === "account" ? p.account : null;
+  if (!secret?.password) return null;
+  const changed = secret.passwordHistory?.map((h) => Date.parse(h.changedAt)).filter((t) => !Number.isNaN(t)) ?? [];
   if (changed.length) return new Date(Math.max(...changed));
   const created = Date.parse(entry.item.createdAt ?? entry.item.updatedAt);
   return Number.isNaN(created) ? null : new Date(created);
