@@ -7,7 +7,7 @@
 # /api/v1/health, à défaut le second argument) dans un arbre à part, puis
 # compare chaque fichier de web/dist, octet par octet (SHA-256), à ce que le
 # serveur sert. Le build est reproductible : mêmes sources et même
-# package-lock.json, mêmes octets, quel que soit le poste (Node 20 ou 22).
+# package-lock.json, mêmes octets, quel que soit le poste (Node 20, 22 ou 26 — l'image).
 #
 # Ce que ça prouve : la page servie à CE poste, maintenant, est celle de ce
 # commit. Pas qu'elle l'est pour tout le monde — un serveur malveillant peut
