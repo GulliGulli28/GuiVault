@@ -1,7 +1,7 @@
 fn main() {
     // La bulle, la biométrie, le remplissage et les archives de coffre
     // d'Android (`src/bubble.rs`, `src/biometric.rs`, `src/autofill.rs`,
-    // `src/coffre_file.rs`) : des plugins de l'app elle-même,
+    // `src/coffre_file.rs`, `src/site_fetch_android.rs`) : des plugins de l'app elle-même,
     // dont les commandes Kotlin ont leurs permissions (`bubble:allow-…`…).
     tauri_build::try_build(
         tauri_build::Attributes::new()
@@ -27,6 +27,7 @@ fn main() {
                 "coffrefile",
                 tauri_build::InlinedPlugin::new().commands(&["save", "pick"]),
             )
+            .plugin("sitefetch", tauri_build::InlinedPlugin::new().commands(&["fetch"]))
             .plugin(
                 "biometric",
                 tauri_build::InlinedPlugin::new()

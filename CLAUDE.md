@@ -104,6 +104,7 @@ il ne déchiffre rien : la user key reste sous la clé que seule la PRF donne).
   `cfg(desktop)` ; `gen/android` est versionné (Kotlin de la bulle :
   `BubblePlugin.kt`, `BubbleService.kt`, de la biométrie :
   `BiometricPlugin.kt`, des archives de coffre : `CoffreFilePlugin.kt`,
+  des icônes des sites : `SiteFetchPlugin.kt`,
   du remplissage des autres applications :
   `GuiVaultAutofillService.kt`, `AutofillIndex.kt`, `AutofillActivity.kt` —
   `docs/REMPLISSAGE.md`, marges : `MainActivity.kt`) ; on
@@ -113,6 +114,8 @@ il ne déchiffre rien : la user key reste sous la clé que seule la PRF donne).
   `GuiVaultAndroid` de `MainActivity.kt` : écran caché aux captures,
   presse-papiers sensible), `bubbleBridge.ts`,
   `biometricBridge.ts` (→ `src/lib/biometric.ts`, `BiometricSetting`),
+  `siteFetchBridge.ts` (icônes des sites : `site_fetch.rs` au bureau,
+  `SiteFetchPlugin.kt` sous Android),
   `coffreFileBridge.ts` (exporter / importer un coffre en `.zip` :
   `CoffreFilePlugin.kt`, `guivault_local::export_coffre`/`import_coffre`,
   `CoffreExport`),

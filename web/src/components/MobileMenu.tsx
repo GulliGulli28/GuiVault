@@ -13,10 +13,11 @@ import { reduceToBubble, useAutoBubble } from "../lib/bubble";
 import { BubbleButton } from "./BubbleButton";
 import { BiometricSetting } from "./BiometricSetting";
 import { AutofillSetting } from "./AutofillSetting";
+import { AppSiteIcons } from "./SiteIconsSetting";
 import { autofillBridge } from "../lib/autofill";
 import { biometricBridge } from "../lib/biometric";
 import { IconBell, IconChevronRight, IconDatabase, IconLock } from "./ui-icons";
-import { screenBridge, updaterBridge } from "../lib/platform";
+import { screenBridge, siteFetchBridge, updaterBridge } from "../lib/platform";
 import { loadSecureScreen, saveSecureScreen } from "../lib/appSettings";
 import { AppUpdates } from "./AppUpdates";
 import { t } from "../lib/i18n";
@@ -100,6 +101,15 @@ export function MobileMenu({ ctx, onLock, onLogout }: { ctx: PageContext; onLock
             <h2 className="m-section">{t("Remplissage")}</h2>
             <div className="m-card m-list">
               <AutofillSetting ctx={ctx} mobile />
+            </div>
+          </section>
+        )}
+
+        {siteFetchBridge() && !session.offline && (
+          <section className="flex flex-col gap-2">
+            <h2 className="m-section">{t("Icônes des sites")}</h2>
+            <div className="m-card m-list">
+              <AppSiteIcons ctx={ctx} mobile />
             </div>
           </section>
         )}

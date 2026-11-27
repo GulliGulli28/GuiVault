@@ -42,7 +42,7 @@ void detectMobile().then(() => {
   else installUpdater();
   installCoffres();
   installCoffreFiles();
-  if (!isMobile()) installSiteFetch();
+  installSiteFetch(isMobile());
   // Le pont système (verrou de session, zone de notification, démarrage,
   // extension) n'a pas de sens sur Android : pas de catégorie « Application ».
   return Promise.allSettled([installAutoType(), installClipboard(), isMobile() ? Promise.resolve() : installSystem(), installBubble(), installBiometric(), installAutofill(), isMobile() ? Promise.resolve() : installSshAgent()]);

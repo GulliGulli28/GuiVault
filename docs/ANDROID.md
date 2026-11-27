@@ -235,6 +235,17 @@ réactivent. Avant Android 12, une seule règle pour les deux : les coffres
 n'y sont pas. Reste vrai : exporter est le seul moyen sûr de garder un
 coffre hors du téléphone.
 
+## Icônes des sites
+
+Onglet Réglages, « Icônes des sites » (désactivé par défaut, comme au
+bureau) : `SiteFetchPlugin.kt` lit la page d'accueil et l'icône du site
+d'un identifiant avec la pile HTTPS d'Android (`HttpURLConnection`, sans
+cookies, 8 s, 512 Kio au plus, redirections suivies à la main jusqu'à 5),
+pour `src/lib/siteIcon.ts` qui choisit et redessine. Un plugin Kotlin
+plutôt que `reqwest` : celui de Tauri n'a pas de TLS ici, et le vérificateur
+de certificats de rustls demanderait une initialisation par JNI. Inscrit par
+`src/site_fetch_android.rs`, commande `plugin:sitefetch|fetch`.
+
 ## Déverrouillage biométrique
 
 Paramètres › Sécurité (et l'onglet Réglages, « Déverrouillage ») :

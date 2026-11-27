@@ -458,7 +458,7 @@ export function Popup() {
           }}
         />
       ) : view.kind === "settings" ? (
-        <SettingsView settings={settings} state={screen.kind === "vault" ? screen.state : null} say={say} onSettings={(s) => { setSettings(s); void saveSettings(s).then(() => settingsChanged("extension")); void touchLock(s.lockMinutes); }} onBack={() => go({ kind: "list" })} />
+        <SettingsView settings={settings} state={screen.kind === "vault" ? screen.state : null} say={say} onSettings={(s) => { setSettings(s); void saveSettings(s).then(() => settingsChanged("extension")); void touchLock(s.lockMinutes); }} onIconsFetched={() => void reloadCache()} onBack={() => go({ kind: "list" })} />
       ) : view.kind === "edit" && current ? (
         <div className="flex min-h-0 flex-1 flex-col">
           <ItemForm
@@ -840,7 +840,7 @@ function ShortcutRow() {
 /** Les réglages, une fois connecté : le verrouillage et le remplissage
  * (les mêmes que sous « Réglages » à la connexion), et l'apparence — la
  * même page que dans l'interface web et dans Guiterm, en une colonne. */
-function SettingsView({ settings, state, say, onSettings, onBack }: { settings: Settings; state: SessionState | null; say: (m: string) => void; onSettings: (s: Settings) => void; onBack: () => void }) {
+function SettingsView({ settings, state, say, onSettings, onIconsFetched, onBack }: { settings: Settings; state: SessionState | null; say: (m: string) => void; onSettings: (s: Settings) => void; onIconsFetched: () => void; onBack: () => void }) {
   const toggle = (label: string, on: boolean, set: (v: boolean) => void) => (
     <button type="button" role="switch" aria-checked={on} aria-label={label} onClick={() => set(!on)} className="switch" />
   );
@@ -869,7 +869,12 @@ function SettingsView({ settings, state, say, onSettings, onBack }: { settings: 
           <SiteIconsSetting
             enabled={settings.siteIcons}
             onChange={(v) => onSettings({ ...settings, siteIcons: v })}
-            onFetchNow={() => chrome.runtime.sendMessage<PopupToBackground, number>({ type: "guivault-site-icons", retry: true }).catch(() => 0)}
+            onFetchNow={async () => {
+              const n = await chrome.runtime.sendMessage<PopupToBackground, number>({ type: "guivault-site-icons", retry: true }).catch(() => 0);
+              // La liste relit le cache que le service worker vient de remettre à jour.
+              if (n) onIconsFetched();
+              return n;
+            }}
           />
         </section>
         <section className="flex flex-col gap-2">

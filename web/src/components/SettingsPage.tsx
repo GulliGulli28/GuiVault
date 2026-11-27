@@ -6,7 +6,7 @@ import { navigate, routeHash, type SettingsSection } from "../lib/route";
 import { LOCK_CHOICES, loadLockMinutes, saveLockMinutes } from "../lib/persist";
 import { CLEAR_CHOICES, loadClearSeconds, saveClearSeconds } from "../lib/clipboard";
 import { OfflineSetting } from "./OfflineSetting";
-import { changePassword, deleteAccount, loadItems, wipe } from "../lib/session";
+import { changePassword, deleteAccount, wipe } from "../lib/session";
 import { clearWebSession } from "../lib/persist";
 import { disableOffline } from "../lib/offline";
 import { forgetKdf } from "../lib/kdfPins";
@@ -26,8 +26,7 @@ import { AppSettings } from "./AppSettings";
 import { LocalBackups } from "./LocalBackups";
 import { CoffreExport } from "./CoffreExport";
 import { autoTypeBridge, backupBridge, coffreBridge, coffreFileBridge, siteFetchBridge, sshAgentBridge, systemBridge } from "../lib/platform";
-import { SiteIconsSetting } from "./SiteIconsSetting";
-import { fetchSiteIcon, fillMissingIcons, localSiteIcons, renderIcon, writableTargets } from "../lib/siteIcon";
+import { AppSiteIcons } from "./SiteIconsSetting";
 import { TransferDialog } from "./TransferDialog";
 import { RecoveryKit } from "./RecoveryKit";
 import { TravelSettings } from "./TravelSettings";
@@ -258,7 +257,9 @@ export function SettingsPage({ ctx, section }: { ctx: PageContext; section: Sett
           {current.key === "agent-ssh" && <SshAgentSettings ctx={ctx} />}
 
           {current.key === "application" && <AppSettings error={ctx.error} />}
-          {current.key === "application" && siteFetchBridge() && (
+          {/* Les icônes des sites : Application au bureau ; Android n'a pas
+              cette catégorie, elles vont dans Sécurité. */}
+          {current.key === (systemBridge() ? "application" : "securite") && siteFetchBridge() && (
             <section className="mt-6 max-w-2xl space-y-1.5">
               <Eyebrow>{t("Icônes des sites")}</Eyebrow>
               <AppSiteIcons ctx={ctx} />
@@ -568,26 +569,5 @@ function ClipboardSetting() {
         {CLEAR_CHOICES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
       </select>
     </div>
-  );
-}
-
-/** Les icônes des sites, dans l'application : le réglage de cet appareil,
- * et une passe sur tous les vaults où l'on écrit. */
-function AppSiteIcons({ ctx }: { ctx: PageContext }) {
-  const [enabled, setEnabled] = useState(localSiteIcons.enabled);
-  const bridge = siteFetchBridge();
-  return (
-    <SiteIconsSetting
-      enabled={enabled}
-      onChange={(on) => { localSiteIcons.setEnabled(on); setEnabled(on); }}
-      onFetchNow={async () => {
-        if (!bridge) return 0;
-        localSiteIcons.forget();
-        const targets = await writableTargets(ctx.session.vaults, loadItems);
-        const n = await fillMissingIcons(targets, (site) => fetchSiteIcon(site, bridge.fetch, renderIcon), localSiteIcons.tried, 1000);
-        if (n) await ctx.reload();
-        return n;
-      }}
-    />
   );
 }

@@ -250,8 +250,8 @@ paramètres ou formats anciens.
   (`site_fetch.rs`) et le service worker de l'extension les demandent au
   site lui-même (réglage par appareil, désactivé par défaut), PNG de
   64 px rangé chiffré dans l'identifiant (`favicon`) ; web, Android et
-  menu dans les pages les affichent. Pas encore : Android ne les récupère
-  pas lui-même.
+  menu dans les pages les affichent ; Android les récupère aussi
+  (`SiteFetchPlugin.kt`).
 - [x] **Copier un élément vers un autre vault** (menu ⋯ de la fiche, ou la
   multisélection) : id neuf, sans pièces jointes ni passkeys ; un
   identifiant copié seul est détaché de son compte.

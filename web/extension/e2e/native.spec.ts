@@ -102,6 +102,31 @@ test("popup : ouvrir le coffre local par l'hôte natif, puis remplir la page", a
   await expect.poll(() => site.evaluate(() => (window as unknown as { __fields: Record<string, HTMLInputElement> }).__fields.password?.value ?? "")).toBe("mdp-coffre-local");
 });
 
+test("icônes des sites : le service worker demande l'icône au site et l'écrit dans l'identifiant", async () => {
+  const popup = await context.newPage();
+  await popup.goto(`chrome-extension://${extensionId}/popup.html`);
+  // L'identifiant pointe sur le site du corpus (son port est tiré au sort).
+  await popup.getByText("Banque locale").first().click();
+  await popup.getByRole("button", { name: "Modifier" }).click();
+  await popup.getByLabel("Site 1", { exact: true }).fill(`http://coffre.test:${port}/plain.html`);
+  await popup.getByRole("button", { name: "Enregistrer" }).click();
+  await expect(popup.getByRole("button", { name: "Modifier" })).toBeVisible({ timeout: 30_000 });
+
+  await popup.getByRole("button", { name: "Réglages" }).click();
+  await popup.getByLabel("Récupérer l'icône du site de chaque identifiant").check();
+  await popup.getByRole("button", { name: "Récupérer maintenant" }).click();
+  await expect(popup.getByText("1 identifiant a reçu son icône.")).toBeVisible({ timeout: 30_000 });
+
+  // Écrite dans le coffre (relu par le cache), en PNG redessiné.
+  const favicon = await context.serviceWorkers()[0].evaluate(async () => {
+    const items = ((await chrome.storage.session.get("items")).items ?? {}) as Record<string, { items: { ok: boolean; payload?: { kind: string; login?: { name: string; favicon?: string } } }[] }>;
+    return Object.values(items).flatMap((v) => v.items).find((i) => i.payload?.login?.name === "Banque locale")?.payload?.login?.favicon ?? null;
+  });
+  expect(favicon).toMatch(/^data:image\/png;base64,/);
+  await popup.getByRole("button", { name: "Réglages" }).click();
+  await expect(popup.locator(".tile-favicon img").first()).toBeVisible();
+});
+
 test("popup : un mauvais mot de passe est refusé", async () => {
   // Le scénario d'avant a laissé le coffre ouvert : on le verrouille comme
   // l'extension le fait (la session de l'extension effacée).

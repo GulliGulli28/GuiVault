@@ -355,9 +355,8 @@ commune lit sans rien importer de Tauri (`web/src/lib/platform.ts`, posés par
   plus) — la WebView ne le peut pas, faute de CORS ; l'interface
   (`src/lib/siteIcon.ts`) choisit l'icône, la redessine en PNG de 64 px et
   l'écrit chiffrée dans l'identifiant. Une passe après chaque lecture d'un
-  vault, et « Récupérer maintenant » pour tous. Au bureau seulement (pas
-  de client HTTP dans l'application Android, qui montre les icônes
-  récupérées ailleurs).
+  vault, et « Récupérer maintenant » pour tous. Sous Android, la même chose
+  par `SiteFetchPlugin.kt` (`docs/ANDROID.md`, « Icônes des sites »).
 
 ## Mises à jour
 

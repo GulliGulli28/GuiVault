@@ -29,6 +29,8 @@ mod coffre_file;
 mod native_host;
 #[cfg(desktop)]
 mod site_fetch;
+#[cfg(target_os = "android")]
+mod site_fetch_android;
 #[cfg(desktop)]
 mod ssh_agent;
 mod system;
@@ -573,7 +575,8 @@ pub fn run() {
         .plugin(bubble::init())
         .plugin(biometric::init())
         .plugin(autofill::init())
-        .plugin(coffre_file::init());
+        .plugin(coffre_file::init())
+        .plugin(site_fetch_android::init());
     let builder = builder
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
