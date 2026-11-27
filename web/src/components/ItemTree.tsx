@@ -67,6 +67,11 @@ export function ItemTile({ entity, customIcons, size = 32 }: { entity: GuiVaultE
   if (entity.kind === "group" || hasIcon(entity.icon, customIcons)) {
     return <span className="tile tile-neutral" style={style}><EntityIcon entity={entity} customIcons={customIcons} size={16} /></span>;
   }
+  // L'icône du site (`lib/siteIcon.ts`), sur un fond clair : beaucoup sont
+  // sombres sur transparent.
+  if (entity.favicon) {
+    return <span className="tile tile-favicon" aria-hidden="true" style={style}><img src={entity.favicon} alt="" draggable={false} /></span>;
+  }
   return (
     <span className="tile" aria-hidden="true" style={{ ...style, "--tile-h": tileHue(entity.name) } as React.CSSProperties}>
       {tileInitial(entity.name)}

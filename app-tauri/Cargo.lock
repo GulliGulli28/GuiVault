@@ -1811,8 +1811,11 @@ dependencies = [
 name = "guivault-app"
 version = "0.6.0"
 dependencies = [
+ "base64 0.22.1",
  "guivault-local",
+ "reqwest",
  "rsa",
+ "rustls",
  "serde",
  "serde_json",
  "signature",

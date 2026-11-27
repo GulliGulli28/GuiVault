@@ -21,6 +21,7 @@
 import { spawn, spawnSync } from "node:child_process";
 import { createWriteStream, existsSync, readFileSync } from "node:fs";
 import { mkdir, rm, writeFile } from "node:fs/promises";
+import http from "node:http";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
@@ -455,6 +456,48 @@ scenario("compte enregistré : un identifiant le reprend et suit son mot de pass
   assert(!(await bodyText(b)).includes("n'est plus celui du compte"), "l'identifiant se dit en retard sur son compte");
   assert(!coffreOnDisk(coffre).raw.includes("jdupont-e2e"), "un compte est en clair dans coffre.json");
   await shot(b, "3e-compte");
+});
+
+scenario("icônes des sites : l'application les demande au site, rangées chiffrées", async (b) => {
+  // Un site sur ce poste : une page qui annonce son icône, et l'icône.
+  const png = readFileSync(path.join(webRoot, "src", "assets", "logo.png"));
+  const site = http.createServer((req, res) => {
+    if (req.url === "/") return res.writeHead(200, { "content-type": "text/html" }).end(`<html><head><link rel="icon" type="image/png" sizes="128x128" href="/img/logo.png"></head><body>ok</body></html>`);
+    if (req.url === "/img/logo.png") return res.writeHead(200, { "content-type": "image/png" }).end(png);
+    res.writeHead(404).end();
+  });
+  await new Promise((ok) => site.listen(0, "127.0.0.1", ok));
+  const url = `http://127.0.0.1:${site.address().port}/login`;
+  try {
+    await openNewMenu(b);
+    await (await b.$("//button[@role='menuitem'][normalize-space()='Identifiant']")).click();
+    await waitText(b, "Nouvel identifiant");
+    await fillField(b, "Nom", "Site à icône");
+    await (await b.$("//button[normalize-space()='Ajouter un site']")).click();
+    await (await b.$('input[aria-label="Site 1"]')).setValue(url);
+    await click(b, "Enregistrer");
+    await waitText(b, "« Site à icône » enregistré.");
+
+    await openSettings(b, "Application");
+    await waitText(b, "Icônes des sites");
+    const box = await b.$("//label[span[normalize-space()=\"Récupérer l'icône du site de chaque identifiant\"]]//input");
+    await box.waitForExist({ timeout: 10_000, timeoutMsg: "réglage des icônes absent de Paramètres › Application" });
+    await b.execute((el) => el.click(), box);
+    await click(b, "Récupérer maintenant");
+    await waitText(b, "identifiant a reçu son icône", 30_000);
+    // Le réglage remis : les scénarios suivants ne contactent aucun site.
+    await b.execute((el) => el.click(), box);
+
+    await (await b.$("//a[.//span[normalize-space()='Personnel']]")).click();
+    const tile = await b.$("//button[.//*[normalize-space()='Site à icône']]//span[contains(@class,'tile-favicon')]/img");
+    await tile.waitForExist({ timeout: 15_000, timeoutMsg: "la tuile de l'identifiant ne montre pas l'icône du site" });
+    const src = await tile.getAttribute("src");
+    assert(/^data:image\/png;base64,/.test(src ?? ""), `icône inattendue : ${String(src).slice(0, 40)}`);
+    assert(!coffreOnDisk(coffre).raw.includes("data:image/png"), "une icône est en clair dans coffre.json");
+    await shot(b, "3f-icones");
+  } finally {
+    site.close();
+  }
 });
 
 scenario("fuites : un coffre local interroge Have I Been Pwned lui-même", async (b) => {

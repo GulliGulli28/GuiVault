@@ -74,6 +74,7 @@ const LABELS: Record<string, string> = translated({
   expYear: "Année d'expiration",
   expiresAt: "Expiration",
   accountId: "Compte",
+  favicon: "Icône du site",
 });
 
 /** Libellés propres à un type (`kind:clé`). */

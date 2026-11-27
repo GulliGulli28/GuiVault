@@ -11,6 +11,9 @@ export interface MatchSummary {
   /** Protégé par le mot de passe maître (`SecretBase.reprompt`) : rien n'est
    * remis à la page ; on le remplit depuis le popup, qui le demande. */
   protected?: boolean;
+  /** L'icône du site (URL `data:`, `lib/siteIcon.ts`), à la place de
+   * l'initiale. */
+  favicon?: string;
 }
 
 export type ToBackground =
@@ -117,7 +120,10 @@ export interface FrameInfo {
  *   (`pickFrame`) ; `frameId` : celui que l'utilisateur a confirmé. */
 export type PopupToBackground =
   | { type: "guivault-clipboard-clear"; hash: string; delayMs: number }
-  | { type: "guivault-fill-tab"; tabId: number; loginId: string; what: "credentials" | "totp"; frameId?: number };
+  | { type: "guivault-fill-tab"; tabId: number; loginId: string; what: "credentials" | "totp"; frameId?: number }
+  /** Récupérer les icônes de sites qui manquent (`siteIcons.ts`) ; `retry` :
+   * retenter aussi les sites en échec récent. Rend le nombre écrit. */
+  | { type: "guivault-site-icons"; retry?: boolean };
 
 export type FillTabReply =
   | { ok: true; filled: FillReply }

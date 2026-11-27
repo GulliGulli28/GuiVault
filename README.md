@@ -103,6 +103,9 @@ le TypeScript (et réciproquement) le vérifient à chaque build.
   AWS, clés d'API, comptes, hôtes, clés SSH, snippets ; champs
   personnalisés, favoris, dossiers colorés, icônes. Formats dans
   [`docs/ITEMS.md`](docs/ITEMS.md).
+- **Icônes des sites** (facultatif, désactivé par défaut) : l'application
+  et l'extension demandent l'icône à chaque site, directement, et la
+  rangent chiffrée dans l'identifiant.
 - **Comptes enregistrés** (un compte LDAP, un compte de service) : un
   identifiant ou un hôte du même vault reprend son utilisateur et son mot
   de passe ; changer le compte met à jour tout ce qui le reprend.

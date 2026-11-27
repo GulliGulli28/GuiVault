@@ -233,6 +233,8 @@ declare global {
       .item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 9px; cursor: pointer; text-align: left; border: 0; background: none; color: inherit; width: 100%; box-sizing: border-box; font: inherit; min-width: 0; }
       .item:hover, .item:focus { background: var(--sel); outline: none; }
       .tile { flex: none; width: 32px; height: 32px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font: 600 13px/1 var(--font); background: hsl(var(--h, 230) var(--tile-s) var(--tile-l)); color: hsl(var(--h, 230) var(--tile-ts) var(--tile-tl)); }
+      .tile.icon { background: #f4f5f7; box-shadow: inset 0 0 0 1px var(--line); }
+      .tile.icon > img { width: 20px; height: 20px; object-fit: contain; }
       .tile.plain { background: var(--hover); color: var(--text2); font-size: 16px; font-weight: 500; }
       .txt { display: flex; flex-direction: column; min-width: 0; flex: 1; }
       .name { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -364,7 +366,7 @@ declare global {
 
   /** Une ligne de menu : sa tuile (l'initiale du nom sur sa teinte, ou un
    * signe), un nom, une ligne secondaire, une action. */
-  const menuItem = (name: string, sub: string, onClick: () => void, hint?: string, sign?: string) => {
+  const menuItem = (name: string, sub: string, onClick: () => void, hint?: string, sign?: string, favicon?: string) => {
     const b = document.createElement("button");
     b.className = "item";
     b.setAttribute("role", "menuitem");
@@ -376,6 +378,14 @@ declare global {
     } else {
       tile.textContent = tileInitial(name);
       tile.style.setProperty("--h", String(tileHue(name)));
+    }
+    // L'icône du site, en `data:` (rien n'est chargé) ; une page dont la CSP
+    // refuse les images `data:` garde l'initiale.
+    if (favicon && /^data:image\/(png|jpeg|gif|webp);base64,/.test(favicon)) {
+      const img = document.createElement("img");
+      img.alt = "";
+      img.onload = () => { tile.textContent = ""; tile.classList.add("icon"); tile.appendChild(img); };
+      img.src = favicon;
     }
     (b.querySelector(".name") as HTMLElement).textContent = name;
     (b.querySelector(".user") as HTMLElement).textContent = sub;
@@ -438,13 +448,13 @@ declare global {
   const openMenu = (input: HTMLInputElement, btn: HTMLElement) => {
     const site = location.hostname.replace(/^www\./, "");
     const { menu: m, list } = newMenu(btn, t("GuiVault · {0}", site));
-    for (const l of matches) list.appendChild(menuItem(`${l.favorite ? "★ " : ""}${l.name}`, l.protected ? t("{0} · protégé", l.username || "—") : l.username || "—", () => void choose(l, input), l.protected ? t("Protégé par le mot de passe maître : à remplir depuis l'icône GuiVault") : t("Remplir avec cet identifiant")));
+    for (const l of matches) list.appendChild(menuItem(`${l.favorite ? "★ " : ""}${l.name}`, l.protected ? t("{0} · protégé", l.username || "—") : l.username || "—", () => void choose(l, input), l.protected ? t("Protégé par le mot de passe maître : à remplir depuis l'icône GuiVault") : t("Remplir avec cet identifiant"), undefined, l.favicon));
     if (parent?.logins.length) {
       const h = document.createElement("div");
       h.className = "head";
       h.textContent = t("De {0}, dans un cadre de {1}", parent.host, parent.frameHost);
       list.appendChild(h);
-      for (const l of parent.logins) list.appendChild(menuItem(`${l.favorite ? "★ " : ""}${l.name}`, t("{0} · à confirmer", l.username || "—"), () => void choose(l, input, true), t("Identifiant de {0}, dans un cadre de {1} : GuiVault demandera confirmation", parent!.host, parent!.frameHost)));
+      for (const l of parent.logins) list.appendChild(menuItem(`${l.favorite ? "★ " : ""}${l.name}`, t("{0} · à confirmer", l.username || "—"), () => void choose(l, input, true), t("Identifiant de {0}, dans un cadre de {1} : GuiVault demandera confirmation", parent!.host, parent!.frameHost), undefined, l.favicon));
     }
     const signup = signupFor(input);
     const sticky = document.createElement("div");
@@ -509,7 +519,7 @@ declare global {
   const openTotpMenu = (field: HTMLInputElement, btn: HTMLElement) => {
     const list = totpCandidates();
     const { menu: m, list: box } = newMenu(btn, t("GuiVault · code à usage unique"));
-    for (const c of list) box.appendChild(menuItem(`${c.favorite ? "★ " : ""}${c.name}`, c === recent ? t("{0} · rempli juste avant", c.username || "—") : c.username || "—", () => void fillTotp(c, field), t("Remplir le code TOTP de cet identifiant")));
+    for (const c of list) box.appendChild(menuItem(`${c.favorite ? "★ " : ""}${c.name}`, c === recent ? t("{0} · rempli juste avant", c.username || "—") : c.username || "—", () => void fillTotp(c, field), t("Remplir le code TOTP de cet identifiant"), undefined, c.favicon));
     if (list.length === 0) {
       const p = document.createElement("div");
       p.className = "note";

@@ -2301,5 +2301,14 @@
  "{0} élément de ce vault le reprend : il garde sa dernière copie, le lien ne suit pas. Déplacez-les ensemble (multisélection) pour le garder.": "{0} item in this vault uses it: it keeps its last copy, the link doesn't follow. Move them together (multi-select) to keep it.",
  "{0} éléments de ce vault le reprennent : ils gardent leur dernière copie, le lien ne suit pas. Déplacez-les ensemble (multisélection) pour le garder.": "{0} items in this vault use it: they keep their last copy, the link doesn't follow. Move them together (multi-select) to keep it.",
  "Copier vers « {0} » ?": "Copy to “{0}”?",
- "Une copie de « {0} » est créée dans {1}, re-chiffrée sous sa clé, sans pièces jointes ; l'original reste ici. {2}": "A copy of “{0}” is created in {1}, re-encrypted under its key, without attachments; the original stays here. {2}"
+ "Une copie de « {0} » est créée dans {1}, re-chiffrée sous sa clé, sans pièces jointes ; l'original reste ici. {2}": "A copy of “{0}” is created in {1}, re-encrypted under its key, without attachments; the original stays here. {2}",
+ "Icônes des sites": "Site icons",
+ "{0} identifiant a reçu son icône.": "{0} login got its icon.",
+ "{0} identifiants ont reçu leur icône.": "{0} logins got their icon.",
+ "Aucune icône de plus trouvée.": "No more icons found.",
+ "Récupérer l'icône du site de chaque identifiant": "Fetch the site icon of each login",
+ "Récupération…": "Fetching…",
+ "Récupérer maintenant": "Fetch now",
+ "Demandée directement à chaque site, qui voit l'adresse IP de cet appareil ; rien ne passe par le serveur GuiVault. Rangée chiffrée dans l'identifiant, elle s'affiche ensuite partout.": "Requested directly from each site, which sees this device's IP address; nothing goes through the GuiVault server. Stored encrypted in the login, it then shows everywhere.",
+ "Icône du site": "Site icon"
 }

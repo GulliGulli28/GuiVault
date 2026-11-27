@@ -706,6 +706,9 @@ export interface Login extends SecretBase {
   /** Le compte enregistré (`Account`, même vault) dont `username` et
    * `password` sont la copie, tenue à jour par `lib/accounts.ts`. */
   accountId?: string | null;
+  /** L'icône du site, récupérée par l'application ou l'extension
+   * (`lib/siteIcon.ts`) : une image PNG de 64 px au plus, en URL `data:`. */
+  favicon?: string;
 }
 
 /** Un compte enregistré (un compte LDAP, un compte de service) : un
@@ -905,6 +908,9 @@ export interface GuiVaultEntity {
   favorite?: boolean;
   /** Icône choisie (banque de Guiterm ou icône du vault) — hôte, dossier. */
   icon?: string;
+  /** L'icône du site d'un identifiant (URL `data:`), à la place de
+   * l'initiale. */
+  favicon?: string;
   /** Pour un hôte : de quoi choisir l'icône du genre quand il n'en a pas. */
   hostKind?: HostKind;
   /** Pour un dossier : sa couleur, un nom d'accent de Guiterm. */

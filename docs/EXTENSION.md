@@ -263,6 +263,14 @@ que quand on le choisit. Coffre verrouillé ou sans rien pour le site : il
 n'ajoute rien à la page. `scripting` sert aussi à demander à chaque cadre
 ce qu'il montre (`__guivaultFrameInfo`) avant de remplir depuis le popup.
 
+Les mêmes permissions d'hôte servent aux **icônes des sites**, si on les
+active (réglages du popup, désactivé par défaut) : le service worker
+demande la page d'accueil et l'icône de chaque site, sans cookies ni
+référent (`siteIcons.ts`, `src/lib/siteIcon.ts`), après chaque
+synchronisation du popup et chaque identifiant enregistré depuis une page.
+Le site voit l'adresse IP du navigateur ; ni le serveur ni un tiers ne
+voient la liste.
+
 ## Modèle de menace
 
 **Élément protégé** (`reprompt`) : dans le menu de la page, il est marqué

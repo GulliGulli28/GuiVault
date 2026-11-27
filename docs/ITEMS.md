@@ -51,7 +51,7 @@ text|hidden|boolean }`).
 
 | `kind` | Champs propres |
 |---|---|
-| `login` | `username`, `password`, `uris[] { uri, match? }`, `totp` (URI `otpauth://` ou secret base32), `passkeys[]`, `passwordHistory[] { password, changedAt }`, `autoType? { enabled?, sequence?, windows?[] { title, sequence? } }` (saisie automatique de l'application, `lib/autotype.ts`), `accountId?` (le compte repris, voir plus bas) |
+| `login` | `username`, `password`, `uris[] { uri, match? }`, `totp` (URI `otpauth://` ou secret base32), `passkeys[]`, `passwordHistory[] { password, changedAt }`, `autoType? { enabled?, sequence?, windows?[] { title, sequence? } }` (saisie automatique de l'application, `lib/autotype.ts`), `accountId?` (le compte repris, voir plus bas), `favicon?` (l'icône du site : `data:image/png;base64,…`, 64 px au plus, `web/src/lib/siteIcon.ts`) |
 | `note` | `content` |
 | `card` | `cardholderName`, `brand`, `number`, `expMonth`, `expYear`, `code` |
 | `identity` | `title`, `firstName`, `middleName`, `lastName`, `username`, `company`, `ssn`, `passportNumber`, `licenseNumber`, `email`, `phone`, `address1..3`, `city`, `state`, `postalCode`, `country` |

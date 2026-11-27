@@ -4,6 +4,7 @@
 import type { DecodedItem } from "./session";
 import { payloadEntity, payloadName } from "./session";
 import { describeSecret, isSecret } from "./items";
+import { faviconOf } from "./siteIcon";
 import { KIND_LABELS, SQL_ENGINE_LABELS, type Account, type CustomIcon, type Group, type GuiVaultEntity, type Host, type Payload, type PrivateKey, type Snippet, type SqlConnection } from "./types";
 import { t, translated } from "./i18n";
 
@@ -118,7 +119,7 @@ export function toEntities(items: DecodedItem[]): GuiVaultEntity[] {
     const parentId = payloadParent(it.payload);
     const { subtitle, search } = describeSecret(it.payload);
     const favorite = payloadEntityFavorite(it.payload) || undefined;
-    out.push({ id: it.id, kind: it.payload.kind, name: payloadName(it.payload) || t("(sans nom)"), path: groupPath(groups, parentId), parentId, subtitle: subtitle || undefined, search: search || undefined, favorite, updatedAt: it.updatedAt, createdAt: it.createdAt, ...describeEntity(it.payload) });
+    out.push({ id: it.id, kind: it.payload.kind, name: payloadName(it.payload) || t("(sans nom)"), path: groupPath(groups, parentId), parentId, subtitle: subtitle || undefined, search: search || undefined, favorite, favicon: faviconOf(it.payload), updatedAt: it.updatedAt, createdAt: it.createdAt, ...describeEntity(it.payload) });
   }
   return out;
 }

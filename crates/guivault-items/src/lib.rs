@@ -188,6 +188,10 @@ pub struct Login {
     /// qui ignore les comptes lit l'identifiant comme avant.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub account_id: Option<Uuid>,
+    /// L'icône du site : une image PNG de 64 px au plus, en URL
+    /// `data:image/png;base64,…` (`web/src/lib/siteIcon.ts`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub favicon: Option<String>,
 }
 
 /// Comment l'application tape un identifiant dans une autre fenêtre, à la

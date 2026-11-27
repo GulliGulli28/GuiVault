@@ -18,6 +18,7 @@ import { installBubble } from "./bubbleBridge";
 import { installBiometric } from "./biometricBridge";
 import { installAutofill } from "./autofillBridge";
 import { installSshAgent } from "./sshAgentBridge";
+import { installSiteFetch } from "./siteFetchBridge";
 import { installExternalLinks } from "./links";
 import { detectMobile, installInsets, isMobile } from "./mobile";
 import { installAndroid } from "./android";
@@ -41,6 +42,7 @@ void detectMobile().then(() => {
   else installUpdater();
   installCoffres();
   installCoffreFiles();
+  if (!isMobile()) installSiteFetch();
   // Le pont système (verrou de session, zone de notification, démarrage,
   // extension) n'a pas de sens sur Android : pas de catégorie « Application ».
   return Promise.allSettled([installAutoType(), installClipboard(), isMobile() ? Promise.resolve() : installSystem(), installBubble(), installBiometric(), installAutofill(), isMobile() ? Promise.resolve() : installSshAgent()]);

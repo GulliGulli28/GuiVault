@@ -16,6 +16,7 @@ import { autoTypeBridge } from "../../lib/platform";
 import { SecretFooter, SecretHeader } from "./SecretBits";
 import { AccountSelect, LinkedCredentials } from "./AccountLink";
 import { withAccount, withoutAccount } from "../../lib/accounts";
+import { siteOf } from "../../lib/siteIcon";
 import { t, translated } from "../../lib/i18n";
 
 const MATCH_LABELS: Record<UriMatch, string> = translated({ domain: "domaine", host: "hôte", startsWith: "commence par", exact: "exact", regex: "expression régulière", never: "jamais" });
@@ -63,6 +64,8 @@ export function LoginForm({ initial, index, defaultGroupId, onSave, onCancel }: 
     }
     // Un mot de passe remplacé passe dans l'historique, borné aux dix
     // derniers — le format de Bitwarden, qu'on relit et réexporte.
+    // Un autre site : son icône sera reprise (`lib/siteIcon.ts`).
+    if (initial && out.favicon && siteOf(initial) !== siteOf(out)) delete out.favicon;
     // Relié avant : l'historique est celui du compte, pas de l'identifiant.
     if (initial && initial.password && initial.password !== out.password && !initial.accountId) {
       out.passwordHistory = [{ password: initial.password, changedAt: new Date().toISOString() }, ...login.passwordHistory].slice(0, PASSWORD_HISTORY_MAX);
@@ -113,6 +116,14 @@ export function LoginForm({ initial, index, defaultGroupId, onSave, onCancel }: 
           <button type="button" onClick={() => setLogin({ ...login, uris: [...login.uris, { uri: "", match: null }] })} className="btn btn-secondary btn-sm"><IconPlus size={11} /> {t("Ajouter un site")}</button>
         </div>
       </Field>
+
+      {login.favicon && (
+        <div className="flex items-center gap-2 text-[12.5px] text-[var(--c-text-secondary)]">
+          <span className="tile tile-favicon" style={{ "--tile-size": "24px" } as React.CSSProperties}><img src={login.favicon} alt="" /></span>
+          <span className="min-w-0 flex-1">{t("Icône du site")}</span>
+          <button type="button" onClick={() => { const { favicon: _, ...rest } = login; setLogin(rest); }} className="btn btn-ghost btn-sm">{t("Retirer l'icône")}</button>
+        </div>
+      )}
 
       <Field label={t("Secret TOTP")} hint={t("Lien otpauth://, secret base32 ou image du QR code (Ctrl+V).")}>
         <input

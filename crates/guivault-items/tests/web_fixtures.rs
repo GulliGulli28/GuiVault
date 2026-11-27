@@ -47,6 +47,7 @@ fn web_items_parse_and_roundtrip() {
         login.account_id.map(|id| id.to_string()).as_deref(),
         Some("88888888-8888-4888-8888-888888888888")
     );
+    assert_eq!(login.favicon.as_deref(), Some("data:image/png;base64,iVBORw0KGgo="));
     let SecretItem::Note { note } = SecretItem::from_json(values[1].to_string().as_bytes()).unwrap() else {
         panic!()
     };

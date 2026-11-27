@@ -9,7 +9,7 @@ import type { Account, Login, Payload } from "../../src/lib/types";
 import { loadItemsCache, loadSession, loadSettings, saveItemsCache } from "./store";
 import { t } from "../../src/lib/i18n";
 
-async function session(): Promise<SessionState> {
+export async function session(): Promise<SessionState> {
   const s = await loadSession();
   if (!s) throw new Error(t("Coffre verrouillé."));
   applyBackend(s.state, await loadSettings());

@@ -349,6 +349,16 @@ commune lit sans rien importer de Tauri (`web/src/lib/platform.ts`, posés par
   bibliothèque d'indicateurs souvent absente — et fermer quitte. La fenêtre
   part cachée (`tauri.conf.json`) et `setup` la montre.
 
+- **Icônes des sites** (Paramètres › Application, désactivé par défaut,
+  par appareil) : `app-tauri/src/site_fetch.rs` lit la page d'accueil et
+  l'icône du site d'un identifiant (`GET` sans cookies, 8 s, 512 Kio au
+  plus) — la WebView ne le peut pas, faute de CORS ; l'interface
+  (`src/lib/siteIcon.ts`) choisit l'icône, la redessine en PNG de 64 px et
+  l'écrit chiffrée dans l'identifiant. Une passe après chaque lecture d'un
+  vault, et « Récupérer maintenant » pour tous. Au bureau seulement (pas
+  de client HTTP dans l'application Android, qui montre les icônes
+  récupérées ailleurs).
+
 ## Mises à jour
 
 Comme Guiterm : `tauri-plugin-updater` (Paramètres › Application › Mise à

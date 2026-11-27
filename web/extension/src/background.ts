@@ -9,6 +9,8 @@
  * - le **raccourci clavier** de remplissage et l'alarme de verrouillage. */
 import { parseTotp, totpCode } from "../../src/lib/totp";
 import { loginMatches, loginScore } from "../../src/lib/urimatch";
+import { faviconOf } from "../../src/lib/siteIcon";
+import { runSiteIcons } from "./siteIcons";
 import { classifyCapture } from "./capture";
 import type { Login } from "../../src/lib/types";
 import { setTokensChangedHandler } from "../../src/lib/api";
@@ -40,7 +42,7 @@ async function logins(): Promise<Login[] | null> {
   return out;
 }
 
-const summary = (l: Login): MatchSummary => ({ id: l.id, name: l.name, username: l.username, hasTotp: !!l.totp, favorite: !!l.favorite, protected: !!l.reprompt });
+const summary = (l: Login): MatchSummary => ({ id: l.id, name: l.name, username: l.username, hasTotp: !!l.totp, favorite: !!l.favorite, protected: !!l.reprompt, favicon: faviconOf({ kind: "login", login: l }) });
 
 /** Les identifiants de la page, le plus proche d'abord (`loginScore` : le
  * sous-domaine de la page avant ses voisins), puis favoris, puis nom. */
@@ -221,6 +223,7 @@ async function saveCaptured(tabId: number, vaultId: string): Promise<{ ok: true;
     const login: Login = { id: uuid(), name: host.replace(/^www\./, ""), groupId: null, tags: [], username: c.username, password: c.password, uris: urisFor(c.url, c.parentUrl), totp: null, passkeys: [], passwordHistory: [] };
     await saveLogin(vaultId, login);
     await setPending(tabId, null);
+    void runSiteIcons().catch(() => undefined);
     return { ok: true, name: login.name };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) };
@@ -301,6 +304,13 @@ chrome.runtime.onMessage.addListener((msg: ToBackground | PasskeyToBackground | 
   if (msg.type === "guivault-fill-tab") {
     if (sender.id !== chrome.runtime.id || !sender.url?.startsWith(chrome.runtime.getURL(""))) return;
     void fillTab(msg.tabId, msg.loginId, msg.what, msg.frameId).then(reply, (e) => reply({ ok: false, reason: "no-fields", error: String(e) }));
+    return true;
+  }
+  // Les icônes des sites : le popup seulement — une page ne fait pas
+  // contacter d'autres sites.
+  if (msg.type === "guivault-site-icons") {
+    if (sender.id !== chrome.runtime.id || !sender.url?.startsWith(chrome.runtime.getURL(""))) return;
+    void runSiteIcons(!!msg.retry).then(reply, () => reply(0));
     return true;
   }
   const origin = sender.origin ?? (sender.url ? new URL(sender.url).origin : "");

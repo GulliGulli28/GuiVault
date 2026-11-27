@@ -26,6 +26,7 @@ import { CLEAR_CHOICES, clipboardHash, loadClearSeconds, saveClearSeconds, setCl
 import { IntegrityBanner } from "../../src/components/IntegrityBanner";
 import { RollbackBanner } from "../../src/components/RollbackBanner";
 import { useMerge } from "../../src/components/MergeDialog";
+import { SiteIconsSetting } from "../../src/components/SiteIconsSetting";
 import { AttachmentsPanel } from "../../src/components/AttachmentsPanel";
 import { RepromptContext, useReprompt, useRepromptHost } from "../../src/components/Reprompt";
 import { needsReprompt } from "../../src/lib/reprompt";
@@ -179,6 +180,9 @@ export function Popup() {
       }
       setCache(next);
       await saveItemsCache(next);
+      // Les icônes de sites qui manquent, si on l'a permis : le service
+      // worker s'en charge, la liste suit s'il en a écrit.
+      void chrome.runtime.sendMessage<PopupToBackground, number>({ type: "guivault-site-icons" }).then((n) => { if (n) void reloadCache(); }).catch(() => {});
       const stored = (await chrome.storage.session.get("session")).session as { tokens?: TokenPair } | undefined;
       if (stored?.tokens) await saveSession(state, stored.tokens);
       setScreen({ kind: "vault", state: { ...state } });
@@ -189,7 +193,7 @@ export function Popup() {
     } finally {
       setRefreshing(false);
     }
-  }, [say]);
+  }, [say, reloadCache]);
 
   // Les réglages du générateur (localStorage du popup) sont recopiés dans
   // `chrome.storage.local` : le service worker les lit pour « Générer »
@@ -859,6 +863,14 @@ function SettingsView({ settings, state, say, onSettings, onBack }: { settings: 
             <OtpPatterns settings={settings} onSettings={onSettings} />
             <ShortcutRow />
           </div>
+        </section>
+        <section className="flex flex-col gap-2">
+          <h2 className="eyebrow">{t("Icônes des sites")}</h2>
+          <SiteIconsSetting
+            enabled={settings.siteIcons}
+            onChange={(v) => onSettings({ ...settings, siteIcons: v })}
+            onFetchNow={() => chrome.runtime.sendMessage<PopupToBackground, number>({ type: "guivault-site-icons", retry: true }).catch(() => 0)}
+          />
         </section>
         <section className="flex flex-col gap-2">
           <h2 className="eyebrow">{t("Sécurité")}</h2>

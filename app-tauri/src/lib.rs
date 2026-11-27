@@ -28,6 +28,8 @@ mod clipboard;
 mod coffre_file;
 mod native_host;
 #[cfg(desktop)]
+mod site_fetch;
+#[cfg(desktop)]
 mod ssh_agent;
 mod system;
 mod tray;
@@ -615,7 +617,8 @@ pub fn run() {
         ssh_agent::ssh_agent_stop,
         ssh_agent::ssh_agent_status,
         ssh_agent::ssh_agent_set_keys,
-        ssh_agent::ssh_agent_answer
+        ssh_agent::ssh_agent_answer,
+        site_fetch::site_fetch
     ]);
     // Mobile : le coffre local ; le reste répond « indisponible » (l'interface
     // ne le propose pas).

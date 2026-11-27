@@ -32,9 +32,12 @@ export interface Settings {
    * natif (`nativeHost.ts`) — et lequel. */
   mode: "server" | "local";
   localPath: string;
+  /** Récupérer l'icône du site des identifiants (`siteIcons.ts`) :
+   * désactivé par défaut, le site voit l'adresse IP. */
+  siteIcons: boolean;
 }
 
-export const DEFAULT_SETTINGS: Settings = { serverUrl: "", email: "", lockMinutes: 15, inlineAutofill: true, autoTotp: true, otpPatterns: "", mode: "server", localPath: "" };
+export const DEFAULT_SETTINGS: Settings = { serverUrl: "", email: "", lockMinutes: 15, inlineAutofill: true, autoTotp: true, otpPatterns: "", mode: "server", localPath: "", siteIcons: false };
 
 export interface OtpRule {
   url: RegExp | null;

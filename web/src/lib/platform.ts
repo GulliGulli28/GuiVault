@@ -419,3 +419,20 @@ export function setSshAgentBridge(b: SshAgentBridge | null) {
 export function sshAgentBridge(): SshAgentBridge | null {
   return sshAgent;
 }
+
+/** Lire une page ou une image d'un site, pour son icône (`lib/siteIcon.ts`,
+ * `app-tauri/src/site_fetch.rs`) : la WebView ne le peut pas (CORS). Posé
+ * par l'application de bureau ; l'extension a son propre `fetch`. */
+export interface SiteFetchBridge {
+  fetch(url: string): Promise<import("./siteIcon").Fetched>;
+}
+
+let siteFetch: SiteFetchBridge | null = null;
+
+export function setSiteFetchBridge(b: SiteFetchBridge | null) {
+  siteFetch = b;
+}
+
+export function siteFetchBridge(): SiteFetchBridge | null {
+  return siteFetch;
+}

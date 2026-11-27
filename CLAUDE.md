@@ -238,6 +238,12 @@ il ne déchiffre rien : la user key reste sous la clé que seule la PRF donne).
     réécrite par `syncLinked` **à chaque écriture d'un compte** (page du
     vault, `vaultops.savePayload` de l'extension) ; `AccountCallout` montre
     une copie en retard.
+  - `lib/siteIcon.ts` — les icônes des sites (`Login.favicon`) : choisies
+    et redessinées ici, demandées au site par l'app de bureau (pont
+    `siteFetchBridge`, `app-tauri/src/site_fetch.rs`) ou le service worker
+    de l'extension (`extension/src/siteIcons.ts`) — **jamais par le
+    serveur**. Réglage par appareil, désactivé par défaut ; afficher
+    seulement ce que rend `faviconOf` (une image `data:` matricielle).
   - `lib/duplicates.ts` — les doublons (onglet « Doublons » de la santé,
     fusion par `MergeDuplicates`) et « Dupliquer » (copie sans pièces
     jointes ni passkeys).

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { copiesFor, duplicateOf } from "../lib/duplicates";
 import type { PageContext } from "../App";
 import { errorMessage, supports } from "../lib/api";
-import { autoTypeBridge } from "../lib/platform";
+import { autoTypeBridge, siteFetchBridge } from "../lib/platform";
 import { performAutoType } from "./AutoType";
 import { filterEntities, indexItems, SORT_LABELS, toEntities, withParent, type SortMode } from "../lib/entities";
 import { plainShortcut } from "../lib/keyboard";
@@ -31,6 +31,7 @@ import { IntegrityBanner } from "./IntegrityBanner";
 import { useMerge } from "./MergeDialog";
 import { linkedItems, syncLinked } from "../lib/accounts";
 import { AccountCallout } from "./AccountCallout";
+import { fetchSiteIcon, fillMissingIcons, localSiteIcons, renderIcon } from "../lib/siteIcon";
 import { ShortcutsHelp } from "./ShortcutsHelp";
 import { ItemAside } from "./ItemAside";
 import { NewVaultDialog } from "./NewVault";
@@ -209,6 +210,14 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
   }, []);
 
   useEffect(() => { void load(); }, [load]);
+  // Les icônes des sites qui manquent (l'application, si on l'a permis) :
+  // en fond, après chaque lecture ; rien à refaire quand tout est là.
+  useEffect(() => {
+    const bridge = siteFetchBridge();
+    if (!bridge || !items || !localSiteIcons.enabled() || !canWrite(vault.role) || emergency || ctx.session.offline || problems.length) return;
+    const targets = items.filter((i): i is DecodedItem & { ok: true } => i.ok && i.payload.kind === "login").map((item) => ({ vault, item }));
+    void fillMissingIcons(targets, (site) => fetchSiteIcon(site, bridge.fetch, renderIcon), localSiteIcons.tried).then((n) => { if (n) void load(); });
+  }, [items]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Le serveur dit que le vault a changé : on recharge, sauf au milieu d'une
   // saisie — on le signale alors, et le verrou de révision fera le reste.
