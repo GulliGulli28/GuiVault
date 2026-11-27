@@ -10,7 +10,7 @@
 # l'image en silence (le build de l'interface en est reproductible). Dependabot
 # (`.github/dependabot.yml`) propose les nouvelles empreintes chaque mois.
 
-FROM node:22-alpine@sha256:fe4f6d74e20370acb04ad889077d14d0f64a9c8ea6a42bc60cddf1e844699914 AS web
+FROM node:26-alpine@sha256:c6ad9e9c1d80f6eb607c26b4b0a132ff7a2344fad1c78ea3baa2a7d4c8de6d94 AS web
 WORKDIR /web
 COPY web/package.json web/package-lock.json ./
 RUN npm ci --no-audit --no-fund
@@ -34,7 +34,7 @@ COPY --from=web /web/dist ./web/dist
 ARG GUIVAULT_BUILD_COMMIT=
 RUN GUIVAULT_BUILD_COMMIT="${GUIVAULT_BUILD_COMMIT}" cargo build --release --locked -p guivault-server
 
-FROM debian:bookworm-slim@sha256:7ff6ba31527b9e336162fa061746c366c4b2032f4d2cff2078bea43f78efe3f8
+FROM debian:bookworm-slim@sha256:99c0b25c46d0214d5a2091092e7908907dcaecd6a962cde0ac700acee222b6f3
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates \
     && rm -rf /var/lib/apt/lists/* \
