@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type DragEvent, type ReactNode } from "react";
+import { rangeBetween } from "../lib/bulk";
 import { FOLDERABLE_KINDS, sortedFlat, type SortMode } from "../lib/entities";
 import { plainShortcut } from "../lib/keyboard";
 import { hostKindMeta } from "../lib/hostKinds";
@@ -126,8 +127,13 @@ function FolderNameInput({ depth, initial, onSubmit, onCancel }: { depth: number
  * panneau des hôtes de Guiterm : boutons au survol d'un dossier (nouvel
  * élément, sous-dossier, renommer), dossier nommé sur place, et
  * glisser-déposer d'un élément ou d'un dossier dans un autre — ou sur la
- * bande « racine » qui apparaît pendant le glisser. */
-export function ItemTree({ entities, customIcons = [], query, selected, onSelect, emptyMessage = t("Rien ici pour l'instant."), rowActions, folderActions, naming, onName, onNameCancel, onMove, sort = "name", keyboard = false, alerts }: {
+ * bande « racine » qui apparaît pendant le glisser.
+ *
+ * Multisélection (`onPick`) : Ctrl/⌘+clic coche un élément, Maj+clic la
+ * plage depuis le dernier coché (les dossiers ne se cochent pas) ; en mode
+ * sélection (`picking`), chaque élément a sa case et un clic coche au lieu
+ * d'ouvrir. */
+export function ItemTree({ entities, customIcons = [], query, selected, onSelect, emptyMessage = t("Rien ici pour l'instant."), rowActions, folderActions, naming, onName, onNameCancel, onMove, sort = "name", keyboard = false, alerts, picked, picking = false, onPick, onPickable }: {
   entities: GuiVaultEntity[];
   /** Éléments signalés (id → raison), par exemple par le manifeste du vault :
    * une étiquette rouge sur leur ligne. */
@@ -154,7 +160,18 @@ export function ItemTree({ entities, customIcons = [], query, selected, onSelect
   /** Ranger un élément dans un dossier (`null` = racine) : active le
    * glisser-déposer. */
   onMove?: (id: string, folderId: string | null) => void;
+  /** Les éléments cochés. */
+  picked?: ReadonlySet<string>;
+  /** Mode sélection : les cases restent visibles, un clic coche. */
+  picking?: boolean;
+  /** Cocher ou décocher (`toggle`), ou cocher une plage (`add`). */
+  onPick?: (ids: string[], mode: "toggle" | "add") => void;
+  /** Les éléments cochables à l'écran (filtre, dossiers dépliés), pour
+   * « tout cocher ». */
+  onPickable?: (ids: string[]) => void;
 }) {
+  /** Le dernier coché, d'où part une plage (Maj+clic). */
+  const [anchor, setAnchor] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [dragId, setDragId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
@@ -183,6 +200,19 @@ export function ItemTree({ entities, customIcons = [], query, selected, onSelect
     [entities, query, sort],
   );
   const visible = useMemo(() => visibleRows(tree.rows, collapsed), [tree, collapsed]);
+  const pickableIds = useMemo(() => visible.flatMap((r) => (r.kind === "entity" && r.entity.kind !== "group" ? [r.id] : [])), [visible]);
+  useEffect(() => { onPickable?.(pickableIds); }, [pickableIds, onPickable]);
+  /** Un clic sur un élément : coche (mode sélection, Ctrl/⌘, Maj) ou ouvre. */
+  const click = (e: React.MouseEvent, id: string) => {
+    if (onPick && (picking || e.ctrlKey || e.metaKey || e.shiftKey)) {
+      e.preventDefault();
+      if (e.shiftKey) onPick(rangeBetween(pickableIds, anchor, id), "add");
+      else onPick([id], "toggle");
+      setAnchor(id);
+      return;
+    }
+    onSelect(id);
+  };
 
   // ─── Clavier ───────────────────────────────────────────────────────────
   useEffect(() => {
@@ -313,19 +343,30 @@ export function ItemTree({ entities, customIcons = [], query, selected, onSelect
           </>
         ) : undefined;
         const draggable = dragProps(entity);
+        const pickable = !!onPick && entity.kind !== "group";
+        const isPicked = !!picked?.has(entity.id);
         return (
           <div key={row.id} {...draggable} data-entity-id={entity.id} className={dragId === entity.id ? "opacity-50" : undefined}>
           <EntityRow
             depth={row.depth}
-            active={selected === entity.id}
+            active={selected === entity.id || isPicked}
             className="cursor-pointer"
+            leading={pickable && (picking || isPicked) ? (
+              <input
+                type="checkbox"
+                checked={isPicked}
+                onChange={() => undefined}
+                onClick={(e) => { e.stopPropagation(); if (e.shiftKey) onPick!(rangeBetween(pickableIds, anchor, entity.id), "add"); else onPick!([entity.id], "toggle"); setAnchor(entity.id); }}
+                aria-label={t("Sélectionner {0}", entity.name)}
+              />
+            ) : undefined}
             tile={<ItemTile entity={entity} customIcons={customIcons} size="var(--entity-icon)" />}
             title={entity.name}
             badges={alert || entity.favorite || entity.badge ? badges : undefined}
             secondary={secondary}
             title_={`${KIND_LABELS[entity.kind]}${entity.path ? ` — ${entity.path}` : ""}`}
-            onClick={() => onSelect(entity.id)}
-            actions={rowActions?.(entity)}
+            onClick={(e) => click(e, entity.id)}
+            actions={picking ? undefined : rowActions?.(entity)}
           />
           </div>
         );

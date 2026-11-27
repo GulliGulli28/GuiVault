@@ -53,3 +53,27 @@ export function uriMatches(entry: LoginUri, pageUrl: string): boolean {
 export function loginMatches(login: Login, pageUrl: string): boolean {
   return login.uris.some((u) => uriMatches(u, pageUrl));
 }
+
+/** À quel point une URI qui correspond vise la page : 4 une règle précise
+ * (exacte, préfixe, expression), 3 le même hôte (`www.` mis à part), 2 un
+ * domaine parent de la page (`example.com` pour `app.example.com`), 1 le
+ * même domaine enregistrable seulement (un autre sous-domaine) ; 0 aucune
+ * correspondance. */
+export function uriScore(entry: LoginUri, pageUrl: string): number {
+  if (!uriMatches(entry, pageUrl)) return 0;
+  const mode = entry.match ?? DEFAULT_MATCH;
+  if (mode === "exact" || mode === "startsWith" || mode === "regex") return 4;
+  const page = parse(pageUrl);
+  const saved = parse(entry.uri);
+  if (!page || !saved) return 1;
+  const strip = (h: string) => h.toLowerCase().replace(/^www\./, "");
+  // Le port ne compte que si l'URI enregistrée en donne un.
+  if (saved.port ? strip(page.host) === strip(saved.host) : strip(page.hostname) === strip(saved.hostname)) return 3;
+  return strip(page.hostname).endsWith(`.${strip(saved.hostname)}`) ? 2 : 1;
+}
+
+/** La meilleure de ses URI : plusieurs identifiants d'un même domaine se
+ * rangent par là, celui du sous-domaine de la page en premier. */
+export function loginScore(login: Login, pageUrl: string): number {
+  return login.uris.reduce((best, u) => Math.max(best, uriScore(u, pageUrl)), 0);
+}

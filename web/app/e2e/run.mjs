@@ -369,6 +369,49 @@ scenario("doublons : dupliquer un identifiant, le voir dans la santé, fusionner
   await (await b.$("//a[.//span[normalize-space()='Personnel']]")).click();
 });
 
+scenario("multisélection : cocher deux éléments, les étiqueter, les supprimer d'un coup", async (b) => {
+  const live = () => coffreOnDisk(coffre).json.vaults[0].items.filter((i) => !i.deleted_at).length;
+  const before = live();
+  for (const name of ["Lot A", "Lot B"]) {
+    await openNewMenu(b);
+    await (await b.$("//button[@role='menuitem'][normalize-space()='Note']")).click();
+    await waitText(b, "Nouvelle note");
+    await fillField(b, "Nom", name);
+    await fillField(b, "Contenu", "à supprimer");
+    await click(b, "Enregistrer");
+    await waitText(b, `« ${name} » enregistré.`);
+  }
+  await b.waitUntil(async () => live() === before + 2, { timeout: 15_000, timeoutMsg: "les deux notes n'ont pas été écrites" });
+  const back = await b.$('button[aria-label="Retour à la liste"]');
+  if (await back.isDisplayed().catch(() => false)) await back.click();
+  // Le mode sélection : une case par élément, un clic coche.
+  const select = await b.$('button[aria-label="Sélectionner plusieurs éléments"]');
+  await select.waitForClickable({ timeout: 10_000, timeoutMsg: "bouton « Sélectionner plusieurs éléments » introuvable" });
+  await select.click();
+  for (const name of ["Lot A", "Lot B"]) {
+    const box = await b.$(`input[aria-label="Sélectionner ${name}"]`);
+    await box.waitForExist({ timeout: 10_000, timeoutMsg: `case de « ${name} » absente` });
+    await b.execute((el) => el.click(), box);
+  }
+  await waitText(b, "2 sélectionnés");
+  await (await b.$('button[aria-label="Autres actions"]')).click();
+  await (await b.$("//button[@role='menuitem'][contains(normalize-space(), 'Étiquettes…')]")).click();
+  await fillField(b, "Ajouter", "e2e-lot");
+  await click(b, "Appliquer");
+  await waitText(b, "2 éléments modifiés.");
+  // La sélection est vidée après une action : on recoche, puis on supprime.
+  await select.click();
+  for (const name of ["Lot A", "Lot B"]) await b.execute((el) => el.click(), await b.$(`input[aria-label="Sélectionner ${name}"]`));
+  await waitText(b, "2 sélectionnés");
+  await (await b.$("//div[@role='toolbar']//button[normalize-space()='Supprimer']")).click();
+  await waitText(b, "Supprimer 2 éléments ?");
+  await (await b.$("//div[@role='dialog']//button[normalize-space()='Supprimer']")).click();
+  await waitText(b, "2 éléments supprimés (dans la corbeille).");
+  await b.waitUntil(async () => live() === before, { timeout: 15_000, timeoutMsg: "les deux notes ne sont pas parties à la corbeille" });
+  assert(!coffreOnDisk(coffre).raw.includes("e2e-lot"), "une étiquette est en clair dans coffre.json");
+  await shot(b, "3d-multiselection");
+});
+
 scenario("fuites : un coffre local interroge Have I Been Pwned lui-même", async (b) => {
   await openNewMenu(b);
   await (await b.$("//button[@role='menuitem'][normalize-space()='Identifiant']")).click();

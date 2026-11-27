@@ -6,7 +6,7 @@ import { describeSecret, isSecret, uriHost } from "../../src/lib/items";
 import { openOffline, acceptIntegrity, acceptRollback, closeLocal, loadItems, login, openLocal, payloadEntity, payloadName, refresh, setDeviceLabel, type DecodedItem, type SessionState, type VaultView } from "../../src/lib/session";
 import { applyBackend } from "./backend";
 import { coffreLabel, knownCoffres, nativeCoffre } from "./nativeHost";
-import { loginMatches } from "../../src/lib/urimatch";
+import { loginScore } from "../../src/lib/urimatch";
 import { canWrite, KIND_LABELS, KIND_LABELS_PLURAL, type CustomIcon, type GuiVaultEntity, type ItemKind, type Login, type Payload, type TokenPair } from "../../src/lib/types";
 import { GeneratorPanel } from "../../src/components/GeneratorPanel";
 import { ItemView } from "../../src/components/ItemView";
@@ -304,7 +304,13 @@ export function Popup() {
   }, [entries]);
 
   const canFill = !!pageUrl && /^https?:/.test(pageUrl);
-  const forPage = useMemo(() => (canFill ? logins.filter((e) => loginMatches(e.login, pageUrl!)) : []), [logins, pageUrl, canFill]);
+  // Le sous-domaine de la page d'abord (`loginScore`), puis l'ordre de la
+  // liste (favoris, nom) : un tri stable le garde.
+  const forPage = useMemo(() => {
+    if (!canFill) return [];
+    const scored = logins.map((e) => ({ e, s: loginScore(e.login, pageUrl!) })).filter((x) => x.s > 0);
+    return scored.sort((a, b) => b.s - a.s).map((x) => x.e);
+  }, [logins, pageUrl, canFill]);
   const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
   const pageHost = useMemo(() => { try { return pageUrl ? new URL(pageUrl).hostname.replace(/^www\./, "") : ""; } catch { return ""; } }, [pageUrl]);
   const colors = useVaultColors();
@@ -799,6 +805,34 @@ function Detail({ entry, vault, offline, index, canFill, writable, onBack, onFil
   );
 }
 
+/** Le raccourci de remplissage tel que le navigateur l'a attribué : Chrome
+ * ne donne pas le raccourci proposé (Ctrl+Maj+L) quand une autre extension
+ * l'a déjà, sans rien dire — d'où « Non attribué » et le lien pour le
+ * choisir (Firefox : pas de page à ouvrir, `about:addons` est interdit). */
+function ShortcutRow() {
+  const [shortcut, setShortcut] = useState<string | null>(null);
+  useEffect(() => {
+    void chrome.commands
+      .getAll()
+      .then((all) => setShortcut(all.find((c) => c.name === "autofill")?.shortcut ?? ""))
+      .catch(() => setShortcut(""));
+  }, []);
+  if (shortcut === null) return null;
+  const firefox = navigator.userAgent.includes("Firefox");
+  return (
+    <SettingRow title={t("Raccourci de remplissage")} desc={shortcut ? undefined : t("Non attribué : une autre extension l'utilise peut-être.")}>
+      <div className="flex items-center gap-2">
+        {shortcut && <kbd className="kbd">{shortcut}</kbd>}
+        {!firefox && (
+          <button type="button" className="btn btn-ghost" onClick={() => void chrome.tabs.create({ url: "chrome://extensions/shortcuts" })}>
+            {shortcut ? t("Changer") : t("Choisir")}
+          </button>
+        )}
+      </div>
+    </SettingRow>
+  );
+}
+
 /** Les réglages, une fois connecté : le verrouillage et le remplissage
  * (les mêmes que sous « Réglages » à la connexion), et l'apparence — la
  * même page que dans l'interface web et dans Guiterm, en une colonne. */
@@ -823,6 +857,7 @@ function SettingsView({ settings, state, say, onSettings, onBack }: { settings: 
               {toggle(t("Remplir le code 2FA tout seul"), settings.autoTotp, (v) => onSettings({ ...settings, autoTotp: v }))}
             </SettingRow>
             <OtpPatterns settings={settings} onSettings={onSettings} />
+            <ShortcutRow />
           </div>
         </section>
         <section className="flex flex-col gap-2">

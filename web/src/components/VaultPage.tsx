@@ -32,6 +32,7 @@ import { ShortcutsHelp } from "./ShortcutsHelp";
 import { ItemAside } from "./ItemAside";
 import { NewVaultDialog } from "./NewVault";
 import { BubbleButton } from "./BubbleButton";
+import { BulkBar } from "./BulkBar";
 import { putVaultItems, useAllItems } from "../lib/allItems";
 import { IconCheck, IconChevronDown, IconChevronRight, IconCopy, IconEdit, IconExternal, IconFolder, IconKeyboard, IconLock, IconPlus, IconRefresh, IconSearch, IconSettings, IconTrash, IconVault } from "./ui-icons";
 import { copyText, Dropdown, formatAgo, formatWhen, Loading, Modal, useDelayed } from "./ui";
@@ -151,6 +152,23 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
   }, [newMenu]);
   const [stale, setStale] = useState(false);
   const [naming, setNaming] = useState<FolderNaming | null>(null);
+  // ─── Multisélection (`BulkBar`) ──────────────────────────────────────────
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  /** Le mode sélection demandé (bouton) : les cases restent même à vide. */
+  const [picking, setPicking] = useState(false);
+  const [pickable, setPickable] = useState<string[]>([]);
+  const selecting = picking || picked.size > 0;
+  const onPick = useCallback((ids: string[], how: "toggle" | "add") => {
+    setPicked((prev) => {
+      const next = new Set(prev);
+      for (const id of ids) {
+        if (how === "add" || !next.has(id)) next.add(id);
+        else next.delete(id);
+      }
+      return next;
+    });
+  }, []);
+  const clearPicks = useCallback(() => { setPicked(new Set()); setPicking(false); }, []);
   /** Le menu « + » d'un dossier, posé à l'endroit du bouton. */
   const [folderMenu, setFolderMenu] = useState<{ folderId: string; x: number; y: number } | null>(null);
   const slow = useDelayed(loading);
@@ -410,6 +428,7 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
   const shortcutsRef = useRef<(e: KeyboardEvent) => void>(() => {});
   shortcutsRef.current = (e: KeyboardEvent) => {
     if (!plainShortcut(e)) return;
+    if (e.key === "Escape" && selecting) { e.preventDefault(); clearPicks(); return; }
     if (e.key === "/") { e.preventDefault(); filterRef.current?.focus(); return; }
     if (e.key === "?") { e.preventDefault(); setHelp(true); return; }
     if (mode.kind !== "view" || !current?.ok) return;
@@ -489,6 +508,7 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
           </div>
           <div className="menu-sep" />
           <button role="menuitem" className="menu-item" onClick={() => { close(); void load(); }}><IconRefresh size={14} /> {t("Recharger")}</button>
+          <button role="menuitem" className="menu-item" onClick={() => { close(); setPicking(true); }}><IconCheck size={14} /> {t("Sélectionner plusieurs éléments")}</button>
           <button role="menuitem" className="menu-item" onClick={() => { close(); navigate({ page: "vault-tools", id: vault.id }); }}><IconTools size={14} /> {emergency ? t("Exporter") : t("Importer ou exporter")}</button>
           {!emergency && <button role="menuitem" className="menu-item" onClick={() => { close(); navigate({ page: "vault-trash", id: vault.id }); }}><IconTrash size={14} /> {t("Corbeille")}</button>}
           {!emergency && <button role="menuitem" className="menu-item" onClick={() => { close(); navigate({ page: "vault-settings", id: vault.id }); }}><IconSettings size={14} /> {t("Membres et réglages")}</button>}
@@ -652,11 +672,26 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
                 </Dropdown>
               )}
               {sortMenu}
+              <button onClick={() => (selecting ? clearPicks() : setPicking(true))} aria-pressed={selecting} className={`btn btn-icon shrink-0 ${selecting ? "btn-toggled" : "btn-secondary"}`} title={t("Sélectionner plusieurs éléments (ou Ctrl+clic, Maj+clic)")} aria-label={t("Sélectionner plusieurs éléments")}><IconCheck size={15} /></button>
               {writable && (
                 <button onClick={() => { setQuery(""); setFilter("all"); setNaming({ mode: "create", parentId: null }); }} className="btn btn-secondary btn-icon shrink-0 max-sm:hidden" title={t("Nouveau dossier (à la racine ; le bouton d'un dossier en crée un dedans)")} aria-label={t("Nouveau dossier")}><IconFolderPlus size={15} /></button>
               )}
             </div>
           </header>
+          {selecting && items && (
+            <BulkBar
+              ctx={ctx}
+              vault={vault}
+              index={index}
+              picked={items.filter((i) => picked.has(i.id))}
+              visibleCount={pickable.length}
+              writable={writable && !emergency}
+              otherVaults={otherWritable}
+              onAll={() => setPicked(new Set(pickable))}
+              onClear={clearPicks}
+              onChanged={async () => { clearPicks(); setSelected(null); await load(); }}
+            />
+          )}
           <div className="m-tree sidebar-scroll -mx-1 min-h-0 flex-1 overflow-y-auto px-3 pb-4 max-md:mx-0 max-md:px-2 max-md:pb-24">
             {items === null ? (slow ? <Loading /> : null) : (
               <ItemTree
@@ -669,6 +704,10 @@ function VaultBody({ ctx, vault, itemId, create }: { ctx: PageContext; vault: Va
                 sort={sort}
                 keyboard={mode.kind === "view"}
                 alerts={alerts}
+                picked={picked}
+                picking={selecting}
+                onPick={onPick}
+                onPickable={setPickable}
                 emptyMessage={writable ? t("Ce vault est vide.") : t("Rien ici pour l'instant.")}
                 {...(writable && sort === "name" ? { folderActions, naming, onName: (n: string) => void submitFolderName(n), onNameCancel: () => setNaming(null), onMove: (id: string, folderId: string | null) => void moveToFolder(id, folderId) } : {})}
               />

@@ -8,7 +8,8 @@
  *   les secrets de celui qu'on a choisi) ;
  * - le **raccourci clavier** de remplissage et l'alarme de verrouillage. */
 import { parseTotp, totpCode } from "../../src/lib/totp";
-import { loginMatches } from "../../src/lib/urimatch";
+import { loginMatches, loginScore } from "../../src/lib/urimatch";
+import { classifyCapture } from "./capture";
 import type { Login } from "../../src/lib/types";
 import { setTokensChangedHandler } from "../../src/lib/api";
 import { uuid } from "../../src/lib/bytes";
@@ -41,10 +42,15 @@ async function logins(): Promise<Login[] | null> {
 
 const summary = (l: Login): MatchSummary => ({ id: l.id, name: l.name, username: l.username, hasTotp: !!l.totp, favorite: !!l.favorite, protected: !!l.reprompt });
 
+/** Les identifiants de la page, le plus proche d'abord (`loginScore` : le
+ * sous-domaine de la page avant ses voisins), puis favoris, puis nom. */
 async function matchesFor(url: string | undefined): Promise<Login[] | null> {
   if (!url || !/^https?:/.test(url)) return [];
   const all = await logins();
-  return all ? all.filter((l) => loginMatches(l, url)).sort((a, b) => Number(!!b.favorite) - Number(!!a.favorite) || a.name.localeCompare(b.name)) : null;
+  if (!all) return null;
+  const scored = all.map((l) => ({ l, s: loginScore(l, url) })).filter((x) => x.s > 0);
+  scored.sort((a, b) => b.s - a.s || Number(!!b.l.favorite) - Number(!!a.l.favorite) || a.l.name.localeCompare(b.l.name));
+  return scored.map((x) => x.l);
 }
 
 // ─── Icône : grise quand il faut se reconnecter ─────────────────────────────
@@ -171,16 +177,14 @@ async function setPending(tabId: number, c: Captured | null) {
 }
 
 /** Une saisie vaut la peine d'être proposée si aucun identifiant du site
- * n'a déjà ce couple, ou si l'un a ce nom mais un autre mot de passe. */
-async function classify(urls: string[], username: string, password: string): Promise<Pick<Captured, "mode" | "loginId" | "loginName"> | null> {
+ * n'a déjà ce couple ; la règle, et le choix de celui à modifier, sont
+ * dans `classifyCapture`. */
+async function classify(tabId: number, urls: string[], username: string, password: string): Promise<Pick<Captured, "mode" | "loginId" | "loginName"> | null> {
   const lists = await Promise.all(urls.map((u) => matchesFor(u)));
   if (lists.some((l) => l === null)) return null;
   const m = [...new Map(lists.flatMap((l) => l ?? []).map((l) => [l.id, l])).values()];
-  const same = m.find((l) => l.username.toLowerCase() === username.toLowerCase());
-  if (same && same.password === password) return null;
-  if (same) return { mode: "update", loginId: same.id, loginName: same.name };
-  if (m.some((l) => l.password === password && !l.username)) return null;
-  return { mode: "new", loginId: null, loginName: null };
+  const candidates = m.map((l) => ({ id: l.id, name: l.name, username: l.username, password: l.password, score: Math.max(...urls.map((u) => loginScore(l, u))) }));
+  return classifyCapture(candidates, username, password, await recentFill(tabId));
 }
 
 async function saveCaptured(tabId: number, vaultId: string): Promise<{ ok: true; name: string } | { ok: false; error: string }> {
@@ -341,7 +345,7 @@ chrome.runtime.onMessage.addListener((msg: ToBackground | PasskeyToBackground | 
       if (tabId == null || !url || !msg.password) return reply(null);
       const top = parentUrl(sender);
       const parentOther = top && new URL(top).origin !== new URL(url).origin ? top : undefined;
-      const cls = await classify(parentOther ? [url, parentOther] : [url], msg.username, msg.password);
+      const cls = await classify(tabId, parentOther ? [url, parentOther] : [url], msg.username, msg.password);
       if (!cls) return reply(null);
       await setPending(tabId, { url, parentUrl: parentOther, username: msg.username, password: msg.password, ...cls, at: Date.now() });
       return reply({ ok: true });
@@ -439,7 +443,10 @@ chrome.commands.onCommand.addListener((command) => {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (!tab?.id) return;
     const m = await matchesFor(tab.url);
-    if (!m || !tab.url || !/^https?:/.test(tab.url)) return;
+    // Verrouillé : le popup, pour se reconnecter (Chrome 127+, le raccourci
+    // compte comme un geste de l'utilisateur) — plutôt que rien.
+    if (!m) return void chrome.action.openPopup?.().catch(() => undefined);
+    if (!tab.url || !/^https?:/.test(tab.url)) return;
     // Un seul cadre décide (celui qui a le focus, sinon celui qui a un
     // formulaire), avec ses propres correspondances ; le script de page y
     // est d'ordinaire déjà, l'injecter n'en crée pas un second.

@@ -227,6 +227,15 @@ paramètres ou formats anciens.
   `c` copier le secret, `u` l'utilisateur, `e` modifier, `h` historique,
   `f` favori, Suppr, `?` l'aide (`ShortcutsHelp.tsx`) — ignorés pendant
   la saisie.
+- [x] **Multisélection** dans un vault (`BulkBar.tsx`, `lib/bulk.ts`) :
+  Ctrl/⌘+clic coche, Maj+clic une plage, bouton « Sélectionner » (ou menu
+  du vault, au tactile) pour un mode où chaque ligne a sa case ; Échap
+  quitte. Supprimer (corbeille), déplacer vers un dossier ou un autre vault
+  (pièces jointes comprises, dossiers exclus), épingler ou non,
+  ajouter/retirer des étiquettes, exporter la sélection (mot de passe
+  maître d'abord si un élément est protégé). Une écriture par élément,
+  l'une après l'autre (chacune porte le manifeste) ; un échec n'arrête pas
+  les suivantes.
 - [x] **Mobile** — relevé à 390 px, écran par écran : aucune page ne
   déborde (panneau unique, tiroir). Corrigé : `src/touch.css` (pointeur
   tactile : champs en 16 px, sans quoi Safari iOS zoome au focus ; boutons

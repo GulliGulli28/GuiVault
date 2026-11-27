@@ -13,6 +13,9 @@ export const VAULT_SHORTCUTS: { keys: string[]; label: string }[] = translated([
   { keys: ["h"], label: "Historique" },
   { keys: ["f"], label: "Favori" },
   { keys: ["Suppr"], label: "Supprimer (vers la corbeille)" },
+  { keys: ["Ctrl", "clic"], label: "Cocher un élément (multisélection)" },
+  { keys: ["Maj", "clic"], label: "Cocher une plage d'éléments" },
+  { keys: ["Échap"], label: "Quitter la sélection" },
   { keys: ["?"], label: "Cette aide" },
 ], ["label"]);
 

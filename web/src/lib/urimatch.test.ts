@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { registrableDomain, uriMatches } from "./urimatch";
+import type { Login } from "./types";
+import { loginScore, registrableDomain, uriMatches, uriScore } from "./urimatch";
 
 describe("correspondance d'URI", () => {
   it("domaine enregistrable", () => {
@@ -23,5 +24,20 @@ describe("correspondance d'URI", () => {
     expect(uriMatches({ uri: "(", match: "regex" }, page)).toBe(false);
     expect(uriMatches({ uri: "https://example.com", match: "never" }, page)).toBe(false);
     expect(uriMatches({ uri: "https://notexample.com" }, page)).toBe(false);
+  });
+
+  it("rang : le sous-domaine de la page avant les autres", () => {
+    const page = "https://b.example.com/login";
+    expect(uriScore({ uri: "https://b.example.com/login", match: "exact" }, page)).toBe(4);
+    expect(uriScore({ uri: "https://b.example.com" }, page)).toBe(3);
+    expect(uriScore({ uri: "https://www.b.example.com" }, page)).toBe(3);
+    expect(uriScore({ uri: "example.com" }, page)).toBe(2);
+    expect(uriScore({ uri: "https://a.example.com" }, page)).toBe(1);
+    expect(uriScore({ uri: "https://other.com" }, page)).toBe(0);
+    expect(uriScore({ uri: "http://b.example.com" }, "http://b.example.com:8443/")).toBe(3);
+    expect(uriScore({ uri: "http://b.example.com:9000" }, "http://b.example.com:8443/")).toBe(1);
+    const login = (...uris: string[]) => ({ uris: uris.map((uri) => ({ uri })) }) as unknown as Login;
+    expect(loginScore(login("https://a.example.com", "https://b.example.com"), page)).toBe(3);
+    expect(loginScore(login(), page)).toBe(0);
   });
 });

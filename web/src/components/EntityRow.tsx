@@ -44,8 +44,9 @@ export interface EntityRowProps {
    * bouton qui doit rester là (« Démarrer » un tunnel). */
   actions?: ReactNode;
   alwaysVisibleActions?: ReactNode;
-  /** Clic sur la zone principale (titre + secondaire). */
-  onClick?: () => void;
+  /** Clic sur la zone principale (titre + secondaire) ; l'événement dit
+   * les touches tenues (Ctrl/Maj+clic de la multisélection). */
+  onClick?: (e: React.MouseEvent) => void;
   title_?: string;
   active?: boolean;
   /** Indentation d'un arbre, en niveaux. */

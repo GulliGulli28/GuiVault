@@ -40,8 +40,17 @@ maître et le délai de verrouillage.
   connexion, si le couple n'est pas dans le coffre, la page suivante montre
   une bannière « Enregistrer l'identifiant pour <site> ? » (avec le vault) ;
   si un identifiant du site a ce nom mais un autre mot de passe : « Mettre à
-  jour ? » (l'ancien passe dans l'historique). La saisie attend deux
-  minutes dans la mémoire de session du worker, jamais dans la page.
+  jour ? » (l'ancien passe dans l'historique). Celui qu'on met à jour : le
+  dernier rempli dans l'onglet s'il a ce nom, sinon le plus proche de la
+  page ; jamais celui d'un autre sous-domaine (un autre compte : la bannière
+  propose d'en enregistrer un nouveau), et rien du tout si l'un des
+  identifiants du domaine a déjà ce couple (`extension/src/capture.ts`). La
+  saisie attend deux minutes dans la mémoire de session du worker, jamais
+  dans la page.
+- **Ordre des identifiants** (menu, popup, raccourci) : le plus proche de la
+  page d'abord — règle précise (exacte, préfixe, expression), puis même
+  hôte, puis domaine parent, puis un autre sous-domaine du même domaine
+  (`loginScore`, `src/lib/urimatch.ts`) ; à égalité, favoris puis nom.
 - **Dans la page** : un bouton GuiVault sur le champ utilisateur (sinon un
   champ e-mail, sinon le mot de passe) de tout formulaire de connexion — y
   compris les connexions en deux étapes (champ utilisateur seul). Il ouvre
@@ -55,9 +64,13 @@ maître et le délai de verrouillage.
   (les mêmes que le popup, dans les deux sens), vault au choix — enregistré
   puis rempli. Coffre verrouillé → il le dit.
   **Ctrl+Maj+L** remplit sans ouvrir le popup (un seul compte → rempli,
-  plusieurs → le menu, un champ de code visible → le code), dans le cadre
-  qui a le focus. Désactivable (« Proposer le remplissage dans les
-  pages »).
+  plusieurs → le menu, ou le premier si le bouton des champs est coupé ; un
+  champ de code visible → le code), dans le cadre qui a le focus ; coffre
+  verrouillé → le popup s'ouvre. Chrome n'attribue pas le raccourci quand
+  une autre extension l'a déjà : les réglages du popup montrent celui qui
+  est attribué (« Non attribué » sinon) et ouvrent
+  `chrome://extensions/shortcuts` pour le choisir. Désactivable (« Proposer
+  le remplissage dans les pages »).
 - **Pages modernes** : les champs sont cherchés à travers les **shadow
   roots**, ouvertes et fermées (`chrome.dom.openOrClosedShadowRoot`, les
   composants web des design systems), imbriquées, ou créées après le

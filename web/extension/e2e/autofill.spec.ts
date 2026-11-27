@@ -21,6 +21,10 @@ const EXTENSION = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..
 
 const BANK = { id: "l-bank", name: "Banque", username: "alice@banque", password: "mdp-banque-42", uris: [{ uri: "http://bank.test", match: null }], totp: "JBSWY3DPEHPK3PXP" };
 const PROVIDER = { id: "l-provider", name: "Fournisseur", username: "alice@fournisseur", password: "mdp-fournisseur", uris: [{ uri: "http://login.provider.test", match: null }], totp: null };
+/** Deux sous-domaines d'un même domaine : sur `b`, celui de `b` d'abord —
+ * même si l'autre vient avant par le nom. */
+const MULTI_A = { id: "l-multi-a", name: "Alpha", username: "alice", password: "mdp-a", uris: [{ uri: "http://a.multi.test", match: null }], totp: null };
+const MULTI_B = { id: "l-multi-b", name: "Bravo", username: "alice", password: "mdp-b", uris: [{ uri: "http://b.multi.test", match: null }], totp: null };
 /** Protégé par le mot de passe maître (`reprompt`) : jamais remis à la page. */
 const PROTECTED = { id: "l-coffre", name: "Coffre-fort", username: "alice@coffre", password: "mdp-protege", uris: [{ uri: "http://coffre.test", match: null }], totp: "JBSWY3DPEHPK3PXP", reprompt: true };
 
@@ -57,7 +61,7 @@ test.beforeAll(async () => {
   await worker.evaluate(async (items) => {
     await chrome.storage.local.set({ settings: { serverUrl: "http://guivault.test", email: "e2e@guivault.test", lockMinutes: 60, inlineAutofill: true, autoTotp: true, otpPatterns: "" } });
     await chrome.storage.session.set({ session: { e2e: true }, items: { "v-e2e": { revision: 1, items } } });
-  }, [asItem(BANK), asItem(PROVIDER), asItem(PROTECTED)]);
+  }, [asItem(BANK), asItem(PROVIDER), asItem(PROTECTED), asItem(MULTI_A), asItem(MULTI_B)]);
 });
 
 test.afterAll(async () => {
@@ -124,6 +128,15 @@ test("formulaire classique : bouton, menu, remplissage", async () => {
   await fillFirst(page, f, "username");
   await expect.poll(() => fieldValue(f, "username")).toBe(BANK.username);
   expect(await fieldValue(f, "password")).toBe(BANK.password);
+  await page.close();
+});
+
+test("plusieurs sous-domaines : celui de la page en tête du menu", async () => {
+  const page = await open("plain.html", "b.multi.test");
+  const f = page.mainFrame();
+  await fillFirst(page, f, "username");
+  await expect.poll(() => fieldValue(f, "password")).toBe(MULTI_B.password);
+  expect(await fieldValue(f, "username")).toBe(MULTI_B.username);
   await page.close();
 });
 

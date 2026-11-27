@@ -1076,10 +1076,12 @@ declare global {
           else openTotpMenu(code, codeBtn);
           return reply({ ...none, totp: true });
         }
+        // Sans bouton dans les champs (réglage coupé), pas de menu où
+        // choisir : le premier, le plus proche de la page (`matchesFor`).
         const input = Array.from(anchors.keys()).find((i) => !otpInputs.has(i));
         if (matches.length === 1 && input) void choose(matches[0], input);
-        else if (matches.length === 1 && !matches[0].protected) void send<CredentialsReply>({ type: "guivault-credentials", id: matches[0].id }).then((c) => c && "username" in c && fill({ username: c.username, password: c.password }));
         else if (input && matches.length > 1) openMenu(input, anchors.get(input)!);
+        else if (matches.length && !matches[0].protected) void send<CredentialsReply>({ type: "guivault-credentials", id: matches[0].id }).then((c) => c && "username" in c && fill({ username: c.username, password: c.password }));
         reply(none);
       });
       return true;

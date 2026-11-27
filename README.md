@@ -108,6 +108,9 @@ le TypeScript (et réciproquement) le vérifient à chaque build.
 - **Historique** de chaque élément et **corbeille** (30 jours par défaut).
 - **Conflits** : deux modifications concurrentes se fusionnent champ par
   champ au lieu qu'une écrase l'autre.
+- **Multisélection** (Ctrl/Maj+clic ou « Sélectionner ») : supprimer,
+  déplacer (dossier ou autre vault), épingler, étiqueter ou exporter
+  plusieurs éléments d'un coup.
 - **Recherche** dans tous les vaults (Ctrl+K), raccourcis clavier (`?`),
   presse-papiers effacé après le délai réglé, verrouillage après
   inactivité, réglages qui suivent le compte (chiffrés).

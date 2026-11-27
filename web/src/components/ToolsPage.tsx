@@ -201,7 +201,7 @@ function ImportSection({ ctx, vault, groups, onDone }: { ctx: PageContext; vault
   );
 }
 
-function ExportSection({ ctx, vault, items }: { ctx: PageContext; vault: VaultView; items: DecodedItem[] | null }) {
+export function ExportSection({ ctx, vault, items }: { ctx: PageContext; vault: VaultView; items: DecodedItem[] | null }) {
   const [format, setFormat] = useState<"json" | "encrypted" | "csv">("encrypted");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
