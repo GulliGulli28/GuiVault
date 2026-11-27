@@ -125,10 +125,10 @@ export function AdminPage({ ctx }: { ctx: PageContext }) {
                       <p className="text-[11px] text-[var(--c-text-muted)]">
                         {t("créé le")} {formatWhen(u.created_at)}
                         {` · ${u.last_seen_at ? t("vu le {0}", formatWhen(u.last_seen_at)) : t("jamais vu")}`}
-                        {t(" · {0} session{1}", u.active_sessions, u.active_sessions > 1 ? "s" : "")}
-                        {t(" · {0} vault{1}", u.vaults_owned, u.vaults_owned > 1 ? "s" : "")}
-                        {u.vaults_joined > 0 ? t(" (+{0} partagé{1})", u.vaults_joined, u.vaults_joined > 1 ? "s" : "") : ""}
-                        {t(" · {0} élément{1}", u.items, u.items > 1 ? "s" : "")}
+                        {plural(u.active_sessions, " · {0} session", " · {0} sessions")}
+                        {plural(u.vaults_owned, " · {0} vault", " · {0} vaults")}
+                        {u.vaults_joined > 0 ? plural(u.vaults_joined, " (+{0} partagé)", " (+{0} partagés)") : ""}
+                        {plural(u.items, " · {0} élément", " · {0} éléments")}
                       </p>
                       <p className="text-[11px] text-[var(--c-text-muted)]">
                         {formatBytes(u.storage_bytes)}
@@ -220,10 +220,10 @@ function ServerSummary({ overview: o, ctx }: { overview: AdminOverview; ctx: Pag
     <section className="max-w-3xl space-y-1.5">
       <Eyebrow>{t("Serveur")}</Eyebrow>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <Stat label={t("Comptes")} value={String(o.users)} detail={[o.disabled_users ? t("{0} désactivé{1}", o.disabled_users, o.disabled_users > 1 ? "s" : "") : "", `${o.admins} admin${o.admins > 1 ? "s" : ""}`].filter(Boolean).join(" · ")} />
-        <Stat label={t("Vaults")} value={String(o.vaults)} detail={t("{0} partagé{1}", o.shared_vaults, o.shared_vaults > 1 ? "s" : "")} />
+        <Stat label={t("Comptes")} value={String(o.users)} detail={[o.disabled_users ? plural(o.disabled_users, "{0} désactivé", "{0} désactivés") : "", plural(o.admins, "{0} admin", "{0} admins")].filter(Boolean).join(" · ")} />
+        <Stat label={t("Vaults")} value={String(o.vaults)} detail={plural(o.shared_vaults, "{0} partagé", "{0} partagés")} />
         <Stat label={t("Éléments")} value={String(o.items)} detail={formatBytes(o.storage_bytes)} />
-        <Stat label={t("Sessions actives")} value={String(o.active_sessions)} detail={t("{0} lien{1} de partage", o.sends, o.sends > 1 ? "s" : "")} />
+        <Stat label={t("Sessions actives")} value={String(o.active_sessions)} detail={plural(o.sends, "{0} lien de partage", "{0} liens de partage")} />
       </div>
       <div className="card space-y-0.5 p-2.5 text-[12px] text-[var(--c-text-secondary)]">
         <p>{t("Inscriptions :")} <span className="text-[var(--c-text)]">{REGISTRATION_LABELS[o.registration]}</span> <span className="text-[var(--c-text-muted)]">{t("(GUIVAULT_REGISTRATION)")}</span></p>

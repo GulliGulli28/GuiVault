@@ -9,7 +9,7 @@ import { payloadEntity } from "../lib/session";
 import type { VaultItem } from "../lib/allItems";
 import { formatAgo, formatWhen } from "./ui";
 import { IconCheck, IconWarning } from "./ui-icons";
-import { t } from "../lib/i18n";
+import { plural, t } from "../lib/i18n";
 
 /** La colonne de droite de la fiche (maquette « Coffre ») : ce que dit la
  * santé de cet élément — force, réutilisation, 2FA, âge du mot de passe —,
@@ -36,7 +36,7 @@ export function ItemAside({ vault, item, index, all, onHistory }: {
     const owner = secretOwner({ vault, item });
     const elsewhere = all.filter((o) => o.item.id !== item.id && secretOwner(o) !== owner && secretsOf(o).some((x) => x.value === s.value));
     checks.push(elsewhere.length
-      ? { ok: false, text: <>{t("Aussi utilisé par «")} {nameOf(elsewhere[0])} »{elsewhere.length > 1 ? t(" et {0} autre{1}", elsewhere.length - 1, elsewhere.length > 2 ? "s" : "") : ""}</> }
+      ? { ok: false, text: elsewhere.length > 1 ? plural(elsewhere.length - 1, "Aussi utilisé par « {1} » et {0} autre", "Aussi utilisé par « {1} » et {0} autres", nameOf(elsewhere[0])) : t("Aussi utilisé par « {0} »", nameOf(elsewhere[0])) }
       : { ok: true, text: t("Utilisé nulle part ailleurs") });
   }
   if (p.kind === "login" && p.login.password) checks.push(p.login.totp ? { ok: true, text: t("2FA enregistrée") } : { ok: null, text: t("Pas de code 2FA") });

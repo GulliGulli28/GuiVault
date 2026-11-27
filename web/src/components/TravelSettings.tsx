@@ -42,7 +42,7 @@ export function TravelSettings({ ctx }: { ctx: PageContext }) {
             { text: t("Les autres disparaissent à la prochaine synchronisation, et reviennent au retour.") },
             { text: t("Le couper redemande le mot de passe maître.") },
           ]} /></>}
-          desc={on ? t("{0} vault{1} sur vos appareils.", staying.length, staying.length > 1 ? "s" : "") : staying.length ? t("Gardera {0}.", staying.map((v) => `« ${v.name} »`).join(", ")) : t("Marquez d'abord un vault « sûr en voyage » (réglages du vault).")}
+          desc={on ? plural(staying.length, "{0} vault sur vos appareils.", "{0} vaults sur vos appareils.") : staying.length ? t("Gardera {0}.", staying.map((v) => `« ${v.name} »`).join(", ")) : t("Marquez d'abord un vault « sûr en voyage » (réglages du vault).")}
         >
           {on
             ? <button onClick={() => setDialog("off")} className="btn btn-secondary">{t("Désactiver…")}</button>

@@ -242,7 +242,7 @@ function progressText(p: TransferProgress): string {
 }
 
 function summary(r: VaultReport): string {
-  const parts = [t("{0} élément{1}{2}", r.items, r.items > 1 ? "s" : "", r.trashed ? t(" (dont {0} à la corbeille)", r.trashed) : ""), t("{0} version{1} précédente{2}", r.versions, r.versions > 1 ? "s" : "", r.versions > 1 ? "s" : "")];
+  const parts = [plural(r.items, "{0} élément{1}", "{0} éléments{1}", r.trashed ? t(" (dont {0} à la corbeille)", r.trashed) : ""), plural(r.versions, "{0} version précédente", "{0} versions précédentes")];
   if (r.attachments) parts.push(plural(r.attachments, "{0} pièce jointe", "{0} pièces jointes"));
   let s = parts.join(", ");
   if (r.skippedAttachments) s += plural(r.skippedAttachments, " — {0} pièce jointe d'éléments à la corbeille non copiée", " — {0} pièces jointes d'éléments à la corbeille non copiées");

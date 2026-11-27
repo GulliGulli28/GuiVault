@@ -6,7 +6,7 @@ import { payloadEntity, payloadName } from "./session";
 import { describeSecret, isSecret } from "./items";
 import { faviconOf } from "./siteIcon";
 import { KIND_LABELS, SQL_ENGINE_LABELS, type Account, type CustomIcon, type Group, type GuiVaultEntity, type Host, type Payload, type PrivateKey, type Snippet, type SqlConnection } from "./types";
-import { t, translated } from "./i18n";
+import { plural, t, translated } from "./i18n";
 
 export interface VaultIndex {
   groups: Group[];
@@ -155,7 +155,7 @@ function describeEntity(p: Payload): Pick<GuiVaultEntity, "mono" | "icon" | "hos
       return { subtitle: p.passphrase ? t("protégée par passphrase") : undefined };
     case "runbook": {
       const n = p.runbook.steps.length;
-      return { subtitle: p.runbook.description.split("\n")[0].slice(0, 80) || undefined, badge: t("{0} étape{1}", n, n > 1 ? "s" : "") };
+      return { subtitle: p.runbook.description.split("\n")[0].slice(0, 80) || undefined, badge: plural(n, "{0} étape", "{0} étapes") };
     }
     case "aws":
       return { badge: p.aws.authType === "sso" ? "SSO" : t("clés") };
